@@ -22,7 +22,20 @@
     </div>
   </section>
 
-  <script src="app.bundle.js"></script>
+  <script type="module" src="Businesslogic.js"></script>
+
+  <script>
+      window.onload = function () {
+
+          // We can execute a webservice using Webservice class
+          var biz = new Businesslogic.Webservice({key: '727553b1062845b4865dcbcee130051c'});
+          var result = biz.getResult();
+
+          console.log(this)
+      };
+  </script>
+
+<div bl-token="727553b1062845b4865dcbcee130051c"></div>
 
 </body>
 
