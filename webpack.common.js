@@ -2,7 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const libraryName = 'Businesslogic';
+const libraryName = 'businesslogic';
 const outputFile = libraryName + '.js';
 
 module.exports = {
