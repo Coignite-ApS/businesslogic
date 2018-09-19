@@ -22,16 +22,54 @@
     </div>
   </section>
 
-  <script type="module" src="Businesslogic.js"></script>
+  <script bl-debug type="module" src="Businesslogic.js"></script>
   <script>
       window.onload = function () {
+
           // We can execute a webservice using Webservice class
-          var biz = new Businesslogic.Webservice({key: '727553b1062845b4865dcbcee130051c'});
-          var result = biz.getResult();
+
+          var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+          biz.setParams({ "goal": 10000, "deadline": 2019 });
+
+          biz.execute().then(function (result) {
+              console.log('Output from programmatic execution: ',result)
+          }).catch(function (error) {
+              console.log('Error in programmatic execution: ',error)
+          });
+
+
+          // You are able to get and manipulate with any webservice from the collection
+          //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
+          //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
+
       };
   </script>
 
-<div bl-token="727553b1062845b4865dcbcee130051c"></div>
+  <div bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
+    <!-- input -->
+    <div class="form-group">
+      <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
+      <input type="number" class="form-control" id="salary_per_month" bl-input="salary_per_month">
+      <small class="form-text text-muted" bl-input-description="salary_per_month">DKK, before tax</small>
+      <p bl-input-error="salary_per_month"></p>
+    </div>
+    <div class="input-group">
+      <label class="input-group-text" for="start_year" bl-input-label="start_year">Options</label>
+      <select class="custom-select" id="start_year" bl-input="start_year">
+        <option selected disabled>Choose...</option>
+        <option>1</option>
+        <option>2</option>
+        <option>2</option>
+      </select>
+    </div>
+    <hr>
+    <button bl-control="submit">Calculate</button>
+    <hr>
+    <!-- output -->
+    <p><span bl-label="total_amount">Yosur salary</span> is: <span bl-output="total_amount">35000</span></p>
+  </div>
+
+  <div bl-name="calc2" bl-token="727553b1062845b4865dcbcee130051c" bl-auto></div>
 
 </body>
 
