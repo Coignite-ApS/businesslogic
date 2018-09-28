@@ -1,7 +1,34 @@
 'use strict';
 
-import { WebForm } from "./WebForm";
-import { http } from "./http";
+import { WebForm, WebFormErrors } from './WebForm';
+import { http } from './http';
+import { TypedEvent } from './Events/TypedEvent';
+import { WebFormComponents } from './Dom/WebFormComponents';
+import * as helpers from './Helpers/HelperFunctions';
+import { JSDict } from './Helpers/TypedDictionary';
+import {isUndefined} from "util";
+
+type status = 'onInit' | 'onSchemaReceived' | 'onValidationFailed';
+
+declare global {
+    interface Window {
+        Ajv: any;
+    }
+}
+
+const ajv:any = helpers.isConstructor(window.Ajv) ? new window.Ajv() : null;
+
+
+export interface SchemaReceivedEvent {
+    inputSchema: any;
+    outputSchema: any;
+    relatedData: any;
+}
+
+export interface ValidationFailedEvent {
+    errors: WebFormErrors;
+}
+
 
 // Todo: Needs to be split into more logical parts
 
@@ -15,6 +42,10 @@ export class Webservice {
     private outputSchema: any;
     private relatedData: any;
     private executeLater: boolean;
+    private errors:WebFormErrors;
+
+    public onSchemaRecevied = new TypedEvent<SchemaReceivedEvent>();
+    public onValidationFailed = new TypedEvent<ValidationFailedEvent>();
 
     constructor(key:string = '', webform?:WebForm) {
         this.key = key;
@@ -22,6 +53,7 @@ export class Webservice {
         this.webform = webform;
         this.http = new http(key);
         this.executeLater = false;
+        this.errors = {};
         this.init();
     }
 
@@ -30,22 +62,23 @@ export class Webservice {
         let vm = this;
 
         // Retrieve all relevant webservice metadata
-        this.getScemas().then((result) => {
-            vm.inputSchema = result.expected_input || {};
-            vm.outputSchema = result.expected_output || {};
-            vm.relatedData = result.available_data || {};
+        this.getWebserviceDocs().then((result) => {
+            this.onSchemaRecevied.emit({
+                inputSchema: vm.inputSchema = result.expected_input || {},
+                outputSchema: vm.outputSchema = result.expected_output || {},
+                relatedData: vm.relatedData = result.available_data || {}
+            });
             if(this.webform) vm.enrichWebFormInputs();
         }).then(() => {
             // If execute was called before /describe was called
             if(this.executeLater) vm.execute();
         }).then(() => {
-            // Autogenerate creation of a form if required
-
             // Handle associated webform
             if(this.webform) {
                 for(let param in this.webform.inputs) {
                     let vm = this;
                     let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
+
                     let type = vm.inputSchema.properties[param].type;
                     vm.setParam(param,value);
                     console.log();
@@ -55,24 +88,24 @@ export class Webservice {
                     // If there is no submit button we execute the form upon a valid input
                     if(this.webform.controls['submit'] === undefined) {
                         this.webform.inputs[param].input_el.addEventListener('change',function (e) {
-                            // TODO: Need to validate the input before executing the code
-                            vm.execute();
+                            if(vm.validate()) vm.execute();
                         })
                     }
                 }
                 for(let name in this.webform.controls) {
                     let vm = this;
                     this.webform.controls[name].control_el.addEventListener('click',function (e) {
-                        if(name === 'submit') vm.execute();
+                        if(vm.validate()) vm.execute();
                     })
                 }
             }
             // Adds this webservice to the collection of Webservices
             Webservices.add(this.key,this);
-            console.log('Webservice created')
         })
+    }
 
-
+    public assignWebForm(webform:WebForm): void {
+        this.webform = webform;
     }
 
     public setParams(params: any = {}): void {
@@ -83,11 +116,16 @@ export class Webservice {
         this.data[param] = value;
     }
 
+    public getValidationErrors(): WebFormErrors {
+        return this.errors;
+    }
+
     public execute(): Promise<any> {
 
         let vm = this;
 
         if(this.inputSchema) {
+            // Clean up the parameters before execution
             this.correctDataTypes();
         } else {
             // Wait until we have webservice schema
@@ -113,8 +151,63 @@ export class Webservice {
         });
     }
 
+    private validate():Boolean {
+        let valid:boolean = true;
+        this.errors = {};
 
-    private getScemas(): Promise<any> {
+        if(ajv) ajv.validate(this.inputSchema, this.data);
+
+        if(this.webform) {
+            // Handle form validation when the webservice is associated with a webform
+
+            if(this.webform.form_el) {
+                // Use native form validation
+                this.webform.form_el.customMessages = true;
+                valid = this.webform.form_el.checkValidity();
+                console.log(this.webform.form_el);
+            } else {
+                // Use input validation
+                let inputValid: boolean;
+                for(let el in this.webform.inputs) {
+                    let input = <HTMLInputElement>this.webform.inputs[el].input_el;
+                    let message = '';
+                    if(!input.validity.valid) {
+                        message = input.validationMessage
+                    }
+                    // Todo: Implement custom validation with language support
+                    // Todo: Implement custom validation with support for custom messages
+                    this.errors[el] = message;
+                    this.updateWebFormErrorMessage(el,message);
+                }
+                if(!helpers.isEmpty(this.errors)) {
+                    valid = false
+                }
+            }
+
+        } else {
+            //Handle pure data validation based on associated json schema
+            // TODO: Consider using AJV library for schema validation instead of form validation
+            // valid = ajv.validate(this.inputSchema, this.data);
+        }
+
+
+        if(!valid) {
+            this.onValidationFailed.emit({
+                errors: this.errors
+            });
+        }
+
+        return valid;
+    }
+
+    private updateWebFormErrorMessage(input:any,message:string):void {
+        if(this.webform && this.webform.inputs[input].err_el){
+            this.webform.inputs[input].err_el.textContent = message;
+        }
+
+    }
+
+    private getWebserviceDocs(): Promise<any> {
 
         return new Promise((resolve: any, reject: any) => {
             this.http.makeRequest('GET','https://api.businesslogic.online/describe')
@@ -130,6 +223,7 @@ export class Webservice {
     }
 
     private enrichWebFormInputs():void {
+        // Enrich input elements
         for(let param in this.webform.inputs) {
             for(let property in this.inputSchema.properties) {
                 if(param === property && this.inputSchema.properties.hasOwnProperty(property)) {
@@ -185,8 +279,9 @@ export class Webservice {
 
                         inputData = this.relatedData[labelObjName||valueObjName] || null;
 
+                        // TODO: Consider support of optgroup
                         if(!!select) {
-                            select.querySelectorAll("option:not([disabled])").forEach((o)=>{
+                            select.querySelectorAll('option:not([disabled])').forEach((o)=>{
                                 o.remove();
                             });
                             for(let i=0; i < definition.enum.length; i++) {
@@ -228,6 +323,29 @@ export class Webservice {
                 }
             }
         }
+
+        // Enrich output elements
+        // TODO: Consider other types of outputs like progress and meter tags
+        // TODO: Consider other types of outputs like charts
+        // TODO: Support array outputs
+        for(let param in this.webform.outputs) {
+            for (let property in this.outputSchema.properties) {
+                if (param === property && this.outputSchema.properties.hasOwnProperty(property)) {
+                    let definition = this.outputSchema.properties[property];
+                    let label = this.webform.outputs[property].label_el;
+                    let description = this.webform.outputs[property].desc_el;
+                    let type = this.outputSchema.properties[property].type;
+                    let input = this.webform.outputs[property].output_el;
+
+                    // Set title and description
+                    if(definition.title) label.innerHTML = definition.title;
+                    if(definition.description) description.innerHTML = definition.description;
+
+                    // Set default
+                    if(definition.default) input.innerHTML = definition.default;
+                }
+            }
+        }
     }
 
 
@@ -247,6 +365,7 @@ export class Webservice {
             for(let param in this.data) {
                 if(this.data.hasOwnProperty(param)){
                     let value = this.data[param];
+
                     if(this.inputSchema.properties.hasOwnProperty(param)) {
                         let type = this.inputSchema.properties[param].type;
                         let val: any;
@@ -282,7 +401,11 @@ export interface IDictionary<Webservice> {
 // Create dictonary for keeping track of all webservice instances
 export class ServiceContainer {
 
-    private dict: IDictionary<Webservice> = {};
+    private dict:any;
+
+    constructor() {
+        this.dict = JSDict.Create<string, Webservice>()
+    }
 
     public add(apiKey:string, webservice:Webservice): void {
         if(!this.dict[apiKey]) this.dict[apiKey] = webservice;
@@ -301,75 +424,144 @@ function log(message:any):void {
     if(debug) console.log(message);
 }
 
-export { Webservices };
+function mapWebForm(formItem:any):WebForm {
+    let name = formItem.getAttribute('bl-name');
+    let key = formItem.getAttribute('bl-token');
+    let inputs = formItem.querySelectorAll('[bl-input]');
+    let controls = formItem.querySelectorAll('[bl-control]');
+    let outputs = formItem.querySelectorAll('[bl-output]');
+    let param: string,type: string ,tagName : string;
+    let el:Element;
+    let lbl_el: Element, desc_el: Element, err_el: Element;
+
+
+    let wf: WebForm = {
+        name: name,
+        inputs: {},
+        controls: {},
+        outputs: {}
+    };
+
+    if(formItem instanceof HTMLFormElement) {
+        wf.form_el = formItem;
+    }
+
+    // Handling inputs
+    for(let i = 0; i < inputs.length; i++) {
+        param = inputs[i].getAttribute('bl-input');
+        type = inputs[i].getAttribute('type');
+        tagName = inputs[i].tagName;
+        el = inputs[i];
+        lbl_el = formItem.querySelector('[bl-input-label=' + param + ']');
+        desc_el = formItem.querySelector('[bl-input-description=' + param + ']');
+        err_el = formItem.querySelector('[bl-input-error=' + param + ']');
+        wf.inputs[param] = { 'label_el': lbl_el, 'desc_el': desc_el, 'input_el': el, 'err_el': err_el };
+    }
+    // Handling controls
+    for(let i = 0; i < controls.length; i++) {
+        param = controls[i].getAttribute('bl-control');
+        type = controls[i].getAttribute('type');
+        tagName = controls[i].tagName;
+        el = controls[i];
+        wf.controls[param] = { 'control_el': el };
+    }
+    // Handling outputs
+    for(let i = 0; i < outputs.length; i++) {
+        param = outputs[i].getAttribute('bl-output');
+        type = outputs[i].getAttribute('type');
+        tagName = outputs[i].tagName;
+        el = outputs[i];
+        lbl_el = formItem.querySelector('[bl-output-label=' + param + ']');
+        desc_el = formItem.querySelector('[bl-output-description=' + param + ']');
+        wf.outputs[param] = { 'label_el': lbl_el, 'desc_el': desc_el, 'output_el': el };
+    }
+    return wf;
+}
+
+export { Webservices};
 
 (function (){
 
     // See if we are in debug mode
-    if(!!document.querySelector("script[bl-debug]")) debug = true;
+    if(!!document.querySelector('script[bl-debug]')) debug = true;
     log('Initialise businesslogic');
 
-    let formList = document.querySelectorAll("[bl-name]");
+    let formList = document.querySelectorAll('[bl-name]');
 
     for(let f = 0; f < formList.length; f++) {
+        let ws: Webservice;
         let name = formList[f].getAttribute('bl-name');
         let key = formList[f].getAttribute('bl-token');
         let auto = (formList[f].getAttribute('bl-auto') === '');
 
         if(auto) {
-            // We do autogeneration of the webform
-            log('Automatically generated form: ' + name);
+            formList[f].querySelectorAll('*').forEach((o)=>o.remove());
+            ws = new Webservice(key);
+            ws.onSchemaRecevied.on((e)=>{
+                let inputs:WebFormComponents  = new WebFormComponents('form-inputs');
+                let outputs:WebFormComponents  = new WebFormComponents('form-outputs');
+
+                for(let param in e.inputSchema.properties) {
+                    if(e.inputSchema.properties.hasOwnProperty(param)){
+                        let type = e.inputSchema.properties[param].type;
+                        let enumeration = e.inputSchema.properties[param].enum;
+                        let input;
+                        if(enumeration) {
+                            inputs.attachComponent('select',param);
+
+                        } else {
+                            switch (type) {
+                                case 'number':
+                                    inputs.attachComponent('number',param);
+                                    break;
+                                case 'integer':
+                                    inputs.attachComponent('integer',param);
+                                    break;
+                                default:
+                                    inputs.attachComponent('text',param);
+                            }
+
+                        }
+
+                    }
+                }
+                inputs.attachComponent('submit');
+                formList[f].appendChild(inputs.compileWebformComponents());
+
+                for(let param in e.outputSchema.properties) {
+                    if(e.outputSchema.properties.hasOwnProperty(param)){
+                        let type = e.outputSchema.properties[param].type;
+                        let enumeration = e.outputSchema.properties[param].enum;
+                        let output;
+                        if(enumeration) {
+                            outputs.attachComponent('select',param);
+
+                        } else {
+                            switch (type) {
+                                case 'number':
+                                    outputs.attachComponent('output',param);
+                                    break;
+                                case 'integer':
+                                    outputs.attachComponent('output',param);
+                                    break;
+                                default:
+                                    outputs.attachComponent('output',param);
+                            }
+                        }
+                    }
+                }
+                formList[f].appendChild(outputs.compileWebformComponents());
+                let wf = mapWebForm(formList[f]);
+                ws.assignWebForm(wf);
+            });
         } else {
-            log('Creating form from termplate: ' + name);
-
-            // Map out the DOM
-            let inputs = formList[f].querySelectorAll("[bl-input]");
-            let controls = formList[f].querySelectorAll("[bl-control]");
-            let outputs = formList[f].querySelectorAll("[bl-output]");
-            let param: string,type: string ,tagName : string;
-            let el:Element;
-            let lbl_el: Element, desc_el: Element;
-            if(name && key) {
-                let wf: WebForm = {
-                    name: name,
-                    inputs: {},
-                    controls: {},
-                    outputs: {}
-                };
-                // Handling inputs
-                for(let i = 0; i < inputs.length; i++) {
-                    param = inputs[i].getAttribute('bl-input');
-                    type = inputs[i].getAttribute('type');
-                    tagName = inputs[i].tagName;
-                    el = inputs[i];
-                    lbl_el = formList[f].querySelector("[bl-input-label=" + param + "]");
-                    desc_el = formList[f].querySelector("[bl-input-description=" + param + "]");
-                    wf.inputs[param] = { 'label_el': lbl_el, 'desc_el': desc_el, 'input_el': el };
-                }
-                // Handling controls
-                for(let i = 0; i < controls.length; i++) {
-                    param = controls[i].getAttribute('bl-control');
-                    type = controls[i].getAttribute('type');
-                    tagName = controls[i].tagName;
-                    el = controls[i];
-                    wf.controls[param] = { 'control_el': el };
-                }
-                // Handling outputs
-                for(let i = 0; i < outputs.length; i++) {
-                    param = outputs[i].getAttribute('bl-output');
-                    type = outputs[i].getAttribute('type');
-                    tagName = outputs[i].tagName;
-                    el = outputs[i];
-                    lbl_el = formList[f].querySelector("[bl-input-label=" + param + "]");
-                    desc_el = formList[f].querySelector("[bl-input-description=" + param + "]");
-                    wf.outputs[param] = { 'label_el': lbl_el, 'desc_el': desc_el, 'output_el': el };
-                }
-                let ws = new Webservice(key, wf);
-                log(ws)
-            }
-
+            ws = new Webservice(key, mapWebForm(formList[f]));
         }
+
+        log('Creating form from termplate: ' + name);
     }
 })();
 
-// TODO: Consider using https://github.com/epoberezkin/ajv for validation
+// TODO: Consider implementing datalist with input instead of select https://www.quackit.com/html/tags/html_datalist_tag.cfm
+// TODO: Consider supporting http://inorganik.github.io/countUp.js/
+// TODO: Consider supporting https://nosir.github.io/cleave.js/

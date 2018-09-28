@@ -1,7 +1,7 @@
 {
   "name": "businesslogic",
   "version": "1.0.0",
-  "description": "Javascript connector to businesslogic.online",
+  "description": "Javascript library for businesslogic.online",
   "main": "./lib/businesslogic.js",
   "scripts": {
     "build": "webpack --config webpack.prod.js",
@@ -10,9 +10,11 @@
   "author": "Rassvet ApS <rassvet@rassvet.dk> (https://rassvet.co)",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^10.10.3",
     "clean-webpack-plugin": "^0.1.19",
     "html-webpack-plugin": "^3.2.0",
     "source-map-loader": "^0.2.4",
+    "strip-whitespace-loader": "^1.0.4",
     "ts-loader": "^5.1.0",
     "typescript": "^3.0.3",
     "webpack": "^4.18.0",
