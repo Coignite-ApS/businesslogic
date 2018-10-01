@@ -17,7 +17,10 @@ var banner =
     'NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.';
 
 module.exports = {
-    entry: ['./src/index.ts','./src/main.scss'],
+    entry: [
+        './src/index.ts',
+        './themes/businesslogic-standard-theme.scss'
+    ],
     devtool: 'inline-source-map',
     module: {
         rules: [
@@ -35,14 +38,14 @@ module.exports = {
                     {
                         loader: 'file-loader',
                         options: {
-                            name: libraryName + '.css'
+                            name: '[name].css'
                         }
                     },
                     {
                         loader: 'extract-loader'
                     },
                     {
-                        loader: 'css-loader?-url'
+                        loader: 'css-loader'
                     },
                     {
                         loader: 'postcss-loader'
@@ -50,8 +53,7 @@ module.exports = {
                     {
                         loader: 'sass-loader'
                     }
-                ],
-                exclude: path.resolve(__dirname, '/src/index.js')
+                ]
             }
         ]
     },

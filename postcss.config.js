@@ -1,8 +1,12 @@
 // Consider other plugins https://github.com/postcss/postcss#plugins
 module.exports = {
-    map: 'inline',
+    syntax: 'postcss-scss',
+    map: { inline: true },
     plugins: [
         require('autoprefixer'),
-        require('postcss-preset-env')
+        require('postcss-preset-env'),
+        require('cssnano')({
+            preset: 'default'
+        })
     ]
-}
+};

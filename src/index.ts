@@ -6,7 +6,6 @@ import { TypedEvent } from './Events/TypedEvent';
 import { WebFormComponents } from './Dom/WebFormComponents';
 import * as helpers from './Helpers/HelperFunctions';
 import { JSDict } from './Helpers/TypedDictionary';
-import {isUndefined} from "util";
 
 type status = 'onInit' | 'onSchemaReceived' | 'onValidationFailed';
 
