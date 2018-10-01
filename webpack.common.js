@@ -3,7 +3,6 @@ const webpack = require('webpack');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const libraryName = 'businesslogic';
-const outputFile = libraryName + '.js';
 const package = require('./package.json');
 
 var banner =
@@ -18,7 +17,7 @@ var banner =
     'NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.';
 
 module.exports = {
-    entry: './src/index.ts',
+    entry: ['./src/index.ts','./src/main.scss'],
     devtool: 'inline-source-map',
     module: {
         rules: [
@@ -27,8 +26,32 @@ module.exports = {
                 use: [
                     { loader: 'strip-whitespace-loader' },
                     { loader: 'ts-loader' }
-                    ],
+                ],
                 exclude: /node_modules/
+            },
+            {
+                test: /\.scss$/,
+                use: [
+                    {
+                        loader: 'file-loader',
+                        options: {
+                            name: libraryName + '.css'
+                        }
+                    },
+                    {
+                        loader: 'extract-loader'
+                    },
+                    {
+                        loader: 'css-loader?-url'
+                    },
+                    {
+                        loader: 'postcss-loader'
+                    },
+                    {
+                        loader: 'sass-loader'
+                    }
+                ],
+                exclude: path.resolve(__dirname, '/src/index.js')
             }
         ]
     },
@@ -36,11 +59,11 @@ module.exports = {
         new webpack.BannerPlugin(banner)
     ],
     resolve: {
-        extensions: [ '.tsx', '.ts', '.js' ]
+        extensions: [ '.tsx', '.ts', '.js', '.scss', '.css' ]
     },
     output: {
         path: path.resolve(__dirname, 'lib'),
-        filename: outputFile,
+        filename: libraryName + '.js',
         library: libraryName,
         libraryTarget: 'umd',
         umdNamedDefine: true

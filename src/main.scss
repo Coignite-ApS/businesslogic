@@ -1,0 +1,8 @@
+.test-this {
+  background: red;
+  border-radius: 3px;
+  transition: all .5s;
+}
+::placeholder {
+  color: gray;
+}
