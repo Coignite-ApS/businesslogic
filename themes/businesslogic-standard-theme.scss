@@ -1,1 +1,6 @@
 @import "scss/main";
+
+// Wrap inside a theme class
+.businesslogic-standard-theme {
+  @include main;
+}

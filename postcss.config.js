@@ -3,6 +3,13 @@ module.exports = {
     syntax: 'postcss-scss',
     map: { inline: true },
     plugins: [
+        require('stylelint')({
+            extends: 'stylelint-config-standard',
+            rules: {
+                "block-opening-brace-newline-before": "always"
+            }
+        }),
+        require("postcss-reporter")({ clearReportedMessages: true }),
         require('autoprefixer'),
         require('postcss-preset-env'),
         require('cssnano')({

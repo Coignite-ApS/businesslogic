@@ -1,4 +1,5 @@
 const path = require('path');
+const glob = require("glob");
 const webpack = require('webpack');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
@@ -19,7 +20,7 @@ var banner =
 module.exports = {
     entry: [
         './src/index.ts',
-        './themes/businesslogic-standard-theme.scss'
+        glob.sync("./test/**/*.css")
     ],
     devtool: 'inline-source-map',
     module: {

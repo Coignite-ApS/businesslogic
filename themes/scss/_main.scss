@@ -1,12 +1,5 @@
-.test-this {
-  background: red;
-  border-radius: 3px;
-  transition: all .5s;
-}
-::placeholder {
-  color: gray;
-}
-:root {
-  // Main theme color
-  --color: red;
+@mixin main {
+  h1 {
+    font-size: large;
+  }
 }
