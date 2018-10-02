@@ -1,6 +1,119 @@
+@import "scss/mixins";
+@import "scss/styleguide";
 @import "scss/main";
 
-// Wrap inside a theme class
-.businesslogic-standard-theme {
+$color-lightest-gray: #f8f9fa;
+$color-light-gray: #ced4da;
+$color-gray: #6c757d;
+$color-dark-gray: #444;
+$color-darker-gray: #343a40;
+$color-darkest-gray: #222;
+
+$color-primary: #007bff;
+$color-secondary: #6c757d;
+
+$color-success: #28a745;
+$color-info: #17a2b8;
+$color-warning: #ffc107;
+$color-danger: #dc3545;
+
+$font-normal: 16px;
+$font-family-sans-serif: Roboto,"Helvetica Neue",Arial,sans-serif;
+$font-family-monospace: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+
+$border-radius: .15rem;
+
+$input-height: calc(2.25rem + 2px);
+$input-height: calc(2.25rem + 2px);
+
+$offset-1: 5px;
+$offset-2: $offset-1*2;
+$offset-3: $offset-1*3;
+$offset-4: $offset-1*4;
+
+// Setup theme variables
+$vars: (
+  // Fonts
+        font-base-size: $font-normal,
+  // Colors
+        color-primary: $color-primary,
+        color-secondary: $color-secondary,
+        color-success: $color-success,
+        color-info: $color-info,
+        color-warning: $color-warning,
+        color-danger: $color-danger,
+        color-gray: $color-gray,
+  // Container
+        container-padding: $offset-4,
+        container-background-color: $color-lightest-gray,
+  // Fonts
+        input-height: $input-height,
+        input-text-color: $color-dark-gray,
+        input-placeholder-color: $color-gray,
+  // Border
+        border-color: $color-light-gray,
+        border-radius: $border-radius,
+  // Breakpoints
+        breakpoint-xs: 0,
+        breakpoint-sm: 576px,
+        breakpoint-md: 768px,
+        breakpoint-lg: 992px,
+        breakpoint-xl: 1200px,
+  // Fonts
+        font-family-sans-serif: $font-family-sans-serif,
+        font-family-monospace: $font-family-monospace,
+);
+
+// Setup root variables
+@include root-vars;
+
+// Setup styleguide
+@include styleguide;
+
+// Wrap styles inside a theme class
+.bl-standard-theme {
   @include main;
+
+  &.bl-theme-fonts {
+    @include var(font-size, font-base-size);
+    @include var(font-family, font-family-sans-serif);
+  }
+
+  &.bl-grid-columns {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-between;
+    align-items: stretch;
+    & > div {
+      width: 50%;
+      &:first-child {
+        padding-right: $offset-4;
+      }
+      &:last-child {
+        padding-left: $offset-4;
+        border-left-width: 1px;
+        border-left-style: solid;
+        @include var(border-left-color, border-color);
+      }
+    }
+  }
+  &.bl-grid-columns-reversed {
+    display: flex;
+    flex-flow: row-reverse wrap;
+    justify-content: space-between;
+    align-items: stretch;
+    & > div {
+      width: 50%;
+      &:first-child {
+
+        padding-left: $offset-4;
+        border-left-width: 1px;
+        border-left-style: solid;
+        @include var(border-left-color, border-color);
+      }
+      &:last-child {
+        padding-right: $offset-4;
+      }
+    }
+  }
 }

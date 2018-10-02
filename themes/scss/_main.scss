@@ -1,5 +1,171 @@
 @mixin main {
-  h1 {
-    font-size: large;
+
+  box-sizing: border-box;
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  @include var(padding, container-padding);
+  @include var(background-color, container-background-color);
+
+  *, ::after, ::before {
+    box-sizing: border-box;
+    outline: none;
+  }
+  label {
+    display: inline-block;
+    margin-bottom: .5rem;
+  }
+  input,select {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border-width: 1px;
+    border-style: solid;
+    @include var(border-radius, border-radius);
+  }
+
+  .form-group, .input-group {
+    margin-bottom: 1rem;
+  }
+
+  .input-group > .form-control {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+  }
+
+  .form-control {
+    @include var(height, input-height);
+    padding: .375rem .75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    display: block;
+  }
+
+  button, input {
+    overflow: visible;
+  }
+
+  button, input, optgroup, select, textarea {
+    margin: 0;
+    margin-bottom: 0;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    box-shadow: none;
+    @include var(color, input-text-color);
+    border-width: 1px;
+    border-style: solid;
+    @include var(border-color, border-color);
+  }
+
+  button, .btn {
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: .375rem .75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  select{
+    display: inline-block;
+    width: 100%;
+    @include var(height, input-height);
+    padding: .375rem 1.75rem .375rem .75rem;
+    line-height: 1.5;
+    color: #495057;
+    vertical-align: middle;
+    background: #fff url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23343a40' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") no-repeat right .75rem center;
+    appearance: none;
+    background-size: auto auto;
+    background-size: 8px 10px;
+    @include var(color, input-placeholder-color);
+  }
+
+  hr {
+    height: 1px;
+    @include var(background-color, border-color);
+    font-size: 0;
+    border: 0;
+    @include var(margin-top, container-padding);
+    @include var(margin-bottom, container-padding);
+  }
+  small {
+    height: 1.4rem;
+    line-height: 1.05rem;
+    padding-top: .65rem;
+    display: inline-block;
+    &[bl-input-description] {
+      @include var(color, color-gray);
+    }
+    &[bl-input-error] {
+      @include var(color, color-danger);
+    }
+  }
+  button, .btn {
+    cursor: pointer;
+    &[bl-control="submit"] {
+      color: white;
+      @include var(background-color, color-success);
+    }
+    @include var(border-radius, border-radius);
+    &:hover {
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.15);
+    }
+  }
+
+
+  :required {
+
+  }
+
+  .touched:required:valid {
+    @include var(border-color, color-success);
+  }
+  .touched:required:invalid {
+    @include var(border-color, color-danger);
+  }
+
+  select{
+    cursor: pointer;
+
+    // Remove outline and color it properly
+    &:-moz-focusring {
+      color: transparent !important;
+      text-shadow: 0 0 0 map-get($vars, input-placeholder-color);
+      text-shadow: 0 0 0 var(--bl-input-placeholder-color);
+    }
+    &.touched:-moz-focusring {
+      color: transparent !important;
+      text-shadow: 0 0 0 map-get($vars, input-text-color);
+      text-shadow: 0 0 0 var(--bl-input-text-color);
+    }
+    &.touched:required:valid {
+      @include var(color, input-text-color);
+    }
+  }
+
+  option:not(:checked) {
+    @include var(color, input-text-color);
+  }
+
+  option[bl-placeholder] {
+    @include var(color, input-placeholder-color);
+  }
+  .output-row {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-between;
+    border-bottom-width: 1px;
+    border-bottom-style: dashed;
+    padding-bottom: 0.6rem;
+    @include var(border-bottom-color, border-color);
+    &:not(:first-child):last-child {
+      border: none;
+    }
   }
 }

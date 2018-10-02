@@ -75,13 +75,18 @@ export class Webservice {
             // Handle associated webform
             if(this.webform) {
                 for(let param in this.webform.inputs) {
+
                     let vm = this;
                     let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
-
+                    console.log(this.webform.inputs[param].input_el);
                     let type = vm.inputSchema.properties[param].type;
                     vm.setParam(param,value);
-                    console.log();
+                    this.webform.inputs[param].input_el.addEventListener('blur',function (e) {
+                        vm.validateInput(param);
+                        vm.webform.inputs[param].input_el.classList.add('touched');
+                    });
                     this.webform.inputs[param].input_el.addEventListener('input',function (e) {
+                        vm.validateInput(param);
                         vm.setParam(param,this.value)
                     });
                     // If there is no submit button we execute the form upon a valid input
@@ -156,6 +161,7 @@ export class Webservice {
 
         if(ajv) ajv.validate(this.inputSchema, this.data);
 
+
         if(this.webform) {
             // Handle form validation when the webservice is associated with a webform
 
@@ -168,16 +174,10 @@ export class Webservice {
                 // Use input validation
                 let inputValid: boolean;
                 for(let el in this.webform.inputs) {
-                    let input = <HTMLInputElement>this.webform.inputs[el].input_el;
-                    let message = '';
-                    if(!input.validity.valid) {
-                        message = input.validationMessage
-                    }
-                    // Todo: Implement custom validation with language support
-                    // Todo: Implement custom validation with support for custom messages
-                    this.errors[el] = message;
-                    this.updateWebFormErrorMessage(el,message);
+                    this.validateInput(el);
+                    this.webform.inputs[el].input_el.classList.add('touched');
                 }
+
                 if(!helpers.isEmpty(this.errors)) {
                     valid = false
                 }
@@ -196,7 +196,27 @@ export class Webservice {
             });
         }
 
+
+
         return valid;
+    }
+
+    private validateInput(param:string):Boolean{
+        let input = <HTMLInputElement>this.webform.inputs[param].input_el;
+        let inputValid = true;
+        let message = '';
+        if(!input.validity.valid) {
+            inputValid = false;
+            message = input.validationMessage;
+            this.errors[param] = message;
+            this.updateWebFormErrorMessage(param,message);
+        } else {
+            this.updateWebFormErrorMessage(param,'');
+        }
+        // Todo: Implement custom validation with language support
+        // Todo: Implement custom validation with support for custom messages
+
+        return inputValid;
     }
 
     private updateWebFormErrorMessage(input:any,message:string):void {
@@ -232,7 +252,6 @@ export class Webservice {
                     let type = this.inputSchema.properties[property].type;
                     let select: HTMLSelectElement;
                     let input = <HTMLInputElement>this.webform.inputs[property].input_el;
-
                     if(this.webform.inputs[property].input_el.tagName === 'SELECT') {
                         select = <HTMLSelectElement>this.webform.inputs[property].input_el;
                     }
@@ -280,8 +299,12 @@ export class Webservice {
 
                         // TODO: Consider support of optgroup
                         if(!!select) {
-                            select.querySelectorAll('option:not([disabled])').forEach((o)=>{
-                                o.remove();
+                            select.querySelectorAll('option').forEach((o)=>{
+                                if(o.getAttribute('bl-placeholder') === '') {
+                                    (<HTMLOptionElement>o).value ='';
+                                } else {
+                                    o.remove();
+                                }
                             });
                             for(let i=0; i < definition.enum.length; i++) {
                                 let option = document.createElement('option');

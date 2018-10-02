@@ -1,0 +1,36 @@
+@import "scss/main";
+
+
+
+$vars: (
+        primary: yellow
+);
+
+@mixin var($property, $varName) {
+  #{$property}: map-get($vars, $varName);
+  #{$property}: var(--bl-#{$varName});
+}
+
+/*
+:root {
+  --primary: map-get($vars, primary);
+}
+*/
+
+
+:root {
+  @each $key, $var in $vars {
+    --bl-#{$key}: $var;
+  }
+}
+
+:root {
+  --main-bg-color: red;
+}
+
+
+// Wrap inside a theme class
+.businesslogic-elegant-theme {
+  @include main;
+  @include var(background-color, primary);
+}

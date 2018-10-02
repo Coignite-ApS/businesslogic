@@ -1,0 +1,21 @@
+@import "functions";
+
+@mixin styleguide {
+  // Create styleguide
+  .styleguide {
+    margin-bottom: 40px;
+    font-family: monospace;
+  }
+  @each $color, $value in $vars  {
+    @if type-of($value) == color {
+      .styleguide .#{$color} {
+        padding: 5px;
+        background-color: $value;
+        &:after {
+          content: "variable name is #{$color}";
+          color: choose-contrast-color($value);
+        }
+      }
+    }
+  }
+}

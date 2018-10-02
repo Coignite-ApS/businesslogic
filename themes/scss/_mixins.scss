@@ -1,0 +1,51 @@
+@mixin root-vars(){
+  :root {
+    @each $key, $var in $vars {
+      --bl-#{$key}: #{$var};
+    }
+  }
+}
+
+@mixin var($property, $varName) {
+  #{$property}: map-get($vars, $varName);
+  #{$property}: var(--bl-#{$varName});
+}
+
+
+/*
+$primary-nav: (
+        padding-top: .2em,
+        margin-top: .2em,
+        line-height: 1.3,
+        nav-item: (
+                color: white,
+                is-expanded: (
+                        padding-top: 1em,
+                        margin-top: 1em
+                )
+        )
+);
+
+*/
+
+@mixin print-styles($map, $keys...){
+  $i: 1;
+  $length: length($keys);
+  @while $length >= $i  {
+    $map: map-get($map, nth($keys, $i));
+    $i: $i + 1;
+  }
+
+  @each $property, $value in $map {
+    @if type-of($value) != map {
+      #{$property}: $value;
+    }
+  }
+}
+
+
+/*
+nav.expanded {
+  @include print-styles($primary-nav, nav-item, is-expanded);
+}
+*/

@@ -3,7 +3,6 @@ const glob = require("glob");
 const webpack = require('webpack');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const libraryName = 'businesslogic';
 const package = require('./package.json');
 
 var banner =
@@ -17,11 +16,21 @@ var banner =
     'Public domain.' + '\n' +
     'NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.';
 
+var entries = ['./src/index.ts'];
+
+var themes = [
+    'businesslogic-standard-theme',
+    //'businesslogic-elegant-theme'
+];
+
+for(var theme in themes) {
+    if(themes.hasOwnProperty(theme)) {
+        entries.push('./themes/' + themes[theme] + '.scss')
+    }
+}
+
 module.exports = {
-    entry: [
-        './src/index.ts',
-        glob.sync("./test/**/*.css")
-    ],
+    entry: entries,
     devtool: 'inline-source-map',
     module: {
         rules: [
@@ -46,7 +55,13 @@ module.exports = {
                         loader: 'extract-loader'
                     },
                     {
-                        loader: 'css-loader'
+                        loader: 'css-loader',
+                        options: {
+                            minimize: true,
+                            sourceMap: true,
+                            importLoaders: 2
+                        }
+
                     },
                     {
                         loader: 'postcss-loader'
@@ -54,7 +69,8 @@ module.exports = {
                     {
                         loader: 'sass-loader'
                     }
-                ]
+                ],
+                exclude: /node_modules/
             }
         ]
     },
@@ -66,8 +82,8 @@ module.exports = {
     },
     output: {
         path: path.resolve(__dirname, 'lib'),
-        filename: libraryName + '.js',
-        library: libraryName,
+        filename: package.name + '.' + package.version + '.js',
+        library: package.name,
         libraryTarget: 'umd',
         umdNamedDefine: true
     }
