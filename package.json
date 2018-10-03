@@ -1,7 +1,7 @@
 {
   "name": "businesslogic",
   "version": "1.0.0",
-  "description": "Javascript library for businesslogic.online",
+  "description": "A small javascript library for creating interactive webforms and logic functionality using https://businesslogic.online.",
   "main": "./lib/businesslogic.js",
   "scripts": {
     "build": "webpack --config webpack.prod.js",

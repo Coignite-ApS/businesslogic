@@ -1,6 +1,6 @@
 ## Businesslogic
 
-Javascript library for https://businesslogic.online.
+A small javascript library for creating interactive webforms and logic functionality using https://businesslogic.online.
 
 ## Usage
 Businesslogic library is intended to be used in three ways:
@@ -19,7 +19,7 @@ Create a businesslogic driven webform with only a few lines of code.
   <script type="module" src="businesslogic.js"></script>
   <link rel="stylesheet" href="businesslogic-standard-theme.css">
   <div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" bl-auto
-  class="bl--theme bl-theme-fonts"></div>
+  class="bl-theme bl-theme-fonts"></div>
 ```
 Including it anyware on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
 
@@ -39,7 +39,7 @@ Wire your own webform template with businesslogic. In this cases businesslogic u
   <link rel="stylesheet" href="businesslogic-standard-theme.css">
    
   <!-- Your own webform -->
-  <div class="bl--theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
+  <div class="bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
     <div class="form-group">
       <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
       <input title="Some crap" type="number" class="form-control" id="salary_per_month" bl-input="salary_per_month">
@@ -66,7 +66,7 @@ Wire your own webform template with businesslogic. In this cases businesslogic u
   </div>
 ```
 
-This will generate a form like the following example, or [see it in action here][jsfiddle-templated-webform]
+This will generate a form like the following example. [See a live example here][jsfiddle-templated-webform]
 
 ![alt text][templated-webform]
 

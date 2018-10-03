@@ -47,11 +47,6 @@ class="bl-standard-theme bl-theme-fonts"></div>
     --bl-input-placeholder-color: #6c757d;
     --bl-border-color: #ced4da;
     --bl-border-radius: 0.15rem;
-    --bl-breakpoint-xs: 0;
-    --bl-breakpoint-sm: 576px;
-    --bl-breakpoint-md: 768px;
-    --bl-breakpoint-lg: 992px;
-    --bl-breakpoint-xl: 1200px;
     --bl-font-family-sans-serif: Roboto,Helvetica Neue,Arial,sans-serif;
     --bl-font-family-monospace: SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;
 }
@@ -69,8 +64,8 @@ You can display webforms as columns:
 class="bl-theme bl-theme-fonts bl-grid-columns"></div>
 ```
 
-### Custom stylesheet
-You can override any styles directly, using a custom stylesheet.
+### Custom styles
+You can override any styles directly, using custom styles.
 
 ```html
 <script type="module" src="businesslogic.js"></script>
@@ -85,7 +80,7 @@ class="bl-theme bl-theme-fonts custom-theme"></div>
 }
 </style>
 ```
-### Alternatively youcan create your own theme
+### Custom theme
 You can override any styles directly, using a custom stylesheet.
 
 ```html
