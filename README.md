@@ -1,3 +1,5 @@
+<img align="right" alt="Ajv logo" width="110" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png">
+
 ## Businesslogic
 
 A small javascript library for creating interactive webforms and logic functionality using https://businesslogic.online.
