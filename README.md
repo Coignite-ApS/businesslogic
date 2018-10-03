@@ -1,4 +1,4 @@
-<img align="right" alt="Ajv logo" width="110" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png">
+<img align="right" alt="Ajv logo" width="40" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png">
 
 ## Businesslogic
 
