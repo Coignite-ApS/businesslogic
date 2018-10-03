@@ -78,7 +78,6 @@ export class Webservice {
 
                     let vm = this;
                     let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
-                    console.log(this.webform.inputs[param].input_el);
                     let type = vm.inputSchema.properties[param].type;
                     vm.setParam(param,value);
                     this.webform.inputs[param].input_el.addEventListener('blur',function (e) {
@@ -169,7 +168,6 @@ export class Webservice {
                 // Use native form validation
                 this.webform.form_el.customMessages = true;
                 valid = this.webform.form_el.checkValidity();
-                console.log(this.webform.form_el);
             } else {
                 // Use input validation
                 let inputValid: boolean;
@@ -259,8 +257,6 @@ export class Webservice {
                     // Set title and description
                     if(definition.title) label.innerHTML = definition.title;
                     if(definition.description) description.innerHTML = definition.description;
-
-                    console.log(definition);
 
                     // Set required
                     if(!this.inputSchema.required[property])input.setAttribute('required','required');
@@ -421,7 +417,7 @@ export interface IDictionary<Webservice> {
 }
 
 // Create dictonary for keeping track of all webservice instances
-export class ServiceContainer {
+class ServiceContainer {
 
     private dict:any;
 
@@ -430,7 +426,11 @@ export class ServiceContainer {
     }
 
     public add(apiKey:string, webservice:Webservice): void {
-        if(!this.dict[apiKey]) this.dict[apiKey] = webservice;
+        if(!this.dict[apiKey]){
+            this.dict[apiKey] = webservice;
+        } else {
+            console.warn('Webservice with apiKey: ' + apiKey + ' was allready added to Businesslogic.Webservices');
+        }
     }
 
     public get(apiKey:string): Webservice {

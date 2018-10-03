@@ -16,21 +16,14 @@ var banner =
     'Public domain.' + '\n' +
     'NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.';
 
-var entries = ['./src/index.ts'];
-
-var themes = [
-    'businesslogic-standard-theme',
-    //'businesslogic-elegant-theme'
-];
-
-for(var theme in themes) {
-    if(themes.hasOwnProperty(theme)) {
-        entries.push('./themes/' + themes[theme] + '.scss')
-    }
-}
-
 module.exports = {
-    entry: entries,
+    entry: [
+        // Theme files
+        './themes/businesslogic-standard-theme.scss',
+        //'./themes/businesslogic-elegant-theme.scss',
+        // Main files
+        './src/index.ts'
+    ],
     devtool: 'inline-source-map',
     module: {
         rules: [
@@ -83,7 +76,7 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, 'lib'),
         filename: package.name + '.' + package.version + '.js',
-        library: package.name,
+        library: 'Businesslogic',
         libraryTarget: 'umd',
         umdNamedDefine: true
     }

@@ -71,7 +71,7 @@ $vars: (
 @include styleguide;
 
 // Wrap styles inside a theme class
-.bl-standard-theme {
+.bl-theme {
   @include main;
 
   &.bl-theme-fonts {

@@ -24,6 +24,10 @@
     @include var(border-radius, border-radius);
   }
 
+  .form-inputs, .form-outputs {
+    padding-bottom: 2rem;
+  }
+
   .form-group, .input-group {
     margin-bottom: 1rem;
   }
@@ -96,6 +100,10 @@
   }
   small {
     height: 1.4rem;
+    // Firefox height fix
+    @-moz-document url-prefix() {
+      height: 1.5rem;
+    }
     line-height: 1.05rem;
     padding-top: .65rem;
     display: inline-block;

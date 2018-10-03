@@ -41,6 +41,7 @@
         /*
         var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
         biz.setParams({ "goal": 10000, "deadline": 2019 });
+        biz.setParam("goal", 10000);
 
         biz.execute().then(function (result) {
             console.log('Output from programmatic execution: ',result)
@@ -56,12 +57,20 @@
     };
 </script>
 
-<div class="bl-standard-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
+<style>
+  .custom-theme button {
+    background: red;
+  }
+</style>
+
+<div class="custom-theme bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
+  <div class="input-group">
   <div class="form-group">
     <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
     <input title="Some crap" type="number" class="form-control" id="salary_per_month" bl-input="salary_per_month">
     <small bl-input-description="salary_per_month">DKK, before tax.</small>
     <small bl-input-error="salary_per_month"></small>
+  </div>
   </div>
   <div class="input-group">
     <div class="form-group">
@@ -81,13 +90,21 @@
   <hr>
   <p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
 </div>
-
-
-<div class="bl-standard-theme bl-theme-fonts bl-grid-columns-reversed"  bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto>
+<p>&nbsp;</p>
+<div class="bl-theme bl-theme-fonts bl-grid-columns-reversed"  bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto>
+  <p>Test</p>
+</div>
+<p>&nbsp;</p>
+<div class="bl-theme bl-theme-fonts bl-grid-columns"  bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto>
+  <p>Test</p>
+</div>
+<p>&nbsp;</p>
+<div class="bl-theme bl-theme-fonts"  bl-name="calc3" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto>
   <p>Test</p>
 </div>
 
-
 </body>
+
+
 
 </html>
