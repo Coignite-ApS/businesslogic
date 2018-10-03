@@ -1,8 +1,10 @@
-<img align="right" alt="Ajv logo" width="40" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png">
+<p align="center">
+<img alt="businesslogic.js" title="businesslogic.js" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png" width="120">
+</p>
+<h1 align="center" style="color: #1F3957">Businesslogic</h1>
+<p align="center">A small javascript library for creating interactive webforms and logic functionality using <a href="https://businesslogic.online" target="_blank">https://businesslogic.online</a>.</p>
 
-## Businesslogic
-
-A small javascript library for creating interactive webforms and logic functionality using https://businesslogic.online.
+---
 
 ## Usage
 Businesslogic library is intended to be used in three ways:
