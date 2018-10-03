@@ -16,10 +16,10 @@ Businesslogic library is intended to be used in three ways:
 Create a businesslogic driven webform with only a few lines of code.
 
 ```html
-  <script type="module" src="businesslogic.js"></script>
-  <link rel="stylesheet" href="businesslogic-standard-theme.css">
-  <div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" bl-auto
-  class="bl-theme bl-theme-fonts"></div>
+<script type="module" src="businesslogic.js"></script>
+<link rel="stylesheet" href="businesslogic-standard-theme.css">
+<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" bl-auto
+class="bl-theme bl-theme-fonts"></div>
 ```
 Including it anyware on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
 
@@ -35,35 +35,35 @@ Adding *stylesheet link-tag* and *class attribute* are optional. Consider your s
 Wire your own webform template with businesslogic. In this cases businesslogic uses it as a template.
 
 ```html
-  <script type="module" src="businesslogic.js"></script>
-  <link rel="stylesheet" href="businesslogic-standard-theme.css">
-   
-  <!-- Your own webform -->
-  <div class="bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
-    <div class="form-group">
-      <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
-      <input title="Some crap" type="number" class="form-control" id="salary_per_month" bl-input="salary_per_month">
-      <small bl-input-description="salary_per_month">DKK, before tax.</small>
-      <small bl-input-error="salary_per_month"></small>
-    </div>
-    <div class="input-group">
-      <div class="form-group">
-      <label for="start_year" bl-input-label="start_year">Options</label>
-      <select class="form-control" id="start_year" bl-input="start_year">
-        <option selected bl-placeholder>Choose...</option>
-        <option>1</option>
-        <option>2</option>
-        <option>2</option>
-      </select>
-        <small bl-input-description="start_year">Year which is important.</small>
-        <small bl-input-error="start_year"></small>
-      </div>
-    </div>
-    <hr>
-    <button bl-control="submit">Calculate</button>
-    <hr>
-    <p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
+<script type="module" src="businesslogic.js"></script>
+<link rel="stylesheet" href="businesslogic-standard-theme.css">
+
+<!-- Your own webform -->
+<div class="bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
+<div class="form-group">
+  <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
+  <input title="Some crap" type="number" class="form-control" id="salary_per_month" bl-input="salary_per_month">
+  <small bl-input-description="salary_per_month">DKK, before tax.</small>
+  <small bl-input-error="salary_per_month"></small>
+</div>
+<div class="input-group">
+  <div class="form-group">
+  <label for="start_year" bl-input-label="start_year">Options</label>
+  <select class="form-control" id="start_year" bl-input="start_year">
+    <option selected bl-placeholder>Choose...</option>
+    <option>1</option>
+    <option>2</option>
+    <option>2</option>
+  </select>
+    <small bl-input-description="start_year">Year which is important.</small>
+    <small bl-input-error="start_year"></small>
   </div>
+</div>
+<hr>
+<button bl-control="submit">Calculate</button>
+<hr>
+<p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
+</div>
 ```
 
 This will generate a form like the following example. [See a live example here][jsfiddle-templated-webform]
@@ -82,39 +82,39 @@ Here is an example how you can use it directly on the page using code
 Use businesslogic library to connect and to execute functionality in your businesslogic webservice.
 
 ```html
-  <script type="module" src="businesslogic.js"></script>
-  <script>
-      window.onload = function () {
-      
-        // You can execute a webservice using Webservice class
-        
-        var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
-        biz.setParams({ "goal": 10000, "deadline": 2019 });
-        biz.setParam("goal", 10000);
+<script type="module" src="businesslogic.js"></script>
+<script>
+  window.onload = function () {
+  
+    // You can execute a webservice using Webservice class
+    
+    var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+    biz.setParams({ "goal": 10000, "deadline": 2019 });
+    biz.setParam("goal", 10000);
 
-        biz.execute().then(function (result) {
-            console.log('Output from programmatic execution: ',result)
-        }).catch(function (error) {
-            console.log('Error in programmatic execution: ',error)
-        });
-      };
-  </script>
+    biz.execute().then(function (result) {
+        console.log('Output from programmatic execution: ',result)
+    }).catch(function (error) {
+        console.log('Error in programmatic execution: ',error)
+    });
+  };
+</script>
 ```
 
 You are able to get and manipulate with any webservice from the collection.
 
 ```html
-  <script type="module" src="businesslogic.js"></script>
-  <script>
-      window.onload = function () {
-        
-        var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
-        
-        Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
-        Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParam("goal", 10000);
-        Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
-      };
-  </script>
+<script type="module" src="businesslogic.js"></script>
+<script>
+  window.onload = function () {
+    
+    var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+    
+    Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
+    Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParam("goal", 10000);
+    Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
+  };
+</script>
 ```
 In this way you can interconnect several webservices together or to enrich their functionality using external ressources.
 
