@@ -21,7 +21,7 @@ The following attributes are supported for inputs:
 * `bl-control="submit"` binds a submission button. (Optional)
 
 ```html
-<div  bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
+<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
   <div class="input-group">
     <div class="form-group">
       <label bl-input-label="salary_per_month" for="salary_per_month"></label>
@@ -53,7 +53,7 @@ The following attributes are supported for outputs:
 * `bl-output="[parameter]"` binds to value of the parameter. (Optional)
 
 ```html
-<div  bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
+<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
   <div class="input-group">
     <div class="form-group">
       <label bl-input-label="salary_per_month" for="salary_per_month"></label>
@@ -75,6 +75,7 @@ The following attributes are supported for outputs:
   <hr>
   <button bl-control="submit">Calculate</button>
   <hr>
+  <p><span bl-output-label="total_amount"></span> is: <span bl-output="total_amount"></span></p>
 </div>
 ```
 **Please note:** *It's not nessecary to show all the results if not needed. In some cases the results maybe shown later or sent to email.*

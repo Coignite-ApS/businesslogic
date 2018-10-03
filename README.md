@@ -18,8 +18,7 @@ Create a businesslogic driven webform with only a few lines of code.
 ```html
 <script type="module" src="businesslogic.js"></script>
 <link rel="stylesheet" href="businesslogic-standard-theme.css">
-<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" bl-auto
-class="bl-theme bl-theme-fonts"></div>
+<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" bl-auto class="bl-theme bl-theme-fonts"></div>
 ```
 Including it anyware on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
 
@@ -39,30 +38,29 @@ Wire your own webform template with businesslogic. In this cases businesslogic u
 <link rel="stylesheet" href="businesslogic-standard-theme.css">
 
 <!-- Your own webform -->
-<div class="bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
-<div class="form-group">
-  <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
-  <input title="Some crap" type="number" class="form-control" id="salary_per_month" bl-input="salary_per_month">
-  <small bl-input-description="salary_per_month">DKK, before tax.</small>
-  <small bl-input-error="salary_per_month"></small>
-</div>
-<div class="input-group">
-  <div class="form-group">
-  <label for="start_year" bl-input-label="start_year">Options</label>
-  <select class="form-control" id="start_year" bl-input="start_year">
-    <option selected bl-placeholder>Choose...</option>
-    <option>1</option>
-    <option>2</option>
-    <option>2</option>
-  </select>
-    <small bl-input-description="start_year">Year which is important.</small>
-    <small bl-input-error="start_year"></small>
+<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" class="bl-theme bl-theme-fonts">
+  <div class="input-group">
+    <div class="form-group">
+      <label bl-input-label="salary_per_month" for="salary_per_month"></label>
+      <input bl-input="salary_per_month" id="salary_per_month" type="number" class="form-control" >
+      <small bl-input-description="salary_per_month"></small>
+      <small bl-input-error="salary_per_month"></small>
+    </div>
   </div>
-</div>
-<hr>
-<button bl-control="submit">Calculate</button>
-<hr>
-<p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
+  <div class="input-group">
+    <div class="form-group">
+      <label bl-input-label="start_year" for="start_year"></label>
+      <select bl-input="start_year" id="start_year" class="form-control">
+        <option selected bl-placeholder>Choose...</option>
+      </select>
+        <small bl-input-description="start_year"></small>
+        <small bl-input-error="start_year"></small>
+    </div>
+  </div>
+  <hr>
+  <button bl-control="submit">Calculate</button>
+  <hr>
+  <p><span bl-output-label="total_amount"></span> is: <span bl-output="total_amount"></span></p>
 </div>
 ```
 
