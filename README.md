@@ -134,7 +134,7 @@ You are able to get and manipulate with any webservice from the collection.
 In this way you can interconnect several webservices together or to enrich their functionality using external ressources.
 
 #### Use the library in development environment
-Install businesslogic library:
+Install businesslogic library using [npm][npm-businesslogic]:
 
 ```
 npm install businesslogic
@@ -174,3 +174,4 @@ In lieu of a formal style guide, take care to maintain the existing coding style
 [jsfiddle-automatic-webform]: https://jsfiddle.net/kropsi/16ty8vna/
 [jsfiddle-templated-webform]: https://jsfiddle.net/kropsi/7jk0yzx4/
 [jsfiddle-programmatic-implementation]: https://jsfiddle.net/kropsi/mf3ux8hg/
+[npm-businesslogic]: https://www.npmjs.com/package/businesslogic
