@@ -39,7 +39,7 @@ Including it anyware on your page will generate a form like the following exampl
 
 ![alt text][automatic-webform]
 
-Adding *stylesheet link-tag* and *class attribute* are optional. Consider your styling options with [styling guidelines][styling guide].
+Use our [styling guidelines][styling guide] to achieve your unique look.
 
 **Please note:** *Auto-generated forms are also accessible [programmatically](#use-businesslogic-programmatically).*
 
@@ -83,7 +83,7 @@ This will generate a form like the following example. [See a live example here][
 
 ![alt text][templated-webform]
 
-Consider your styling options with [styling guidelines][styling guide].
+Use our [styling guidelines][styling guide] to achieve your unique look.
 
 **Please note:** *Webforms created this way are also accessible [programmatically](#use-businesslogic-programmatically).*
 
