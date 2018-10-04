@@ -9,15 +9,15 @@
 ## Use cases
 Whenever you need to add interactive content or weblogic:
 
-* Build an online calculator that takes inputs and converts them into outputs without revealing the logic
-* Create a pricing tool for your sales force without giving access to the underlying logic
-* Convert a static consulting analysis into a dynamic model for your clients
-* Publish a public poll or diagnostic tool that provides custom insights to users
-* Run different scenarios through your financial model to measure sensitivity
+* Build an online calculator that takes inputs and converts them into outputs without revealing the logic.
+* Create a pricing tool for your sales force without giving access to the underlying logic.
+* Publish a public poll to provide custom insights to users based on your decisioning model.
+* Convert a static consulting analysis into a dynamic charts and visualisations for your clients.
+* [More use cases here...][use cases]
 
 ---
 
-## Usage
+## How to use?
 Businesslogic library is intended to be used in three ways:
 1. [Create auto-generated webforms](#auto-generated-webforms)
 1. [Create webforms based on a template](#webforms-based-on-a-template)
@@ -89,7 +89,7 @@ Consider your styling options with [styling guidelines][styling guide].
 
 ---
 ### Use businesslogic programmatically
-Here is an example how you can use it directly on the page using code
+Here is an example how you can use it directly on the page using code.
 
 #### Use the library on a webpage
 Use businesslogic library to connect and to execute functionality in your businesslogic webservice.
@@ -132,13 +132,13 @@ You are able to get and manipulate with any webservice from the collection.
 In this way you can interconnect several webservices together or to enrich their functionality using external ressources.
 
 #### Use the library in development environment
-Install businesslogic library
+Install businesslogic library:
 
 ```
 npm install businesslogic
 ```
   
-Use it in the code like so
+Use it in the code like so:
 
 ```javascript
 var Businesslogic = require('Businesslogic');
@@ -168,6 +168,7 @@ In lieu of a formal style guide, take care to maintain the existing coding style
 [automatic-webform]: ./assets/images/businesslogic-automatic-approach.png "Automaticaly generated businesslogic webform based on a standard template"
 [templated-webform]: ./assets/images/businesslogic-automatic-approach.png "Businesslogic wrapped into a template of your choice"
 [styling guide]: ./wiki/styling-guide.md
+[use cases]: ./wiki/use-cases.md
 [jsfiddle-automatic-webform]: https://google.com
 [jsfiddle-templated-webform]: https://google.com
 [jsfiddle-programmatic-implementation]: https://google.com
