@@ -134,6 +134,7 @@ export class Webservice {
             // Wait until we have webservice schema
             this.executeLater = true;
             //return new Promise(() => {});
+            return;
         }
 
 

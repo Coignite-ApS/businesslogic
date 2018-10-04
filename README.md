@@ -39,7 +39,7 @@ Create a businesslogic driven webform with only a few lines of code and your own
 ```
 Including it anyware on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
 
-![alt text][automatic-webform]
+[![alt text][automatic-webform]][jsfiddle-automatic-webform]
 
 Use our [styling guidelines][styling guide] to achieve your unique look.
 
@@ -81,9 +81,9 @@ Wire your own webform template with businesslogic. In this cases businesslogic u
 </div>
 ```
 
-This will generate a form like the following example. [See a live example here][jsfiddle-templated-webform]
+This will generate a form like the following example. [See a live example here][jsfiddle-templated-webform].
 
-![alt text][templated-webform]
+[![alt text][templated-webform]][jsfiddle-templated-webform]
 
 Use our [styling guidelines][styling guide] to achieve your unique look.
 
