@@ -7,7 +7,7 @@
 ---
 
 ## Use cases
-Whenever you need to add interactive content or weblogic:
+Whenever you need interactive content or weblogic:
 
 * Build an online calculator that takes inputs and converts them into outputs without revealing the logic.
 * Create a pricing tool for your sales force without giving access to the underlying logic.
