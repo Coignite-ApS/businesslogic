@@ -6,6 +6,8 @@
 
 ---
 
+[![Join the chat at https://gitter.im/businesslogiconline/Lobby](https://badges.gitter.im/businesslogiconline/Lobby.svg)](https://gitter.im/businesslogiconline/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ## Use cases
 Whenever you need interactive content or weblogic:
 
