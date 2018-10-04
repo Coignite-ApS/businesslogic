@@ -2,14 +2,14 @@
 <img alt="businesslogic.js" title="businesslogic.js" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png" width="120">
 </p>
 <h1 align="center" style="color: #1F3957">Businesslogic</h1>
-<p align="center">A small javascript library for creating weblogic and interactive content using <a href="https://businesslogic.online" target="_blank">businesslogic.online</a> webservices.</p>
+<p align="center">A small javascript library for creating interactive content and decisioning automation using <a href="https://businesslogic.online" target="_blank">businesslogic.online</a> webservices.</p>
 
 ---
 
 [![Join the chat at https://gitter.im/businesslogiconline/Lobby](https://badges.gitter.im/businesslogiconline/Lobby.svg)](https://gitter.im/businesslogiconline/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Use cases
-Whenever you need interactive content or weblogic:
+Whenever you need interactive content, calculations or decisioning logic:
 
 * Build an online calculator that takes inputs and converts them into outputs without revealing the logic.
 * Create a pricing tool for your sales force without giving access to the underlying logic.
