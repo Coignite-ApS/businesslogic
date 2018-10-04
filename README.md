@@ -2,7 +2,18 @@
 <img alt="businesslogic.js" title="businesslogic.js" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png" width="120">
 </p>
 <h1 align="center" style="color: #1F3957">Businesslogic</h1>
-<p align="center">A small javascript library for creating interactive webforms and logic functionality using <a href="https://businesslogic.online" target="_blank">https://businesslogic.online</a>.</p>
+<p align="center">A small javascript library for creating weblogic and interactive content using <a href="https://businesslogic.online" target="_blank">businesslogic.online</a> webservices.</p>
+
+---
+
+## Use cases
+Whenever you need to add interactive content or weblogic:
+
+* Build an online calculator that takes inputs and converts them into outputs without revealing the logic
+* Create a pricing tool for your sales force without giving access to the underlying logic
+* Convert a static consulting analysis into a dynamic model for your clients
+* Publish a public poll or diagnostic tool that provides custom insights to users
+* Run different scenarios through your financial model to measure sensitivity
 
 ---
 
@@ -17,7 +28,7 @@ Businesslogic library is intended to be used in three ways:
 ---
 
 ### Auto-generated webforms
-Create a businesslogic driven webform with only a few lines of code.
+Create a businesslogic driven webform with only a few lines of code and your own webservice token `bl-token="[your-businesslogic-webservice-token]"`.
 
 ```html
 <script type="module" src="businesslogic.js"></script>
