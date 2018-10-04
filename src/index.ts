@@ -133,18 +133,19 @@ export class Webservice {
         } else {
             // Wait until we have webservice schema
             this.executeLater = true;
-            return new Promise(() => {});
+            //return new Promise(() => {});
         }
 
 
         return new Promise((resolve: any, reject: any) => {
             this.http.makeRequest('POST','https://api.businesslogic.online/execute', this.data)
                 .then(function (result) {
+                    resolve(result);
                     if(vm.webform) {
                         // If webservice was assigned to a webform print outputs to assigned elements
                         vm.handleWebformOutputs(result);
                     }
-                    resolve(result);
+
                     log(result);
                 })
                 .catch(function (error) {
