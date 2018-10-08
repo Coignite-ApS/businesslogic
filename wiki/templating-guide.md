@@ -5,7 +5,7 @@ It is possible to create a template using any templating engine, such as bootstr
 Initialse the form using `bl-token="[your-businesslogic-webservice-token]"`. You can also provide a name using `bl-name="[name]"` if you have multiple webforms.
 
 ```html
-<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
+<div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc">
     <!-- content goes here -->
 </div>
 ```
@@ -21,7 +21,7 @@ The following attributes are supported for inputs:
 * `bl-control="submit"` binds a submission button. (Optional)
 
 ```html
-<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
+<div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc">
   <div class="input-group">
     <div class="form-group">
       <label bl-input-label="salary_per_month" for="salary_per_month"></label>
@@ -53,7 +53,7 @@ The following attributes are supported for outputs:
 * `bl-output="[parameter]"` binds to value of the parameter. (Optional)
 
 ```html
-<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc">
+<div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc">
   <div class="input-group">
     <div class="form-group">
       <label bl-input-label="salary_per_month" for="salary_per_month"></label>

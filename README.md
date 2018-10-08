@@ -103,7 +103,7 @@ Use businesslogic library to connect and to execute functionality in your busine
   
     // You can execute a webservice using Webservice class
     
-    var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+    var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
     biz.setParams({ "goal": 10000, "deadline": 2019 });
     biz.setParam("goal", 10000);
 
@@ -123,11 +123,11 @@ You are able to get and manipulate with any webservice from the collection.
 <script>
   window.onload = function () {
     
-    var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+    var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
     
-    Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
-    Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParam("goal", 10000);
-    Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
+    Businesslogic.Webservices.get('cf4c7b6555db4c98bda752f750e2684f').setParams({ "goal": 15000, "deadline": 2019 });
+    Businesslogic.Webservices.get('cf4c7b6555db4c98bda752f750e2684f').setParam("goal", 10000);
+    Businesslogic.Webservices.get('cf4c7b6555db4c98bda752f750e2684f').execute();
   };
 </script>
 ```
@@ -145,7 +145,7 @@ Use it in the code like so:
 ```javascript
 var Businesslogic = require('Businesslogic');
 
-var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
 biz.setParams({ "goal": 10000, "deadline": 2019 });
 
 biz.execute().then(function (result) {
