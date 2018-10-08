@@ -35,7 +35,7 @@ Create a businesslogic driven webform with only a few lines of code and your own
 ```html
 <script type="module" src="https://businesslogic.online/lib/businesslogic.1.0.0.js"></script>
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
-<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" bl-auto class="bl-theme bl-theme-fonts"></div>
+<div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto class="bl-theme bl-theme-fonts"></div>
 ```
 Including it anyware on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
 
@@ -55,7 +55,7 @@ Wire your own webform template with businesslogic. In this cases businesslogic u
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
 
 <!-- Your own webform -->
-<div bl-token="5009a8b8529d4c059560a863f8904e31" bl-name="calc" class="bl-theme bl-theme-fonts">
+<div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" class="bl-theme bl-theme-fonts">
   <div class="input-group">
     <div class="form-group">
       <label bl-input-label="salary_per_month" for="salary_per_month"></label>
