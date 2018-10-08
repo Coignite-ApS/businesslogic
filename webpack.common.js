@@ -5,6 +5,19 @@ const CleanWebpackPlugin = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const package = require('./package.json');
 
+/*
+TODO: Support for integrity and crossorigin
+
+https://www.srihash.org
+
+<script
+  src="https://code.jquery.com/jquery-3.3.1.js"
+  integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60="
+  crossorigin="anonymous"></script>
+
+
+ */
+
 var banner =
     package.name + '\n' +
     'version ' + package.version + '\n' +
@@ -24,7 +37,7 @@ module.exports = {
         // Main files
         './src/index.ts'
     ],
-    devtool: 'inline-source-map',
+    //devtool: 'inline-source-map',
     module: {
         rules: [
             {
@@ -51,7 +64,7 @@ module.exports = {
                         loader: 'css-loader',
                         options: {
                             minimize: true,
-                            sourceMap: true,
+                            //sourceMap: true,
                             importLoaders: 2
                         }
 

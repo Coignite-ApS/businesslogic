@@ -28,6 +28,10 @@ export interface ValidationFailedEvent {
     errors: WebFormErrors;
 }
 
+export interface DataChangedEvent {
+    data: any;
+}
+
 
 // Todo: Needs to be split into more logical parts
 
@@ -41,10 +45,12 @@ export class Webservice {
     private outputSchema: any;
     private relatedData: any;
     private executeLater: boolean;
+    private cachedParams: any;
     private errors:WebFormErrors;
 
     public onSchemaRecevied = new TypedEvent<SchemaReceivedEvent>();
     public onValidationFailed = new TypedEvent<ValidationFailedEvent>();
+    public onDataChanged = new TypedEvent<DataChangedEvent>();
 
     constructor(key:string = '', webform?:WebForm) {
         this.key = key;
@@ -53,6 +59,9 @@ export class Webservice {
         this.http = new http(key);
         this.executeLater = false;
         this.errors = {};
+        this.cachedParams = {};
+
+
         this.init();
     }
 
@@ -67,6 +76,8 @@ export class Webservice {
                 outputSchema: vm.outputSchema = result.expected_output || {},
                 relatedData: vm.relatedData = result.available_data || {}
             });
+            vm.initDataTypes();
+            vm.setParamsFromCachedParams();
             if(this.webform) vm.enrichWebFormInputs();
         }).then(() => {
             // If execute was called before /describe was called
@@ -79,14 +90,14 @@ export class Webservice {
                     let vm = this;
                     let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
                     let type = vm.inputSchema.properties[param].type;
-                    vm.setParam(param,value);
+                    vm.setParamFromWebform(param,value);
                     this.webform.inputs[param].input_el.addEventListener('blur',function (e) {
                         vm.validateInput(param);
                         vm.webform.inputs[param].input_el.classList.add('touched');
                     });
                     this.webform.inputs[param].input_el.addEventListener('input',function (e) {
                         vm.validateInput(param);
-                        vm.setParam(param,this.value)
+                        vm.setParamFromWebform(param,this.value);
                     });
                     // If there is no submit button we execute the form upon a valid input
                     if(this.webform.controls['submit'] === undefined) {
@@ -97,9 +108,16 @@ export class Webservice {
                 }
                 for(let name in this.webform.controls) {
                     let vm = this;
-                    this.webform.controls[name].control_el.addEventListener('click',function (e) {
-                        if(vm.validate()) vm.execute();
-                    })
+                    if(name == 'submit') {
+                        this.webform.controls[name].control_el.addEventListener('click',function (e) {
+                            if(vm.validate()) vm.execute();
+                        })
+                    }
+                    if(name == 'reset') {
+                        this.webform.controls[name].control_el.addEventListener('click',function (e) {
+                            vm.clearParams()
+                        })
+                    }
                 }
             }
             // Adds this webservice to the collection of Webservices
@@ -111,12 +129,94 @@ export class Webservice {
         this.webform = webform;
     }
 
+    public clearParams():void {
+        // Todo: clear the results as well
+        if(this.inputSchema){
+            let vm = this;
+            this.initDataTypes();
+            this.correctDataTypes();
+            for(let param in this.data) {
+                if(this.data.hasOwnProperty(param)){
+                    if(this.webform) {
+                        (<HTMLInputElement>this.webform.inputs[param].input_el).value = this.data[param];
+                    }
+                }
+            }
+            this.validate();
+            this.onDataChanged.emit({data: vm.data});
+        }
+    }
+
     public setParams(params: any = {}): void {
-        this.data = params;
+        // Todo: make it wait for schema
+        if(this.inputSchema){
+            let vm = this;
+            let dataChanged = false;
+            this.data = params;
+            for(let param in params) {
+                if(this.data.hasOwnProperty(param)){
+                    if(this.data[param] !== params[param]) {
+                        if(this.webform) {
+                            (<HTMLInputElement>this.webform.inputs[param].input_el).value = params[param];
+                        }
+                        this.data[param] = params[param];
+                        dataChanged = true;
+                    }
+                }
+            }
+            if(dataChanged) this.onDataChanged.emit({data: vm.data});
+        } else {
+            for(let param in params) {
+                if(params.hasOwnProperty(param)){
+                    this.cachedParams[param] = params[param];
+                }
+            }
+        }
     }
 
     public setParam(param: string, value: any): void {
-        this.data[param] = value;
+        // Todo: make it wait for schema
+
+        if(this.inputSchema){
+
+            let vm = this;
+            let dataChanged = false;
+            if (this.data.hasOwnProperty(param)) {
+                if (this.data[param] !== value) {
+                    if (this.webform) {
+                        (<HTMLInputElement>this.webform.inputs[param].input_el).value = value;
+                    }
+                    this.data[param] = value;
+                    dataChanged = true;
+                }
+                if (dataChanged) this.onDataChanged.emit({data: vm.data});
+            }
+        } else {
+            this.cachedParams[param] = value;
+        }
+
+    }
+
+    private setParamFromWebform(param: string, value: any): void {
+        // Todo: make it wait for schema
+        if(this.inputSchema){
+            let vm = this;
+            let dataChanged = false;
+            if (this.data.hasOwnProperty(param)) {
+                if (this.data[param] !== value) {
+                    this.data[param] = value;
+                    dataChanged = true;
+                }
+            }
+            if (dataChanged) this.onDataChanged.emit({data: vm.data});
+        } else {
+            this.cachedParams[param] = value;
+        }
+    }
+
+    private setParamsFromCachedParams():void {
+        this.setParams(this.cachedParams);
+        this.cachedParams = {};
     }
 
     public getValidationErrors(): WebFormErrors {
@@ -133,10 +233,7 @@ export class Webservice {
         } else {
             // Wait until we have webservice schema
             this.executeLater = true;
-            //return new Promise(() => {});
-            return;
         }
-
 
         return new Promise((resolve: any, reject: any) => {
             this.http.makeRequest('POST','https://api.businesslogic.online/execute', this.data)
@@ -155,6 +252,8 @@ export class Webservice {
                 });
         });
     }
+
+
 
     private validate():Boolean {
         let valid:boolean = true;
@@ -195,8 +294,6 @@ export class Webservice {
                 errors: this.errors
             });
         }
-
-
 
         return valid;
     }
@@ -385,7 +482,6 @@ export class Webservice {
             for(let param in this.data) {
                 if(this.data.hasOwnProperty(param)){
                     let value = this.data[param];
-
                     if(this.inputSchema.properties.hasOwnProperty(param)) {
                         let type = this.inputSchema.properties[param].type;
                         let val: any;
@@ -411,6 +507,14 @@ export class Webservice {
             }
         }
     }
+
+    private initDataTypes() : void {
+        if(this.inputSchema) {
+            for(let param in this.inputSchema.properties) {
+                this.data[param] = null;
+            }
+        }
+    }
 }
 
 
@@ -424,7 +528,7 @@ class ServiceContainer {
     private dict:any;
 
     constructor() {
-        this.dict = JSDict.Create<string, Webservice>()
+        this.dict = JSDict.Create<string, Webservice>();
     }
 
     public add(apiKey:string, webservice:Webservice): void {
@@ -435,6 +539,8 @@ class ServiceContainer {
         }
     }
 
+    // TODO: Make this functions as a promise so you can be sure it is initialised
+    // Remember to have a timeout resolve 30secs
     public get(apiKey:string): Webservice {
         return this.dict[apiKey];
     }
@@ -517,6 +623,8 @@ export { Webservices};
         let name = formList[f].getAttribute('bl-name');
         let key = formList[f].getAttribute('bl-token');
         let auto = (formList[f].getAttribute('bl-auto') === '');
+        let submitLabel = formList[f].getAttribute('bl-control-submit-label');
+        let resetLabel = formList[f].getAttribute('bl-control-reset-label');
 
         if(auto) {
             formList[f].querySelectorAll('*').forEach((o)=>o.remove());
@@ -549,7 +657,17 @@ export { Webservices};
 
                     }
                 }
-                inputs.attachComponent('submit');
+                if(resetLabel !== null) {
+                    inputs.attachComponent('submit-reset',null,{
+                        submit: submitLabel,
+                        reset: resetLabel
+                    });
+                } else {
+                    inputs.attachComponent('submit',null,{
+                        submit: submitLabel
+                    });
+                }
+
                 formList[f].appendChild(inputs.compileWebformComponents());
 
                 for(let param in e.outputSchema.properties) {

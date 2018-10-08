@@ -42,30 +42,32 @@ export class WebFormComponents {
 
     public attachComponent(control:control,param?:string, options?:any): void {
         let component;
+        let submit;
+        let reset;
 
         switch(control) {
             case 'text':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='text' class='form-control' id='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'number':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='number' class='form-control' id='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'integer':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='number' class='form-control' id='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'text-data':
@@ -73,24 +75,24 @@ export class WebFormComponents {
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='number' class='form-control' id='${param}' bl-input='${param}' list='${param}Datalist'>
                     <datalist id='${param}Datalist'></datalist>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'textarea':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <textarea class='form-control' rows='5' id='${param}' bl-input-label='${param}'></textarea>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'select':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <select type='text' class='form-control' id='${param}' bl-input='${param}'></select>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'checkbox':
@@ -107,56 +109,56 @@ export class WebFormComponents {
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='range' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'email':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='email' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'tel':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='tel' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'password':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='password' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'time':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='time' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'date':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='date' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'month':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='month' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
 
@@ -164,19 +166,22 @@ export class WebFormComponents {
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='week' id='${param}' name='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
                 break;
             case 'submit':
+                submit = options.submit ? `value='${options.submit}'` : ``;
                 component = `
-                    <input class='btn' type='submit' bl-control='submit'>
+                    <input class='btn btn-primary' ${submit} type='submit' bl-control='submit'>
                 `;
                 break;
             case 'submit-reset':
+                submit = options.submit ? `value='${options.submit}'` : ``;
+                reset = options.reset ? `value='${options.reset}'` : ``;
                 component = `
-                    <input class='btn' type='submit' bl-control='submit'>
-                    <input class='btn' type='reset' bl-control='reset'>
+                    <input class='btn btn-primary' ${submit} type='submit' bl-control='submit'>
+                    <input class='btn btn-secondary' ${reset} type='reset' bl-control='reset'> 
                 `;
                 break;
             case 'output':
@@ -193,15 +198,15 @@ export class WebFormComponents {
             case 'output-progress':
                 component = `
                     <label for='${param}' bl-output-label='${param}'></label>
-                    <progress bl-output='${param}'></progress>
+                    <progress bl-output='${param}'></p>rogress>
                 `;
                 break;
             default:
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
                     <input type='string' class='form-control' id='${param}' bl-input='${param}'>
-                    <small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small>
+                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
+                    <small bl-input-error='${param}'></small></p>
                 `;
         }
 
