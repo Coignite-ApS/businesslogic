@@ -215,8 +215,10 @@ export class Webservice {
     }
 
     private setParamsFromCachedParams():void {
-        this.setParams(this.cachedParams);
-        this.cachedParams = {};
+        if(!helpers.isEmpty(this.cachedParams)) {
+            this.setParams(this.cachedParams);
+            this.cachedParams = {};
+        }
     }
 
     public getValidationErrors(): WebFormErrors {
