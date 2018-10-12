@@ -5,7 +5,7 @@
 <p align="center">A small javascript library for creating interactive content and decisioning automation using <a href="https://businesslogic.online" target="_blank">businesslogic.online</a> webservices.</p>
 
 ---
-
+[![npm version](https://badge.fury.io/js/businesslogic.svg)](https://badge.fury.io/js/businesslogic)
 [![Join the chat at https://gitter.im/businesslogiconline/Lobby](https://badges.gitter.im/businesslogiconline/Lobby.svg)](https://gitter.im/businesslogiconline/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Use cases
