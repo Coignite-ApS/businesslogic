@@ -20,17 +20,6 @@
     display: block;
   }
 
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: #212529;
-    text-align: left;
-    background-color: #fff;
-  }
-
   [tabindex="-1"]:focus {
     outline: none !important;
   }
@@ -43,12 +32,12 @@
 
   h1, h2, h3, h4, h5, h6 {
     margin-top: 0;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.5em;
   }
 
   p {
     margin-top: 0;
-    margin-bottom: 1rem;
+    margin-bottom: 1em;
   }
 
   abbr[title],
@@ -60,7 +49,7 @@
   }
 
   address {
-    margin-bottom: 1rem;
+    margin-bottom: 1em;
     font-style: normal;
     line-height: inherit;
   }
@@ -69,7 +58,7 @@
   ul,
   dl {
     margin-top: 0;
-    margin-bottom: 1rem;
+    margin-bottom: 1em;
   }
 
   ol ol,
@@ -84,12 +73,12 @@
   }
 
   dd {
-    margin-bottom: .5rem;
+    margin-bottom: .5em;
     margin-left: 0;
   }
 
   blockquote {
-    margin: 0 0 1rem;
+    margin: 0 0 1em;
   }
 
   dfn {
@@ -154,13 +143,13 @@
 
   pre {
     margin-top: 0;
-    margin-bottom: 1rem;
+    margin-bottom: 1em;
     overflow: auto;
     -ms-overflow-style: scrollbar;
   }
 
   figure {
-    margin: 0 0 1rem;
+    margin: 0 0 1em;
   }
 
   img {
@@ -189,8 +178,8 @@
   }
 
   caption {
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
+    padding-top: 0.75em;
+    padding-bottom: 0.75em;
     color: #868e96;
     text-align: left;
     caption-side: bottom;
@@ -202,7 +191,7 @@
 
   label {
     display: inline-block;
-    margin-bottom: .5rem;
+    margin-bottom: .5em;
   }
 
   button {
@@ -280,8 +269,8 @@
     width: 100%;
     max-width: 100%;
     padding: 0;
-    margin-bottom: .5rem;
-    font-size: 1.5rem;
+    margin-bottom: .5em;
+    font-size: 1.5em;
     line-height: inherit;
     color: inherit;
     white-space: normal;

@@ -1,12 +1,14 @@
 @mixin main {
+
   margin-right: auto;
   margin-left: auto;
   @include var(padding, container-padding);
   @include var(background-color, container-background-color);
+  @include var(font-size, font-base-size);
 
   label {
     display: inline-block;
-    margin-bottom: .5rem;
+    margin-bottom: .5em;
   }
 
   input,select {
@@ -20,7 +22,7 @@
 
 
   .form-group, .input-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1em;
     p {
       margin: 0;
     }
@@ -34,8 +36,8 @@
 
   .form-control {
     @include var(height, input-height);
-    padding: .375rem .75rem;
-    font-size: 1rem;
+    padding: .375em .75em;
+    font-size: 1em;
     line-height: 1.5;
     display: block;
   }
@@ -65,19 +67,19 @@
     vertical-align: middle;
     user-select: none;
     border: 1px solid transparent;
-    padding: .375rem .75rem;
-    font-size: 1rem;
+    padding: .375em .75em;
+    font-size: 1em;
     line-height: 1.5;
   }
   select{
     display: inline-block;
     width: 100%;
     @include var(height, input-height);
-    padding: .375rem 1.75rem .375rem .75rem;
+    padding: .375em 1.75em .375em .75em;
     line-height: 1.5;
     color: #495057;
     vertical-align: middle;
-    background: #fff url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23343a40' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") no-repeat right .75rem center;
+    background: #fff url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23343a40' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") no-repeat right .75em center;
     appearance: none;
     background-size: auto auto;
     background-size: 8px 10px;
@@ -93,13 +95,13 @@
     @include var(margin-bottom, container-padding);
   }
   small {
-    height: 1.4rem;
+    height: 1.4em;
     // Firefox height fix
     @-moz-document url-prefix() {
-      height: 1.5rem;
+      height: 1.5em;
     }
-    line-height: 1.05rem;
-    padding-top: .65rem;
+    line-height: 1.05em;
+    padding-top: .65em;
     display: inline-block;
     &[bl-input-description] {
       @include var(color, color-gray);
@@ -201,7 +203,7 @@
     justify-content: space-between;
     border-bottom-width: 1px;
     border-bottom-style: dashed;
-    padding-bottom: 0.6rem;
+    padding-bottom: 0.6em;
     @include var(border-bottom-color, border-color);
     &:not(:first-child):last-child {
       border: none;

@@ -25,10 +25,10 @@ $font-normal: 16px;
 $font-family-sans-serif: Roboto,"Helvetica Neue",Arial,sans-serif;
 $font-family-monospace: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
 
-$border-radius: .15rem;
+$border-radius: .15em;
 
-$input-height: calc(2.25rem + 2px);
-$input-label-size: 1rem;
+$input-height: calc(2.25em + 2px);
+$input-label-size: 1em;
 $input-button-color: white;
 
 $offset-1: 5px;
@@ -93,7 +93,7 @@ $vars: (
   }
 
   .form-inputs, .form-outputs {
-    margin-bottom: 2rem;
+    margin-bottom: 2em;
   }
 
   &.bl-grid-rows,
@@ -179,7 +179,7 @@ $vars: (
         padding-left: $offset-2;
       }
       &:last-child {
-        margin-top: calc(var(--bl-input-label-size) + .6rem);
+        margin-top: calc(var(--bl-input-label-size) + .6em);
         margin-bottom: auto;
         padding-right: 0;
         padding-left: $offset-2;
@@ -230,7 +230,7 @@ $vars: (
   &.bl-grid-columns-reversed
   {
     .form-inputs, .form-outputs {
-      padding-bottom: 2rem;
+      padding-bottom: 2em;
       margin-bottom: 0;
     }
   }
