@@ -1,4 +1,5 @@
 type control =
+    'businesslogic' |
     'text'          |
     'number'        |
     'integer'       |
@@ -28,11 +29,11 @@ export class WebFormComponents {
 
     constructor(groupName?:string) {
         this.webformComponents = '';
-        this.groupName = groupName;
+        this.groupName = groupName ? groupName : '';
     }
 
     public compileWebformComponents():Element {
-        this.webformComponents = this.groupComponents(this.webformComponents ,this.groupName);
+        if(this.groupName !== '')this.webformComponents = this.groupComponents(this.webformComponents ,this.groupName);
         return  new DOMParser().parseFromString(this.webformComponents,'text/html').body.children[0];
     }
 
@@ -46,6 +47,11 @@ export class WebFormComponents {
         let reset;
 
         switch(control) {
+            case 'businesslogic':
+                component = `
+                    <a class='logo' title='Power by businesslogic' href='https://businesslogic.online' target='_blank'></a>
+                `;
+                break;
             case 'text':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
@@ -222,7 +228,7 @@ export class WebFormComponents {
     */
 
         // Wrap inside the group
-        component = this.groupComponents(component,'form-group');
+        if(this.groupName !== '') component = this.groupComponents(component,'form-group');
 
         this.webformComponents += component;
 

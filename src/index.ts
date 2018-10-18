@@ -630,10 +630,14 @@ export { Webservices};
 
         if(auto) {
             formList[f].querySelectorAll('*').forEach((o)=>o.remove());
+            let container:HTMLDivElement = document.createElement('div');
+            container.className = 'bl-form';
+            formList[f].appendChild(container);
             ws = new Webservice(key);
             ws.onSchemaRecevied.on((e)=>{
                 let inputs:WebFormComponents  = new WebFormComponents('form-inputs');
                 let outputs:WebFormComponents  = new WebFormComponents('form-outputs');
+                let signature:WebFormComponents  = new WebFormComponents();
 
                 for(let param in e.inputSchema.properties) {
                     if(e.inputSchema.properties.hasOwnProperty(param)){
@@ -670,7 +674,7 @@ export { Webservices};
                     });
                 }
 
-                formList[f].appendChild(inputs.compileWebformComponents());
+                container.appendChild(inputs.compileWebformComponents());
 
                 for(let param in e.outputSchema.properties) {
                     if(e.outputSchema.properties.hasOwnProperty(param)){
@@ -694,7 +698,13 @@ export { Webservices};
                         }
                     }
                 }
-                formList[f].appendChild(outputs.compileWebformComponents());
+
+                container.appendChild(outputs.compileWebformComponents());
+
+                signature.attachComponent('businesslogic');
+
+                formList[f].appendChild(signature.compileWebformComponents());
+
                 let wf = mapWebForm(formList[f]);
                 ws.assignWebForm(wf);
             });

@@ -110,30 +110,34 @@ $vars: (
 
 
   &.bl-grid-rows {
-    display: flex;
-    flex-flow: column wrap;
-    justify-content: space-between;
-    .form-inputs {
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-      @include var(border-bottom-color, border-color);
-    }
-    .form-outputs {
-      margin-bottom: 0;
+    .bl-form {
+      display: flex;
+      flex-flow: column wrap;
+      justify-content: space-between;
+      .form-inputs {
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        @include var(border-bottom-color, border-color);
+      }
+      .form-outputs {
+        margin-bottom: 0;
+      }
     }
   }
 
   &.bl-grid-rows-reversed {
-    display: flex;
-    flex-flow: column-reverse wrap;
-    justify-content: space-between;
-    .form-outputs {
-      border-bottom-width: 1px;
-      border-bottom-style: solid;
-      @include var(border-bottom-color, border-color);
-    }
-    .form-inputs {
-      margin-bottom: 0;
+    .bl-form {
+      display: flex;
+      flex-flow: column-reverse wrap;
+      justify-content: space-between;
+      .form-outputs {
+        border-bottom-width: 1px;
+        border-bottom-style: solid;
+        @include var(border-bottom-color, border-color);
+      }
+      .form-inputs {
+        margin-bottom: 0;
+      }
     }
   }
 
@@ -235,40 +239,46 @@ $vars: (
     }
   }
   &.bl-grid-columns {
-    display: flex;
-    flex-flow: row wrap;
-    justify-content: space-between;
-    align-items: stretch;
-    & > div {
-      width: 50%;
-      &:first-child {
-        padding-right: $offset-4;
-      }
-      &:last-child {
-        padding-left: $offset-4;
-        border-left-width: 1px;
-        border-left-style: solid;
-        @include var(border-left-color, border-color);
+    .bl-form {
+      display: flex;
+      flex-flow: row wrap;
+      justify-content: space-between;
+      align-items: stretch;
+      & > div {
+        width: 50%;
+        &:first-child {
+          padding-right: $offset-4;
+        }
+        &:last-child {
+          padding-left: $offset-4;
+          border-left-width: 1px;
+          border-left-style: solid;
+          @include var(border-left-color, border-color);
+        }
       }
     }
+
   }
   &.bl-grid-columns-reversed {
-    display: flex;
-    flex-flow: row-reverse wrap;
-    justify-content: space-between;
-    align-items: stretch;
-    & > div {
-      width: 50%;
-      &:first-child {
+    .bl-form {
+      display: flex;
+      flex-flow: row-reverse wrap;
+      justify-content: space-between;
+      align-items: stretch;
+      & > div {
+        width: 50%;
+        &:first-child {
 
-        padding-left: $offset-4;
-        border-left-width: 1px;
-        border-left-style: solid;
-        @include var(border-left-color, border-color);
-      }
-      &:last-child {
-        padding-right: $offset-4;
+          padding-left: $offset-4;
+          border-left-width: 1px;
+          border-left-style: solid;
+          @include var(border-left-color, border-color);
+        }
+        &:last-child {
+          padding-right: $offset-4;
+        }
       }
     }
+
   }
 }
