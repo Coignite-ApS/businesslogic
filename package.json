@@ -12,6 +12,9 @@
   "devDependencies": {
     "@types/node": "^10.10.3",
     "autoprefixer": "^9.1.5",
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.5",
+    "babel-preset-env": "^1.7.0",
     "clean-webpack-plugin": "^0.1.19",
     "css-loader": "^1.0.0",
     "cssnano": "^4.1.4",

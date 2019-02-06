@@ -49,7 +49,7 @@ export class WebFormComponents {
         switch(control) {
             case 'businesslogic':
                 component = `
-                    <a class='logo' title='Power by businesslogic' href='https://businesslogic.online' target='_blank'></a>
+                    <a class='logo' title='Power by businesslogic.online' href='https://businesslogic.online' target='_blank'></a>
                 `;
                 break;
             case 'text':

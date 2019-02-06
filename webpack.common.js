@@ -43,6 +43,7 @@ module.exports = {
             {
                 test: /\.tsx?$/,
                 use: [
+                    { loader: 'babel-loader'},
                     { loader: 'strip-whitespace-loader' },
                     { loader: 'ts-loader' }
                 ],

@@ -140,7 +140,7 @@ $vars: (
       }
     }
   }
-
+  @mixin columns {
   &.bl-inputs-columns-2,
   &.bl-inputs-columns-3
   {
@@ -191,94 +191,108 @@ $vars: (
     }
   }
 
-  &.bl-outputs-columns-2,
-  &.bl-outputs-columns-3
-  {
-    .form-outputs {
-      flex: 1 1 auto;
-      flex-flow: row wrap;
-      justify-content: space-between;
-      align-items: flex-start;
-      align-content: flex-start;
-    }
-  }
 
-  &.bl-outputs-columns-2 .form-outputs {
-    & > div {
-      width: 50%;
-      &:nth-child(2n + 1){
-        padding-right: $offset-4;
-      }
-      &:nth-child(2n + 2){
-        padding-left: $offset-4;
-      }
-    }
-  }
-  &.bl-outputs-columns-3 .form-outputs {
-    & > div {
-      width: 33.333333333%;
-      &:nth-child(2n + 1){
-        padding-right: $offset-2;
-      }
-      &:nth-child(2n + 2){
-        padding-right: $offset-2;
-        padding-left: $offset-2;
-      }
-      &:nth-child(2n + 3){
-        padding-left: $offset-2;
+    &.bl-outputs-columns-2,
+    &.bl-outputs-columns-3
+    {
+      .form-outputs {
+        flex: 1 1 auto;
+        flex-flow: row wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        align-content: flex-start;
       }
     }
-  }
-
-  &.bl-grid-columns,
-  &.bl-grid-columns-reversed
-  {
-    .form-inputs, .form-outputs {
-      padding-bottom: 2em;
-      margin-bottom: 0;
-    }
-  }
-  &.bl-grid-columns {
-    .bl-form {
-      display: flex;
-      flex-flow: row wrap;
-      justify-content: space-between;
-      align-items: stretch;
+    &.bl-outputs-columns-2 .form-outputs {
       & > div {
         width: 50%;
-        &:first-child {
+        &:nth-child(2n + 1){
           padding-right: $offset-4;
         }
-        &:last-child {
+        &:nth-child(2n + 2){
           padding-left: $offset-4;
-          border-left-width: 1px;
-          border-left-style: solid;
-          @include var(border-left-color, border-color);
         }
       }
     }
-
-  }
-  &.bl-grid-columns-reversed {
-    .bl-form {
-      display: flex;
-      flex-flow: row-reverse wrap;
-      justify-content: space-between;
-      align-items: stretch;
+    &.bl-outputs-columns-3 .form-outputs {
       & > div {
-        width: 50%;
-        &:first-child {
-
-          padding-left: $offset-4;
-          border-left-width: 1px;
-          border-left-style: solid;
-          @include var(border-left-color, border-color);
+        width: 33.333333333%;
+        &:nth-child(2n + 1){
+          padding-right: $offset-2;
         }
-        &:last-child {
-          padding-right: $offset-4;
+        &:nth-child(2n + 2){
+          padding-right: $offset-2;
+          padding-left: $offset-2;
+        }
+        &:nth-child(2n + 3){
+          padding-left: $offset-2;
         }
       }
     }
+    .logo {
+      margin: 0 0 0 auto;
+    }
+  }
 
+
+  @mixin grid-columns {
+    &.bl-grid-columns,
+    &.bl-grid-columns-reversed
+    {
+      .form-inputs, .form-outputs {
+        padding-bottom: 2em;
+        margin-bottom: 0;
+      }
+    }
+    &.bl-grid-columns {
+      .bl-form {
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-between;
+        align-items: stretch;
+        & > div {
+          width: 50%;
+          &:first-child {
+            padding-right: $offset-4;
+          }
+          &:last-child {
+            padding-left: $offset-4;
+            border-left-width: 1px;
+            border-left-style: solid;
+            @include var(border-left-color, border-color);
+          }
+        }
+      }
+
+    }
+    &.bl-grid-columns-reversed {
+      .bl-form {
+        display: flex;
+        flex-flow: row-reverse wrap;
+        justify-content: space-between;
+        align-items: stretch;
+        & > div {
+          width: 50%;
+          &:first-child {
+
+            padding-left: $offset-4;
+            border-left-width: 1px;
+            border-left-style: solid;
+            @include var(border-left-color, border-color);
+          }
+          &:last-child {
+            padding-right: $offset-4;
+          }
+        }
+      }
+    }
+  }
+  @media only screen and (min-width: map-get($vars, breakpoint-sm)) {
+    @include grid-columns;
+    @include columns;
+  }
+  @media only screen and (min-width: var(--bl-breakpoint-sm)) {
+    @include grid-columns;
+    @include columns;
   }
 }
