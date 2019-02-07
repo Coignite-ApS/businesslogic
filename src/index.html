@@ -55,6 +55,18 @@
         //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
         //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
 
+        /*
+                    .addEventListener('onExecuted', function (e)  {
+            console.log('data', e.data)
+        })
+         */
+
+        // You can set
+        var bizl = Businesslogic.Webservices.get('5009a8b8529d4c059560a863f8904e31');
+
+        bizl.ExecutedListener.on(function (result) {
+            console.log('data', result)
+        });
     };
 </script>
 
@@ -90,6 +102,7 @@
   <hr>
   <p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
 </div>
+<!--
 <p>&nbsp;</p>
 <div bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto
      bl-control-submit-label="Submit"
@@ -109,7 +122,7 @@
 <div class="bl-theme bl-theme-fonts bl-grid-rows bl-inputs-columns-2 bl-outputs-columns-2"  bl-name="calc3" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto>
   <p>Test</p>
 </div>
-
+-->
 </body>
 
 

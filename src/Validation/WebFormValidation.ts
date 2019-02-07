@@ -46,7 +46,6 @@ export class WebFormValidation {
                 let willValidate = input.willValidate; // Returns true if the element will be validated when the form is submitted; false otherwise.
                 let custom = false;
                 let message = '';
-                console.log(input)
                 if(!this.customErrorMessages) {
                     message = input.validationMessage; // Returns the error message that would be shown to the user if the element was to be checked for validity.
                 } else if(input.validity.valueMissing) {
@@ -90,7 +89,7 @@ export class WebFormValidation {
 
         if(!valid) {
             /*
-            this.onValidationFailed.emit({
+            this.ValidationFailedListener.emit({
                 errors: this.errors
             });
             */

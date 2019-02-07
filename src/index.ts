@@ -7,7 +7,7 @@ import { WebFormComponents } from './Dom/WebFormComponents';
 import * as helpers from './Helpers/HelperFunctions';
 import { JSDict } from './Helpers/TypedDictionary';
 
-type status = 'onInit' | 'onSchemaReceived' | 'onValidationFailed';
+type status = 'onInit' | 'onSchemaReceived' | 'onValidationFailed' | 'onExecuted';
 
 declare global {
     interface Window {
@@ -32,6 +32,10 @@ export interface DataChangedEvent {
     data: any;
 }
 
+export interface ExecutedEvent {
+    data: any;
+}
+
 
 // Todo: Needs to be split into more logical parts
 
@@ -48,9 +52,10 @@ export class Webservice {
     private cachedParams: any;
     private errors:WebFormErrors;
 
-    public onSchemaRecevied = new TypedEvent<SchemaReceivedEvent>();
-    public onValidationFailed = new TypedEvent<ValidationFailedEvent>();
-    public onDataChanged = new TypedEvent<DataChangedEvent>();
+    public SchemaReceviedListener = new TypedEvent<SchemaReceivedEvent>();
+    public ValidationFailedListener = new TypedEvent<ValidationFailedEvent>();
+    public DataChangedListener = new TypedEvent<DataChangedEvent>();
+    public ExecutedListener = new TypedEvent<ExecutedEvent>();
 
     constructor(key:string = '', webform?:WebForm) {
         this.key = key;
@@ -67,11 +72,14 @@ export class Webservice {
 
     private init() : void{
 
+        // Adds this webservice to the collection of Webservices
+        Webservices.add(this.key,this);
+
         let vm = this;
 
         // Retrieve all relevant webservice metadata
         this.getWebserviceDocs().then((result) => {
-            this.onSchemaRecevied.emit({
+            this.SchemaReceviedListener.emit({
                 inputSchema: vm.inputSchema = result.expected_input || {},
                 outputSchema: vm.outputSchema = result.expected_output || {},
                 relatedData: vm.relatedData = result.available_data || {}
@@ -120,8 +128,7 @@ export class Webservice {
                     }
                 }
             }
-            // Adds this webservice to the collection of Webservices
-            Webservices.add(this.key,this);
+
         })
     }
 
@@ -143,7 +150,7 @@ export class Webservice {
                 }
             }
             this.validate();
-            this.onDataChanged.emit({data: vm.data});
+            this.DataChangedListener.emit({data: vm.data});
         }
     }
 
@@ -164,7 +171,7 @@ export class Webservice {
                     }
                 }
             }
-            if(dataChanged) this.onDataChanged.emit({data: vm.data});
+            if(dataChanged) this.DataChangedListener.emit({data: vm.data});
         } else {
             for(let param in params) {
                 if(params.hasOwnProperty(param)){
@@ -189,7 +196,7 @@ export class Webservice {
                     this.data[param] = value;
                     dataChanged = true;
                 }
-                if (dataChanged) this.onDataChanged.emit({data: vm.data});
+                if (dataChanged) this.DataChangedListener.emit({data: vm.data});
             }
         } else {
             this.cachedParams[param] = value;
@@ -208,7 +215,7 @@ export class Webservice {
                     dataChanged = true;
                 }
             }
-            if (dataChanged) this.onDataChanged.emit({data: vm.data});
+            if (dataChanged) this.DataChangedListener.emit({data: vm.data});
         } else {
             this.cachedParams[param] = value;
         }
@@ -245,8 +252,7 @@ export class Webservice {
                         // If webservice was assigned to a webform print outputs to assigned elements
                         vm.handleWebformOutputs(result);
                     }
-
-                    log(result);
+                    vm.ExecutedListener.emit(result);
                 })
                 .catch(function (error) {
                     reject(error);
@@ -292,7 +298,7 @@ export class Webservice {
 
 
         if(!valid) {
-            this.onValidationFailed.emit({
+            this.ValidationFailedListener.emit({
                 errors: this.errors
             });
         }
@@ -634,7 +640,7 @@ export { Webservices};
             container.className = 'bl-form';
             formList[f].appendChild(container);
             ws = new Webservice(key);
-            ws.onSchemaRecevied.on((e)=>{
+            ws.SchemaReceviedListener.on((e)=>{
                 let inputs:WebFormComponents  = new WebFormComponents('form-inputs');
                 let outputs:WebFormComponents  = new WebFormComponents('form-outputs');
                 let signature:WebFormComponents  = new WebFormComponents();
