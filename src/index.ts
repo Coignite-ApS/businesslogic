@@ -204,6 +204,11 @@ export class Webservice {
 
     }
 
+    public getParams(): void {
+        return this.cachedParams;
+
+    }
+
     private setParamFromWebform(param: string, value: any): void {
         // Todo: make it wait for schema
         if(this.inputSchema){
