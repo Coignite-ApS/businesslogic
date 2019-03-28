@@ -377,7 +377,8 @@ export class Webservice {
                     if(definition.default) input.value = definition.default;
 
 
-                    // Set options
+                    // Set options for enum
+                    // TODO: Consider switching to simple version of enum without dataobject
                     if(definition.enum) {
 
                         // Handle labels
@@ -418,6 +419,29 @@ export class Webservice {
                                 let option = document.createElement('option');
                                 option.text = inputData && inputData[i][labelFieldName] || definition.enum[i];
                                 option.value = inputData && inputData[i]['year'] || definition.enum[i];
+                                select.add(<HTMLOptionElement>option);
+                            }
+                        } else {
+                            // TODO: Consider alternative inputs for select with options
+                        }
+                    }
+
+                    // Set options for oneOf
+                    if(definition.oneOf) {
+
+                        // TODO: Consider support of optgroup
+                        if(!!select) {
+                            select.querySelectorAll('option').forEach((o)=>{
+                                if(o.getAttribute('bl-placeholder') === '') {
+                                    (<HTMLOptionElement>o).value ='';
+                                } else {
+                                    o.remove();
+                                }
+                            });
+                            for(let i=0; i < definition.oneOf.length; i++) {
+                                let option = document.createElement('option');
+                                option.text = definition.oneOf[i].title;
+                                option.value = definition.oneOf[i].const;
                                 select.add(<HTMLOptionElement>option);
                             }
                         } else {
@@ -653,7 +677,7 @@ export { Webservices};
                 for(let param in e.inputSchema.properties) {
                     if(e.inputSchema.properties.hasOwnProperty(param)){
                         let type = e.inputSchema.properties[param].type;
-                        let enumeration = e.inputSchema.properties[param].enum;
+                        let enumeration = e.inputSchema.properties[param].enum || e.inputSchema.properties[param].oneOf;
                         let input;
                         if(enumeration) {
                             inputs.attachComponent('select',param);
@@ -690,7 +714,7 @@ export { Webservices};
                 for(let param in e.outputSchema.properties) {
                     if(e.outputSchema.properties.hasOwnProperty(param)){
                         let type = e.outputSchema.properties[param].type;
-                        let enumeration = e.outputSchema.properties[param].enum;
+                        let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
                         let output;
                         if(enumeration) {
                             outputs.attachComponent('select',param);
