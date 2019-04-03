@@ -33,7 +33,7 @@ Businesslogic library is intended to be used in three ways:
 Create a businesslogic driven webform with only a few lines of code and your own webservice token `bl-token="[your-businesslogic-webservice-token]"`.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto class="bl-theme bl-theme-fonts"></div>
 ```
@@ -51,7 +51,7 @@ Use our [styling guidelines][styling guide] to achieve your unique look.
 Wire your own webform template with businesslogic. In this cases businesslogic uses it as a template.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
 
 <!-- Your own webform -->
@@ -97,7 +97,7 @@ Here is an example how you can use it directly on the page using code.
 Use businesslogic library to connect and to execute functionality in your businesslogic webservice.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
 <script>
   window.onload = function () {
   
@@ -119,7 +119,7 @@ Use businesslogic library to connect and to execute functionality in your busine
 You are able to get and manipulate with any webservice from the collection.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
 <script>
   window.onload = function () {
     
