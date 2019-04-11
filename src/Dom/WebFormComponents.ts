@@ -19,6 +19,7 @@ type control =
     'submit'        |
     'submit-reset'  |
     'output'        |
+    'output-array'  |
     'output-meter'  |
     'output-progress'
 
@@ -194,6 +195,14 @@ export class WebFormComponents {
                 component = `
                     <label class='output-row'><div><span bl-output-label='${param}'></span><span>: </span></div><div><span bl-output='${param}'></span> <span bl-output-description='${param}'></span></div></label>
                 `;
+                break;
+            case 'output-array':
+                component = `
+                    <label class=''><div><span bl-output-label='${param}'></span><span>: </span></div><div><span bl-output-description='${param}'></span></div>
+                    </label>
+                    <p class='output-array small'><span bl-output='${param}'></span></p>
+                `;
+                //<ul bl-output-array='${param}'>${options.map((option: any) => { return Object.keys(option).map((key: any) => `<li bl-output-array-item='${key}'>${option[key]}</li>`) }).join('')}</ul>
                 break;
             case 'output-meter':
                 component = `

@@ -202,12 +202,29 @@
     flex-flow: row wrap;
     justify-content: space-between;
     border-bottom-width: 1px;
-    border-bottom-style: dashed;
+    border-bottom-style: solid;
     padding-bottom: 0.6em;
     @include var(border-bottom-color, border-color);
     &:not(:first-child):last-child {
       border: none;
     }
+  }
+  .output-array {
+    text-align: right;
+    ul {
+      list-style-type: none;
+      padding: 10px 0;
+      @include var(color, input-text-color);
+      border-bottom-width: 1px;
+      border-bottom-style: dashed;
+      @include var(border-bottom-color, border-color);
+      &:not(:first-child):last-child {
+        border: none;
+      }
+    }
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    @include var(border-bottom-color, border-color);
   }
   .logo {
     margin: 0 auto;

@@ -32,7 +32,7 @@
 </section>
 <!--<script src="//cdnjs.cloudflare.com/ajax/libs/ajv/6.5.4/ajv.bundle.js"></script>-->
 <!--<script bl-debug type="module" src="businesslogic.1.1.0.js"></script>-->
-<script type="module" src="businesslogic.1.3.0.js"></script>
+<script type="module" src="businesslogic.1.3.1.js"></script>
 <link rel="stylesheet" href="businesslogic-standard-theme.css">
 
 <script>
@@ -40,34 +40,44 @@
 
         // We can execute a webservice using Webservice class
         /*
-        var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
-        biz.setParams({ "goal": 10000, "deadline": 2019 });
-        biz.setParam("goal", 15000);
+                var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+                biz.setParams({ "goal": 10000, "deadline": 2020 });
+                biz.setParam("goal", 15000);
+
+                biz.execute().then(function (result) {
+                    console.log('Output from programmatic execution: ',result)
+                }).catch(function (error) {
+                    console.log('Error in programmatic execution: ',error)
+                });
+
+
+                        // You are able to get and manipulate with any webservice from the collection
+                        //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
+                        //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
+
+                        /*
+                                    .addEventListener('onExecuted', function (e)  {
+                            console.log('data', e.data)
+                        })
+
+
+                        // You can set
+                        var bizl = Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c');
+
+                        bizl.ExecutedListener.on(function (result) {
+                            console.log('data', result)
+                        });
+
 
         biz.execute().then(function (result) {
             console.log('Output from programmatic execution: ',result)
         }).catch(function (error) {
             console.log('Error in programmatic execution: ',error)
         });
-*/
+ */
 
-        // You are able to get and manipulate with any webservice from the collection
-        //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
-        //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
 
-        /*
-                    .addEventListener('onExecuted', function (e)  {
-            console.log('data', e.data)
-        })
-         */
-
-        // You can set
-        var bizl = Businesslogic.Webservices.get('5009a8b8529d4c059560a863f8904e31');
-
-        bizl.ExecutedListener.on(function (result) {
-            console.log('data', result)
-        });
-    };
+    }
 </script>
 
 <div class="custom-theme bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
@@ -100,7 +110,7 @@
   <hr>
   <p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
 </div>
-<!--
+
 <p>&nbsp;</p>
 <div bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto
      bl-control-submit-label="Submit"
@@ -108,6 +118,7 @@
      class="bl-theme bl-theme-fonts bl-grid-columns-reversed">
   <p>Test</p>
 </div>
+<!--
 <p>&nbsp;</p>
 <div class="bl-theme bl-theme-fonts bl-grid-columns"  bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto>
   <p>Test</p>

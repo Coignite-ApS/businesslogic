@@ -7,8 +7,6 @@ import { WebFormComponents } from './Dom/WebFormComponents';
 import * as helpers from './Helpers/HelperFunctions';
 import { JSDict } from './Helpers/TypedDictionary';
 
-type status = 'onInit' | 'onSchemaReceived' | 'onValidationFailed' | 'onExecuted';
-
 declare global {
     interface Window {
         Ajv: any;
@@ -48,9 +46,9 @@ export class Webservice {
     private inputSchema: any;
     private outputSchema: any;
     private relatedData: any;
-    private executeLater: boolean;
     private cachedParams: any;
     private errors:WebFormErrors;
+    private test: number;
 
     public SchemaReceviedListener = new TypedEvent<SchemaReceivedEvent>();
     public ValidationFailedListener = new TypedEvent<ValidationFailedEvent>();
@@ -62,78 +60,93 @@ export class Webservice {
         this.data = {};
         this.webform = webform;
         this.http = new http(key);
-        this.executeLater = false;
         this.errors = {};
         this.cachedParams = {};
+        this.test = 1;
 
 
         this.init();
     }
 
-    private init() : void{
+    private init() : void {
+
+        let vm = this;
 
         // Adds this webservice to the collection of Webservices
         Webservices.add(this.key,this);
 
-        let vm = this;
-
-        // Retrieve all relevant webservice metadata
-        this.getWebserviceDocs().then((result) => {
-            this.SchemaReceviedListener.emit({
-                inputSchema: vm.inputSchema = result.expected_input || {},
-                outputSchema: vm.outputSchema = result.expected_output || {},
-                relatedData: vm.relatedData = result.available_data || {}
-            });
+        this.describe().then(() => {
             vm.initDataTypes();
             vm.setParamsFromCachedParams();
-            if(this.webform) vm.enrichWebFormInputs();
+            vm.enrichWebFormInputs();
         }).then(() => {
-            // If execute was called before /describe was called
-            if(this.executeLater) vm.execute();
-        }).then(() => {
-            // Handle associated webform
-            if(this.webform) {
-                for(let param in this.webform.inputs) {
+            vm.handleAssociatedWebform();
+        });
 
-                    let vm = this;
-                    let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
-                    let type = vm.inputSchema.properties[param].type;
-                    vm.setParamFromWebform(param,value);
-                    this.webform.inputs[param].input_el.addEventListener('blur',function (e) {
-                        vm.validateInput(param);
-                        vm.webform.inputs[param].input_el.classList.add('touched');
+
+    }
+
+    private describe(): Promise<any> {
+
+        let vm = this;
+
+        return new Promise((resolve: any, reject: any) => {
+            // Retrieve all relevant webservice metadata
+            if(vm.inputSchema) {
+                resolve('');
+            } else {
+                this.getWebserviceDocs().then((result) => {
+                    this.SchemaReceviedListener.emit({
+                        inputSchema: vm.inputSchema = result.expected_input || {},
+                        outputSchema: vm.outputSchema = result.expected_output || {},
+                        relatedData: vm.relatedData = result.available_data || {}
                     });
-                    this.webform.inputs[param].input_el.addEventListener('input',function (e) {
-                        vm.validateInput(param);
-                        vm.setParamFromWebform(param,this.value);
-                    });
-                    // If there is no submit button we execute the form upon a valid input
-                    if(this.webform.controls['submit'] === undefined) {
-                        this.webform.inputs[param].input_el.addEventListener('change',function (e) {
-                            if(vm.validate()) vm.execute();
-                        })
-                    }
-                }
-                for(let name in this.webform.controls) {
-                    let vm = this;
-                    if(name == 'submit') {
-                        this.webform.controls[name].control_el.addEventListener('click',function (e) {
-                            if(vm.validate()) vm.execute();
-                        })
-                    }
-                    if(name == 'reset') {
-                        this.webform.controls[name].control_el.addEventListener('click',function (e) {
-                            vm.clearParams()
-                        })
-                    }
-                }
+
+                    resolve(result);
+                })
             }
-
-        })
+        });
     }
 
     public assignWebForm(webform:WebForm): void {
         this.webform = webform;
+    }
+
+    private handleAssociatedWebform():void {
+        for (let param in this.webform.inputs) {
+
+            let vm = this;
+            let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
+            let type = vm.inputSchema.properties[param].type;
+            vm.setParamFromWebform(param, value);
+            this.webform.inputs[param].input_el.addEventListener('blur', function (e) {
+                vm.validateInput(param);
+                vm.webform.inputs[param].input_el.classList.add('touched');
+            });
+            this.webform.inputs[param].input_el.addEventListener('input', function (e) {
+                vm.validateInput(param);
+                vm.setParamFromWebform(param, this.value);
+            });
+            // If there is no submit button we execute the form upon a valid input
+            if (this.webform.controls['submit'] === undefined) {
+                this.webform.inputs[param].input_el.addEventListener('change', function (e) {
+                    if (vm.validate()) vm.execute();
+                })
+            }
+        }
+        for (let name in this.webform.controls) {
+            let vm = this;
+            if (name == 'submit') {
+                this.webform.controls[name].control_el.addEventListener('click', function (e) {
+                    if (vm.validate()) vm.execute();
+                })
+            }
+            if (name == 'reset') {
+                this.webform.controls[name].control_el.addEventListener('click', function (e) {
+                    vm.clearParams()
+                })
+            }
+        }
     }
 
     public clearParams():void {
@@ -155,6 +168,7 @@ export class Webservice {
     }
 
     public setParams(params: any = {}): void {
+
         // Todo: make it wait for schema
         if(this.inputSchema){
             let vm = this;
@@ -183,9 +197,7 @@ export class Webservice {
 
     public setParam(param: string, value: any): void {
         // Todo: make it wait for schema
-
         if(this.inputSchema){
-
             let vm = this;
             let dataChanged = false;
             if (this.data.hasOwnProperty(param)) {
@@ -201,12 +213,10 @@ export class Webservice {
         } else {
             this.cachedParams[param] = value;
         }
-
     }
 
     public getParams(): void {
-        return this.cachedParams;
-
+        return this.data || this.cachedParams;
     }
 
     private setParamFromWebform(param: string, value: any): void {
@@ -238,31 +248,34 @@ export class Webservice {
     }
 
     public execute(): Promise<any> {
-
         let vm = this;
 
-        if(this.inputSchema) {
-            // Clean up the parameters before execution
-            this.correctDataTypes();
-        } else {
-            // Wait until we have webservice schema
-            this.executeLater = true;
-        }
-
+        //Wait for documents to get arround
         return new Promise((resolve: any, reject: any) => {
-            this.http.makeRequest('POST','https://api.businesslogic.online/execute', this.data)
-                .then(function (result) {
-                    resolve(result);
-                    if(vm.webform) {
-                        // If webservice was assigned to a webform print outputs to assigned elements
-                        vm.handleWebformOutputs(result);
-                    }
-                    vm.ExecutedListener.emit(result);
-                })
-                .catch(function (error) {
-                    reject(error);
-                    console.error('Augh, there was an error! ', error.status + ': ' + error.statusText);
-                });
+            let test: any;
+            this.describe().then(() => {
+                // Retrieve cached value
+                vm.setParamsFromCachedParams();
+            }).then(() => {
+                // Correct data types
+                vm.correctDataTypes();
+
+                vm.http.makeRequest('POST','https://api.businesslogic.online/execute', vm.data)
+                    .then(function (result) {
+                        if(vm.webform) {
+                            // If webservice was assigned to a webform print outputs to assigned elements
+                            vm.handleWebformOutputs(result);
+                        }
+                        vm.ExecutedListener.emit(result);
+                        test = result;
+                        resolve(result);
+                    })
+                    .catch(function (error) {
+                        reject(error);
+                        console.error('Augh, there was an error! ', error.status + ': ' + error.statusText);
+                    });
+            });
+
         });
     }
 
@@ -374,7 +387,7 @@ export class Webservice {
                     if(!this.inputSchema.required[property])input.setAttribute('required','required');
 
                     // Set default
-                    if(definition.default) input.value = definition.default;
+                    if(definition.default !== null) input.value = definition.default;
 
 
                     // Set options for enum
@@ -489,14 +502,14 @@ export class Webservice {
                     let label = this.webform.outputs[property].label_el;
                     let description = this.webform.outputs[property].desc_el;
                     let type = this.outputSchema.properties[property].type;
-                    let input = this.webform.outputs[property].output_el;
+                    let output = this.webform.outputs[property].output_el;
 
                     // Set title and description
                     if(definition.title) label.innerHTML = definition.title;
                     if(definition.description) description.innerHTML = definition.description;
 
                     // Set default
-                    if(definition.default) input.innerHTML = definition.default;
+                    if(definition.default) output.innerHTML = definition.default;
                 }
             }
         }
@@ -504,12 +517,28 @@ export class Webservice {
 
 
     private handleWebformOutputs(results: any = {}):void {
+
         for(let result in results) {
             for(let param in this.webform.outputs) {
+                console.log(results[param]);
                 if(result === param) {
-                    this.webform.outputs[param].output_el.innerHTML = results[param];
+                    if(Array.isArray(results[param])) {
+                        let values = '';
+                        for(let field in results[param]) {
+                            values += '<ul>';
+                            for(let entry in results[param][field]) {
+                                values += '<li>' + results[param][field][entry] + '</li>';
+                            }
+                            values += '</ul>';
+                        }
+
+                        // TODO: Handle array outputs with proper component from WebFormComponents
+                        this.webform.outputs[param].output_el.innerHTML = values;
+                    } else {
+                        this.webform.outputs[param].output_el.innerHTML = results[param];
+                    }
                 }
-                // TODO: Handle array outputs
+
             }
         }
     }
@@ -680,8 +709,8 @@ export { Webservices};
                         let enumeration = e.inputSchema.properties[param].enum || e.inputSchema.properties[param].oneOf;
                         let input;
                         if(enumeration) {
+                            //TODO: We can already here generate dropdown options
                             inputs.attachComponent('select',param);
-
                         } else {
                             switch (type) {
                                 case 'number':
@@ -715,7 +744,7 @@ export { Webservices};
                     if(e.outputSchema.properties.hasOwnProperty(param)){
                         let type = e.outputSchema.properties[param].type;
                         let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
-                        let output;
+                        let output = e.outputSchema.properties[param];
                         if(enumeration) {
                             outputs.attachComponent('select',param);
 
@@ -726,6 +755,10 @@ export { Webservices};
                                     break;
                                 case 'integer':
                                     outputs.attachComponent('output',param);
+                                    break;
+                                //TODO: Consider how we can prepaire placeholders for data in the output for an array
+                                case 'array':
+                                    outputs.attachComponent('output-array',param,[{"name": 1}]);
                                     break;
                                 default:
                                     outputs.attachComponent('output',param);
