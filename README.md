@@ -98,7 +98,7 @@ A combination of templating and a programatic approach can be used to extend tem
 Here is an example how you can use it directly on the page using code.
 
 #### Use the library on a webpage
-Use businesslogic library to connect and to execute functionality in your businesslogic webservice.
+Use businesslogic library to connect and to execute functionality in your businesslogic webservice. [See a live example here][jsfiddle-programmatic-implementation].
 
 ```html
 <script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
