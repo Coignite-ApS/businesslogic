@@ -78,9 +78,9 @@ export class Webservice {
         this.describe().then(() => {
             vm.initDataTypes();
             vm.setParamsFromCachedParams();
-            vm.enrichWebFormInputs();
+            if(this.webform) vm.enrichWebFormInputs();
         }).then(() => {
-            vm.handleAssociatedWebform();
+            if(this.webform) vm.handleAssociatedWebform();
         });
 
 
