@@ -172,7 +172,7 @@ In lieu of a formal style guide, take care to maintain the existing coding style
 
 
 [automatic-webform]: ./assets/images/businesslogic-automatic-approach.png "Automaticaly generated businesslogic webform based on a standard template"
-[templated-webform]: ./assets/images/businesslogic-automatic-approach.png "Businesslogic wrapped into a template of your choice"
+[templated-webform]: ./assets/images/businesslogic-templating-approach.png "Businesslogic wrapped into a template of your choice"
 [templated-webform-with-chart]: ./assets/images/businesslogic-charting.png "Businesslogic form with chartjs"
 [styling guide]: ./wiki/styling-guide.md
 [use cases]: ./wiki/use-cases.md
