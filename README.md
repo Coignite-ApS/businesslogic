@@ -89,6 +89,10 @@ Use our [styling guidelines][styling guide] to achieve your unique look.
 
 **Please note:** *Webforms created this way are also accessible [programmatically](#use-businesslogic-programmatically).*
 
+A combination of templating and a programatic approach can be used to extend templates with rich visuals, like charts, using charting libraries. [See a live example here][jsfiddle-templated-webform-with-chart].
+
+[![alt text][templated-webform-with-chart]][jsfiddle-templated-webform-with-chart]
+
 ---
 ### Use businesslogic programmatically
 Here is an example how you can use it directly on the page using code.
@@ -169,9 +173,11 @@ In lieu of a formal style guide, take care to maintain the existing coding style
 
 [automatic-webform]: ./assets/images/businesslogic-automatic-approach.png "Automaticaly generated businesslogic webform based on a standard template"
 [templated-webform]: ./assets/images/businesslogic-automatic-approach.png "Businesslogic wrapped into a template of your choice"
+[templated-webform-with-chart]: ./assets/images/businesslogic-charting.png "Businesslogic form with chartjs"
 [styling guide]: ./wiki/styling-guide.md
 [use cases]: ./wiki/use-cases.md
 [jsfiddle-automatic-webform]: https://jsfiddle.net/kropsi/16ty8vna/
 [jsfiddle-templated-webform]: https://jsfiddle.net/kropsi/7jk0yzx4/
+[jsfiddle-templated-webform-with-chart]: https://jsfiddle.net/kropsi/f1cu830j/
 [jsfiddle-programmatic-implementation]: https://jsfiddle.net/kropsi/mf3ux8hg/
 [npm-businesslogic]: https://www.npmjs.com/package/businesslogic
