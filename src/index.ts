@@ -386,7 +386,7 @@ export class Webservice {
                     // Set required
                     if(!this.inputSchema.required[property])input.setAttribute('required','required');
 
-                    // Set default
+                    // Set default to inputs (not select)
                     if(definition.default !== null) input.value = definition.default;
 
 
@@ -431,7 +431,13 @@ export class Webservice {
                             for(let i=0; i < definition.enum.length; i++) {
                                 let option = document.createElement('option');
                                 option.text = inputData && inputData[i][labelFieldName] || definition.enum[i];
-                                option.value = inputData && inputData[i]['year'] || definition.enum[i];
+                                option.value = inputData && inputData[i][labelObjName] || definition.enum[i];
+                                // Set defaults for select
+                                if(definition.default !== null) {
+                                    if(option.value === String(definition.default)) {
+                                        option.setAttribute('selected', 'selected')
+                                    }
+                                }
                                 select.add(<HTMLOptionElement>option);
                             }
                         } else {
@@ -455,6 +461,12 @@ export class Webservice {
                                 let option = document.createElement('option');
                                 option.text = definition.oneOf[i].title;
                                 option.value = definition.oneOf[i].const;
+                                // Set defaults for select
+                                if(definition.default !== null) {
+                                    if(option.value === String(definition.default)) {
+                                        option.setAttribute('selected', 'selected')
+                                    }
+                                }
                                 select.add(<HTMLOptionElement>option);
                             }
                         } else {
