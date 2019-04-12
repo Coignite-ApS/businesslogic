@@ -14,7 +14,7 @@ Attach it with link to the stylesheet and by passing class:
 * `bl-theme-fonts` overrides page fonts with ones from the theme (Optional)
 
 ```html
-<script type="module" src="https//businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https//businesslogic.online/lib/businesslogic.latest.js"></script>
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto
 class="bl-standard-theme bl-theme-fonts"></div>
@@ -24,7 +24,7 @@ class="bl-standard-theme bl-theme-fonts"></div>
 You can override any color or variable in the theme root setting.
 
 ```html
-<script type="module" src="https//businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https//businesslogic.online/lib/businesslogic.latest.js"></script>
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto
 class="bl-standard-theme bl-theme-fonts"></div>
@@ -58,7 +58,7 @@ You can display webforms as columns:
 * `bl-grid-columns-reversed` gives outputs and then inputs as columns (Optional)
 
 ```html
-<script type="module" src="https//businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https//businesslogic.online/lib/businesslogic.latest.js"></script>
 <link rel="stylesheet" href="your-ovn-custom-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto
 class="bl-theme bl-theme-fonts bl-grid-columns"></div>
@@ -68,7 +68,7 @@ class="bl-theme bl-theme-fonts bl-grid-columns"></div>
 You can override any styles directly, using custom styles.
 
 ```html
-<script type="module" src="https//businesslogic.online/lib/businesslogic.1.1.0.js"></script>
+<script type="module" src="https//businesslogic.online/lib/businesslogic.latest.js"></script>
 <link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto
 class="bl-theme bl-theme-fonts custom-theme"></div>
@@ -84,8 +84,8 @@ class="bl-theme bl-theme-fonts custom-theme"></div>
 You can override any styles directly, using a custom stylesheet.
 
 ```html
-<script type="module" src="https//businesslogic.online/lib/businesslogic.1.1.0.js"></script>
-<link rel="stylesheet" href="your-ovn-custom-theme.css">
+<script type="module" src="https//businesslogic.online/lib/businesslogic.latest.js"></script>
+<link rel="stylesheet" href="your-own-custom-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto
 class="your-ovn-custom-theme"></div>
 ```
