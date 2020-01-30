@@ -379,12 +379,13 @@ export class Webservice {
                         select = <HTMLSelectElement>this.webform.inputs[property].input_el;
                     }
 
+
                     // Set title and description
                     if(definition.title) label.innerHTML = definition.title;
                     if(definition.description) description.innerHTML = definition.description;
 
                     // Set required
-                    if(!this.inputSchema.required[property])input.setAttribute('required','required');
+                    if(this.inputSchema.required.includes(property))input.setAttribute('required','required');
 
                     // Set default to inputs (not select)
                     if(definition.default !== null) input.value = definition.default;
@@ -532,7 +533,7 @@ export class Webservice {
 
         for(let result in results) {
             for(let param in this.webform.outputs) {
-                console.log(results[param]);
+                //console.log(results[param]);
                 if(result === param) {
                     if(Array.isArray(results[param])) {
                         let values = '';
