@@ -13,8 +13,8 @@
   "author": "Rassvet ApS <rassvet@rassvet.dk> (https://rassvet.co)",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^10.17.28",
-    "autoprefixer": "^9.8.5",
+    "@types/node": "^10.17.32",
+    "autoprefixer": "^9.8.6",
     "babel-core": "^6.26.3",
     "babel-loader": "^7.1.5",
     "babel-preset-env": "^1.7.0",
