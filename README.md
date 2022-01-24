@@ -1,5 +1,5 @@
 <p align="center">
-<img alt="businesslogic.js" title="businesslogic.js" src="https://businesslogic.online/images/favicon/apple-icon-180x180.png" width="120">
+<img alt="businesslogic.js" title="businesslogic.js" src="https://uploads-ssl.webflow.com/6163f04af154637a4dfbc5a4/6164217046b607243a01c2c9_icon_256.png" width="120">
 </p>
 <h1 align="center" style="color: #1F3957">Businesslogic</h1>
 <p align="center">A small javascript library for creating interactive content and decisioning automation using <a href="https://businesslogic.online" target="_blank">businesslogic.online</a> webservices.</p>
