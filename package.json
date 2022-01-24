@@ -7,8 +7,9 @@
     "build": "webpack --config webpack.prod.js",
     "fix": "npm install && npm audit fix",
     "start": "webpack-dev-server --open --config webpack.dev.js",
-    "version:patch": "npm version patch",
-    "version:minor": "npm version minor"
+    "npm:version:patch": "npm version patch",
+    "npm:version:minor": "npm version minor",
+    "npm:publish": "npm publish"
   },
   "author": "Rassvet ApS <rassvet@rassvet.dk> (https://rassvet.co)",
   "license": "ISC",
