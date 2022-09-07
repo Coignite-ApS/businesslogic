@@ -35,11 +35,11 @@ export class WebFormComponents {
 
     public compileWebformComponents():Element {
         if(this.groupName !== '')this.webformComponents = this.groupComponents(this.webformComponents ,this.groupName);
-        return  new DOMParser().parseFromString(this.webformComponents,'text/html').body.children[0];
+        return new DOMParser().parseFromString(this.webformComponents,'text/html').body.children[0];
     }
 
     public getWebformComponents():string {
-        return  this.webformComponents;
+        return this.webformComponents;
     }
 
     public attachComponent(control:control, param?:string, options?:any): void {
@@ -118,14 +118,19 @@ export class WebFormComponents {
                     <div class='range-group'>
                         <span class='min'>${options.minimum}</span>
                         <div class='range-control'>
-                        <div class='range-value'></div>
-                        <input type='range' min='${options.minimum}' max='${options.maximum}'
-                         step='${1000}' value='${options.default}' id='${param}' name='${param}' bl-input='${param}'>
+                            <input type='range'
+                             step='${options.multipleOf}' oninput='rangevalue.value=value'
+                             id='${param}' name='${param}' bl-input='${param}'>
                         </div>
                         <span class='max'>${options.maximum}</span>
                     </div>
-                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small></p>
+                    <p>
+                        <div class='range-desc'>
+                            <small class='form-text text-muted' bl-input-description='${param}'></small>
+                            <div class='range-output'><output id='rangevalue'>0</output></div>
+                        </div>
+                        <small bl-input-error='${param}'></small>
+                    </p>
                 `;
                 break;
             case 'email':

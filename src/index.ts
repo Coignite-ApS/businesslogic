@@ -34,11 +34,9 @@ export interface ExecutedEvent {
     data: any;
 }
 
-
 // Todo: Needs to be split into more logical parts
 
 export class Webservice {
-
     protected key: string;
     private http: http;
     protected webform: WebForm;
@@ -68,7 +66,6 @@ export class Webservice {
     }
 
     private init(): void {
-
         let vm = this;
 
         // Adds this webservice to the collection of Webservices
@@ -272,7 +269,6 @@ export class Webservice {
                         console.error('Augh, there was an error! ', error.status + ': ' + error.statusText);
                     });
             });
-
         });
     }
 
@@ -296,25 +292,21 @@ export class Webservice {
                     this.validateInput(el);
                     this.webform.inputs[el].input_el.classList.add('touched');
                 }
-
                 if (!helpers.isEmpty(this.errors)) {
                     valid = false
                 }
             }
-
         } else {
             //Handle pure data validation based on associated json schema
             // TODO: Consider using AJV library for schema validation instead of form validation
             // valid = ajv.validate(this.inputSchema, this.data);
         }
 
-
         if (!valid) {
             this.ValidationFailedListener.emit({
                 errors: this.errors
             });
         }
-
         return valid;
     }
 
@@ -340,11 +332,9 @@ export class Webservice {
         if (this.webform && this.webform.inputs[input].err_el) {
             this.webform.inputs[input].err_el.textContent = message;
         }
-
     }
 
     private getWebserviceDocs(): Promise<any> {
-
         return new Promise((resolve: any, reject: any) => {
             this.http.makeRequest('GET', 'https://api.businesslogic.online/describe')
                 .then(function (result) {
@@ -373,7 +363,6 @@ export class Webservice {
                         select = <HTMLSelectElement>this.webform.inputs[property].input_el;
                     }
 
-
                     // Set title and description
                     if (definition.title) label.innerHTML = definition.title;
                     if (definition.description) description.innerHTML = definition.description;
@@ -384,11 +373,9 @@ export class Webservice {
                     // Set default to inputs (not select)
                     if (definition.default !== null) input.value = definition.default;
 
-
                     // Set options for enum
                     // TODO: Consider switching to simple version of enum without dataobject
                     if (definition.enum) {
-
                         // Handle labels
                         let inputData: any;
                         let mappings: Array<string>;
@@ -396,7 +383,6 @@ export class Webservice {
                         let labelFieldName: string;
                         let valueObjName: string;
                         let valueFieldName: string;
-
 
                         // TODO: Revisit data mapping
                         if (definition.data_label_mapping) {
@@ -442,7 +428,6 @@ export class Webservice {
 
                     // Set options for oneOf
                     if (definition.oneOf) {
-
                         // TODO: Consider support of optgroup
                         if (!!select) {
                             select.querySelectorAll('option').forEach((o) => {
@@ -522,7 +507,6 @@ export class Webservice {
         }
     }
 
-
     private handleWebformOutputs(results: any = {}): void {
         for (let result in results) {
             for (let param in this.webform.outputs) {
@@ -587,14 +571,12 @@ export class Webservice {
     }
 }
 
-
 export interface IDictionary<Webservice> {
     [id: string]: Webservice;
 }
 
 // Create dictonary for keeping track of all webservice instances
 class ServiceContainer {
-
     private dict: any;
 
     constructor() {
@@ -614,7 +596,6 @@ class ServiceContainer {
     public get(apiKey: string): Webservice {
         return this.dict[apiKey];
     }
-
 }
 
 let Webservices: ServiceContainer = new ServiceContainer();
@@ -677,6 +658,23 @@ function mapWebForm(formItem: any): WebForm {
     }
     return wf;
 }
+//TODO refactor library, replace string component by html components
+function setRangeListeners(formInputs) {
+    const rangeGroup = formInputs.querySelectorAll('.range-group');
+
+    rangeGroup.forEach((rangeGroup) => {
+        const rangeInput = rangeGroup.querySelector('input[type="range"]');
+
+        rangeInput.addEventListener('input', (event) => {
+            let target = event.target
+            const min = target['min'];
+            const max = target['max'];
+            const val = target['value'];
+
+            target['style'].backgroundSize = (val - min) * 100 / (max - min) + '% 100%'
+        });
+    });
+}
 
 export {Webservices};
 
@@ -711,9 +709,10 @@ export {Webservices};
 
                     let type = e.inputSchema.properties[param].type;
                     let enumeration = e.inputSchema.properties[param].enum || e.inputSchema.properties[param].oneOf;
+
                     let isRange = e.inputSchema.properties[param].maximum &&
-                        e.inputSchema.properties[param].minimum &&
-                        e.inputSchema.properties[param].type === 'integer' &&
+                        e.inputSchema.properties[param].minimum !== undefined &&
+                        e.inputSchema.properties[param].type === 'number' &&
                         e.inputSchema.properties[param].default
 
                     if (enumeration) {
@@ -746,31 +745,34 @@ export {Webservices};
                     });
                 }
 
-                container.appendChild(inputs.compileWebformComponents());
+                const formInputs = inputs.compileWebformComponents();
+
+                setRangeListeners(formInputs);
+
+                container.appendChild(formInputs);
 
                 for (let param in e.outputSchema.properties) {
-                    if (e.outputSchema.properties.hasOwnProperty(param)) {
-                        let type = e.outputSchema.properties[param].type;
-                        let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
-                        let output = e.outputSchema.properties[param];
-                        if (enumeration) {
-                            outputs.attachComponent('select', param);
+                    if (!e.outputSchema.properties.hasOwnProperty(param)) return;
+                    let type = e.outputSchema.properties[param].type;
+                    let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
 
-                        } else {
-                            switch (type) {
-                                case 'number':
-                                    outputs.attachComponent('output', param);
-                                    break;
-                                case 'integer':
-                                    outputs.attachComponent('output', param);
-                                    break;
-                                //TODO: Consider how we can prepare placeholders for data in the output for an array
-                                case 'array':
-                                    outputs.attachComponent('output-array', param, [{"name": 1}]);
-                                    break;
-                                default:
-                                    outputs.attachComponent('output', param);
-                            }
+                    if (enumeration) {
+                        outputs.attachComponent('select', param);
+
+                    } else {
+                        switch (type) {
+                            case 'number':
+                                outputs.attachComponent('output', param);
+                                break;
+                            case 'integer':
+                                outputs.attachComponent('output', param);
+                                break;
+                            //TODO: Consider how we can prepare placeholders for data in the output for an array
+                            case 'array':
+                                outputs.attachComponent('output-array', param, [{"name": 1}]);
+                                break;
+                            default:
+                                outputs.attachComponent('output', param);
                         }
                     }
                 }
