@@ -42,7 +42,7 @@ export class WebFormComponents {
         return  this.webformComponents;
     }
 
-    public attachComponent(control:control,param?:string, options?:any): void {
+    public attachComponent(control:control, param?:string, options?:any): void {
         let component;
         let submit;
         let reset;
@@ -115,7 +115,15 @@ export class WebFormComponents {
             case 'range':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
-                    <input type='range' id='${param}' name='${param}' bl-input='${param}'>
+                    <div class='range-group'>
+                        <span class='min'>${options.minimum}</span>
+                        <div class='range-control'>
+                        <div class='range-value'></div>
+                        <input type='range' min='${options.minimum}' max='${options.maximum}'
+                         step='${1000}' value='${options.default}' id='${param}' name='${param}' bl-input='${param}'>
+                        </div>
+                        <span class='max'>${options.maximum}</span>
+                    </div>
                     <p><small class='form-text text-muted' bl-input-description='${param}'></small>
                     <small bl-input-error='${param}'></small></p>
                 `;
@@ -240,11 +248,9 @@ export class WebFormComponents {
         if(this.groupName !== '') component = this.groupComponents(component,'form-group');
 
         this.webformComponents += component;
-
     }
 
     public groupComponents(component:string,groupClass:string):string{
         return  `<div class='${groupClass}'>${component}</div>`;
     }
-
 }
