@@ -389,7 +389,6 @@ export class Webservice {
                             mappings = definition.data_label_mapping.split('.');
                             labelFieldName = mappings.pop();
                             labelObjName = mappings.pop();
-
                         }
 
                         if (definition.data_mapping) {

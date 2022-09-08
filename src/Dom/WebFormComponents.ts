@@ -119,15 +119,21 @@ export class WebFormComponents {
                         <span class='min'>${options.minimum}</span>
                         <div class='range-control'>
                             <input type='range'
-                             step='${options.multipleOf}' oninput='rangevalue.value=value'
-                             id='${param}' name='${param}' bl-input='${param}'>
+                                min='${options.minimum}'
+                                max='${options.maximum}'
+                                value='${options.default}'
+                                step='${options.multipleOf}' oninput='rangevalue.value=value'
+                                id='${param}' name='${param}' bl-input='${param}'
+                                style='background-size: ${(options.default - options.minimum) * 100 / (options.maximum - options.minimum) + '% 100%'}'>
                         </div>
                         <span class='max'>${options.maximum}</span>
                     </div>
                     <p>
                         <div class='range-desc'>
                             <small class='form-text text-muted' bl-input-description='${param}'></small>
-                            <div class='range-output'><output id='rangevalue'>0</output></div>
+                            <div class='range-output'>
+                                <output id='rangevalue'>${options.default}</output>
+                            </div>
                         </div>
                         <small bl-input-error='${param}'></small>
                     </p>

@@ -1,5 +1,18 @@
-@mixin main {
+@mixin range-input-thumb {
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  @include var(background-color, color-primary);
+  @include var(border, 2px solid color-primary);
+  border-radius: 50%;
+}
 
+@mixin range-input-thumb-hover {
+  @include var(background-color, color-primary);
+  cursor: pointer;
+}
+
+@mixin main {
   margin-right: auto;
   margin-left: auto;
   @include var(padding, container-padding);
@@ -19,7 +32,6 @@
     border-style: solid;
     @include var(border-radius, border-radius);
   }
-
 
   .form-group, .input-group {
     margin-bottom: 1em;
@@ -253,6 +265,8 @@
   .range-group {
     display: flex;
 
+
+
     input {
       -webkit-appearance: none;
       margin-right: 15px;
@@ -265,17 +279,19 @@
     }
 
     input::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 15px;
-      height: 15px;
-      background: #28a745;
-      border: 2px solid #28a745;
-      border-radius: 50%;
+      @include range-input-thumb;
     }
 
     input::-webkit-slider-thumb:hover {
-      background: #28a745;
-      cursor: pointer;
+      @include range-input-thumb-hover;
+    }
+
+    input::-moz-range-thumb {
+      @include range-input-thumb;
+    }
+
+    input::-moz-range-thumb:hover {
+      @include range-input-thumb-hover;
     }
 
     .range-control {
