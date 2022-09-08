@@ -35,14 +35,14 @@ export class WebFormComponents {
 
     public compileWebformComponents():Element {
         if(this.groupName !== '')this.webformComponents = this.groupComponents(this.webformComponents ,this.groupName);
-        return  new DOMParser().parseFromString(this.webformComponents,'text/html').body.children[0];
+        return new DOMParser().parseFromString(this.webformComponents,'text/html').body.children[0];
     }
 
     public getWebformComponents():string {
-        return  this.webformComponents;
+        return this.webformComponents;
     }
 
-    public attachComponent(control:control,param?:string, options?:any): void {
+    public attachComponent(control:control, param?:string, options?:any): void {
         let component;
         let submit;
         let reset;
@@ -115,9 +115,28 @@ export class WebFormComponents {
             case 'range':
                 component = `
                     <label for='${param}' bl-input-label='${param}'></label>
-                    <input type='range' id='${param}' name='${param}' bl-input='${param}'>
-                    <p><small class='form-text text-muted' bl-input-description='${param}'></small>
-                    <small bl-input-error='${param}'></small></p>
+                    <div class='range-group'>
+                        <span class='min'>${options.minimum}</span>
+                        <div class='range-control'>
+                            <input type='range'
+                                min='${options.minimum}'
+                                max='${options.maximum}'
+                                value='${options.default}'
+                                step='${options.multipleOf}' oninput='rangevalue.value=value'
+                                id='${param}' name='${param}' bl-input='${param}'
+                                style='background-size: ${(options.default - options.minimum) * 100 / (options.maximum - options.minimum) + '% 100%'}'>
+                        </div>
+                        <span class='max'>${options.maximum}</span>
+                    </div>
+                    <p>
+                        <div class='range-desc'>
+                            <small class='form-text text-muted' bl-input-description='${param}'></small>
+                            <div class='range-output'>
+                                <output id='rangevalue'>${options.default}</output>
+                            </div>
+                        </div>
+                        <small bl-input-error='${param}'></small>
+                    </p>
                 `;
                 break;
             case 'email':
@@ -240,11 +259,9 @@ export class WebFormComponents {
         if(this.groupName !== '') component = this.groupComponents(component,'form-group');
 
         this.webformComponents += component;
-
     }
 
     public groupComponents(component:string,groupClass:string):string{
         return  `<div class='${groupClass}'>${component}</div>`;
     }
-
 }
