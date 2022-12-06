@@ -1,10 +1,4 @@
-export interface Listener<T> {
-    (event: T): any;
-}
-
-export interface Disposable {
-    dispose():any;
-}
+import {Disposable, Listener} from "../interfaces/events";
 
 /** passes through events as they happen. You will not get events from before you start listening */
 export class TypedEvent<T> {

@@ -1,11 +1,12 @@
 'use strict';
-
-import {WebForm, WebFormErrors} from './WebForm';
 import {http} from './http';
 import {TypedEvent} from './Events/TypedEvent';
 import {WebFormComponents} from './Dom/WebFormComponents';
 import * as helpers from './Helpers/HelperFunctions';
 import {JSDict} from './Helpers/TypedDictionary';
+import {DataChangedEvent, ExecutedEvent, SchemaReceivedEvent, ValidationFailedEvent} from "./interfaces/events";
+import {WebForm, WebFormErrors} from "./interfaces/web-form";
+import {log} from "./Helpers/HelperFunctions";
 
 declare global {
     interface Window {
@@ -15,26 +16,6 @@ declare global {
 
 const ajv: any = helpers.isConstructor(window.Ajv) ? new window.Ajv() : null;
 
-
-export interface SchemaReceivedEvent {
-    inputSchema: any;
-    outputSchema: any;
-    relatedData: any;
-}
-
-export interface ValidationFailedEvent {
-    errors: WebFormErrors;
-}
-
-export interface DataChangedEvent {
-    data: any;
-}
-
-export interface ExecutedEvent {
-    data: any;
-}
-
-// Todo: Needs to be split into more logical parts
 
 export class Webservice {
     protected key: string;
@@ -243,7 +224,6 @@ export class Webservice {
 
     public execute(): Promise<any> {
         let vm = this;
-        console.log(vm.data)
         //Wait for documents to get arround
         return new Promise((resolve: any, reject: any) => {
             let test: any;
@@ -339,7 +319,7 @@ export class Webservice {
             this.http.makeRequest('GET', 'https://api.businesslogic.online/describe')
                 .then(function (result) {
                     resolve(result);
-                    log(result);
+                    log(debug, result);
                 })
                 .catch(function (error) {
                     reject(error);
@@ -570,10 +550,6 @@ export class Webservice {
     }
 }
 
-export interface IDictionary<Webservice> {
-    [id: string]: Webservice;
-}
-
 // Create dictonary for keeping track of all webservice instances
 class ServiceContainer {
     private dict: any;
@@ -599,10 +575,6 @@ class ServiceContainer {
 
 let Webservices: ServiceContainer = new ServiceContainer();
 let debug: boolean;
-
-function log(message: any): void {
-    if (debug) console.log(message);
-}
 
 function mapWebForm(formItem: any): WebForm {
     let name = formItem.getAttribute('bl-name');
@@ -680,7 +652,7 @@ export {Webservices};
 (function () {
     // See if we are in debug mode
     if (!!document.querySelector('script[bl-debug]')) debug = true;
-    log('Initialise businesslogic');
+    log(debug, 'Initialise businesslogic');
 
     let formList = document.querySelectorAll('[bl-name]');
 
@@ -790,7 +762,7 @@ export {Webservices};
             ws = new Webservice(key, mapWebForm(formList[f]));
         }
 
-        log('Creating form from termplate: ' + name);
+        log(debug, 'Creating form from termplate: ' + name);
     }
 })();
 

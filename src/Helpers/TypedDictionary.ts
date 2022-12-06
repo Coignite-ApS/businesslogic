@@ -1,14 +1,6 @@
 type KEY = string | number | symbol;
 
-interface Dictionary<K extends KEY, V> {
-    getKeys(): K[];
-    getValues(): V[];
-    get(key: K): V | null;
-    put(key: K, val: V): void; // or boolean?
-}
-
 export class JSDict<K extends KEY, V> implements Dictionary<K, V> {
-
     private dict: { [key in K]?: V };
 
     constructor() {

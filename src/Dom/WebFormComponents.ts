@@ -24,7 +24,6 @@ type control =
     'output-progress'
 
 export class WebFormComponents {
-
     private webformComponents: string;
     private groupName:string;
 

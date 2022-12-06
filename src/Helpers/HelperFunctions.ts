@@ -16,6 +16,11 @@ export function isConstructor(f:any) {
     return true;
 }
 
+export function log(isDebug: boolean,message: any): void {
+    if (isDebug) console.log(message);
+}
+
+
 export function isUndefined(obj:any) {
     return obj === undefined;
 }

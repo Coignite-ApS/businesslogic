@@ -1,7 +1,6 @@
 type Method = 'GET' | 'POST';
 
 export class http {
-
     protected key: string;
     protected data: any;
 
@@ -10,11 +9,9 @@ export class http {
     }
 
     public makeRequest(method:Method, url:string, data?:any): Promise<any> {
-
         this.data = data || {};
 
         return new Promise((resolve: any, reject: any) => {
-
             let xhr = new XMLHttpRequest();
 
             xhr.open(method, url, true);
