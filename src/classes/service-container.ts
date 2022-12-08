@@ -1,7 +1,5 @@
-// Create dictonary for keeping track of all webservice instances
 import {JSDict} from "../Helpers/TypedDictionary";
 import {Webservice} from "./web-service";
-// import {Webservice} from "../index";
 
 export class ServiceContainer {
     private dict: any;

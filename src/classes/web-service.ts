@@ -4,7 +4,6 @@ import {DataChangedEvent, ExecutedEvent, SchemaReceivedEvent, ValidationFailedEv
 import * as helpers from "../Helpers/HelperFunctions";
 import {log} from "../Helpers/HelperFunctions";
 import {http} from '../http';
-// import {debug} from "util";
 import {Webservices} from "../index";
 
 declare global {
@@ -14,6 +13,7 @@ declare global {
 }
 
 const ajv: any = helpers.isConstructor(window.Ajv) ? new window.Ajv() : null;
+let debug = false;
 
 export class Webservice {
     protected key: string;
@@ -26,7 +26,7 @@ export class Webservice {
     private cachedParams: any;
     private errors: WebFormErrors;
     private test: number;
-    private debug: boolean;
+    // private debug: boolean;
 
     public SchemaReceviedListener = new TypedEvent<SchemaReceivedEvent>();
     public ValidationFailedListener = new TypedEvent<ValidationFailedEvent>();
@@ -41,7 +41,7 @@ export class Webservice {
         this.errors = {};
         this.cachedParams = {};
         this.test = 1;
-        this.debug = isDebug;
+        debug = isDebug;
 
         this.init();
     }
@@ -319,7 +319,7 @@ export class Webservice {
             this.http.makeRequest('GET', 'https://api.businesslogic.online/describe')
                 .then(function (result) {
                     resolve(result);
-                    log(this.debug, result);
+                    log(debug, result);
                 })
                 .catch(function (error) {
                     reject(error);
