@@ -68,18 +68,18 @@ export class Webservice {
     }
 
     private describe(): Promise<any> {
-        let vm = this;
+        let self = this;
 
         return new Promise((resolve: any, reject: any) => {
             // Retrieve all relevant webservice metadata
-            if (vm.inputSchema) {
+            if (self.inputSchema) {
                 resolve('');
             } else {
                 this.getWebserviceDocs().then((result) => {
                     this.SchemaReceviedListener.emit({
-                        inputSchema: vm.inputSchema = result.expected_input || {},
-                        outputSchema: vm.outputSchema = result.expected_output || {},
-                        relatedData: vm.relatedData = result.available_data || {}
+                        inputSchema: self.inputSchema = result.expected_input || {},
+                        outputSchema: self.outputSchema = result.expected_output || {},
+                        relatedData: self.relatedData = result.available_data || {}
                     });
 
                     resolve(result);
@@ -321,11 +321,13 @@ export class Webservice {
     }
 
     private getWebserviceDocs(): Promise<any> {
+        let self = this;
+
         return new Promise((resolve: any, reject: any) => {
             this.http.makeRequest('GET', 'https://api.businesslogic.online/describe')
                 .then(function(result) {
                     resolve(result);
-                    log(result, this.debug);
+                    log(result, self.debug);
                 })
                 .catch(function(error) {
                     reject(error);
