@@ -32,25 +32,25 @@
 </section>
 <!--<script src="//cdnjs.cloudflare.com/ajax/libs/ajv/6.5.4/ajv.bundle.js"></script>-->
 <!--<script bl-debug type="module" src="businesslogic.1.1.0.js"></script>-->
-<script type="module" src="businesslogic.1.3.10.js"></script>
+<script type="module" src="businesslogic.1.4.0.js"></script>
 <link rel="stylesheet" href="businesslogic-standard-theme.css">
 
 <script>
-    window.onload = function () {
-        // You can execute a webservice using Webservice class
-        var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
-        biz.setParams({
-            "salary_per_month": 25000,
-            "start_year": 1
-        });
-
-        biz.setParam("start_year", 102);
-
-        biz.execute().then(function (result) {
-            console.log('Output from programmatic execution: ',result)
-        }).catch(function (error) {
-            console.log('Error in programmatic execution: ',error)
-        });
+    // window.onload = function () {
+    //     // You can execute a webservice using Webservice class
+    //     var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
+    //     biz.setParams({
+    //         "salary_per_month": 25000,
+    //         "start_year": 1
+    //     });
+    //
+    //     biz.setParam("start_year", 102);
+    //
+    //     biz.execute().then(function (result) {
+    //         console.log('Output from programmatic execution: ',result)
+    //     }).catch(function (error) {
+    //         console.log('Error in programmatic execution: ',error)
+    //     });
 
         // We can execute a webservice using Webservice class
         /*
@@ -80,7 +80,7 @@
             console.log('Error in programmatic execution: ',error)
         });
  */
-    }
+    // }
 </script>
 
 <div class="custom-theme bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
