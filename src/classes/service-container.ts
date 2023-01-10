@@ -1,6 +1,6 @@
 // Create dictonary for keeping track of all webservice instances
 import { JSDict } from "../Helpers/TypedDictionary";
-import { Webservice } from "../index";
+import { Webservice } from "./web-service";
 
 
 export class ServiceContainer {
