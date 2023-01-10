@@ -1,11 +1,21 @@
 'use strict';
 
-import {WebForm, WebFormErrors} from './WebForm';
-import {http} from './http';
-import {TypedEvent} from './Events/TypedEvent';
-import {WebFormComponents} from './Dom/WebFormComponents';
+import { http } from './http';
+import { TypedEvent } from './Events/TypedEvent';
+import { WebFormComponents } from './Dom/WebFormComponents';
 import * as helpers from './Helpers/HelperFunctions';
-import {JSDict} from './Helpers/TypedDictionary';
+import { JSDict } from './Helpers/TypedDictionary';
+import {
+    DataChangedEvent,
+    ExecutedEvent,
+    SchemaReceivedEvent,
+    ValidationFailedEvent,
+    WebForm,
+    WebFormErrors
+} from "./interfaces/index";
+import { log, mapWebForm, setRangeListeners } from "./Helpers/HelperFunctions";
+import { ServiceContainer } from "./classes/index";
+
 
 declare global {
     interface Window {
@@ -15,24 +25,6 @@ declare global {
 
 const ajv: any = helpers.isConstructor(window.Ajv) ? new window.Ajv() : null;
 
-
-export interface SchemaReceivedEvent {
-    inputSchema: any;
-    outputSchema: any;
-    relatedData: any;
-}
-
-export interface ValidationFailedEvent {
-    errors: WebFormErrors;
-}
-
-export interface DataChangedEvent {
-    data: any;
-}
-
-export interface ExecutedEvent {
-    data: any;
-}
 
 // Todo: Needs to be split into more logical parts
 
@@ -106,38 +98,38 @@ export class Webservice {
     }
 
     private handleAssociatedWebform(): void {
-        for (let param in this.webform.inputs) {
+        for(let param in this.webform.inputs) {
             let vm = this;
             let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
             let type = vm.inputSchema.properties[param].type;
 
             vm.setParamFromWebform(param, value);
 
-            this.webform.inputs[param].input_el.addEventListener('blur', function (e) {
+            this.webform.inputs[param].input_el.addEventListener('blur', function(e) {
                 vm.validateInput(param);
                 vm.webform.inputs[param].input_el.classList.add('touched');
             });
-            this.webform.inputs[param].input_el.addEventListener('input', function (e) {
+            this.webform.inputs[param].input_el.addEventListener('input', function(e) {
                 vm.validateInput(param);
                 vm.setParamFromWebform(param, this.value);
             });
             // If there is no submit button we execute the form upon a valid input
             if (this.webform.controls['submit'] === undefined) {
-                this.webform.inputs[param].input_el.addEventListener('change', function (e) {
+                this.webform.inputs[param].input_el.addEventListener('change', function(e) {
                     if (vm.validate()) vm.execute();
                 })
             }
         }
-        for (let name in this.webform.controls) {
+        for(let name in this.webform.controls) {
             let vm = this;
 
             if (name == 'submit') {
-                this.webform.controls[name].control_el.addEventListener('click', function (e) {
+                this.webform.controls[name].control_el.addEventListener('click', function(e) {
                     if (vm.validate()) vm.execute();
                 })
             }
             if (name == 'reset') {
-                this.webform.controls[name].control_el.addEventListener('click', function (e) {
+                this.webform.controls[name].control_el.addEventListener('click', function(e) {
                     vm.clearParams()
                 })
             }
@@ -150,7 +142,7 @@ export class Webservice {
             let vm = this;
             this.initDataTypes();
             this.correctDataTypes();
-            for (let param in this.data) {
+            for(let param in this.data) {
                 if (this.data.hasOwnProperty(param)) {
                     if (this.webform) {
                         (<HTMLInputElement>this.webform.inputs[param].input_el).value = this.data[param];
@@ -168,7 +160,7 @@ export class Webservice {
             let vm = this;
             let dataChanged = false;
             this.data = params;
-            for (let param in params) {
+            for(let param in params) {
                 if (this.data.hasOwnProperty(param)) {
                     if (this.data[param] !== params[param]) {
                         if (this.webform) {
@@ -181,7 +173,7 @@ export class Webservice {
             }
             if (dataChanged) this.DataChangedListener.emit({data: vm.data});
         } else {
-            for (let param in params) {
+            for(let param in params) {
                 if (params.hasOwnProperty(param)) {
                     this.cachedParams[param] = params[param];
                 }
@@ -243,7 +235,6 @@ export class Webservice {
 
     public execute(): Promise<any> {
         let vm = this;
-        console.log(vm.data)
         //Wait for documents to get arround
         return new Promise((resolve: any, reject: any) => {
             let test: any;
@@ -255,7 +246,7 @@ export class Webservice {
                 vm.correctDataTypes();
 
                 vm.http.makeRequest('POST', 'https://api.businesslogic.online/execute', vm.data)
-                    .then(function (result) {
+                    .then(function(result) {
                         if (vm.webform) {
                             // If webservice was assigned to a webform print outputs to assigned elements
                             vm.handleWebformOutputs(result);
@@ -264,7 +255,7 @@ export class Webservice {
                         test = result;
                         resolve(result);
                     })
-                    .catch(function (error) {
+                    .catch(function(error) {
                         reject(error);
                         console.error('Augh, there was an error! ', error.status + ': ' + error.statusText);
                     });
@@ -288,7 +279,7 @@ export class Webservice {
             } else {
                 // Use input validation
                 let inputValid: boolean;
-                for (let el in this.webform.inputs) {
+                for(let el in this.webform.inputs) {
                     this.validateInput(el);
                     this.webform.inputs[el].input_el.classList.add('touched');
                 }
@@ -337,11 +328,11 @@ export class Webservice {
     private getWebserviceDocs(): Promise<any> {
         return new Promise((resolve: any, reject: any) => {
             this.http.makeRequest('GET', 'https://api.businesslogic.online/describe')
-                .then(function (result) {
+                .then(function(result) {
                     resolve(result);
-                    log(result);
+                    log(result, debug);
                 })
-                .catch(function (error) {
+                .catch(function(error) {
                     reject(error);
                     console.error('Augh, there was an error! ', error.status + ': ' + error.statusText);
                 });
@@ -350,8 +341,8 @@ export class Webservice {
 
     private enrichWebFormInputs(): void {
         // Enrich input elements
-        for (let param in this.webform.inputs) {
-            for (let property in this.inputSchema.properties) {
+        for(let param in this.webform.inputs) {
+            for(let property in this.inputSchema.properties) {
                 if (param === property && this.inputSchema.properties.hasOwnProperty(property)) {
                     let definition = this.inputSchema.properties[property];
                     let label = <HTMLInputElement>this.webform.inputs[property].label_el;
@@ -408,7 +399,7 @@ export class Webservice {
                                     o.remove();
                                 }
                             });
-                            for (let i = 0; i < definition.enum.length; i++) {
+                            for(let i = 0; i < definition.enum.length; i++) {
                                 let option = document.createElement('option');
                                 option.text = inputData && inputData[i][labelFieldName] || definition.enum[i];
                                 option.value = inputData && inputData[i][labelObjName] || definition.enum[i];
@@ -436,7 +427,7 @@ export class Webservice {
                                     o.remove();
                                 }
                             });
-                            for (let i = 0; i < definition.oneOf.length; i++) {
+                            for(let i = 0; i < definition.oneOf.length; i++) {
                                 let option = document.createElement('option');
                                 option.text = definition.oneOf[i].title;
                                 option.value = definition.oneOf[i].const;
@@ -454,7 +445,7 @@ export class Webservice {
                     }
 
                     // Set extras from webservice definitions (input json schema)
-                    switch (type) {
+                    switch(type) {
                         case 'string':
                             if (definition.minLength) input.minLength = definition.minLength;
                             if (definition.maxLength) input.maxLength = definition.maxLength;
@@ -486,8 +477,8 @@ export class Webservice {
         // TODO: Consider other types of outputs like progress and meter tags
         // TODO: Consider other types of outputs like charts
         // TODO: Support array outputs
-        for (let param in this.webform.outputs) {
-            for (let property in this.outputSchema.properties) {
+        for(let param in this.webform.outputs) {
+            for(let property in this.outputSchema.properties) {
                 if (param === property && this.outputSchema.properties.hasOwnProperty(property)) {
                     let definition = this.outputSchema.properties[property];
                     let label = this.webform.outputs[property].label_el;
@@ -507,14 +498,14 @@ export class Webservice {
     }
 
     private handleWebformOutputs(results: any = {}): void {
-        for (let result in results) {
-            for (let param in this.webform.outputs) {
+        for(let result in results) {
+            for(let param in this.webform.outputs) {
                 if (result === param) {
                     if (Array.isArray(results[param])) {
                         let values = '';
-                        for (let field in results[param]) {
+                        for(let field in results[param]) {
                             values += '<ul>';
-                            for (let entry in results[param][field]) {
+                            for(let entry in results[param][field]) {
                                 values += '<li>' + results[param][field][entry] + '</li>';
                             }
                             values += '</ul>';
@@ -532,13 +523,13 @@ export class Webservice {
 
     private correctDataTypes(): void {
         if (this.inputSchema) {
-            for (let param in this.data) {
+            for(let param in this.data) {
                 if (this.data.hasOwnProperty(param)) {
                     let value = this.data[param];
                     if (this.inputSchema.properties.hasOwnProperty(param)) {
                         let type = this.inputSchema.properties[param].type;
                         let val: any;
-                        switch (type) {
+                        switch(type) {
                             case 'string':
                                 val = String(value);
                                 break;
@@ -563,128 +554,26 @@ export class Webservice {
 
     private initDataTypes(): void {
         if (this.inputSchema) {
-            for (let param in this.inputSchema.properties) {
+            for(let param in this.inputSchema.properties) {
                 this.data[param] = null;
             }
         }
     }
 }
 
-export interface IDictionary<Webservice> {
-    [id: string]: Webservice;
-}
-
-// Create dictonary for keeping track of all webservice instances
-class ServiceContainer {
-    private dict: any;
-
-    constructor() {
-        this.dict = JSDict.Create<string, Webservice>();
-    }
-
-    public add(apiKey: string, webservice: Webservice): void {
-        if (!this.dict[apiKey]) {
-            this.dict[apiKey] = webservice;
-        } else {
-            console.warn('Webservice with apiKey: ' + apiKey + ' was allready added to Businesslogic.Webservices');
-        }
-    }
-
-    // TODO: Make this functions as a promise so you can be sure it is initialised
-    // Remember to have a timeout resolve 30secs
-    public get(apiKey: string): Webservice {
-        return this.dict[apiKey];
-    }
-}
-
 let Webservices: ServiceContainer = new ServiceContainer();
 let debug: boolean;
 
-function log(message: any): void {
-    if (debug) console.log(message);
-}
+export { Webservices };
 
-function mapWebForm(formItem: any): WebForm {
-    let name = formItem.getAttribute('bl-name');
-    let key = formItem.getAttribute('bl-token');
-    let inputs = formItem.querySelectorAll('[bl-input]');
-    let controls = formItem.querySelectorAll('[bl-control]');
-    let outputs = formItem.querySelectorAll('[bl-output]');
-    let param: string, type: string, tagName: string;
-    let el: Element;
-    let lbl_el: Element, desc_el: Element, err_el: Element;
-
-
-    let wf: WebForm = {
-        name: name,
-        inputs: {},
-        controls: {},
-        outputs: {}
-    };
-
-    if (formItem instanceof HTMLFormElement) {
-        wf.form_el = formItem;
-    }
-
-    // Handling inputs
-    for (let i = 0; i < inputs.length; i++) {
-        param = inputs[i].getAttribute('bl-input');
-        type = inputs[i].getAttribute('type');
-        tagName = inputs[i].tagName;
-        el = inputs[i];
-        lbl_el = formItem.querySelector('[bl-input-label=' + param + ']');
-        desc_el = formItem.querySelector('[bl-input-description=' + param + ']');
-        err_el = formItem.querySelector('[bl-input-error=' + param + ']');
-        wf.inputs[param] = {'label_el': lbl_el, 'desc_el': desc_el, 'input_el': el, 'err_el': err_el};
-    }
-    // Handling controls
-    for (let i = 0; i < controls.length; i++) {
-        param = controls[i].getAttribute('bl-control');
-        type = controls[i].getAttribute('type');
-        tagName = controls[i].tagName;
-        el = controls[i];
-        wf.controls[param] = {'control_el': el};
-    }
-    // Handling outputs
-    for (let i = 0; i < outputs.length; i++) {
-        param = outputs[i].getAttribute('bl-output');
-        type = outputs[i].getAttribute('type');
-        tagName = outputs[i].tagName;
-        el = outputs[i];
-        lbl_el = formItem.querySelector('[bl-output-label=' + param + ']');
-        desc_el = formItem.querySelector('[bl-output-description=' + param + ']');
-        wf.outputs[param] = {'label_el': lbl_el, 'desc_el': desc_el, 'output_el': el};
-    }
-    return wf;
-}
-//TODO refactor library, replace string component by html components
-function setRangeListeners(formInputs) {
-    const rangeGroup = formInputs.querySelectorAll('.range-group');
-
-    rangeGroup.forEach((rangeGroup) => {
-        const rangeInput = rangeGroup.querySelector('input[type="range"]');
-
-        rangeInput.addEventListener('input', (event) => {
-            let target = event.target
-            const min = target['min'];
-            const max = target['max'];
-            const val = target['value'];
-
-            target['style'].backgroundSize = (val - min) * 100 / (max - min) + '% 100%'
-        });
-    });
-}
-
-export {Webservices};
-
-(function () {
+(function() {
     // See if we are in debug mode
     if (!!document.querySelector('script[bl-debug]')) debug = true;
-    log('Initialise businesslogic');
+    log('Initialise businesslogic', debug);
 
     let formList = document.querySelectorAll('[bl-name]');
 
-    for (let f = 0; f < formList.length; f++) {
+    for(let f = 0; f < formList.length; f++) {
         let ws: Webservice;
         let name = formList[f].getAttribute('bl-name');
         let key = formList[f].getAttribute('bl-token');
@@ -703,7 +592,7 @@ export {Webservices};
                 let outputs: WebFormComponents = new WebFormComponents('form-outputs');
                 let signature: WebFormComponents = new WebFormComponents();
 
-                for (let param in e.inputSchema.properties) {
+                for(let param in e.inputSchema.properties) {
                     if (!e.inputSchema.properties.hasOwnProperty(param)) return;
 
                     let type = e.inputSchema.properties[param].type;
@@ -720,7 +609,7 @@ export {Webservices};
                     } else if (isRange) {
                         inputs.attachComponent('range', param, e.inputSchema.properties[param]);
                     } else {
-                        switch (type) {
+                        switch(type) {
                             case 'number':
                                 inputs.attachComponent('number', param);
                                 break;
@@ -750,7 +639,7 @@ export {Webservices};
 
                 container.appendChild(formInputs);
 
-                for (let param in e.outputSchema.properties) {
+                for(let param in e.outputSchema.properties) {
                     if (!e.outputSchema.properties.hasOwnProperty(param)) return;
                     let type = e.outputSchema.properties[param].type;
                     let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
@@ -759,7 +648,7 @@ export {Webservices};
                         outputs.attachComponent('select', param);
 
                     } else {
-                        switch (type) {
+                        switch(type) {
                             case 'number':
                                 outputs.attachComponent('output', param);
                                 break;
@@ -790,7 +679,7 @@ export {Webservices};
             ws = new Webservice(key, mapWebForm(formList[f]));
         }
 
-        log('Creating form from termplate: ' + name);
+        log(`Creating form from termplate: ${name}`, debug);
     }
 })();
 
