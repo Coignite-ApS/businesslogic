@@ -1,5 +1,5 @@
-import { WebForm, WebFormErrors } from '../WebForm';
 import * as helpers from '../Helpers/HelperFunctions';
+import { WebForm, WebFormErrors } from "../interfaces";
 
 
 export interface validationMessages {
@@ -17,23 +17,22 @@ export interface validationMessages {
 }
 
 export class WebFormValidation {
-
-    private errors:WebFormErrors;
-    private defaultMessages:validationMessages;
-    private formElement:HTMLFormElement;
-    private webform:WebForm;
+    private errors: WebFormErrors;
+    private defaultMessages: validationMessages;
+    private formElement: HTMLFormElement;
+    private webform: WebForm;
     private customErrorMessages: boolean;
 
-    constructor(language:string = '', webform?:WebForm) {
+    constructor(language: string = '', webform?: WebForm) {
         this.formElement = new HTMLFormElement();
         this.webform = webform;
     }
 
-    private validate():Boolean {
-        let valid:boolean = true;
+    private validate(): Boolean {
+        let valid: boolean = true;
         this.errors = {};
 
-        if(this.formElement) {
+        if (this.formElement) {
             // Use native form validation
             this.formElement.customMessages = true;
             valid = this.formElement.checkValidity(); // Returns true if the element's value has no validity problems; false otherwise. Fires an invalid event at the element in the latter case.
@@ -46,48 +45,47 @@ export class WebFormValidation {
                 let willValidate = input.willValidate; // Returns true if the element will be validated when the form is submitted; false otherwise.
                 let custom = false;
                 let message = '';
-                if(!this.customErrorMessages) {
+                if (!this.customErrorMessages) {
                     message = input.validationMessage; // Returns the error message that would be shown to the user if the element was to be checked for validity.
-                } else if(input.validity.valueMissing) {
+                } else if (input.validity.valueMissing) {
 
-                } else if(input.validity.typeMismatch) {
+                } else if (input.validity.typeMismatch) {
 
-                } else if(input.validity.typeMismatch) {
+                } else if (input.validity.typeMismatch) {
 
-                } else if(input.validity.patternMismatch) {
+                } else if (input.validity.patternMismatch) {
 
-                } else if(input.validity.tooLong) {
+                } else if (input.validity.tooLong) {
 
-                } else if(input.validity.tooShort) {
+                } else if (input.validity.tooShort) {
 
-                } else if(input.validity.rangeUnderflow) {
+                } else if (input.validity.rangeUnderflow) {
 
-                } else if(input.validity.rangeOverflow) {
+                } else if (input.validity.rangeOverflow) {
 
-                } else if(input.validity.stepMismatch) {
+                } else if (input.validity.stepMismatch) {
 
-                } else if(input.validity.badInput) {
+                } else if (input.validity.badInput) {
 
-                } else if(input.validity.customError) {
+                } else if (input.validity.customError) {
 
-                } else if(input.validity.valid) {
+                } else if (input.validity.valid) {
 
                 } else {
                     //this.updateErrorMessage(el,'');
                 }
-                if(custom)input.setCustomValidity(message); // Sets a custom error, so that the element would fail to validate. The given message is the message to be shown to the user when reporting the problem to the user.
+                if (custom) input.setCustomValidity(message); // Sets a custom error, so that the element would fail to validate. The given message is the message to be shown to the user when reporting the problem to the user.
                 this.errors[el] = message;
                 // this.updateErrorMessage(el,message);
             }
 
 
-
-            if(!helpers.isEmpty(this.errors)) {
+            if (!helpers.isEmpty(this.errors)) {
                 valid = false
             }
         }
 
-        if(!valid) {
+        if (!valid) {
             /*
             this.ValidationFailedListener.emit({
                 errors: this.errors
@@ -98,7 +96,7 @@ export class WebFormValidation {
         return valid;
     }
 
-    private setErrorMessages(value:string) {
+    private setErrorMessages(value: string) {
         this.defaultMessages = {
             valueMissing: `${value} is required `, // Returns true if the element has no value but is a required field; false otherwise.
             typeMismatch: `Some text here ${value}`, // Returns true if the element's value is not in the correct syntax; false otherwise.

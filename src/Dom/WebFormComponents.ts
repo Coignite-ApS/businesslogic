@@ -1,48 +1,47 @@
 type control =
     'businesslogic' |
-    'text'          |
-    'number'        |
-    'integer'       |
-    'text-data'     | // Input with datalist
-    'textarea'      |
-    'select'        |
-    'checkbox'      |
-    'radio'         |
-    'range'         |
-    'password'      |
-    'email'         |
-    'tel'           |
-    'time'          |
-    'date'          |
-    'month'         |
-    'week'          |
-    'submit'        |
-    'submit-reset'  |
-    'output'        |
-    'output-array'  |
-    'output-meter'  |
+    'text' |
+    'number' |
+    'integer' |
+    'text-data' | // Input with datalist
+    'textarea' |
+    'select' |
+    'checkbox' |
+    'radio' |
+    'range' |
+    'password' |
+    'email' |
+    'tel' |
+    'time' |
+    'date' |
+    'month' |
+    'week' |
+    'submit' |
+    'submit-reset' |
+    'output' |
+    'output-array' |
+    'output-meter' |
     'output-progress'
 
 export class WebFormComponents {
-
     private webformComponents: string;
-    private groupName:string;
+    private groupName: string;
 
-    constructor(groupName?:string) {
+    constructor(groupName?: string) {
         this.webformComponents = '';
         this.groupName = groupName ? groupName : '';
     }
 
-    public compileWebformComponents():Element {
-        if(this.groupName !== '')this.webformComponents = this.groupComponents(this.webformComponents ,this.groupName);
-        return new DOMParser().parseFromString(this.webformComponents,'text/html').body.children[0];
+    public compileWebformComponents(): Element {
+        if (this.groupName !== '') this.webformComponents = this.groupComponents(this.webformComponents, this.groupName);
+        return new DOMParser().parseFromString(this.webformComponents, 'text/html').body.children[0];
     }
 
-    public getWebformComponents():string {
+    public getWebformComponents(): string {
         return this.webformComponents;
     }
 
-    public attachComponent(control:control, param?:string, options?:any): void {
+    public attachComponent(control: control, param?: string, options?: any): void {
         let component;
         let submit;
         let reset;
@@ -256,12 +255,12 @@ export class WebFormComponents {
     */
 
         // Wrap inside the group
-        if(this.groupName !== '') component = this.groupComponents(component,'form-group');
+        if (this.groupName !== '') component = this.groupComponents(component, 'form-group');
 
         this.webformComponents += component;
     }
 
-    public groupComponents(component:string,groupClass:string):string{
-        return  `<div class='${groupClass}'>${component}</div>`;
+    public groupComponents(component: string, groupClass: string): string {
+        return `<div class='${groupClass}'>${component}</div>`;
     }
 }
