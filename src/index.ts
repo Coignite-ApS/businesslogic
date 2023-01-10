@@ -12,9 +12,10 @@ import {
     ValidationFailedEvent,
     WebForm,
     WebFormErrors
-} from "./interfaces/index";
+} from "./interfaces";
 import { log, mapWebForm, setRangeListeners } from "./Helpers/HelperFunctions";
-import { ServiceContainer } from "./classes/index";
+import { ServiceContainer } from "./classes/service-container";
+// import { Webservice } from "./classes/web-service";
 
 
 declare global {
@@ -25,9 +26,11 @@ declare global {
 
 const ajv: any = helpers.isConstructor(window.Ajv) ? new window.Ajv() : null;
 
+let WebServicesContainer: ServiceContainer = new ServiceContainer();
+let debug: boolean;
+
 
 // Todo: Needs to be split into more logical parts
-
 export class Webservice {
     protected key: string;
     private http: http;
@@ -39,13 +42,14 @@ export class Webservice {
     private cachedParams: any;
     private errors: WebFormErrors;
     private test: number;
+    private debug: boolean;
 
     public SchemaReceviedListener = new TypedEvent<SchemaReceivedEvent>();
     public ValidationFailedListener = new TypedEvent<ValidationFailedEvent>();
     public DataChangedListener = new TypedEvent<DataChangedEvent>();
     public ExecutedListener = new TypedEvent<ExecutedEvent>();
 
-    constructor(key: string = '', webform?: WebForm) {
+    constructor(key: string = '', debug = false, webform?: WebForm) {
         this.key = key;
         this.data = {};
         this.webform = webform;
@@ -53,6 +57,7 @@ export class Webservice {
         this.errors = {};
         this.cachedParams = {};
         this.test = 1;
+        this.debug = debug;
 
         this.init();
     }
@@ -60,8 +65,8 @@ export class Webservice {
     private init(): void {
         let vm = this;
 
-        // Adds this webservice to the collection of Webservices
-        Webservices.add(this.key, this);
+        // Adds this webservice to the collection of WebServicesContainer
+        WebServicesContainer.add(this.key, this);
 
         this.describe().then(() => {
             vm.initDataTypes();
@@ -270,8 +275,8 @@ export class Webservice {
         if (ajv) ajv.validate(this.inputSchema, this.data);
 
         if (this.webform) {
-            // Handle form validation when the webservice is associated with a webform
 
+            // Handle form validation when the webservice is associated with a webform
             if (this.webform.form_el) {
                 // Use native form validation
                 this.webform.form_el.customMessages = true;
@@ -330,7 +335,7 @@ export class Webservice {
             this.http.makeRequest('GET', 'https://api.businesslogic.online/describe')
                 .then(function(result) {
                     resolve(result);
-                    log(result, debug);
+                    log(result, this.debug);
                 })
                 .catch(function(error) {
                     reject(error);
@@ -561,11 +566,6 @@ export class Webservice {
     }
 }
 
-let Webservices: ServiceContainer = new ServiceContainer();
-let debug: boolean;
-
-export { Webservices };
-
 (function() {
     // See if we are in debug mode
     if (!!document.querySelector('script[bl-debug]')) debug = true;
@@ -586,7 +586,7 @@ export { Webservices };
             let container: HTMLDivElement = document.createElement('div');
             container.className = 'bl-form';
             formList[f].appendChild(container);
-            ws = new Webservice(key);
+            ws = new Webservice(key, debug);
             ws.SchemaReceviedListener.on((e) => {
                 let inputs: WebFormComponents = new WebFormComponents('form-inputs');
                 let outputs: WebFormComponents = new WebFormComponents('form-outputs');
@@ -676,12 +676,14 @@ export { Webservices };
                 ws.assignWebForm(wf);
             });
         } else {
-            ws = new Webservice(key, mapWebForm(formList[f]));
+            ws = new Webservice(key, debug, mapWebForm(formList[f]));
         }
 
         log(`Creating form from termplate: ${name}`, debug);
     }
 })();
+
+export { WebServicesContainer };
 
 // TODO: Consider implementing datalist with input instead of select https://www.quackit.com/html/tags/html_datalist_tag.cfm
 // TODO: Consider supporting http://inorganik.github.io/countUp.js/

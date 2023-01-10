@@ -1,4 +1,4 @@
-import { WebForm } from "../interfaces/index";
+import { WebForm } from "../interfaces";
 
 
 export function isEmpty(obj:any) {
@@ -78,6 +78,7 @@ export function mapWebForm(formItem: any): WebForm {
         desc_el = formItem.querySelector('[bl-output-description=' + param + ']');
         wf.outputs[param] = {'label_el': lbl_el, 'desc_el': desc_el, 'output_el': el};
     }
+
     return wf;
 }
 
