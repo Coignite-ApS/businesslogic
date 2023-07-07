@@ -33,7 +33,7 @@
     "sass-loader": "^7.3.1",
     "source-map-loader": "^0.2.4",
     "strip-whitespace-loader": "^1.0.4",
-    "stylelint": " ^10.0.0",
+    "stylelint": " ^15.10.1",
     "stylelint-config-standard": "^18.3.0",
     "ts-loader": "^5.4.5",
     "typescript": "^3.9.10",
