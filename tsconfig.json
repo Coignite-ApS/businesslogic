@@ -1,11 +1,16 @@
 {
   "compilerOptions": {
+    "moduleResolution": "node",
+    "types": ["node"], // You can add other types as needed
+    "typeRoots": ["node_modules/@types", "types"], // Include your custom types directory
     "outDir": "lib",
     "noImplicitAny": false,
     "sourceMap": true,
     "declaration": false,
     "module": "es6",
     "target": "es5",
-    "lib": ["es2016", "dom", "es6"]
+    "lib": ["es2016", "dom", "es6"],
+    "esModuleInterop": true, // Ensure this is set to true for module compatibility
+    "skipLibCheck": true // Optional, can help with some type checking issues
   }
 }

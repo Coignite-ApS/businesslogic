@@ -11,23 +11,6 @@
   #{$property}: var(--bl-#{$varName});
 }
 
-
-/*
-$primary-nav: (
-        padding-top: .2em,
-        margin-top: .2em,
-        line-height: 1.3,
-        nav-item: (
-                color: white,
-                is-expanded: (
-                        padding-top: 1em,
-                        margin-top: 1em
-                )
-        )
-);
-
-*/
-
 @mixin print-styles($map, $keys...){
   $i: 1;
   $length: length($keys);
@@ -42,10 +25,3 @@ $primary-nav: (
     }
   }
 }
-
-
-/*
-nav.expanded {
-  @include print-styles($primary-nav, nav-item, is-expanded);
-}
-*/

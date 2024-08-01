@@ -13,6 +13,9 @@
   },
   "author": "Rassvet ApS <rassvet@rassvet.dk> (https://rassvet.co)",
   "license": "ISC",
+  "dependencies": {
+    "await-to-js": "^3.0.0"
+  },
   "devDependencies": {
     "@types/node": "^10.17.60",
     "autoprefixer": "^9.8.8",
