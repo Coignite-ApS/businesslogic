@@ -60,11 +60,9 @@ export class Webservice {
 
     private async describe(): Promise<any> {
         let vm = this;
-
         // Retrieve all relevant webservice metadata
         if (vm.inputSchema) return;
         const result = await this.getWebserviceDocs();
-
         this.SchemaReceviedListener.emit({
             inputSchema: vm.inputSchema = result.expected_input || {},
             outputSchema: vm.outputSchema = result.expected_output || {},
@@ -319,7 +317,7 @@ export class Webservice {
         for (let param in this.webform.inputs) {
             let vm = this;
             let value = (<HTMLInputElement>this.webform.inputs[param].input_el).value;
-            let type = vm.inputSchema.properties[param].type;
+            // let type = vm.inputSchema.properties[param].type;
             let inputElType = this.webform.inputs[param].input_el['type'];
 
             vm.setParamFromWebform(param, value);
@@ -336,10 +334,12 @@ export class Webservice {
 
             if (inputElType === 'range') {
                 this.webform.inputs[param].input_el.addEventListener('input', function (e) {
+                    const outputEl = this.parentElement.parentElement.parentElement.querySelector('#rangevalue')
                     let target = e.target
                     const min = target['min'];
                     const max = target['max'];
                     const val = target['value'];
+                    outputEl.value = val;
 
                     target['style'].backgroundSize = (val - min) * 100 / (max - min) + '% 100%'
                 })

@@ -24,25 +24,22 @@ type control =
     'output-progress'
 
 export class WebFormComponents {
-    // private webformComponents: string;
     public webformComponents: HTMLElement;
     private groupName: string;
 
     constructor(groupName?: string) {
-        // this.webformComponents = '';
         this.webformComponents = document.createElement('div'); // Initialize as a div element
         if (groupName) this.webformComponents.className = `${groupName}`;
 
         this.groupName = groupName ? groupName : '';
     }
 
-    // public compileWebformComponents(): Element {
-    //     if (this.groupName !== '') {
-    //         this.webformComponents = this.groupComponents(this.webformComponents, this.groupName);
-    //     }
-    //
-    //     return new DOMParser().parseFromString(this.webformComponents, 'text/html').body.children[0];
-    // }
+    public setBgImgContainer(imgUrl: string): void {
+        const bgContainer = document.createElement('div');
+        bgContainer.classList.add('bg-img-container');
+        bgContainer.style.backgroundImage = `url(${imgUrl})`;
+        this.webformComponents.appendChild(bgContainer);
+    }
 
     public attachComponent(control: control, param?: string, options?: any): void {
         let component = '';
@@ -118,7 +115,7 @@ export class WebFormComponents {
                             min='${options.minimum}'
                             max='${options.maximum}'
                             value='${options.default}'
-                            step='${options.multipleOf}' oninput='rangevalue.value=value'
+                            step='${options.multipleOf}'
                             id='${param}' name='${param}' bl-input='${param}'
                             style='background-size: ${(!!(options.default % options.multipleOf) ? options.default - (options.default % options.multipleOf) : options.default - options.minimum) * 100 / (options.maximum - options.minimum)}% 100%'>
                     </div>

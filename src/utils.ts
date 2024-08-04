@@ -1,4 +1,4 @@
-import {WebForm} from './types';
+import {SchemaReceivedEvent, WebForm} from './types';
 
 export function isEmpty(obj: any) {
     for (let key in obj) {
@@ -22,10 +22,12 @@ export function getFormConfiguration(form) {
     const name = form.getAttribute('bl-name');
     const key = form.getAttribute('bl-token');
     const auto = form.getAttribute('bl-auto') === '';
+    const auto_sleek = form.getAttribute('bl-auto-sleek') === '';
+    const bg_image_url = form.getAttribute('bl-background-image');
     const submitLabel = form.getAttribute('bl-control-submit-label');
     const resetLabel = form.getAttribute('bl-control-reset-label');
 
-    return [name, key, auto, submitLabel, resetLabel];
+    return [name, key, auto, auto_sleek, bg_image_url, submitLabel, resetLabel];
 }
 
 export function purgeForm(form): void {
@@ -34,8 +36,23 @@ export function purgeForm(form): void {
 
 export function getFormContainer(): HTMLDivElement {
     const container: HTMLDivElement = document.createElement('div');
-    container.className = 'bl-form';
+    container.classList.add('bl-form');
+    container.classList.add('inputs-shown');
+
     return container;
+}
+
+export function getToggleBtn(formContainer) {
+    const calcBtn = document.createElement('button');
+
+    calcBtn.textContent = 'Hide calculator';
+    calcBtn.addEventListener('click', () => {
+        formContainer.classList.toggle('inputs-shown');
+        const isInputsShown = formContainer.classList.contains('inputs-shown');
+        calcBtn.textContent = isInputsShown ? 'Hide calculator' : 'Show calculator';
+    });
+
+    return calcBtn;
 }
 
 export function mapWebForm(formItem: any): WebForm {
@@ -90,4 +107,45 @@ export function mapWebForm(formItem: any): WebForm {
         wf.outputs[param] = {'label_el': lbl_el, 'desc_el': desc_el, 'output_el': el};
     }
     return wf;
+}
+
+export function getInputComponentName(e: SchemaReceivedEvent, param) {
+    let type = e.inputSchema.properties[param].type;
+    let enumeration = e.inputSchema.properties[param].enum || e.inputSchema.properties[param].oneOf;
+
+    let isRange = e.inputSchema.properties[param].maximum &&
+        e.inputSchema.properties[param].minimum !== undefined &&
+        e.inputSchema.properties[param].type === 'number' &&
+        e.inputSchema.properties[param].default;
+
+    if (enumeration) return 'select';
+    if (isRange) return 'range';
+    return type;
+}
+
+export function getOutputComponentName(e: SchemaReceivedEvent, param) {
+    let type = e.outputSchema.properties[param].type;
+    let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
+
+    if (enumeration) return 'select';
+    return type;
+
+    // if (enumeration) {
+    //     outputs.attachComponent('select', param);
+    // } else {
+    //     switch (type) {
+    //         case 'number':
+    //             outputs.attachComponent('output', param);
+    //             break;
+    //         case 'integer':
+    //             outputs.attachComponent('output', param);
+    //             break;
+    //         //TODO: Consider how we can prepare placeholders for data in the output for an array
+    //         case 'array':
+    //             outputs.attachComponent('output-array', param, [{"name": 1}]);
+    //             break;
+    //         default:
+    //             outputs.attachComponent('output', param);
+    //     }
+    // }
 }
