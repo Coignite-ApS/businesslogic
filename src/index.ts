@@ -6,7 +6,7 @@ import {
     purgeForm,
     mapWebForm,
     getToggleBtn,
-    getInputComponentName, getOutputComponentName
+    getInputComponentName, getBgImgContainer, getBusinessLogicLogo
 } from './utils';
 import {Logger, WebFormComponents, Webservice} from './classes';
 
@@ -71,10 +71,13 @@ import {Logger, WebFormComponents, Webservice} from './classes';
                     });
                 }
 
+                // When auto_sleek mode set logo to inputs container
+                if (auto_sleek) inputs.setComponentToContainer(getBusinessLogicLogo());
+
                 container.appendChild(inputs.webformComponents);
 
                 // Set background image for auto_sleek mode
-                if (auto_sleek && bg_image_url) outputs.setBgImgContainer(bg_image_url);
+                if (auto_sleek && bg_image_url) outputs.setComponentToContainer(getBgImgContainer(bg_image_url));
 
                 for (let param in e.outputSchema.properties) {
                     if (!e.outputSchema.properties.hasOwnProperty(param)) return;

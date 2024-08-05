@@ -34,11 +34,8 @@ export class WebFormComponents {
         this.groupName = groupName ? groupName : '';
     }
 
-    public setBgImgContainer(imgUrl: string): void {
-        const bgContainer = document.createElement('div');
-        bgContainer.classList.add('bg-img-container');
-        bgContainer.style.backgroundImage = `url(${imgUrl})`;
-        this.webformComponents.appendChild(bgContainer);
+    public setComponentToContainer(component: HTMLElement): void {
+        this.webformComponents.appendChild(component);
     }
 
     public attachComponent(control: control, param?: string, options?: any): void {

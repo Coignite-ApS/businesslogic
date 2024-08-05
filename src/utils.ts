@@ -37,15 +37,13 @@ export function purgeForm(form): void {
 export function getFormContainer(): HTMLDivElement {
     const container: HTMLDivElement = document.createElement('div');
     container.classList.add('bl-form');
-    container.classList.add('inputs-shown');
 
     return container;
 }
 
 export function getToggleBtn(formContainer) {
     const calcBtn = document.createElement('button');
-
-    calcBtn.textContent = 'Hide calculator';
+    calcBtn.textContent = 'Show calculator';
     calcBtn.addEventListener('click', () => {
         formContainer.classList.toggle('inputs-shown');
         const isInputsShown = formContainer.classList.contains('inputs-shown');
@@ -123,29 +121,19 @@ export function getInputComponentName(e: SchemaReceivedEvent, param) {
     return type;
 }
 
-export function getOutputComponentName(e: SchemaReceivedEvent, param) {
-    let type = e.outputSchema.properties[param].type;
-    let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
+export function getBgImgContainer(imgUrl: string){
+    const bgContainer = document.createElement('div');
+    bgContainer.classList.add('bg-img-container');
+    bgContainer.style.backgroundImage = `url(${imgUrl})`;
+    return bgContainer;
+}
 
-    if (enumeration) return 'select';
-    return type;
+export function getBusinessLogicLogo() {
+    const blLogo = document.createElement('a');
+    blLogo.classList.add('logo');
+    blLogo.title = 'Power by businesslogic.online';
+    blLogo.href = 'https://businesslogic.online';
+    blLogo.target = '_blank';
 
-    // if (enumeration) {
-    //     outputs.attachComponent('select', param);
-    // } else {
-    //     switch (type) {
-    //         case 'number':
-    //             outputs.attachComponent('output', param);
-    //             break;
-    //         case 'integer':
-    //             outputs.attachComponent('output', param);
-    //             break;
-    //         //TODO: Consider how we can prepare placeholders for data in the output for an array
-    //         case 'array':
-    //             outputs.attachComponent('output-array', param, [{"name": 1}]);
-    //             break;
-    //         default:
-    //             outputs.attachComponent('output', param);
-    //     }
-    // }
+    return blLogo;
 }

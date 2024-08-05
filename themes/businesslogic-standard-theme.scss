@@ -306,9 +306,13 @@ $vars: (
     }
 
     &.bl-grid-columns-sleek {
+      border: 1px solid black;
+      width: 800px;
+
       .bl-form {
         position: relative;
         display: flex;
+        min-height: 640px;
         transition: width .5s ease-in-out, opacity 0.5s ease-in-out;
 
         &:not(.inputs-shown) {
@@ -343,6 +347,7 @@ $vars: (
         .form-inputs {
           padding-top: 80px;
           padding-right: 20px;
+          margin-bottom: 0;
           opacity: 1;
           transition: width .5s ease-in-out, opacity 0.5s ease-in-out;
         }
@@ -387,7 +392,7 @@ $vars: (
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-size: 2em;
+            font-size: 1.5em;
             padding-bottom: 0;
             margin-bottom: 0;
           }

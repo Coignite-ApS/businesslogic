@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=UTF-8>
+    <title>Typescript webpack</title>
+    <base href="/">
+</head>
+
+<body>
+<div class="styleguide">
+    <div class="color-success"></div>
+    <div class="color-info"></div>
+    <div class="color-gray"></div>
+</div>
+
+<section class="clock">
+    <div class="center-point"></div>
+    <div class="seconds-container animate">
+        <div class="seconds"></div>
+    </div>
+    <div class="minutes-container animate">
+        <div class="minutes"></div>
+    </div>
+
+    <div class="hours-container animate">
+        <div class="hours"></div>
+    </div>
+</section>
+
+<nav>
+    <ul>
+        <li><a href="../index.html">Main</a></li>
+        <li><a href="examples/template-from.html">Template Form</a></li>
+        <li><a href="examples/auto-form.html">Auto Form</a></li>
+        <li><a href="examples/auto-sleek-form.html">Auto Sleek Form</a></li>
+        <li><a href="examples/programmatic-form.html">Programmatic Form</a></li>
+    </ul>
+</nav>
+
+<script type="module" src="businesslogic.1.4.0.js"></script>
+<link rel="stylesheet" href="businesslogic-standard-theme.css">
+<link rel="stylesheet" href="examples/styles.css">
+
+<!--Example 1-->
+<div class="custom-theme bl-theme bl-theme-fonts" bl-name="calc" bl-token="5009a8b8529d4c059560a863f8904e31">
+    <h2>Test</h2>
+    <p class="text-muted">Amazing calculation</p>
+    <hr>
+    <div class="input-group">
+        <div class="form-group">
+            <label for="salary_per_month" bl-input-label="salary_per_month">Your salary per month</label>
+            <input title="Some crap" type="number" class="form-control" id="salary_per_month"
+                   bl-input="salary_per_month">
+            <small bl-input-description="salary_per_month">DKK, before tax.</small>
+            <small bl-input-error="salary_per_month"></small>
+        </div>
+    </div>
+    <div class="input-group">
+        <div class="form-group">
+            <label for="start_year" bl-input-label="start_year">Options</label>
+            <select class="form-control" id="start_year" bl-input="start_year">
+                <option selected bl-placeholder>Choose...</option>
+                <option>1</option>
+                <option>2</option>
+                <option>2</option>
+            </select>
+            <small bl-input-description="start_year">Year which is important.</small>
+            <small bl-input-error="start_year"></small>
+        </div>
+    </div>
+    <hr>
+    <button bl-control="submit">Calculate</button>
+    <hr>
+    <p><span bl-output-label="total_amount">Your salary</span> is: <span bl-output="total_amount"></span></p>
+</div>
+</body>
+</html>
