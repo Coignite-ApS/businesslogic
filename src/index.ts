@@ -28,173 +28,90 @@ import {Logger, WebFormComponents, Webservice} from './classes';
             const container = getFormContainer();
 
             // Add toggle state btn for auto_sleek form
-            if (auto_sleek) {
-                container.appendChild(getToggleBtn(container));
-            }
+            if (auto_sleek) container.appendChild(getToggleBtn(container));
 
             formList[f].appendChild(container);
             ws = new Webservice(key, logger);
 
             ws.SchemaReceviedListener.on((e) => {
-                if (auto_sleek) {
-                    const inputs: WebFormComponents = new WebFormComponents('form-inputs');
-                    const outputs: WebFormComponents = new WebFormComponents('form-outputs');
+                let inputs: WebFormComponents = new WebFormComponents('form-inputs');
+                let outputs: WebFormComponents = new WebFormComponents('form-outputs');
+                let signature: WebFormComponents = new WebFormComponents();
 
-                    // When we create auto_sleek form first input elem is reflected in output panel
-                    const firstInputKey = Object.keys(e.inputSchema.properties)[0];
-                    const firstInputProperties = {...e.inputSchema.properties[firstInputKey]};
-                    const firstInputComponentName = getInputComponentName(e, firstInputKey);
+                // For auto_sleek mode we set first input elem to output panel
+                const firstInputKey = Object.keys(e.inputSchema.properties)[0];
+                const firstInputProperties = {...e.inputSchema.properties[firstInputKey]};
+                const firstInputComponentName = getInputComponentName(e, firstInputKey);
 
-                    Object.keys(e.inputSchema.properties)
-                        .forEach((param, index) => {
-                            // When we create auto_sleek form first input is ignored for input panel
-                            if (!index) return;
-                            if (!e.inputSchema.properties.hasOwnProperty(param)) return;
-                            const inputComponentName = getInputComponentName(e, param);
+                Object.keys(e.inputSchema.properties)
+                    .forEach((param, index) => {
+                        // For auto_sleek mode we skip first input for input panel
+                        if (auto_sleek && !index) return;
+                        if (!e.inputSchema.properties.hasOwnProperty(param)) return;
+                        const componentName = getInputComponentName(e, param);
 
-                            if (inputComponentName === 'range') {
-                                inputs.attachComponent(inputComponentName, param, e.inputSchema.properties[param]);
-                            } else {
-                                inputs.attachComponent(inputComponentName, param);
-                            }
-                        })
-
-                    if (resetLabel !== null) {
-                        inputs.attachComponent('submit-reset', null, {
-                            submit: submitLabel,
-                            reset: resetLabel
-                        });
-                    } else {
-                        inputs.attachComponent('submit', null, {
-                            submit: submitLabel
-                        });
-                    }
-
-                    container.appendChild(inputs.webformComponents);
-
-                    // Add background image for auto_sleek form
-                    if (auto_sleek && bg_image_url) {
-                        outputs.setBgImgContainer(bg_image_url);
-                    }
-
-                    for (let param in e.outputSchema.properties) {
-                        if (!e.outputSchema.properties.hasOwnProperty(param)) return;
-
-                        let type = e.outputSchema.properties[param].type;
-                        let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
-
-                        if (enumeration) {
-                            outputs.attachComponent('select', param);
+                        if (componentName === 'select' ||
+                            componentName === 'range' ||
+                            componentName === 'number' ||
+                            componentName === 'integer') {
+                            inputs.attachComponent(componentName, param, e.inputSchema.properties[param]);
                         } else {
-                            switch (type) {
-                                case 'number':
-                                    outputs.attachComponent('output', param);
-                                    break;
-                                case 'integer':
-                                    outputs.attachComponent('output', param);
-                                    break;
-                                //TODO: Consider how we can prepare placeholders for data in the output for an array
-                                case 'array':
-                                    outputs.attachComponent('output-array', param, [{"name": 1}]);
-                                    break;
-                                default:
-                                    outputs.attachComponent('output', param);
-                            }
+                            inputs.attachComponent('text', param);
                         }
-                    }
+                    });
 
-                    // Put first input component to output panel
-                    if (firstInputComponentName === 'range') {
-                        outputs.attachComponent(firstInputComponentName, firstInputKey, firstInputProperties);
-                    } else {
-                        outputs.attachComponent(firstInputComponentName, firstInputKey);
-                    }
-
-                    container.appendChild(outputs.webformComponents);
+                if (resetLabel !== null) {
+                    inputs.attachComponent('submit-reset', null, {
+                        submit: submitLabel,
+                        reset: resetLabel
+                    });
+                } else {
+                    inputs.attachComponent('submit', null, {
+                        submit: submitLabel
+                    });
                 }
 
-                if (auto) {
-                    let inputs: WebFormComponents = new WebFormComponents('form-inputs');
-                    let outputs: WebFormComponents = new WebFormComponents('form-outputs');
-                    let signature: WebFormComponents = new WebFormComponents();
+                container.appendChild(inputs.webformComponents);
 
-                    for (let param in e.inputSchema.properties) {
-                        if (!e.inputSchema.properties.hasOwnProperty(param)) return;
+                // Set background image for auto_sleek mode
+                if (auto_sleek && bg_image_url) outputs.setBgImgContainer(bg_image_url);
 
-                        let type = e.inputSchema.properties[param].type;
-                        let enumeration = e.inputSchema.properties[param].enum || e.inputSchema.properties[param].oneOf;
+                for (let param in e.outputSchema.properties) {
+                    if (!e.outputSchema.properties.hasOwnProperty(param)) return;
+                    let type = e.outputSchema.properties[param].type;
+                    let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
 
-                        let isRange = e.inputSchema.properties[param].maximum &&
-                            e.inputSchema.properties[param].minimum !== undefined &&
-                            e.inputSchema.properties[param].type === 'number' &&
-                            e.inputSchema.properties[param].default
-
-                        if (enumeration) {
-                            //TODO: We can already here generate dropdown options
-                            inputs.attachComponent('select', param);
-                        } else if (isRange) {
-                            inputs.attachComponent('range', param, e.inputSchema.properties[param]);
-                        } else {
-                            switch (type) {
-                                case 'number':
-                                    inputs.attachComponent('number', param);
-                                    break;
-                                case 'integer':
-                                    inputs.attachComponent('integer', param);
-                                    break;
-                                default:
-                                    inputs.attachComponent('text', param);
-                            }
-                        }
-                    }
-
-                    if (resetLabel !== null) {
-                        inputs.attachComponent('submit-reset', null, {
-                            submit: submitLabel,
-                            reset: resetLabel
-                        });
+                    if (enumeration) {
+                        outputs.attachComponent('select', param);
                     } else {
-                        inputs.attachComponent('submit', null, {
-                            submit: submitLabel
-                        });
-                    }
-
-                    container.appendChild(inputs.webformComponents);
-
-                    for (let param in e.outputSchema.properties) {
-                        if (!e.outputSchema.properties.hasOwnProperty(param)) return;
-                        let type = e.outputSchema.properties[param].type;
-                        let enumeration = e.outputSchema.properties[param].enum || e.outputSchema.properties[param].oneOf;
-
-                        if (enumeration) {
-                            outputs.attachComponent('select', param);
-
-                        } else {
-                            switch (type) {
-                                case 'number':
-                                    outputs.attachComponent('output', param);
-                                    break;
-                                case 'integer':
-                                    outputs.attachComponent('output', param);
-                                    break;
-                                //TODO: Consider how we can prepare placeholders for data in the output for an array
-                                case 'array':
-                                    outputs.attachComponent('output-array', param, [{"name": 1}]);
-                                    break;
-                                default:
-                                    outputs.attachComponent('output', param);
-                            }
+                        switch (type) {
+                            case 'number':
+                                outputs.attachComponent('output', param);
+                                break;
+                            case 'integer':
+                                outputs.attachComponent('output', param);
+                                break;
+                            //TODO: Consider how we can prepare placeholders for data in the output for an array
+                            case 'array':
+                                outputs.attachComponent('output-array', param, [{"name": 1}]);
+                                break;
+                            default:
+                                outputs.attachComponent('output', param);
                         }
                     }
+                }
 
-                    container.appendChild(outputs.webformComponents);
+                // For auto_sleek mode we set first input elem to output panel as the last elem
+                if (auto_sleek) outputs.attachComponent(firstInputComponentName, firstInputKey, firstInputProperties);
+
+                container.appendChild(outputs.webformComponents);
+
+                if (!auto_sleek) {
                     signature.attachComponent('businesslogic');
                     formList[f].appendChild(signature.webformComponents);
                 }
 
-
                 const wf = mapWebForm(formList[f]);
-
                 ws.assignWebForm(wf);
             });
         } else {

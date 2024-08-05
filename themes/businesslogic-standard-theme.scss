@@ -355,9 +355,23 @@ $vars: (
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-direction: column;
+
+          .form-text {
+            color: $color-white;
+          }
+
+          .range-output {
+            background-color: transparent;
+            border: none;
+          }
 
           .form-group {
             position: relative;
+          }
+
+          .form-group:not(:last-child) {
+            min-height: 80px;
           }
 
           .bg-img-container {
@@ -373,6 +387,9 @@ $vars: (
             display: flex;
             flex-direction: column;
             align-items: center;
+            font-size: 2em;
+            padding-bottom: 0;
+            margin-bottom: 0;
           }
         }
       }
