@@ -9,6 +9,7 @@ type control =
     'checkbox' |
     'radio' |
     'range' |
+    'range-output' |
     'password' |
     'email' |
     'tel' |
@@ -127,6 +128,24 @@ export class WebFormComponents {
                     </div>
                     <small bl-input-error='${param}'></small>
                 </p>
+            `;
+                break;
+            case 'range-output':
+                component = `
+                <label for='${param}' bl-input-label='${param}'></label>
+                <output id='rangevalue'>${options.default}</output>
+                        
+                <div class='range-group'>
+                    <div class='range-control'>
+                        <input type='range'
+                            min='${options.minimum}'
+                            max='${options.maximum}'
+                            value='${options.default}'
+                            step='${options.multipleOf}'
+                            id='${param}' name='${param}' bl-input='${param}'
+                            style='background-size: ${(!!(options.default % options.multipleOf) ? options.default - (options.default % options.multipleOf) : options.default - options.minimum) * 100 / (options.maximum - options.minimum)}% 100%'>
+                    </div>
+                </div>
             `;
                 break;
             case 'email':

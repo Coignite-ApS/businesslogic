@@ -20,6 +20,7 @@ declare global {
 
 const ajv: any = isConstructor(window.Ajv) ? new window.Ajv() : null;
 const Webservices: ServiceContainer = new ServiceContainer();
+export {Webservices};
 
 export class Webservice {
     protected key: string;
@@ -35,14 +36,16 @@ export class Webservice {
     private cachedParams: any;
     private errors: WebFormErrors;
     private logger: Logger;
+    private autoSleekMode: boolean;
 
-    constructor(key: string = '', logger: Logger, webform?: WebForm) {
+    constructor(key: string = '', logger: Logger, webform?: WebForm, autoSleekMode?: boolean) {
         this.key = key;
         this.data = {};
         this.webform = webform;
         this.errors = {};
         this.cachedParams = {};
-        this.logger = logger;
+        this.autoSleekMode = autoSleekMode;
+        this.logger = logger || Logger.getInstance(false);
 
         this.init();
     }
@@ -63,6 +66,7 @@ export class Webservice {
         // Retrieve all relevant webservice metadata
         if (vm.inputSchema) return;
         const result = await this.getWebserviceDocs();
+
         this.SchemaReceviedListener.emit({
             inputSchema: vm.inputSchema = result.expected_input || {},
             outputSchema: vm.outputSchema = result.expected_output || {},
@@ -87,6 +91,10 @@ export class Webservice {
             this.setParams(this.cachedParams);
             this.cachedParams = {};
         }
+    }
+
+    public getValidationErrors(): WebFormErrors {
+        return this.errors;
     }
 
     public setParams(params: any = {}): void {
@@ -114,6 +122,30 @@ export class Webservice {
                 }
             }
         }
+    }
+
+    public setParam(param: string, value: any): void {
+        // Todo: make it wait for schema
+        if (this.inputSchema) {
+            let vm = this;
+            let dataChanged = false;
+            if (this.data.hasOwnProperty(param)) {
+                if (this.data[param] !== value) {
+                    if (this.webform) {
+                        (<HTMLInputElement>this.webform.inputs[param].input_el).value = value;
+                    }
+                    this.data[param] = value;
+                    dataChanged = true;
+                }
+                if (dataChanged) this.DataChangedListener.emit({data: vm.data});
+            }
+        } else {
+            this.cachedParams[param] = value;
+        }
+    }
+
+    public getParams(): void {
+        return this.data || this.cachedParams;
     }
 
     private initDataTypes(): void {
@@ -172,7 +204,9 @@ export class Webservice {
 
                     // Set title and description
                     if (definition.title) label.innerHTML = definition.title;
-                    if (definition.description) description.innerHTML = definition.description;
+                    if (definition?.description && description?.innerHTML) {
+                        description.innerHTML = definition?.description;
+                    }
 
                     // Set required
                     if (this.inputSchema.required.includes(property)) input.setAttribute('required', 'required');
@@ -304,7 +338,7 @@ export class Webservice {
 
                     // Set title and description
                     if (definition.title) label.innerHTML = definition.title;
-                    if (definition.description) description.innerHTML = definition.description;
+                    if (definition?.description) description.innerHTML = definition.description;
 
                     // Set default
                     if (definition.default) output.innerHTML = definition.default;
@@ -497,6 +531,8 @@ export class Webservice {
         }
 
         vm.ExecutedListener.emit(data);
+
+        return data;
     }
 
     private handleWebformOutputs(results: any = {}): void {
@@ -516,14 +552,18 @@ export class Webservice {
                         // TODO: Handle array outputs with proper component from WebFormComponents
                         this.webform.outputs[param].output_el.innerHTML = values;
                     } else {
-                        this.webform.outputs[param].output_el.innerHTML = results[param];
+                        this.webform.outputs[param].output_el.innerHTML = this.autoSleekMode ?
+                            new Intl.NumberFormat('da-DK').format(results[param]) :
+                            results[param];
                     }
                 }
             }
         }
     }
 
-    public assignWebForm(webform: WebForm): void {
+    public assignWebForm(webform: WebForm, autoLaunch = false): void {
         this.webform = webform;
+        // Auto launch execution for auto_sleek form
+        if (autoLaunch) setTimeout(async () => await this.execute(), 0);
     }
 }

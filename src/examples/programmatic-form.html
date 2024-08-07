@@ -4,6 +4,8 @@
     <meta charset=UTF-8>
     <title>Typescript webpack</title>
     <base href="/">
+    <link rel="stylesheet" href="businesslogic-standard-theme.css">
+    <link rel="stylesheet" href="examples/styles.css">
 </head>
 
 <body>
@@ -30,62 +32,49 @@
 <nav>
     <ul>
         <li><a href="../index.html">Main</a></li>
-        <li><a href="examples/template-from.html">Template Form</a></li>
-        <li><a href="examples/auto-form.html">Auto Form</a></li>
-        <li><a href="examples/auto-sleek-form.html">Auto Sleek Form</a></li>
-        <li><a href="examples/programmatic-form.html">Programmatic Form</a></li>
+        <li><a href="/examples/template-from.html">Template Form</a></li>
+        <li><a href="/examples/auto-form.html">Auto Form</a></li>
+        <li><a href="/examples/auto-sleek-form.html">Auto Sleek Form</a></li>
+        <li><a href="/examples/programmatic-form.html">Programmatic Form</a></li>
     </ul>
 </nav>
 
-<script type="module" src="businesslogic.1.4.0.js"></script>
-<link rel="stylesheet" href="businesslogic-standard-theme.css">
-<link rel="stylesheet" href="examples/styles.css">
+<h2>Programmatic Form</h2>
+<p class="text-muted">Open Console</p>
+
 <script>
     window.onload = function () {
-    // You can execute a webservice using Webservice class
-    // var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
-    // biz.setParams({
-    //     "salary_per_month": 25000,
-    //     "start_year": 1
-    // });
-    //
-    // biz.setParam("start_year", 102);
-    //
-    // biz.execute().then(function (result) {
-    //     console.log('Output from programmatic execution: ',result)
-    // }).catch(function (error) {
-    //     console.log('Error in programmatic execution: ',error)
-    // });
+        // Case: 1
+        // You can execute a webservice using Webservice class
+        var biz = new Businesslogic.Webservice('cf4c7b6555db4c98bda752f750e2684f');
+        biz.setParams({"salary_per_month": 25000, "start_year": 1});
+        biz.setParam("start_year", 102);
+        biz.execute()
+            .then((result) => console.log('Case 1: Output from programmatic execution: ', result))
+            .catch((error) => console.log('Case 1: Error in programmatic execution: ', error));
 
-    // We can execute a webservice using Webservice class
+        // Case: 2
+        // We can execute a webservice using Webservice class
+        var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
+        biz.setParams({"goal": 10000, "deadline": 2020});
+        biz.setParam("goal", 15000);
+        biz.execute()
+            .then((result) => console.log('Case 2: Output from programmatic execution: ', result))
+            .catch((error) => console.log('Case 2: Error in programmatic execution: ', error));
 
-            var biz = new Businesslogic.Webservice('727553b1062845b4865dcbcee130051c');
-            biz.setParams({ "goal": 10000, "deadline": 2020 });
-            biz.setParam("goal", 15000);
-            biz.execute().then(function (result) {
-                console.log('Output from programmatic execution: ',result)
-            }).catch(function (error) {
-                console.log('Error in programmatic execution: ',error)
-            });
-                    // You are able to get and manipulate with any webservice from the collection
-                    //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').setParams({ "goal": 15000, "deadline": 2019 });
-                    //Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c').execute();
-                    /*
-                                .addEventListener('onExecuted', function (e)  {
-                        console.log('data', e.data)
-                    })
-                    // You can set
-                    var bizl = Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c');
-                    bizl.ExecutedListener.on(function (result) {
-                        console.log('data', result)
-                    });
-    biz.execute().then(function (result) {
-        console.log('Output from programmatic execution: ',result)
-    }).catch(function (error) {
-        console.log('Error in programmatic execution: ',error)
-    });
-*/
+        // Case: 3
+        // You can set
+        var bizl = Businesslogic.Webservices.get('727553b1062845b4865dcbcee130051c');
+        bizl.ExecutedListener.on((result) => console.log('Case 3: Data', result));
+
+        // Case: 4
+        biz.execute()
+            .then((result) => console.log('Case 4: Output from programmatic execution: ', result))
+            .catch((error) => console.log('Case 4: Error in programmatic execution: ', error));
     }
 </script>
+
+<script src="examples/script.js"></script>
+<script type="module" src="businesslogic.1.4.0.js"></script>
 </body>
 </html>

@@ -289,8 +289,10 @@ $vars: (
         flex-flow: row-reverse wrap;
         justify-content: space-between;
         align-items: stretch;
+
         & > div {
           width: 50%;
+
           &:first-child {
 
             padding-left: $offset-4;
@@ -298,6 +300,7 @@ $vars: (
             border-left-style: solid;
             @include var(border-left-color, border-color);
           }
+
           &:last-child {
             padding-right: $offset-4;
           }
@@ -306,8 +309,16 @@ $vars: (
     }
 
     &.bl-grid-columns-sleek {
-      border: 1px solid black;
       width: 800px;
+
+      &:has(.bl-form:not(.inputs-shown)) {
+        padding: 0 !important;
+
+        button {
+          top: 20px;
+          left: 20px;
+        }
+      }
 
       .bl-form {
         position: relative;
@@ -373,10 +384,28 @@ $vars: (
 
           .form-group {
             position: relative;
-          }
 
-          .form-group:not(:last-child) {
-            min-height: 80px;
+            &:nth-of-type(2) {
+              display: flex;
+              margin-bottom: 4rem;
+
+              [bl-output="total_amount"] {
+                font-size: 4rem;
+                line-height: 6rem;
+              }
+            }
+
+            &:nth-of-type(3) {
+              width: 70%;
+
+              .range-group {
+                margin-top: 1rem;
+              }
+
+              [bl-input-label] {
+                margin-right: .5rem;
+              }
+            }
           }
 
           .bg-img-container {
@@ -390,7 +419,7 @@ $vars: (
           .output-row {
             border-bottom: none;
             display: flex;
-            flex-direction: column;
+            flex-direction: column-reverse;
             align-items: center;
             font-size: 1.5em;
             padding-bottom: 0;
@@ -410,4 +439,5 @@ $vars: (
     @include grid-columns;
     @include columns;
   }
+
 }

@@ -8,8 +8,9 @@ import {
     getToggleBtn,
     getInputComponentName, getBgImgContainer, getBusinessLogicLogo
 } from './utils';
-import {Logger, WebFormComponents, Webservice} from './classes';
+import {Logger, WebFormComponents, Webservice, Webservices} from './classes';
 
+export {Webservice, Webservices};
 
 (function () {
     // See if we are in debug mode
@@ -31,22 +32,32 @@ import {Logger, WebFormComponents, Webservice} from './classes';
             if (auto_sleek) container.appendChild(getToggleBtn(container));
 
             formList[f].appendChild(container);
-            ws = new Webservice(key, logger);
+            ws = new Webservice(key, logger, undefined, auto_sleek);
 
             ws.SchemaReceviedListener.on((e) => {
                 let inputs: WebFormComponents = new WebFormComponents('form-inputs');
                 let outputs: WebFormComponents = new WebFormComponents('form-outputs');
                 let signature: WebFormComponents = new WebFormComponents();
+                // For auto_sleek mode
+                let firstRangeInputIndex = undefined;
+                let firstRangeInputKey = undefined;
+                let firstRangeInputProperties = undefined;
 
-                // For auto_sleek mode we set first input elem to output panel
-                const firstInputKey = Object.keys(e.inputSchema.properties)[0];
-                const firstInputProperties = {...e.inputSchema.properties[firstInputKey]};
-                const firstInputComponentName = getInputComponentName(e, firstInputKey);
+                // For auto_sleek mode we should have at least one sleek range input
+                if (auto_sleek) {
+                    firstRangeInputIndex = Object.keys(e.inputSchema.properties)
+                        .findIndex((param, index) => getInputComponentName(e, param) === 'range');
+
+                    if (firstRangeInputIndex === -1) return console.error('auto_sleek form should contain at least one range input');
+
+                    firstRangeInputKey = Object.keys(e.inputSchema.properties)[firstRangeInputIndex];
+                    firstRangeInputProperties = {...e.inputSchema.properties[firstRangeInputKey]};
+                }
 
                 Object.keys(e.inputSchema.properties)
                     .forEach((param, index) => {
                         // For auto_sleek mode we skip first input for input panel
-                        if (auto_sleek && !index) return;
+                        if (auto_sleek && index === firstRangeInputIndex) return;
                         if (!e.inputSchema.properties.hasOwnProperty(param)) return;
                         const componentName = getInputComponentName(e, param);
 
@@ -60,15 +71,18 @@ import {Logger, WebFormComponents, Webservice} from './classes';
                         }
                     });
 
-                if (resetLabel !== null) {
-                    inputs.attachComponent('submit-reset', null, {
-                        submit: submitLabel,
-                        reset: resetLabel
-                    });
-                } else {
-                    inputs.attachComponent('submit', null, {
-                        submit: submitLabel
-                    });
+                // For auto_sleek mode set hide buttons
+                if (!auto_sleek) {
+                    if (resetLabel !== null) {
+                        inputs.attachComponent('submit-reset', null, {
+                            submit: submitLabel,
+                            reset: resetLabel
+                        });
+                    } else {
+                        inputs.attachComponent('submit', null, {
+                            submit: submitLabel
+                        });
+                    }
                 }
 
                 // When auto_sleek mode set logo to inputs container
@@ -104,9 +118,8 @@ import {Logger, WebFormComponents, Webservice} from './classes';
                     }
                 }
 
-                // For auto_sleek mode we set first input elem to output panel as the last elem
-                if (auto_sleek) outputs.attachComponent(firstInputComponentName, firstInputKey, firstInputProperties);
-
+                // For auto_sleek mode we set first range input elem to output panel as the last elem
+                if (auto_sleek) outputs.attachComponent('range-output', firstRangeInputKey, firstRangeInputProperties);
                 container.appendChild(outputs.webformComponents);
 
                 if (!auto_sleek) {
@@ -115,7 +128,7 @@ import {Logger, WebFormComponents, Webservice} from './classes';
                 }
 
                 const wf = mapWebForm(formList[f]);
-                ws.assignWebForm(wf);
+                ws.assignWebForm(wf, auto_sleek);
             });
         } else {
             ws = new Webservice(key, logger, mapWebForm(formList[f]));
