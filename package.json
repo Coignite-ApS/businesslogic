@@ -1,6 +1,6 @@
 {
   "name": "businesslogic",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "A small javascript library for creating interactive content, calculations and decisioning logic using https://businesslogic.online webservices.",
   "main": "./lib/businesslogic.js",
   "scripts": {
@@ -13,6 +13,9 @@
   },
   "author": "Rassvet ApS <rassvet@rassvet.dk> (https://rassvet.co)",
   "license": "ISC",
+  "dependencies": {
+    "await-to-js": "^3.0.0"
+  },
   "devDependencies": {
     "@types/node": "^10.17.60",
     "autoprefixer": "^9.8.8",

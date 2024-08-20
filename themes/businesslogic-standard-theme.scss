@@ -22,8 +22,8 @@ $color-warning: #ffc107;
 $color-danger: #dc3545;
 
 $font-normal: 16px;
-$font-family-sans-serif: Roboto,"Helvetica Neue",Arial,sans-serif;
-$font-family-monospace: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+$font-family-sans-serif: Roboto, "Helvetica Neue", Arial, sans-serif;
+$font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
 $border-radius: .15em;
 
@@ -97,8 +97,7 @@ $vars: (
   }
 
   &.bl-grid-rows,
-  &.bl-grid-rows-reversed
-  {
+  &.bl-grid-rows-reversed {
     .form-inputs {
       .form-group {
         display: flex;
@@ -108,17 +107,18 @@ $vars: (
     }
   }
 
-
   &.bl-grid-rows {
     .bl-form {
       display: flex;
       flex-flow: column wrap;
       justify-content: space-between;
+
       .form-inputs {
         border-bottom-width: 1px;
         border-bottom-style: solid;
         @include var(border-bottom-color, border-color);
       }
+
       .form-outputs {
         margin-bottom: 0;
       }
@@ -130,71 +130,79 @@ $vars: (
       display: flex;
       flex-flow: column-reverse wrap;
       justify-content: space-between;
+
       .form-outputs {
         border-bottom-width: 1px;
         border-bottom-style: solid;
         @include var(border-bottom-color, border-color);
       }
+
       .form-inputs {
         margin-bottom: 0;
       }
     }
   }
+
   @mixin columns {
-  &.bl-inputs-columns-2,
-  &.bl-inputs-columns-3
-  {
-    .form-inputs {
-      display: flex;
-      flex-flow: row wrap;
-      justify-content: space-between;
-      align-content: flex-start;
-      align-items: stretch;
+    &.bl-inputs-columns-2,
+    &.bl-inputs-columns-3 {
+      .form-inputs {
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-between;
+        align-content: flex-start;
+        align-items: stretch;
+      }
     }
-  }
 
-  &.bl-inputs-columns-2 .form-inputs {
-    & > div {
-      width: 50%;
-      &:nth-child(2n + 1){
-        padding-right: $offset-4;
-      }
-      &:nth-child(2n + 2){
-        padding-left: $offset-4;
-      }
-      &:last-child {
-        margin-left: auto;
-        padding-right: 0;
-        padding-left: $offset-4;
-      }
-    }
-  }
-  &.bl-inputs-columns-3 .form-inputs {
-    & > div {
-      width: 33.333333333%;
-      &:nth-child(2n + 1){
-        padding-right: $offset-2;
-      }
-      &:nth-child(2n + 2){
-        padding-right: $offset-2;
-        padding-left: $offset-2;
-      }
-      &:nth-child(2n + 3){
-        padding-left: $offset-2;
-      }
-      &:last-child {
-        margin-top: calc(var(--bl-input-label-size) + .6em);
-        margin-bottom: auto;
-        padding-right: 0;
-        padding-left: $offset-2;
-      }
-    }
-  }
+    &.bl-inputs-columns-2 .form-inputs {
+      & > div {
+        width: 50%;
 
+        &:nth-child(2n + 1) {
+          padding-right: $offset-4;
+        }
+
+        &:nth-child(2n + 2) {
+          padding-left: $offset-4;
+        }
+
+        &:last-child {
+          margin-left: auto;
+          padding-right: 0;
+          padding-left: $offset-4;
+        }
+      }
+    }
+
+    &.bl-inputs-columns-3 .form-inputs {
+      & > div {
+        width: 33.333333333%;
+
+        &:nth-child(2n + 1) {
+          padding-right: $offset-2;
+        }
+
+        &:nth-child(2n + 2) {
+          padding-right: $offset-2;
+          padding-left: $offset-2;
+        }
+
+        &:nth-child(2n + 3) {
+          padding-left: $offset-2;
+        }
+
+        &:last-child {
+          margin-top: calc(var(--bl-input-label-size) + .6em);
+          margin-bottom: auto;
+          padding-right: 0;
+          padding-left: $offset-2;
+        }
+      }
+    }
 
     &.bl-outputs-columns-2,
-    &.bl-outputs-columns-3
-    {
+    &.bl-outputs-columns-3 {
       .form-outputs {
         flex: 1 1 auto;
         flex-flow: row wrap;
@@ -203,58 +211,68 @@ $vars: (
         align-content: flex-start;
       }
     }
+
     &.bl-outputs-columns-2 .form-outputs {
       & > div {
         width: 50%;
-        &:nth-child(2n + 1){
+
+        &:nth-child(2n + 1) {
           padding-right: $offset-4;
         }
-        &:nth-child(2n + 2){
+
+        &:nth-child(2n + 2) {
           padding-left: $offset-4;
         }
       }
     }
+
     &.bl-outputs-columns-3 .form-outputs {
       & > div {
         width: 33.333333333%;
-        &:nth-child(2n + 1){
+
+        &:nth-child(2n + 1) {
           padding-right: $offset-2;
         }
-        &:nth-child(2n + 2){
+
+        &:nth-child(2n + 2) {
           padding-right: $offset-2;
           padding-left: $offset-2;
         }
-        &:nth-child(2n + 3){
+
+        &:nth-child(2n + 3) {
           padding-left: $offset-2;
         }
       }
     }
+
     .logo {
       margin: 0 0 0 auto;
     }
   }
 
-
   @mixin grid-columns {
     &.bl-grid-columns,
-    &.bl-grid-columns-reversed
-    {
+    &.bl-grid-columns-reversed {
       .form-inputs, .form-outputs {
         padding-bottom: 2em;
         margin-bottom: 0;
       }
     }
+
     &.bl-grid-columns {
       .bl-form {
         display: flex;
         flex-flow: row wrap;
         justify-content: space-between;
         align-items: stretch;
+
         & > div {
           width: 50%;
+
           &:first-child {
             padding-right: $offset-4;
           }
+
           &:last-child {
             padding-left: $offset-4;
             border-left-width: 1px;
@@ -263,16 +281,18 @@ $vars: (
           }
         }
       }
-
     }
+
     &.bl-grid-columns-reversed {
       .bl-form {
         display: flex;
         flex-flow: row-reverse wrap;
         justify-content: space-between;
         align-items: stretch;
+
         & > div {
           width: 50%;
+
           &:first-child {
 
             padding-left: $offset-4;
@@ -280,19 +300,144 @@ $vars: (
             border-left-style: solid;
             @include var(border-left-color, border-color);
           }
+
           &:last-child {
             padding-right: $offset-4;
           }
         }
       }
     }
+
+    &.bl-grid-columns-sleek {
+      width: 800px;
+
+      &:has(.bl-form:not(.inputs-shown)) {
+        padding: 0 !important;
+
+        button {
+          top: 20px;
+          left: 20px;
+        }
+      }
+
+      .bl-form {
+        position: relative;
+        display: flex;
+        min-height: 640px;
+        transition: width .5s ease-in-out, opacity 0.5s ease-in-out;
+
+        &:not(.inputs-shown) {
+          .form-inputs {
+            width: 0;
+            opacity: 0;
+            padding-right: 0;
+            transition: width .5s ease-in-out, opacity 0.5s ease-in-out;
+          }
+
+          .form-outputs {
+            width: 100%;
+            transition: width .5s ease-in-out;
+          }
+        }
+
+        button {
+          position: absolute;
+          outline: none;
+          z-index: 2;
+        }
+
+        & > div {
+          width: 50%;
+          transition: width .5s ease-in-out;
+
+          &:first-child {
+            padding-right: $offset-4;
+          }
+        }
+
+        .form-inputs {
+          padding-top: 80px;
+          padding-right: 20px;
+          margin-bottom: 0;
+          opacity: 1;
+          transition: width .5s ease-in-out, opacity 0.5s ease-in-out;
+        }
+
+        .form-outputs {
+          position: relative;
+          color: white;
+          transition: width .5s ease-in-out;
+          margin-bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+
+          .form-text {
+            color: $color-white;
+          }
+
+          .range-output {
+            background-color: transparent;
+            border: none;
+          }
+
+          .form-group {
+            position: relative;
+
+            &:nth-of-type(2) {
+              display: flex;
+              margin-bottom: 4rem;
+
+              [bl-output="total_amount"] {
+                font-size: 4rem;
+                line-height: 6rem;
+              }
+            }
+
+            &:nth-of-type(3) {
+              width: 70%;
+
+              .range-group {
+                margin-top: 1rem;
+              }
+
+              [bl-input-label] {
+                margin-right: .5rem;
+              }
+            }
+          }
+
+          .bg-img-container {
+            position: absolute;
+            height: 100%;
+            width: 100%;
+            background-size: cover;
+            background-position: center;
+          }
+
+          .output-row {
+            border-bottom: none;
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            font-size: 1.5em;
+            padding-bottom: 0;
+            margin-bottom: 0;
+          }
+        }
+      }
+    }
   }
+
   @media only screen and (min-width: map-get($vars, breakpoint-sm)) {
     @include grid-columns;
     @include columns;
   }
+
   @media only screen and (min-width: var(--bl-breakpoint-sm)) {
     @include grid-columns;
     @include columns;
   }
+
 }
