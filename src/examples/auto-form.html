@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=UTF-8>
+    <title>Typescript webpack</title>
+    <base href="/">
+    <link rel="stylesheet" href="businesslogic-standard-theme.css">
+    <link rel="stylesheet" href="examples/styles.css">
+</head>
+
+<body>
+<div class="styleguide">
+    <div class="color-success"></div>
+    <div class="color-info"></div>
+    <div class="color-gray"></div>
+</div>
+
+<section class="clock">
+    <div class="center-point"></div>
+    <div class="seconds-container animate">
+        <div class="seconds"></div>
+    </div>
+    <div class="minutes-container animate">
+        <div class="minutes"></div>
+    </div>
+
+    <div class="hours-container animate">
+        <div class="hours"></div>
+    </div>
+</section>
+
+<nav>
+    <ul>
+        <li><a href="../index.html">Main</a></li>
+        <li><a href="/examples/template-from.html">Template Form</a></li>
+        <li><a href="/examples/auto-form.html">Auto Form</a></li>
+        <li><a href="/examples/auto-sleek-form.html">Auto Sleek Form</a></li>
+        <li><a href="/examples/programmatic-form.html">Programmatic Form</a></li>
+    </ul>
+</nav>
+
+<h2>Auto Form</h2>
+
+<!--Example 2: 'bl-auto'-->
+<div bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto
+     bl-control-submit-label="Submit" bl-control-reset-label class="bl-theme bl-theme-fonts bl-grid-columns-reversed">
+    <p>Test</p>
+</div>
+
+<script src="examples/script.js"></script>
+<script type="module" src="businesslogic.1.4.0.js"></script>
+</body>
+</html>

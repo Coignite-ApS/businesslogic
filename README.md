@@ -33,13 +33,24 @@ Businesslogic library is intended to be used in three ways:
 Create a businesslogic driven webform with only a few lines of code and your own webservice token `bl-token="[your-businesslogic-webservice-token]"`.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
-<link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
+<script type="module" src="https://lib.businesslogic.online/js/businesslogic.latest.js"></script>
+<link rel="stylesheet" href="https://lib.businesslogic.online/js/businesslogic-standard-theme.css">
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" bl-auto class="bl-theme bl-theme-fonts"></div>
 ```
-Including it anyware on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
+Including it anywhere on your page will generate a form like the following example. [See a live example here][jsfiddle-automatic-webform].
 
 [![alt text][automatic-webform]][jsfiddle-automatic-webform]
+
+Auto-generated webform in `sleek` mode, just add `bl-auto-sleek` attribute and `bl-background-image` in order to add background image
+
+```html
+<div bl-name="calc2" bl-token="5009a8b8529d4c059560a863f8904e31" bl-auto-sleek bl-control-reset-label
+     class="bl-theme bl-theme-fonts bl-grid-columns-sleek" bl-control-submit-label="Submit"
+     bl-background-image="https://images.unsplash.com/photo-1614059632169-522876ce04c8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMDE5OXwwfDF8Y29sbGVjdGlvbnwxfEtYRUFnWFJoeHRFfHx8fHx8fDE2Mjg1NjkwNTY&ixlib=rb-1.2.1&q=80&w=1080">
+</div>
+```
+
+![alt text][automatic-sleek-webform]
 
 Use our [styling guidelines][styling guide] to achieve your unique look.
 
@@ -51,8 +62,8 @@ Use our [styling guidelines][styling guide] to achieve your unique look.
 Wire your own webform template with businesslogic. In this cases businesslogic uses it as a template.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
-<link rel="stylesheet" href="https://businesslogic.online/lib/businesslogic-standard-theme.css">
+<script type="module" src="https://lib.businesslogic.online/js/businesslogic.latest.js"></script>
+<link rel="stylesheet" href="https://lib.businesslogic.online/js/businesslogic-standard-theme.css">
 
 <!-- Your own webform -->
 <div bl-token="cf4c7b6555db4c98bda752f750e2684f" bl-name="calc" class="bl-theme bl-theme-fonts">
@@ -101,7 +112,7 @@ Here is an example how you can use it directly on the page using code.
 Use businesslogic library to connect and to execute functionality in your businesslogic webservice. [See a live example here][jsfiddle-programmatic-implementation].
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
+<script type="module" src="https://lib.businesslogic.online/js/businesslogic.latest.js"></script>
 <script>
   window.onload = function () {
   
@@ -123,7 +134,7 @@ Use businesslogic library to connect and to execute functionality in your busine
 You are able to get and manipulate with any webservice from the collection.
 
 ```html
-<script type="module" src="https://businesslogic.online/lib/businesslogic.latest.js"></script>
+<script type="module" src="https://lib.businesslogic.online/js/businesslogic.latest.js"></script>
 <script>
   window.onload = function () {
     
@@ -172,6 +183,7 @@ In lieu of a formal style guide, take care to maintain the existing coding style
 
 
 [automatic-webform]: ./assets/images/businesslogic-automatic-approach.png "Automaticaly generated businesslogic webform based on a standard template"
+[automatic-sleek-webform]: ./assets/images/businesslogic-automatic-sleek-approach.png "Automaticaly generated businesslogic webform based on a standard template"
 [templated-webform]: ./assets/images/businesslogic-templating-approach.png "Businesslogic wrapped into a template of your choice"
 [templated-webform-with-chart]: ./assets/images/businesslogic-charting.png "Businesslogic form with chartjs"
 [styling guide]: ./wiki/styling-guide.md
