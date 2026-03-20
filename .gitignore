@@ -62,3 +62,4 @@ coverage/
 legacy-implementation/*/.git
 legacy-implementation/*/node_modules
 legacy-implementation/*/target
+legacy-implementation/
