@@ -9,6 +9,7 @@ import { registerRoutes as registerHealthRoutes } from './routes/health.js';
 import { registerRoutes as registerChatRoutes } from './routes/chat.js';
 import { registerRoutes as registerConversationRoutes } from './routes/conversations.js';
 import { registerRoutes as registerKbRoutes } from './routes/kb.js';
+import { registerRoutes as registerMcpRoutes } from './routes/mcp.js';
 
 export const app = Fastify({
   logger: { level: config.logLevel },
@@ -78,6 +79,7 @@ await registerHealthRoutes(app);
 await registerChatRoutes(app);
 await registerConversationRoutes(app);
 await registerKbRoutes(app);
+await registerMcpRoutes(app);
 
 // Graceful shutdown
 const shutdown = async (signal) => {
