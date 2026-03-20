@@ -1,0 +1,300 @@
+##############################################################################
+# BusinessLogic Platform — Local Development Stack
+#
+# Usage:
+#   docker compose -f infrastructure/docker/docker-compose.dev.yml up -d
+#   docker compose -f infrastructure/docker/docker-compose.dev.yml --profile legacy up -d
+#
+# Host ports are offset to avoid collisions with other local projects:
+#   postgres   — PostgreSQL 16 + pgvector (host 15432 → container 5432)
+#   redis      — Redis 7 (host 16379 → container 6379)
+#   maildev    — Email testing UI (host 11080 → container 1080)
+#   bl-cms     — Directus CMS back-office (host 18055 → container 8055)
+#   bl-formula-api — Formula evaluation (host 13000 → container 3000)
+#   bl-flow-trigger — Flow webhook listener (host 13100 → container 3100)
+#   bl-flow-worker  — Flow DAG executor (no HTTP port)
+#   bl-ai-api  — AI chat, KB, embeddings (host 13200 → container 3200) — Iteration 1
+#   bl-gateway — API gateway (host 18080 → container 8080) — Iteration 2
+#
+# Legacy (for comparison testing):
+#   legacy-cms — Original Directus with embedded AI (host 18056 → container 8055)
+##############################################################################
+
+services:
+
+  # ════════════════════════════════════════════════════
+  # Data Layer
+  # ════════════════════════════════════════════════════
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: directus
+      POSTGRES_USER: directus
+      POSTGRES_PASSWORD: directus
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U directus"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  maildev:
+    image: maildev/maildev
+    ports:
+      - "11080:1080"    # Web UI
+      - "11025:1025"    # SMTP
+
+  # ════════════════════════════════════════════════════
+  # bl-cms (Directus — Back-Office)
+  # ════════════════════════════════════════════════════
+  #
+  # NOTE: Uses base/ submodule Dockerfile.
+  # The build context is the cms/ directory (project root for Directus).
+  # The Dockerfile path is relative to that context: base/Dockerfile
+  #
+  # For local dev with hot-reload, mount extensions as volumes.
+
+  bl-cms:
+    build:
+      context: ../../services/cms
+      dockerfile: base/Dockerfile
+      args:
+        DIRECTUS_VERSION: "11.16.1"
+      secrets:
+        - npm_token
+    ports:
+      - "18055:8055"
+    env_file:
+      - .env
+    environment:
+      - CONFIG_PATH=/directus/config.local.yaml
+      - PUBLIC_URL=http://localhost:18055
+      - DB_CLIENT=pg
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=directus
+      - DB_USER=directus
+      - DB_PASSWORD=directus
+      - REDIS_ENABLED=true
+      - REDIS=redis://redis:6379
+      - CACHE_ENABLED=true
+      - CACHE_TTL=5m
+      - EXTENSIONS_AUTO_RELOAD=true
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      # Service URLs (internal Docker network)
+      - FORMULA_API_URL=http://bl-formula-api:3000
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+      - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
+      - FLOW_TRIGGER_ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
+      # AI proxy (Phase 1: proxy to bl-ai-api when enabled)
+      - AI_SERVICE_URL=http://bl-ai-api:3200
+      - AI_SERVICE_ENABLED=${AI_SERVICE_ENABLED:-false}
+    volumes:
+      # Mount local extensions for hot-reload during development
+      - ../../services/cms/extensions/local:/directus/extensions/local:ro
+      - ../../services/cms/email-templates:/directus/email-templates:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8055/server/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ════════════════════════════════════════════════════
+  # bl-formula-api (Formula Evaluation + Calculators)
+  # ════════════════════════════════════════════════════
+
+  bl-formula-api:
+    build:
+      context: ../../services/formula-api
+      dockerfile: Dockerfile
+    ports:
+      - "13000:3000"
+    environment:
+      - PORT=3000
+      - POOL_SIZE=2
+      - REDIS_URL=redis://redis:6379
+      - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+      - FORMULA_TEST_TOKEN=${FORMULA_TEST_TOKEN:-}
+      - TEST_ACCOUNT_ID=${TEST_ACCOUNT_ID:-}
+      - ENGINE=${ENGINE:-hyperformula}
+      - MAX_QUEUE_DEPTH=256
+      - CACHE_MAX_MEMORY_ITEMS=10000
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ════════════════════════════════════════════════════
+  # bl-flow (Rust DAG Workflow Engine)
+  # ════════════════════════════════════════════════════
+
+  bl-flow-trigger:
+    build:
+      context: ../../services/flow
+      dockerfile: docker/Dockerfile
+      target: trigger
+      secrets:
+        - github_token
+    ports:
+      - "13100:3100"
+    environment:
+      - PORT=3100
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=info
+      - ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  bl-flow-worker:
+    build:
+      context: ../../services/flow
+      dockerfile: docker/Dockerfile
+      target: worker
+      secrets:
+        - github_token
+    environment:
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=info
+      - WORKER_CONCURRENCY=10
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # ════════════════════════════════════════════════════
+  # bl-ai-api (AI Chat, KB, Embeddings) — Iteration 1
+  # ════════════════════════════════════════════════════
+  # Uncomment after Iteration 1 scaffolding is complete
+
+  # bl-ai-api:
+  #   build:
+  #     context: ../../services/ai-api
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "13200:3200"
+  #   environment:
+  #     - PORT=3200
+  #     - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+  #     - REDIS_URL=redis://redis:6379
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - FORMULA_API_URL=http://bl-formula-api:3000
+  #     - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+  #     - CHAT_POOL_SIZE=2
+  #     - EMBED_POOL_SIZE=1
+  #     - INGEST_POOL_SIZE=1
+  #     - DAILY_BUDGET_USD=10.00
+  #     - MONTHLY_BUDGET_USD=100.00
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     redis: { condition: service_healthy }
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
+  # ════════════════════════════════════════════════════
+  # bl-gateway (Go API Gateway) — Iteration 2
+  # ════════════════════════════════════════════════════
+  # Uncomment after Iteration 2 scaffolding is complete
+
+  # bl-gateway:
+  #   build:
+  #     context: ../../services/gateway
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "18080:8080"
+  #   environment:
+  #     - PORT=8080
+  #     - REDIS_URL=redis://redis:6379
+  #     - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+  #     - AI_API_URL=http://bl-ai-api:3200
+  #     - FORMULA_API_URL=http://bl-formula-api:3000
+  #     - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
+  #     - CMS_URL=http://bl-cms:8055
+  #     - LOG_LEVEL=debug
+  #   depends_on:
+  #     redis: { condition: service_healthy }
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 3
+
+  # ════════════════════════════════════════════════════
+  # Legacy CMS (for comparison testing)
+  # ════════════════════════════════════════════════════
+  # Only starts with: --profile legacy
+
+  legacy-cms:
+    profiles: ["legacy"]
+    build:
+      context: ../../legacy-implementation/businesslogic-cms
+      dockerfile: base/Dockerfile
+      args:
+        DIRECTUS_VERSION: "11.16.1"
+      secrets:
+        - npm_token
+    ports:
+      - "18056:8055"
+    env_file:
+      - .env
+    environment:
+      - CONFIG_PATH=/directus/config.local.yaml
+      - PUBLIC_URL=http://localhost:18056
+      - DB_CLIENT=pg
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=directus
+      - DB_USER=directus
+      - DB_PASSWORD=directus
+      - REDIS_ENABLED=true
+      - REDIS=redis://redis:6379
+      - FORMULA_API_URL=http://bl-formula-api:3000
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+secrets:
+  npm_token:
+    environment: NPM_TOKEN
+  github_token:
+    environment: GITHUB_TOKEN
+
+volumes:
+  pg_data:
+  redis_data:

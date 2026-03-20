@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BusinessLogic Platform Architecture</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { margin: 0; padding: 20px 40px; background: #fafbfc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  h1 { color: #1B4F72; font-size: 28px; margin-bottom: 4px; }
+  h2 { color: #5D6D7E; font-size: 16px; font-weight: 400; margin-top: 0; }
+  .diagram-container { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin: 20px 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; padding: 16px; background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #333; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 3px; }
+  .section { margin: 30px 0; }
+  .section h3 { color: #2C3E50; font-size: 18px; border-bottom: 2px solid #D6EAF8; padding-bottom: 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th { background: #1B4F72; color: white; padding: 10px 14px; text-align: left; font-size: 13px; }
+  td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 13px; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge-go { background: #D4EFDF; color: #196F3D; }
+  .badge-rust { background: #F5CBA7; color: #784212; }
+  .badge-node { background: #D6EAF8; color: #1B4F72; }
+  .badge-db { background: #2C3E50; color: white; }
+  .flow-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .flow-card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .flow-card h4 { margin: 0 0 8px 0; color: #1B4F72; font-size: 14px; }
+  .flow-card p { margin: 4px 0; font-size: 13px; color: #555; line-height: 1.5; }
+  .arrow { color: #E67E22; font-weight: bold; }
+  @media (max-width: 900px) { .flow-section { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>BusinessLogic Platform — Target Architecture</h1>
+<h2>Service topology, communication paths, and data flow</h2>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#27AE60"></div> Gateway (Go)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3498DB"></div> CMS (Directus)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8E44AD"></div> AI API (Node.js)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#E67E22"></div> Formula API (Node.js+Rust)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div> Flow Engine (Rust)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2C3E50"></div> Data Layer</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1ABC9C"></div> Object Storage</div>
+</div>
+
+<div class="diagram-container">
+<pre class="mermaid">
+graph TB
+    subgraph INTERNET["☁️ Internet"]
+        CLIENT["🖥️ Client Apps<br/>(Web · Mobile · MCP Clients)"]
+        CF["🛡️ Cloudflare<br/>DNS · WAF · CDN · DDoS"]
+    end
+
+    subgraph S1["S1: Gateway Server — CX22 · 2vCPU · 4GB · €6/mo"]
+        GW["🚪 bl-gateway<br/><b>Go</b><br/>──────────<br/>API Key Auth<br/>Rate Limiting<br/>CORS · IP Allowlist<br/>Route Resolution<br/>Health Aggregation<br/>Prometheus Metrics"]
+    end
+
+    subgraph S2["S2: CMS Server — CX22 · 2vCPU · 4GB · €6/mo"]
+        CMS["📋 bl-cms<br/><b>Directus 11</b><br/>──────────<br/>Admin UI<br/>Account Management<br/>API Key CRUD<br/>KB Document Mgmt<br/>Calculator Definitions<br/>Flow Definitions<br/>Billing · Subscriptions"]
+    end
+
+    subgraph S4["S4: AI Compute — CX32 · 4vCPU · 8GB · €14/mo"]
+        AI["🤖 bl-ai-api<br/><b>Node.js / Fastify</b><br/>──────────<br/>Chat Workers (pool=4)<br/>Embed Workers (pool=2)<br/>Ingest Workers (BullMQ)<br/>5-Layer Budget System<br/>Two-Layer Cache<br/>MCP Endpoint"]
+    end
+
+    subgraph S5["S5: Compute — CPX31 · 4vCPU · 8GB · €17/mo"]
+        FORMULA["📊 bl-formula-api<br/><b>Node.js / Fastify</b><br/>──────────<br/>Worker Pool (CPU cores)<br/>Hash Ring Routing<br/>Calculator Lifecycle<br/>LRU + Redis Cache<br/>MCP Endpoint"]
+        EXCEL["⚡ bl-excel<br/><b>Rust · napi-rs</b><br/>──────────<br/>97K formulas/sec<br/>24 bytes/cell<br/>232 functions"]
+        FLOW_T["🔔 bl-flow trigger<br/><b>Rust · Axum</b><br/>──────────<br/>Webhook Listener<br/>Cron Scheduler<br/>DB Event Listener"]
+        FLOW_W["⚙️ bl-flow workers<br/><b>Rust · Tokio</b><br/>──────────<br/>DAG Execution<br/>LLM · Embed · Search<br/>WASM Plugins<br/>Checkpointing"]
+    end
+
+    subgraph S3["S3: Data — CX32 · 4vCPU · 8GB · €14/mo"]
+        PG["🗄️ PostgreSQL 16<br/><b>+ pgvector (HNSW)</b><br/>──────────<br/>Schema: cms · ai<br/>formula · flow · gw<br/>Owned per-service"]
+        REDIS["⚡ Redis 7 Sentinel<br/>──────────<br/>Cache · Rate Limits<br/>Streams · PubSub<br/>BullMQ Queues<br/>Health Snapshots"]
+    end
+
+    subgraph S3_EXT["Object Storage"]
+        S3_OBJ["📦 Hetzner S3<br/>──────────<br/>KB Documents<br/>Large Flow Outputs<br/>Backups"]
+    end
+
+    CLIENT -->|"HTTPS"| CF
+    CF -->|"HTTPS"| GW
+
+    GW -->|"/admin/*"| CMS
+    GW -->|"/v1/ai/*"| AI
+    GW -->|"/v1/calc/*<br/>/v1/mcp/calc/*"| FORMULA
+    GW -->|"/v1/flows/*"| FLOW_T
+
+    AI -.->|"trigger flow<br/>(Redis Streams)"| FLOW_T
+    AI -->|"execute calc<br/>(HTTP)"| FORMULA
+    CMS -.->|"proxy during<br/>migration"| AI
+    FLOW_T -->|"enqueue<br/>(Redis Streams)"| FLOW_W
+    FLOW_W -->|"execute calc<br/>(HTTP)"| FORMULA
+    FORMULA -->|"compute<br/>(napi-rs FFI)"| EXCEL
+
+    CMS --> PG
+    AI --> PG
+    FORMULA --> REDIS
+    FLOW_T --> PG
+    FLOW_T --> REDIS
+    FLOW_W --> PG
+    FLOW_W --> REDIS
+    AI --> REDIS
+    GW --> REDIS
+    GW -.->|"key fallback"| PG
+
+    AI --> S3_OBJ
+    FLOW_W -.-> S3_OBJ
+
+    classDef gateway fill:#27AE60,stroke:#1E8449,color:#fff
+    classDef cms fill:#3498DB,stroke:#2471A3,color:#fff
+    classDef ai fill:#8E44AD,stroke:#6C3483,color:#fff
+    classDef compute fill:#E67E22,stroke:#CA6F1E,color:#fff
+    classDef rust fill:#E74C3C,stroke:#CB4335,color:#fff
+    classDef data fill:#2C3E50,stroke:#1B2631,color:#fff
+    classDef external fill:#95A5A6,stroke:#7F8C8D,color:#2C3E50
+    classDef storage fill:#1ABC9C,stroke:#16A085,color:#fff
+
+    class GW gateway
+    class CMS cms
+    class AI ai
+    class FORMULA compute
+    class EXCEL,FLOW_T,FLOW_W rust
+    class PG,REDIS data
+    class CLIENT,CF external
+    class S3_OBJ storage
+</pre>
+</div>
+
+<div class="section">
+<h3>Communication Patterns</h3>
+<div class="flow-section">
+  <div class="flow-card">
+    <h4>🌐 Public Request Path</h4>
+    <p>Client <span class="arrow">→</span> Cloudflare (TLS + WAF) <span class="arrow">→</span> bl-gateway (auth + rate limit + route) <span class="arrow">→</span> target service <span class="arrow">→</span> response</p>
+    <p><em>Gateway adds: X-Request-ID, X-Account-ID, X-RateLimit-* headers</em></p>
+  </div>
+  <div class="flow-card">
+    <h4>🔒 Internal Service-to-Service</h4>
+    <p>Service <span class="arrow">→</span> Service (direct HTTP over 10.0.0.0/16 private network)</p>
+    <p><em>No gateway overhead. Internal admin tokens for auth.</em></p>
+  </div>
+  <div class="flow-card">
+    <h4>📨 Async (Event-Driven)</h4>
+    <p>Service <span class="arrow">→</span> Redis Streams <span class="arrow">→</span> Consumer (bl-flow workers, bl-ai-api BullMQ)</p>
+    <p><em>Used for: flow execution, KB ingestion, non-blocking operations</em></p>
+  </div>
+  <div class="flow-card">
+    <h4>🗄️ Database Access</h4>
+    <p>Each service <span class="arrow">→</span> PostgreSQL (own schema, direct SQL)</p>
+    <p><em>Schema ownership: each service WRITES only to its schema, can READ others</em></p>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>Database Schema Ownership</h3>
+<table>
+  <tr><th>Service</th><th>Owns (Read+Write)</th><th>Can Read</th><th>Technology</th></tr>
+  <tr><td><span class="badge badge-node">bl-cms</span></td><td>cms.accounts, cms.users, cms.subscriptions, cms.api_keys, cms.kb_documents, cms.flow_definitions</td><td>—</td><td><span class="badge badge-db">PostgreSQL</span></td></tr>
+  <tr><td><span class="badge badge-node">bl-ai-api</span></td><td>ai.conversations, ai.kb_chunks, ai.token_usage, ai.budgets, ai.ingest_jobs</td><td>cms.accounts, cms.subscriptions, cms.kb_documents</td><td><span class="badge badge-db">PostgreSQL + pgvector</span></td></tr>
+  <tr><td><span class="badge badge-node">bl-formula-api</span></td><td>formula.calculator_stats, formula.calculator_recipes</td><td>cms.accounts</td><td><span class="badge badge-db">PostgreSQL + Redis</span></td></tr>
+  <tr><td><span class="badge badge-rust">bl-flow</span></td><td>flow.executions, flow.checkpoints, flow.trigger_state</td><td>cms.accounts, ai.kb_chunks</td><td><span class="badge badge-db">PostgreSQL + Redis Streams</span></td></tr>
+  <tr><td><span class="badge badge-go">bl-gateway</span></td><td>gateway.rate_limit_log, gateway.key_usage_stats</td><td>cms.api_keys, cms.accounts</td><td><span class="badge badge-db">Redis (primary) + PostgreSQL (fallback)</span></td></tr>
+</table>
+</div>
+
+<div class="section">
+<h3>Server Topology (Hetzner)</h3>
+<table>
+  <tr><th>Server</th><th>Spec</th><th>Cost</th><th>Services</th><th>Internal IP</th></tr>
+  <tr><td><b>S1: Gateway</b></td><td>CX22 (2 vCPU, 4 GB)</td><td>€6/mo</td><td><span class="badge badge-go">bl-gateway</span>, Traefik, Coolify agent</td><td>10.0.0.5</td></tr>
+  <tr><td><b>S2: CMS</b></td><td>CX22 (2 vCPU, 4 GB)</td><td>€6/mo</td><td><span class="badge badge-node">bl-cms</span> (Directus)</td><td>10.0.0.10</td></tr>
+  <tr><td><b>S3: Data</b></td><td>CX32 (4 vCPU, 8 GB)</td><td>€14/mo</td><td><span class="badge badge-db">PostgreSQL 16 + pgvector</span>, <span class="badge badge-db">Redis 7</span></td><td>10.0.0.20</td></tr>
+  <tr><td><b>S4: AI Compute</b></td><td>CX32 (4 vCPU, 8 GB)</td><td>€14/mo</td><td><span class="badge badge-node">bl-ai-api</span> (2-3 instances)</td><td>10.0.0.40</td></tr>
+  <tr><td><b>S5: Compute</b></td><td>CPX31 (4 vCPU, 8 GB)</td><td>€17/mo</td><td><span class="badge badge-node">bl-formula-api</span>, <span class="badge badge-rust">bl-flow trigger</span>, <span class="badge badge-rust">bl-flow workers</span></td><td>10.0.0.30</td></tr>
+</table>
+<p style="text-align:right;color:#7F8C8D;font-size:13px;"><b>Total: ~€57/month</b> for 10x current capacity</p>
+</div>
+
+<div class="section">
+<h3>Key Performance Gains</h3>
+<table>
+  <tr><th>Metric</th><th>Current</th><th>Target</th><th>Gain</th></tr>
+  <tr><td>AI concurrent users</td><td>~100</td><td>1,000+</td><td><b>10x</b></td></tr>
+  <tr><td>KB search latency (p95)</td><td>~500ms</td><td>&lt;50ms</td><td><b>10x faster</b></td></tr>
+  <tr><td>KB total chunks</td><td>~50K</td><td>5M+</td><td><b>100x capacity</b></td></tr>
+  <tr><td>Embedding cost</td><td>$0.02/M tokens</td><td>$0 (local ONNX)</td><td><b>100% savings</b></td></tr>
+  <tr><td>CMS response time (p95)</td><td>~150ms</td><td>~50ms</td><td><b>3x faster</b></td></tr>
+  <tr><td>Crash isolation</td><td>AI crash → CMS down</td><td>AI crash → only AI</td><td><b>Full isolation</b></td></tr>
+  <tr><td>Infrastructure cost</td><td>€31/mo</td><td>€57/mo</td><td><b>10x capacity for 1.8x cost</b></td></tr>
+</table>
+</div>
+
+<script>mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { htmlLabels: true, curve: 'basis' } });</script>
+</body>
+</html>

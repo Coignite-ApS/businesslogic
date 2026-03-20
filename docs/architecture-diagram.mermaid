@@ -1,0 +1,93 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#1B4F72', 'primaryTextColor': '#fff', 'primaryBorderColor': '#154360', 'lineColor': '#5D6D7E', 'secondaryColor': '#D6EAF8', 'tertiaryColor': '#F2F3F4', 'background': '#FDFEFE'}}}%%
+
+graph TB
+    subgraph INTERNET["Internet"]
+        CLIENT["Client Apps<br/>(Web, Mobile, MCP)"]
+        CF["Cloudflare<br/>DNS + WAF + CDN"]
+    end
+
+    subgraph S1["S1: Gateway  (CX22 · 2vCPU · 4GB)"]
+        GW["bl-gateway  (Go)<br/>─────────────<br/>Auth · Rate Limit · CORS<br/>IP Allowlist · Routing<br/>API Key Validation<br/>Health Aggregation"]
+    end
+
+    subgraph S2["S2: CMS  (CX22 · 2vCPU · 4GB)"]
+        CMS["bl-cms  (Directus)<br/>─────────────<br/>Admin UI · Account Mgmt<br/>API Key CRUD · KB Docs<br/>Calculator Defs · Flow Defs<br/>Billing · Subscriptions"]
+    end
+
+    subgraph S4["S4: AI Compute  (CX32 · 4vCPU · 8GB)"]
+        AI["bl-ai-api  (Node.js/Fastify)<br/>─────────────<br/>Chat Workers (pool=4)<br/>Embed Workers (pool=2)<br/>Ingest Workers (BullMQ)<br/>5-Layer Budget · 2L Cache"]
+        AI_MCP["MCP Endpoint<br/>/v1/ai/mcp/:kbId"]
+    end
+
+    subgraph S5["S5: Compute  (CPX31 · 4vCPU · 8GB)"]
+        FORMULA["bl-formula-api  (Node.js/Fastify)<br/>─────────────<br/>Worker Pool (pool=CPU)<br/>Hash Ring Routing<br/>Calculator Lifecycle<br/>LRU + Redis Cache"]
+        EXCEL["bl-excel  (Rust napi-rs)<br/>─────────────<br/>Formula Compute Engine<br/>24 bytes/cell · 97K ops/s"]
+        FLOW_T["bl-flow trigger  (Rust/Axum)<br/>─────────────<br/>Webhook Listener<br/>Cron Scheduler<br/>DB Event Listener"]
+        FLOW_W["bl-flow workers  (Rust/Tokio)<br/>─────────────<br/>DAG Execution<br/>LLM · Embed · VectorSearch<br/>WASM Plugins<br/>Checkpointing"]
+        FORMULA_MCP["MCP Endpoint<br/>/v1/mcp/calc/:id"]
+    end
+
+    subgraph S3["S3: Data  (CX32 · 4vCPU · 8GB)"]
+        PG["PostgreSQL 16 + pgvector<br/>─────────────<br/>HNSW Index · Accounts<br/>Calculators · KB Chunks<br/>Flows · Conversations<br/>API Keys · Budgets"]
+        REDIS["Redis 7 + Sentinel<br/>─────────────<br/>Cache · Rate Limits<br/>Streams · PubSub<br/>BullMQ Queues<br/>Health Snapshots"]
+    end
+
+    subgraph S3_EXT["S3: Object Storage"]
+        S3_OBJ["Hetzner Object Storage<br/>─────────────<br/>KB Documents · Large<br/>Flow Outputs · Backups"]
+    end
+
+    %% ── Public traffic ──
+    CLIENT -->|"HTTPS"| CF
+    CF -->|"HTTPS"| GW
+
+    %% ── Gateway routes ──
+    GW -->|"/admin/*"| CMS
+    GW -->|"/v1/ai/*"| AI
+    GW -->|"/v1/calc/*"| FORMULA
+    GW -->|"/v1/flows/webhook/*"| FLOW_T
+    GW -->|"/v1/mcp/ai/*"| AI_MCP
+    GW -->|"/v1/mcp/calc/*"| FORMULA_MCP
+
+    %% ── Internal service-to-service ──
+    AI -->|"trigger flow<br/>(Redis Streams)"| FLOW_T
+    AI -->|"execute calc<br/>(HTTP internal)"| FORMULA
+    CMS -->|"proxy AI requests<br/>(during migration)"| AI
+    CMS -->|"manage flows<br/>(HTTP internal)"| FLOW_T
+    FLOW_T -->|"enqueue<br/>(Redis Streams)"| FLOW_W
+    FLOW_W -->|"execute calc<br/>(HTTP internal)"| FORMULA
+    FORMULA -->|"compute<br/>(napi-rs FFI)"| EXCEL
+
+    %% ── Data access ──
+    CMS -->|"SQL<br/>(accounts, config)"| PG
+    AI -->|"SQL<br/>(conversations, kb_chunks,<br/>budgets, usage)"| PG
+    FORMULA -->|"cache + rate limits<br/>+ health + routing"| REDIS
+    FLOW_T -->|"SQL<br/>(flow defs, triggers)"| PG
+    FLOW_T -->|"streams<br/>(enqueue)"| REDIS
+    FLOW_W -->|"SQL<br/>(execution logs,<br/>vectors, checkpoints)"| PG
+    FLOW_W -->|"streams + cache<br/>(consume, output tier)"| REDIS
+    AI -->|"cache + queues<br/>+ rate limits"| REDIS
+    GW -->|"key cache<br/>+ rate limits"| REDIS
+    GW -->|"key fallback<br/>lookup"| PG
+
+    %% ── Object storage ──
+    AI -->|"KB docs<br/>(upload/read)"| S3_OBJ
+    FLOW_W -->|"large outputs<br/>(>64KB)"| S3_OBJ
+
+    %% ── Styling ──
+    classDef gateway fill:#27AE60,stroke:#1E8449,color:#fff
+    classDef cms fill:#3498DB,stroke:#2471A3,color:#fff
+    classDef ai fill:#8E44AD,stroke:#6C3483,color:#fff
+    classDef compute fill:#E67E22,stroke:#CA6F1E,color:#fff
+    classDef rust fill:#E74C3C,stroke:#CB4335,color:#fff
+    classDef data fill:#2C3E50,stroke:#1B2631,color:#fff
+    classDef external fill:#95A5A6,stroke:#7F8C8D,color:#fff
+    classDef storage fill:#1ABC9C,stroke:#16A085,color:#fff
+
+    class GW gateway
+    class CMS cms
+    class AI,AI_MCP ai
+    class FORMULA,FORMULA_MCP compute
+    class EXCEL,FLOW_T,FLOW_W rust
+    class PG,REDIS data
+    class CLIENT,CF external
+    class S3_OBJ storage
