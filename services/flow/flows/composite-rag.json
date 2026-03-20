@@ -1,0 +1,82 @@
+{
+  "name": "Composite RAG (KB + Calculator + LLM)",
+  "description": "Multi-step AI reasoning: search KB, execute calculator, then synthesize answer with LLM. Parallel execution of search + calculate where possible.",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "methods": ["POST"]
+    }
+  },
+  "settings": {
+    "timeout_ms": 60000,
+    "budget_limit_usd": 0.50
+  },
+  "nodes": [
+    {
+      "id": "embed_query",
+      "type": "core:embedding",
+      "config": {
+        "input": "$trigger.body.query"
+      }
+    },
+    {
+      "id": "search_kb",
+      "type": "core:vector_search",
+      "config": {
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "query_embedding": "$nodes.embed_query",
+        "top_k": 5,
+        "similarity_threshold": 0.3
+      }
+    },
+    {
+      "id": "text_search",
+      "type": "ai:text_search",
+      "config": {
+        "query": "$trigger.body.query",
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "limit": 10
+      }
+    },
+    {
+      "id": "merge_results",
+      "type": "ai:merge_rrf",
+      "config": {
+        "vector_results": "$nodes.search_kb",
+        "text_results": "$nodes.text_search",
+        "k": 60,
+        "top_k": 5,
+        "min_similarity": 0.2
+      }
+    },
+    {
+      "id": "execute_calc",
+      "type": "core:calculator",
+      "config": {
+        "calculator_id": "$trigger.body.calculator_id",
+        "inputs": "$trigger.body.calculator_inputs"
+      },
+      "error_strategy": { "type": "skip" }
+    },
+    {
+      "id": "synthesize",
+      "type": "core:llm",
+      "config": {
+        "model": "claude-sonnet-4-6",
+        "system_prompt": "You are a business intelligence assistant. Synthesize information from knowledge base search results and calculator outputs to provide a clear, actionable answer. Cite sources with [SOURCE_N] notation.",
+        "prompt": "User question: {{$trigger.body.query}}\n\nKnowledge base results:\n{{$nodes.merge_results.results}}\n\nCalculator results:\n{{$nodes.execute_calc}}\n\nProvide a comprehensive answer based on the above data.",
+        "max_tokens": 2000,
+        "temperature": 0.3
+      }
+    }
+  ],
+  "edges": [
+    { "from": "embed_query", "to": "search_kb" },
+    { "from": "embed_query", "to": "text_search" },
+    { "from": "search_kb", "to": "merge_results" },
+    { "from": "text_search", "to": "merge_results" },
+    { "from": "merge_results", "to": "synthesize" },
+    { "from": "execute_calc", "to": "synthesize" }
+  ]
+}

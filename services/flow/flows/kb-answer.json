@@ -1,0 +1,72 @@
+{
+  "name": "KB Question Answering",
+  "description": "Search KB + generate cited answer with LLM. Local embeddings ($0 cost for search, LLM cost only for answer).",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "methods": ["POST"]
+    }
+  },
+  "settings": {
+    "timeout_ms": 30000,
+    "budget_limit_usd": 0.10
+  },
+  "nodes": [
+    {
+      "id": "embed",
+      "type": "core:embedding",
+      "config": {
+        "input": "$trigger.body.question"
+      }
+    },
+    {
+      "id": "vector_search",
+      "type": "core:vector_search",
+      "config": {
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "query_embedding": "$nodes.embed",
+        "top_k": 10,
+        "similarity_threshold": 0.2
+      }
+    },
+    {
+      "id": "text_search",
+      "type": "ai:text_search",
+      "config": {
+        "query": "$trigger.body.question",
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "limit": 10
+      }
+    },
+    {
+      "id": "merge",
+      "type": "ai:merge_rrf",
+      "config": {
+        "vector_results": "$nodes.vector_search",
+        "text_results": "$nodes.text_search",
+        "k": 60,
+        "top_k": 5,
+        "min_similarity": 0.2
+      }
+    },
+    {
+      "id": "answer",
+      "type": "core:llm",
+      "config": {
+        "model": "claude-sonnet-4-6",
+        "system_prompt": "You are a knowledge base assistant. Answer the question using ONLY the provided sources. Cite with [SOURCE_N]. If the sources don't contain enough information, say so. Use markdown formatting.",
+        "prompt": "Sources:\n{{$nodes.merge.results}}\n\nQuestion: {{$trigger.body.question}}",
+        "max_tokens": 1500,
+        "temperature": 0.2
+      }
+    }
+  ],
+  "edges": [
+    { "from": "embed", "to": "vector_search" },
+    { "from": "embed", "to": "text_search" },
+    { "from": "vector_search", "to": "merge" },
+    { "from": "text_search", "to": "merge" },
+    { "from": "merge", "to": "answer" }
+  ]
+}
