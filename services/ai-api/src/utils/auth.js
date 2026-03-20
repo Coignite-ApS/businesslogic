@@ -1,0 +1,134 @@
+import { timingSafeEqual } from 'node:crypto';
+import { config } from '../config.js';
+import { queryOne } from '../db.js';
+
+/** Timing-safe string comparison */
+function safeCompare(a, b) {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Verify authentication — supports:
+ * 1. X-Admin-Token (internal service-to-service)
+ * 2. X-Gateway-Auth + X-Account-Id + X-User-Id (gateway-forwarded)
+ */
+export async function verifyAuth(req, reply) {
+  const adminToken = req.headers['x-admin-token'];
+  const gatewayAuth = req.headers['x-gateway-auth'];
+
+  if (config.adminToken && adminToken && safeCompare(adminToken, config.adminToken)) {
+    req.authType = 'admin';
+    req.accountId = req.headers['x-account-id'] || null;
+    req.userId = req.headers['x-user-id'] || null;
+    req.isAdmin = true;
+    return;
+  }
+
+  if (gatewayAuth) {
+    req.authType = 'gateway';
+    req.accountId = req.headers['x-account-id'] || null;
+    req.userId = req.headers['x-user-id'] || null;
+    req.isAdmin = req.headers['x-is-admin'] === 'true';
+    return;
+  }
+
+  reply.code(401).send({ error: 'Unauthorized', detail: 'Missing or invalid authentication' });
+}
+
+/** Get active account ID for a user */
+export async function getActiveAccount(userId) {
+  if (!userId) return null;
+  const row = await queryOne(
+    'SELECT active_account FROM directus_users WHERE id = $1',
+    [userId],
+  );
+  return row?.active_account || null;
+}
+
+/** Check subscription status and AI quota */
+export async function checkAiQuota(accountId) {
+  if (!accountId) return { allowed: false, reason: 'No account' };
+
+  // Check exemption
+  const account = await queryOne(
+    'SELECT exempt_from_subscription FROM account WHERE id = $1',
+    [accountId],
+  );
+  if (account?.exempt_from_subscription) {
+    return { allowed: true, queriesLimit: null, queriesUsed: 0, periodStart: new Date(), periodEnd: new Date(), allowedModels: null };
+  }
+
+  // Get subscription + plan
+  const sub = await queryOne(
+    `SELECT s.status, s.current_period_start, s.current_period_end, s.trial_start, s.trial_end,
+            sp.ai_queries_per_month, sp.ai_allowed_models
+     FROM subscriptions s
+     JOIN subscription_plans sp ON sp.id = s.plan
+     WHERE s.account = $1 AND s.status NOT IN ('canceled', 'expired')
+     LIMIT 1`,
+    [accountId],
+  );
+
+  if (!sub) return { allowed: false, reason: 'No active subscription' };
+
+  const limit = sub.ai_queries_per_month;
+
+  // 0 = no AI access
+  if (limit === 0) return { allowed: false, reason: "Plan doesn't include AI" };
+
+  // Determine billing period
+  const { periodStart, periodEnd } = getBillingPeriod(sub);
+
+  // null = unlimited
+  if (limit === null || limit === undefined) {
+    return {
+      allowed: true,
+      queriesLimit: null,
+      queriesUsed: 0,
+      periodStart,
+      periodEnd,
+      allowedModels: sub.ai_allowed_models || null,
+    };
+  }
+
+  // Count queries in current period
+  const usage = await queryOne(
+    'SELECT COUNT(*) as count FROM ai_token_usage WHERE account = $1 AND date_created >= $2',
+    [accountId, periodStart.toISOString()],
+  );
+  const used = parseInt(usage?.count || '0', 10);
+
+  if (used >= limit) {
+    return { allowed: false, reason: `AI query limit reached (${used}/${limit})`, queriesUsed: used, queriesLimit: limit, periodStart, periodEnd };
+  }
+
+  return {
+    allowed: true,
+    queriesLimit: limit,
+    queriesUsed: used,
+    periodStart,
+    periodEnd,
+    allowedModels: sub.ai_allowed_models || null,
+  };
+}
+
+function getBillingPeriod(sub) {
+  if (sub.current_period_start && sub.current_period_end) {
+    return { periodStart: new Date(sub.current_period_start), periodEnd: new Date(sub.current_period_end) };
+  }
+  if (sub.status === 'trialing' && sub.trial_start) {
+    const start = new Date(sub.trial_start);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 30);
+    return { periodStart: start, periodEnd: end };
+  }
+  const now = new Date();
+  return {
+    periodStart: new Date(now.getFullYear(), now.getMonth(), 1),
+    periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+  };
+}

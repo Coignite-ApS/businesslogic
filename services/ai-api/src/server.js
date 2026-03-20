@@ -2,7 +2,12 @@ import Fastify from 'fastify';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
 import { config } from './config.js';
+import { initDb, closeDb } from './db.js';
+import { verifyAuth } from './utils/auth.js';
+import { startCleanup, stopCleanup } from './utils/rate-limit.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
+import { registerRoutes as registerChatRoutes } from './routes/chat.js';
+import { registerRoutes as registerConversationRoutes } from './routes/conversations.js';
 
 export const app = Fastify({
   logger: { level: config.logLevel },
@@ -64,32 +69,13 @@ if (config.requestLogging) {
   });
 }
 
-// Stub auth check for routes that need it
-app.decorate('verifyAuth', async (req, reply) => {
-  const adminToken = req.headers['x-admin-token'];
-  const gatewayAuth = req.headers['x-gateway-auth'];
-  if (config.adminToken && adminToken === config.adminToken) {
-    req.authType = 'admin';
-    req.accountId = req.headers['x-account-id'] || null;
-    req.userId = req.headers['x-user-id'] || null;
-    return;
-  }
-  if (gatewayAuth) {
-    req.authType = 'gateway';
-    req.accountId = req.headers['x-account-id'] || null;
-    req.userId = req.headers['x-user-id'] || null;
-    return;
-  }
-  reply.code(401).send({ error: 'Unauthorized', detail: 'Missing or invalid authentication' });
-});
+// Auth decorator
+app.decorate('verifyAuth', verifyAuth);
 
 // Register routes
 await registerHealthRoutes(app);
-
-// Placeholder route stubs for auth testing
-app.post('/v1/ai/chat', { preHandler: [app.verifyAuth] }, async () => {
-  return { error: 'Not implemented yet' };
-});
+await registerChatRoutes(app);
+await registerConversationRoutes(app);
 
 // Graceful shutdown
 const shutdown = async (signal) => {
@@ -97,6 +83,8 @@ const shutdown = async (signal) => {
   try {
     await app.close();
   } finally {
+    stopCleanup();
+    await closeDb();
     process.exit(0);
   }
 };
@@ -106,6 +94,12 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 export async function start() {
   try {
+    // Init database (optional — runs without DB for health checks)
+    if (config.databaseUrl) {
+      await initDb(config.databaseUrl);
+      console.log('Database connected');
+    }
+    startCleanup();
     await app.listen({ port: config.port, host: config.host });
     console.log(`bl-ai-api ready on ${config.host}:${config.port}`);
   } catch (err) {
