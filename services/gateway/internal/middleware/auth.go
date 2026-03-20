@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/coignite-aps/bl-gateway/internal/service"
@@ -34,6 +35,16 @@ func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), AccountContextKey, account)
 			r.Header.Set("X-Account-ID", account.AccountID)
+			r.Header.Set("X-API-Key-ID", account.KeyID)
+			r.Header.Set("X-Gateway-Auth", "true")
+
+			// Forward permissions as JSON
+			if len(account.Permissions) > 0 {
+				if permBytes, err := json.Marshal(account.Permissions); err == nil {
+					r.Header.Set("X-API-Permissions", string(permBytes))
+				}
+			}
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

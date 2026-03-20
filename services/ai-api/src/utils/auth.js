@@ -31,8 +31,17 @@ export async function verifyAuth(req, reply) {
   if (gatewayAuth) {
     req.authType = 'gateway';
     req.accountId = req.headers['x-account-id'] || null;
+    req.apiKeyId = req.headers['x-api-key-id'] || null;
     req.userId = req.headers['x-user-id'] || null;
     req.isAdmin = req.headers['x-is-admin'] === 'true';
+
+    // Parse API key permissions (e.g. {"ai":true,"calc":true,"flow":false})
+    const permHeader = req.headers['x-api-permissions'];
+    if (permHeader) {
+      try { req.permissions = JSON.parse(permHeader); } catch { req.permissions = {}; }
+    } else {
+      req.permissions = {};
+    }
     return;
   }
 
