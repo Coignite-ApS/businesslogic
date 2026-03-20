@@ -165,6 +165,36 @@ export const AI_TOOLS = [
   },
 ];
 
+/**
+ * Filter AI_TOOLS based on API key permissions.
+ * permissions: { ai: true, calc: true, flow: false, kb: true }
+ * - calc: false → remove calculator tools
+ * - kb: false → remove knowledge base tools
+ * - flow: false → remove flow tools
+ * If permissions is empty/null, return all tools (admin/internal calls).
+ */
+export function filterToolsByPermissions(tools, permissions) {
+  if (!permissions || Object.keys(permissions).length === 0) return tools;
+
+  const calcTools = new Set([
+    'list_calculators', 'describe_calculator', 'execute_calculator',
+    'create_calculator', 'update_calculator', 'get_calculator_config',
+    'configure_calculator', 'deploy_calculator',
+  ]);
+  const kbTools = new Set([
+    'search_knowledge', 'ask_knowledge', 'list_knowledge_bases',
+    'create_knowledge_base', 'get_knowledge_base', 'upload_to_knowledge_base',
+  ]);
+  const flowTools = new Set(['execute_flow']);
+
+  return tools.filter(tool => {
+    if (calcTools.has(tool.name) && permissions.calc === false) return false;
+    if (kbTools.has(tool.name) && permissions.kb === false) return false;
+    if (flowTools.has(tool.name) && permissions.flow === false) return false;
+    return true;
+  });
+}
+
 export async function executeTool(toolName, toolInput, deps) {
   const { accountId, logger } = deps;
 
