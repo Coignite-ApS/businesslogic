@@ -1,0 +1,44 @@
+{
+  "name": "excel-formula-api",
+  "version": "1.23.0",
+  "description": "Fast Excel formula evaluation API",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "dev": "node --env-file=.env --watch src/server.js",
+    "test": "node --test test/formulas.test.js",
+    "test:e2e": "node --test test/e2e.test.js",
+    "test:workers": "node --test test/workers.test.js",
+    "test:all": "node --test --test-concurrency=1 test/formulas.test.js test/e2e.test.js test/engine-features.test.js test/expressions.test.js test/calculators.test.js test/generate.test.js test/multisheet.test.js test/parse.test.js test/profile.test.js test/workers.test.js test/xlsx-formula.test.js test/formula-auth.test.js",
+    "test:parse": "node --test test/parse.test.js",
+    "test:calc": "node --test test/calculators.test.js",
+    "test:ratelimit": "node --test test/rate-limit.test.js",
+    "test:generate": "node --test test/generate.test.js",
+    "test:expressions": "node --test test/expressions.test.js",
+    "test:engine": "node --test test/engine-features.test.js",
+    "test:profile": "node --test test/profile.test.js",
+    "test:auth": "node --test test/formula-auth.test.js",
+    "test:load": "node test/load.js",
+    "build:openapi": "node scripts/build-external-openapi.js"
+  },
+  "dependencies": {
+    "@coignite/businesslogic-excel": "^1.2.1",
+    "@fastify/multipart": "^9.4.0",
+    "@fastify/under-pressure": "^9.0.3",
+    "ajv": "^8.18.0",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.2.1",
+    "hyperformula": "^3.2.0",
+    "ioredis": "^5.4.1",
+    "lru-cache": "^11.0.2"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0",
+    "js-yaml": "^4.1.1",
+    "xlsx": "^0.18.5"
+  }
+}
