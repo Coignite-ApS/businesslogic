@@ -196,35 +196,38 @@ services:
   # ════════════════════════════════════════════════════
   # bl-ai-api (AI Chat, KB, Embeddings) — Iteration 1
   # ════════════════════════════════════════════════════
-  # Uncomment after Iteration 1 scaffolding is complete
 
-  # bl-ai-api:
-  #   build:
-  #     context: ../../services/ai-api
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "13200:3200"
-  #   environment:
-  #     - PORT=3200
-  #     - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
-  #     - REDIS_URL=redis://redis:6379
-  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #     - FORMULA_API_URL=http://bl-formula-api:3000
-  #     - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
-  #     - CHAT_POOL_SIZE=2
-  #     - EMBED_POOL_SIZE=1
-  #     - INGEST_POOL_SIZE=1
-  #     - DAILY_BUDGET_USD=10.00
-  #     - MONTHLY_BUDGET_USD=100.00
-  #   depends_on:
-  #     postgres: { condition: service_healthy }
-  #     redis: { condition: service_healthy }
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
+  bl-ai-api:
+    build:
+      context: ../../services/ai-api
+      dockerfile: Dockerfile
+    ports:
+      - "${AI_API_HOST_PORT:-13200}:3200"
+    environment:
+      - PORT=3200
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_API_ADMIN_TOKEN=${AI_API_ADMIN_TOKEN}
+      - FORMULA_API_URL=http://bl-formula-api:3000
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY}
+      - KB_EMBEDDING_MODEL=${KB_EMBEDDING_MODEL:-text-embedding-3-small}
+      - KB_MIN_SIMILARITY=${KB_MIN_SIMILARITY:-0.2}
+      - KB_RRF_K=${KB_RRF_K:-60}
+      - LOG_LEVEL=${AI_API_LOG_LEVEL:-warn}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
   # ════════════════════════════════════════════════════
   # bl-gateway (Go API Gateway) — Iteration 2
