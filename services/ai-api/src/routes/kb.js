@@ -7,8 +7,19 @@ import { hybridSearch } from '../services/search.js';
 import { generateAnswer } from '../services/answer.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
 
+/** Check AI permission on gateway-forwarded requests */
+function checkAiPermission(req, reply) {
+  if (req.permissions && req.permissions.ai === false) {
+    reply.code(403).send({ errors: [{ message: 'API key does not have AI permission' }] });
+    return false;
+  }
+  return true;
+}
+
 /** Verify account owns the KB, return KB row or send 404 */
 async function verifyKbOwnership(req, reply) {
+  if (!checkAiPermission(req, reply)) return null;
+
   const accountId = req.accountId || await getActiveAccount(req.userId);
   if (!accountId) { reply.code(403).send({ errors: [{ message: 'No active account' }] }); return null; }
 
@@ -25,6 +36,7 @@ export async function registerRoutes(app) {
 
   // List KBs
   app.get('/v1/ai/kb/list', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    if (!checkAiPermission(req, reply)) return;
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
@@ -38,6 +50,7 @@ export async function registerRoutes(app) {
 
   // Create KB
   app.post('/v1/ai/kb/create', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    if (!checkAiPermission(req, reply)) return;
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
@@ -312,6 +325,7 @@ export async function registerRoutes(app) {
 
   // Hybrid search
   app.post('/v1/ai/kb/search', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    if (!checkAiPermission(req, reply)) return;
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
@@ -331,6 +345,7 @@ export async function registerRoutes(app) {
 
   // Search + answer generation
   app.post('/v1/ai/kb/ask', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    if (!checkAiPermission(req, reply)) return;
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
@@ -388,6 +403,7 @@ export async function registerRoutes(app) {
 
   // Submit feedback
   app.post('/v1/ai/kb/feedback', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    if (!checkAiPermission(req, reply)) return;
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
