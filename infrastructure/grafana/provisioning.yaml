@@ -1,0 +1,18 @@
+# Grafana dashboard provisioning config.
+# Mount this + dashboards/ dir into Grafana container at:
+#   /etc/grafana/provisioning/dashboards/businesslogic.yaml
+#
+# Or import dashboards manually via Grafana UI using the JSON files.
+
+apiVersion: 1
+
+providers:
+  - name: BusinessLogic
+    orgId: 1
+    folder: BusinessLogic
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards/businesslogic
+      foldersFromFilesStructure: false

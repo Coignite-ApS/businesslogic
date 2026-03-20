@@ -1,0 +1,85 @@
+{
+  "dashboard": {
+    "title": "BusinessLogic — Flow Engine",
+    "uid": "bl-flow",
+    "tags": ["businesslogic", "flow"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Flow Trigger Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-flow-trigger\"}[5m]))",
+            "legendFormat": "trigger RPS"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Trigger p95 Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"bl-flow-trigger\"}[5m])) by (le))",
+            "legendFormat": "p95"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "id": 3,
+        "title": "Active Flow Executions",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "flow_active_executions",
+            "legendFormat": "active"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Flows Completed",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+        "targets": [
+          {
+            "expr": "flow_messages_processed_total",
+            "legendFormat": "total"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Node Execution Latency (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(flow_node_duration_seconds_bucket[5m])) by (le, node_type))",
+            "legendFormat": "{{node_type}} p95"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "id": 6,
+        "title": "Flow Error Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum(rate(flow_execution_errors_total[5m])) by (error_type)",
+            "legendFormat": "{{error_type}}"
+          }
+        ]
+      }
+    ]
+  }
+}
