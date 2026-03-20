@@ -1,0 +1,225 @@
+##############################################################################
+# BusinessLogic Platform — Production Stack (Coolify-managed)
+#
+# This file documents the production service topology.
+# Coolify uses it as a reference — each service is deployed to its
+# designated server via Coolify's multi-server management.
+#
+# Server mapping:
+#   S1 (10.0.0.5)  — bl-gateway (Coolify controller lives here too)
+#   S2 (10.0.0.10) — bl-cms
+#   S3 (10.0.0.20) — postgres, redis, otel-collector
+#   S4 (10.0.0.40) — bl-ai-api, bl-flow-trigger
+#   S5 (10.0.0.30) — bl-formula-api, bl-flow-worker
+##############################################################################
+
+services:
+
+  # ═══ S3: Data Layer ═══
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /mnt/bl-pg-data:/var/lib/postgresql/data
+    deploy:
+      placement:
+        constraints: [node.labels.role == data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    deploy:
+      placement:
+        constraints: [node.labels.role == data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    deploy:
+      placement:
+        constraints: [node.labels.role == data]
+
+  # ═══ S1: Gateway ═══
+
+  bl-gateway:
+    build:
+      context: ../../services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - REDIS_URL=redis://10.0.0.20:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - AI_API_URL=http://10.0.0.40:3200
+      - FORMULA_API_URL=http://10.0.0.30:3000
+      - FLOW_TRIGGER_URL=http://10.0.0.40:3100
+      - CMS_URL=http://10.0.0.10:8055
+      - LOG_LEVEL=info
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
+      - OTEL_ENABLED=true
+    deploy:
+      placement:
+        constraints: [node.labels.role == gateway]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ═══ S2: CMS ═══
+
+  bl-cms:
+    build:
+      context: ../../services/cms
+      dockerfile: base/Dockerfile
+      args:
+        DIRECTUS_VERSION: "11.16.1"
+    ports:
+      - "8055:8055"
+    environment:
+      - CONFIG_PATH=/directus/config.live.yaml
+      - PUBLIC_URL=https://app.${DOMAIN}
+      - DB_CLIENT=pg
+      - DB_HOST=10.0.0.20
+      - DB_PORT=5432
+      - DB_DATABASE=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_ENABLED=true
+      - REDIS=redis://10.0.0.20:6379
+      - CACHE_ENABLED=true
+      - CACHE_TTL=5m
+      - FORMULA_API_URL=http://10.0.0.30:3000
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN}
+      - FLOW_TRIGGER_URL=http://10.0.0.40:3100
+      - FLOW_TRIGGER_ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN}
+      - AI_SERVICE_URL=http://10.0.0.40:3200
+      - AI_SERVICE_ENABLED=true
+    deploy:
+      placement:
+        constraints: [node.labels.role == cms]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8055/server/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ═══ S4: AI Compute ═══
+
+  bl-ai-api:
+    build:
+      context: ../../services/ai-api
+      dockerfile: Dockerfile
+    ports:
+      - "3200:3200"
+    environment:
+      - PORT=3200
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://10.0.0.20:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_API_ADMIN_TOKEN=${AI_API_ADMIN_TOKEN}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY}
+      - FORMULA_API_URL=http://10.0.0.30:3000
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN}
+      - KB_EMBEDDING_MODEL=${KB_EMBEDDING_MODEL}
+      - LOG_LEVEL=info
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
+      - OTEL_ENABLED=true
+    deploy:
+      placement:
+        constraints: [node.labels.role == ai-compute]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  bl-flow-trigger:
+    build:
+      context: ../../services/flow
+      dockerfile: docker/Dockerfile
+      target: trigger
+    ports:
+      - "3100:3100"
+    environment:
+      - PORT=3100
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://10.0.0.20:6379
+      - RUST_LOG=info
+      - ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
+      - OTEL_ENABLED=true
+    deploy:
+      placement:
+        constraints: [node.labels.role == ai-compute]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ═══ S5: Compute ═══
+
+  bl-formula-api:
+    build:
+      context: ../../services/formula-api
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - POOL_SIZE=4
+      - REDIS_URL=redis://10.0.0.20:6379
+      - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN}
+      - ENGINE=${ENGINE:-hyperformula}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
+      - OTEL_ENABLED=true
+    deploy:
+      placement:
+        constraints: [node.labels.role == compute]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  bl-flow-worker:
+    build:
+      context: ../../services/flow
+      dockerfile: docker/Dockerfile
+      target: worker
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://10.0.0.20:6379
+      - RUST_LOG=info
+      - WORKER_CONCURRENCY=10
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
+      - OTEL_ENABLED=true
+    deploy:
+      placement:
+        constraints: [node.labels.role == compute]
+
+volumes:
+  redis_data:

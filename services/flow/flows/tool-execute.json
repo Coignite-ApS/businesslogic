@@ -1,0 +1,67 @@
+{
+  "name": "AI Tool Execution",
+  "description": "Micro-flow for AI tool calls. Wraps tool execution with input validation, budget tracking, error handling, and audit trail.",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "methods": ["POST"]
+    }
+  },
+  "settings": {
+    "timeout_ms": 30000,
+    "budget_limit_usd": 1.0
+  },
+  "nodes": [
+    {
+      "id": "validate",
+      "type": "core:condition",
+      "config": {
+        "condition": {
+          "left": "$trigger.body.tool_name",
+          "operator": "not_empty"
+        },
+        "true_branch": "execute",
+        "false_branch": null
+      }
+    },
+    {
+      "id": "execute",
+      "type": "core:http_request",
+      "config": {
+        "url": "{{$trigger.body.callback_url}}",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Admin-Token": "{{$env.AI_API_ADMIN_TOKEN}}"
+        },
+        "body": {
+          "tool_name": "$trigger.body.tool_name",
+          "tool_input": "$trigger.body.tool_input",
+          "account_id": "$trigger.body.account_id"
+        },
+        "timeout_ms": 25000
+      }
+    },
+    {
+      "id": "audit",
+      "type": "core:database",
+      "config": {
+        "query": "INSERT INTO ai_tool_audit (id, account_id, tool_name, input, output, execution_id, cost_usd, created_at) VALUES (gen_random_uuid(), $1, $2, $3::jsonb, $4::jsonb, $5, $6, NOW())",
+        "params": [
+          "$trigger.body.account_id",
+          "$trigger.body.tool_name",
+          "$trigger.body.tool_input",
+          "$nodes.execute.body",
+          "$meta.execution_id",
+          "$meta.cumulative_cost_usd"
+        ],
+        "mode": "execute"
+      }
+    }
+  ],
+  "edges": [
+    { "from": "validate", "to": "execute" },
+    { "from": "execute", "to": "audit" }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "bl-ai-api",
+  "version": "0.1.0",
+  "description": "AI chat, knowledge base search, and embeddings service",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "dev": "node --env-file=.env --watch src/server.js",
+    "test": "node --test test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js",
+    "test:all": "node --test --test-concurrency=1 test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js test/kb.test.js test/flow-ingest.test.js test/flow-tools.test.js test/local-embeddings.test.js test/telemetry.test.js",
+    "test:chat": "node --test test/chat.test.js",
+    "test:kb": "node --test test/kb.test.js",
+    "test:contracts": "node --test test/contracts/producer.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^9.4.0",
+    "@fastify/under-pressure": "^9.0.3",
+    "bullmq": "^5.34.8",
+    "fastify": "^5.2.1",
+    "franc": "^6.2.0",
+    "ioredis": "^5.4.1",
+    "lru-cache": "^11.0.2",
+    "openai": "^4.86.2",
+    "pg": "^8.13.1",
+    "@opentelemetry/sdk-node": "^0.57.2",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.2",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.57.2",
+    "@opentelemetry/sdk-metrics": "^1.30.1",
+    "@opentelemetry/instrumentation-http": "^0.57.2",
+    "@opentelemetry/resources": "^1.30.1",
+    "@opentelemetry/semantic-conventions": "^1.30.0"
+  }
+}

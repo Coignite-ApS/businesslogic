@@ -1,0 +1,2380 @@
+openapi: 3.1.0
+info:
+  title: Excel Formula API
+  description: Fast Excel formula evaluation service with caching, batch processing, multi-sheet support, and calculator functions.
+  version: 1.23.0
+  license:
+    name: GPL-3.0
+    identifier: GPL-3.0-only
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /ping:
+    get:
+      operationId: ping
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+              example:
+                status: ok
+
+  /health:
+    get:
+      operationId: health
+      summary: Lightweight health check
+      description: Returns minimal status. No authentication required.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                default:
+                  value:
+                    status: ok
+                    ts: 1740100000000
+
+  /server/stats:
+    get:
+      x-internal: true
+      operationId: serverStats
+      summary: Cluster-wide server stats (admin)
+      description: |
+        Returns per-instance metrics aggregated from Redis. Each instance pushes its health
+        snapshot to Redis every 15s (configurable via `HEALTH_PUSH_INTERVAL_MS`). The current
+        instance always returns live data; other instances return their last snapshot.
+        Stale instance keys auto-expire after 3x the push interval.
+      parameters:
+        - name: X-Admin-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerStatsResponse"
+              examples:
+                default:
+                  value:
+                    status: ok
+                    ts: 1740100000000
+                    instanceId: web-abc12
+                    cluster:
+                      instances: 2
+                      totalWorkers: 4
+                      totalQueuePending: 0
+                      totalQueueMax: 256
+                      totalCalculators: 3
+                      totalHeapUsedMB: 120
+                    instances:
+                      web-abc12:
+                        live: true
+                        ts: 1740100000000
+                        cache: { lru: { size: 42, max: 50000 }, redis: connected }
+                        queue: { pending: 0, max: 128 }
+                        calculators: { size: 2, max: 100 }
+                        capacity: { totalWorkers: 2, totalHeapUsedMB: 60 }
+                      web-def34:
+                        live: false
+                        ts: 1740099990000
+                        cache: { lru: { size: 10, max: 50000 }, redis: connected }
+                        queue: { pending: 1, max: 128 }
+                        calculators: { size: 1, max: 100 }
+                        capacity: { totalWorkers: 2, totalHeapUsedMB: 60 }
+        "401":
+          description: Missing or invalid admin token
+
+  /execute:
+    post:
+      operationId: executeSingle
+      summary: Evaluate a single Excel formula
+      security:
+        - FormulaToken: []
+      description: |
+        Evaluates one formula. Optional `data` provides a 2D cell grid for cell references.
+        When `data` is present, cache is bypassed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [formula]
+              properties:
+                formula:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                data:
+                  $ref: "#/components/schemas/DataGrid"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges (only used when data is present)
+            examples:
+              basic:
+                summary: Basic formula
+                value:
+                  formula: "SUM(1,2,3)"
+              withLocale:
+                summary: German locale
+                value:
+                  formula: "SUMME(1;2;3)"
+                  locale: de
+              withData:
+                summary: Cell references against data
+                value:
+                  formula: "SUM(A1:B2)"
+                  data: [[1,2],[3,4]]
+              arrayFormula:
+                summary: Array/spill formula
+                value:
+                  formula: "SORT({5,3,1,4,2})"
+      responses:
+        "200":
+          description: Formula result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormulaResult"
+              examples:
+                scalar:
+                  summary: Scalar result
+                  value:
+                    result: 6
+                    formula: "SUM(1,2,3)"
+                    format: scalar
+                    cached: false
+                array:
+                  summary: Array/spill result
+                  value:
+                    result: [[1],[2],[3],[4],[5]]
+                    formula: "SORT({5,3,1,4,2})"
+                    format: array
+                    cached: false
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/FormulaError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+
+  /execute/batch:
+    post:
+      operationId: executeBatch
+      summary: Evaluate multiple formulas in one request
+      security:
+        - FormulaToken: []
+      description: |
+        Evaluates up to 1000 formulas. Each result is either a success or an inline error.
+        Optional `data` provides a shared 2D grid; cache is bypassed when present.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [formulas]
+              properties:
+                formulas:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 10000
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                data:
+                  $ref: "#/components/schemas/DataGrid"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges (only used when data is present)
+            examples:
+              basic:
+                summary: Basic batch
+                value:
+                  formulas: ["SUM(1,2)", "MAX(3,4)", "AVERAGE(10,20,30)"]
+              withData:
+                summary: Batch with shared data
+                value:
+                  data: [[100,200],[300,400]]
+                  formulas: ["SUM(A1:B1)", "A1*B1", "SUM(A1:B2)"]
+              withLocale:
+                summary: Danish locale
+                value:
+                  formulas: ["SUM(1;2;3)", "MIDDEL(10;20;30)"]
+                  locale: da
+      responses:
+        "200":
+          description: Batch results (each element is a success or inline error)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BatchResultItem"
+              example:
+                results:
+                  - result: 3
+                    formula: "SUM(1,2)"
+                    format: scalar
+                    cached: false
+                  - result: 4
+                    formula: "MAX(3,4)"
+                    format: scalar
+                    cached: false
+                  - result: 20
+                    formula: "AVERAGE(10,20,30)"
+                    format: scalar
+                    cached: false
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+
+  /execute/sheet:
+    post:
+      operationId: executeSheet
+      summary: Evaluate formulas placed at specific cells in a sheet grid
+      security:
+        - FormulaToken: []
+      description: |
+        Formulas are placed at named cells so they can reference each other and the data grid.
+        Returns the full grid(s) with formula results filled in.
+
+        Provide either `data` (single sheet) or `sheets` (named multi-sheet), not both.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [formulas]
+              properties:
+                data:
+                  $ref: "#/components/schemas/DataGrid"
+                sheets:
+                  $ref: "#/components/schemas/SheetsObject"
+                formulas:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SheetFormula"
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges for the engine
+            examples:
+              singleSheet:
+                summary: Single sheet
+                value:
+                  data: [[1,2],[3,4]]
+                  formulas:
+                    - cell: C1
+                      formula: "A1+B1"
+                    - cell: C2
+                      formula: "SUM(A1:B2)"
+              multiSheet:
+                summary: Multi-sheet with cross-sheet references
+                value:
+                  sheets:
+                    Sales: [[100,200],[300,400]]
+                    Tax: [[0.1],[0.2]]
+                  formulas:
+                    - sheet: Sales
+                      cell: C1
+                      formula: "A1*Tax!A1"
+                    - sheet: Sales
+                      cell: C2
+                      formula: "A2*Tax!A2"
+      responses:
+        "200":
+          description: |
+            With `data`: `{results: 2D array}`.
+            With `sheets`: `{results: {sheetName: 2D array, ...}}`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    oneOf:
+                      - $ref: "#/components/schemas/DataGrid"
+                      - $ref: "#/components/schemas/SheetsObject"
+              examples:
+                singleSheet:
+                  summary: Single sheet result
+                  value:
+                    results: [[1,2,3],[3,4,10]]
+                multiSheet:
+                  summary: Multi-sheet result
+                  value:
+                    results:
+                      Sales: [[100,200,10],[300,400,60]]
+                      Tax: [[0.1],[0.2]]
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/FormulaError"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+
+  /parse/xlsx:
+    post:
+      x-internal: true
+      operationId: parseXlsx
+      summary: Parse an xlsx file into sheets + formulas
+      security:
+        - AdminToken: []
+      description: |
+        Upload an xlsx file and get back `{sheets, formulas}` directly passable to `/execute/sheet`.
+        Cells with formulas become `null` in the grid; the formula is extracted to the `formulas` array.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: xlsx file
+      responses:
+        "200":
+          description: Parsed sheets and formulas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sheets, formulas, expressions, profile]
+                properties:
+                  sheets:
+                    $ref: "#/components/schemas/SheetsObject"
+                  formulas:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SheetFormula"
+                  expressions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NamedExpression"
+                    description: Named expressions/ranges extracted from the workbook
+                  profile:
+                    $ref: "#/components/schemas/StaticProfile"
+                  locale:
+                    type: string
+                    description: Engine locale code extracted from xlsx dc:language tag. Omitted when null or enUS.
+                    example: deDE
+              example:
+                sheets:
+                  Sheet1: [[1, 2, null], [3, 4, null]]
+                formulas:
+                  - sheet: Sheet1
+                    cell: C1
+                    formula: "A1+B1"
+                  - sheet: Sheet1
+                    cell: C2
+                    formula: "A2+B2"
+                expressions:
+                  - name: TaxRate
+                    expression: "=Sheet1!$A$1"
+                locale: deDE
+        "400":
+          description: No file uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithDetail"
+        "415":
+          description: Unsupported file type (expected xlsx)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithDetail"
+        "422":
+          description: Invalid or corrupt xlsx
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /generate/xlsx:
+    post:
+      x-internal: true
+      operationId: generateXlsx
+      summary: Generate an xlsx file from sheets + formulas + optional styling
+      security:
+        - AdminToken: []
+      description: |
+        Reverse of `/parse/xlsx`. Takes `{sheets, formulas}` (same format parse outputs) plus optional
+        highlights, comments, and number formats. Returns a downloadable `.xlsx` with working formulas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sheets]
+              properties:
+                sheets:
+                  $ref: "#/components/schemas/SheetsObject"
+                formulas:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SheetFormula"
+                  default: []
+                highlights:
+                  type: object
+                  additionalProperties:
+                    type: string
+                    pattern: "^#[0-9A-Fa-f]{6}$"
+                  description: "Mapping key → hex color. Applies border (full color) + fill (10% tint)."
+                  example:
+                    "'Sheet1'!A1": "#FF0000"
+                    "'Sheet1'!B2:D5": "#3366CC"
+                comments:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: "Mapping key → comment text. Ranges apply to each cell."
+                  example:
+                    "'Sheet1'!A1": "Tax rate"
+                formats:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: "Mapping key → Excel number format string."
+                  example:
+                    "'Sheet1'!A1": "0.00%"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges to write to the workbook
+                locale:
+                  type: string
+                  description: "Locale to embed in xlsx dc:language. Accepts short code (de), engine code (deDE), or IETF tag (de-DE)."
+                  example: deDE
+                filename:
+                  type: string
+                  description: Output filename in Content-Disposition header.
+                  default: generated.xlsx
+            example:
+              sheets:
+                Sheet1: [[1, 2, null], [3, 4, null]]
+              formulas:
+                - sheet: Sheet1
+                  cell: C1
+                  formula: "A1+B1"
+              highlights:
+                "'Sheet1'!A1": "#FF0000"
+              comments:
+                "'Sheet1'!A1": "Tax rate"
+              formats:
+                "'Sheet1'!A1": "0.00%"
+      responses:
+        "200":
+          description: Generated xlsx file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: 'attachment; filename="generated.xlsx"'
+        "400":
+          description: Validation error (missing sheets, invalid hex color, invalid mapping key)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+
+  /calculators:
+    get:
+      x-internal: true
+      operationId: listCalculators
+      summary: List all registered calculators (LRU + Redis)
+      security:
+        - AdminToken: []
+      description: |
+        Returns calculators from both in-memory LRU and Redis persistence.
+        LRU entries have `source: "memory"` and include `expiresAt`.
+        Redis-only entries have `source: "redis"` (no `expiresAt`).
+      responses:
+        "200":
+          description: Registered calculators
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [calculators]
+                properties:
+                  calculators:
+                    type: array
+                    items:
+                      type: object
+                      required: [calculatorId, name, version, hasToken, source]
+                      properties:
+                        calculatorId:
+                          type: string
+                        name:
+                          type: ["string", "null"]
+                        version:
+                          type: ["string", "null"]
+                        hasToken:
+                          type: boolean
+                          description: Whether a token is set
+                        allowedIps:
+                          type: ["array", "null"]
+                          items:
+                            type: string
+                          description: IP/CIDR allowlist (null = allow all)
+                        allowedOrigins:
+                          type: ["array", "null"]
+                          items:
+                            type: string
+                          description: Origin allowlist (null = allow all)
+                        source:
+                          type: string
+                          enum: [memory, redis]
+                          description: '"memory" = in LRU, "redis" = persisted in Redis only'
+                        expiresAt:
+                          type: string
+                          format: date-time
+                          description: Only present for source "memory"
+                        locale:
+                          type: string
+                          description: Present when set
+                        description:
+                          type: string
+                          description: Omitted when null
+                        test:
+                          type: boolean
+                          description: Present when set
+              example:
+                calculators:
+                  - calculatorId: abc123def456
+                    name: Tax Calculator
+                    version: "2.0"
+                    hasToken: true
+                    expiresAt: "2026-03-01T13:00:00.000Z"
+                    source: memory
+                    test: true
+                  - calculatorId: xyz789
+                    name: Budget Calc
+                    version: "1.0"
+                    hasToken: false
+                    source: redis
+                    locale: da
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+
+  /calculator:
+    post:
+      x-internal: true
+      operationId: createCalculator
+      summary: Create a calculator from sheets, formulas, and I/O schemas
+      security:
+        - AdminToken: []
+      description: |
+        Turns a spreadsheet into a typed function. Define input fields mapped to cells,
+        output fields mapped to cells/ranges, and execute efficiently many times.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [calculatorId, accountId, sheets, formulas, input, output, token]
+              properties:
+                calculatorId:
+                  type: string
+                  minLength: 1
+                  description: Unique calculator identifier
+                token:
+                  type: string
+                  minLength: 1
+                  description: Auth token required to execute this calculator via X-Auth-Token header
+                sheets:
+                  $ref: "#/components/schemas/SheetsObject"
+                formulas:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SheetFormula"
+                input:
+                  $ref: "#/components/schemas/InputSchema"
+                output:
+                  $ref: "#/components/schemas/OutputSchema"
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                name:
+                  type: string
+                  description: Human-readable calculator name
+                version:
+                  type: string
+                  description: Calculator version string
+                description:
+                  type: string
+                  description: Calculator description
+                test:
+                  type: boolean
+                  description: Mark calculator as test — included in stats telemetry when true
+                accountId:
+                  type: string
+                  minLength: 1
+                  description: Account ID for rate limiting (required)
+                allowedIps:
+                  type: array
+                  items:
+                    type: string
+                  description: "Optional IP/CIDR allowlist for execute/describe. Patchable."
+                  example: ["203.0.113.0/24", "198.51.100.42"]
+                allowedOrigins:
+                  type: array
+                  items:
+                    type: string
+                  description: "Optional browser origin allowlist for execute/describe. Supports wildcard subdomains. Patchable."
+                  example: ["https://app.example.com", "https://*.example.com"]
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges for the calculator engine
+                mcp:
+                  $ref: "#/components/schemas/McpConfig"
+            examples:
+              full:
+                summary: All parameters
+                value:
+                  calculatorId: my-tax-calculator
+                  token: my-secret-token
+                  name: Tax Calculator
+                  version: "2.0"
+                  description: Computes income tax based on salary
+                  locale: da
+                  test: true
+                  sheets:
+                    Input: [[0, 0]]
+                    Rates: [[0.25]]
+                    Result: [[null]]
+                  formulas:
+                    - sheet: Result
+                      cell: A1
+                      formula: "Input!A1*Rates!A1"
+                  input:
+                    type: object
+                    required: [salary]
+                    properties:
+                      salary:
+                        type: number
+                        mapping: "'Input'!A1"
+                        minimum: 0
+                        default: 0
+                  output:
+                    type: object
+                    properties:
+                      tax: { type: number, mapping: "'Result'!A1" }
+              simple:
+                summary: Two inputs, two outputs
+                value:
+                  calculatorId: my-sum-calculator
+                  token: my-secret-token
+                  sheets:
+                    Sheet1: [[0, 10], [0, 20]]
+                  formulas:
+                    - sheet: Sheet1
+                      cell: C1
+                      formula: "A1+B1"
+                    - sheet: Sheet1
+                      cell: C2
+                      formula: "A2+B2"
+                  input:
+                    type: object
+                    properties:
+                      val1: { type: number, mapping: "Sheet1!A1", default: 0 }
+                      val2: { type: number, mapping: "Sheet1!A2", default: 0 }
+                  output:
+                    type: object
+                    properties:
+                      sum1: { type: number, mapping: "Sheet1!C1" }
+                      sum2: { type: number, mapping: "Sheet1!C2" }
+              multiSheet:
+                summary: Cross-sheet with tax rate
+                value:
+                  calculatorId: my-tax-multisheet
+                  token: my-secret-token
+                  sheets:
+                    Input: [[0]]
+                    Rates: [[0.25]]
+                    Result: [[null]]
+                  formulas:
+                    - sheet: Result
+                      cell: A1
+                      formula: "Input!A1*Rates!A1"
+                  input:
+                    type: object
+                    properties:
+                      amount: { type: number, mapping: "Input!A1", default: 0 }
+                  output:
+                    type: object
+                    properties:
+                      tax: { type: number, mapping: "Result!A1" }
+              withValidation:
+                summary: Input validation constraints
+                value:
+                  calculatorId: my-validated-calc
+                  token: my-secret-token
+                  sheets:
+                    S: [[0]]
+                  formulas:
+                    - sheet: S
+                      cell: B1
+                      formula: "A1*2"
+                  input:
+                    type: object
+                    required: [salary]
+                    properties:
+                      salary: { type: number, mapping: "S!A1", minimum: 0, maximum: 500000 }
+                  output:
+                    type: object
+                    properties:
+                      doubled: { type: number, mapping: "S!B1" }
+              withTransforms:
+                summary: Input + output transforms (date, time, percentage)
+                value:
+                  calculatorId: my-transform-calc
+                  token: my-secret-token
+                  sheets:
+                    S: [[0, 0, 0, 0, null, null]]
+                  formulas:
+                    - sheet: S
+                      cell: E1
+                      formula: "A1+30"
+                    - sheet: S
+                      cell: F1
+                      formula: "D1"
+                  input:
+                    type: object
+                    properties:
+                      start_date: { type: string, transform: date, mapping: "S!A1" }
+                      meeting_time: { type: string, transform: time, mapping: "S!B1" }
+                      event_at: { type: string, transform: datetime, mapping: "S!C1" }
+                      tax_rate: { type: number, transform: percentage, mapping: "S!D1" }
+                  output:
+                    type: object
+                    properties:
+                      end_date: { type: string, transform: date, mapping: "S!E1" }
+                      effective_rate: { type: number, transform: percentage, mapping: "S!F1" }
+              withOneOf:
+                summary: Input with oneOf dropdown
+                value:
+                  calculatorId: my-dropdown-calc
+                  token: my-secret-token
+                  sheets:
+                    Input: [[0]]
+                  formulas:
+                    - sheet: Input
+                      cell: B1
+                      formula: "A1*2"
+                  input:
+                    type: object
+                    properties:
+                      selection:
+                        type: integer
+                        mapping: "Input!A1"
+                        oneOf:
+                          - { const: 1, title: Alpha }
+                          - { const: 2, title: Beta }
+                          - { const: 3, title: Gamma }
+                  output:
+                    type: object
+                    properties:
+                      result: { type: number, mapping: "Input!B1" }
+      responses:
+        "201":
+          description: Calculator created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculatorMeta"
+              example:
+                calculatorId: my-tax-calculator
+                ttl: 1800
+                expiresAt: "2026-03-01T13:00:00.000Z"
+                name: Tax Calculator
+                version: "2.0"
+                hasToken: true
+                locale: da
+                description: Computes income tax
+                test: true
+                input:
+                  type: object
+                  properties:
+                    val1: { type: number, mapping: "Sheet1!A1", default: 0 }
+                    val2: { type: number, mapping: "Sheet1!A2", default: 0 }
+                output:
+                  type: object
+                  properties:
+                    sum1: { type: number, mapping: "Sheet1!C1" }
+                    sum2: { type: number, mapping: "Sheet1!C2" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+        "422":
+          description: Engine creation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithDetail"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+
+  /calculator/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Calculator ID
+
+    get:
+      x-internal: true
+      operationId: getCalculator
+      summary: Get calculator metadata and schemas
+      security:
+        - AdminToken: []
+      description: Returns I/O schemas with oneOf metadata. Useful for dynamic UI generation.
+      responses:
+        "200":
+          description: Calculator metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculatorMeta"
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      x-internal: true
+      operationId: patchCalculator
+      summary: Update a calculator (any field independently patchable)
+      security:
+        - AdminToken: []
+      description: |
+        Schema-only changes are fast (no worker rebuild).
+        Data changes (sheets/formulas/locale) trigger an engine rebuild in the worker.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                  description: Update auth token for execute endpoint
+                sheets:
+                  $ref: "#/components/schemas/SheetsObject"
+                formulas:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SheetFormula"
+                input:
+                  $ref: "#/components/schemas/InputSchema"
+                output:
+                  $ref: "#/components/schemas/OutputSchema"
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                name:
+                  type: string
+                  description: Human-readable calculator name
+                version:
+                  type: string
+                  description: Calculator version string
+                description:
+                  type: string
+                  description: Calculator description
+                test:
+                  type: boolean
+                  description: Mark calculator as test — included in stats telemetry when true
+                allowedIps:
+                  type: ["array", "null"]
+                  items:
+                    type: string
+                  description: "Update IP/CIDR allowlist. Set to null or [] to remove."
+                allowedOrigins:
+                  type: ["array", "null"]
+                  items:
+                    type: string
+                  description: "Update origin allowlist. Set to null or [] to remove."
+                expressions:
+                  type: ["array", "null"]
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: "Update named expressions. Triggers engine rebuild. Set to null or [] to remove."
+            examples:
+              updateSheets:
+                summary: Update sheet data (triggers engine rebuild)
+                value:
+                  sheets:
+                    Sheet1: [[0, 100], [0, 200]]
+              updateOutput:
+                summary: Update output schema only (no rebuild)
+                value:
+                  output:
+                    type: object
+                    properties:
+                      sum1: { type: number, mapping: "Sheet1!C1", title: "First Sum" }
+                      sum2: { type: number, mapping: "Sheet1!C2", title: "Second Sum" }
+              updateLocale:
+                summary: Change locale
+                value:
+                  locale: da
+      responses:
+        "200":
+          description: Updated calculator metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculatorMeta"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Engine rebuild failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithDetail"
+
+    delete:
+      x-internal: true
+      operationId: deleteCalculator
+      summary: Destroy calculator engine and remove from store
+      security:
+        - AdminToken: []
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cache/refresh-mcp/{id}:
+    post:
+      x-internal: true
+      operationId: cacheRefreshMcp
+      summary: Refresh MCP config from Admin API
+      description: |
+        Re-fetches MCP config (toolName, toolDescription, inputSchema, responseTemplate) from
+        Admin API and patches the live in-memory entry and Redis recipe. No engine rebuild needed.
+        Hash-ring routed — admin can call any instance.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+      responses:
+        "200":
+          description: MCP config refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [refreshed, inMemory, redis]
+                properties:
+                  refreshed:
+                    type: boolean
+                    const: true
+                  inMemory:
+                    type: boolean
+                    description: Whether the in-memory entry was patched
+                  redis:
+                    type: boolean
+                    description: Whether the Redis recipe was patched
+                  mcp:
+                    type: object
+                    description: Updated MCP config
+              example:
+                refreshed: true
+                inMemory: true
+                redis: true
+                mcp:
+                  enabled: true
+                  toolName: test_calculator
+                  toolDescription: Calculate savings...
+                  responseTemplate: null
+        "401":
+          $ref: "#/components/responses/AdminUnauthorized"
+        "403":
+          $ref: "#/components/responses/AdminForbidden"
+        "404":
+          description: MCP config not found on Admin API
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /calculator/{id}/health:
+    get:
+      operationId: calculatorHealth
+      summary: Liveness check for a specific calculator (non-test only)
+      description: |
+        Lightweight health check — no auth required. Returns 200 if the calculator is live
+        and running (or can be rebuilt from Redis/Admin API). Test calculators return 404.
+        Calling this on an unloaded calculator transparently rebuilds it (warms cache).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+      responses:
+        "200":
+          description: Calculator is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, calculatorId, name, version, expiresAt]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  calculatorId:
+                    type: string
+                  name:
+                    type: ["string", "null"]
+                  version:
+                    type: ["string", "null"]
+                  expiresAt:
+                    type: string
+                    format: date-time
+              example:
+                status: ok
+                calculatorId: my-tax-calculator
+                name: Tax Calculator
+                version: "2.0"
+                expiresAt: "2026-03-05T13:00:00.000Z"
+        "404":
+          description: Calculator not found or is a test calculator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthErrorResponse"
+        "503":
+          description: Calculator rebuild failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthErrorResponse"
+
+  /calculator/{id}/describe:
+    get:
+      operationId: describeCalculator
+      summary: Self-describing endpoint for dynamic UI generation
+      security:
+        - CalculatorToken: []
+      description: |
+        Returns human-readable metadata and clean I/O schemas (mapping/transform fields stripped,
+        oneOf preserved). Does not require the engine to be running —
+        rebuilds from Redis if needed. Requires X-Auth-Token header matching the calculator's token.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+      responses:
+        "200":
+          description: Calculator description
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculatorDescribe"
+              example:
+                name: Tax Calculator
+                version: "2.0"
+                description: Computes income tax
+                expected_input:
+                  type: object
+                  properties:
+                    salary: { type: number, minimum: 0 }
+                expected_output:
+                  type: object
+                  properties:
+                    tax: { type: number }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Invalid auth token or access denied (IP/origin not in allowlist)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidToken:
+                  summary: Invalid auth token
+                  value:
+                    error: Invalid auth token
+                accessDenied:
+                  summary: IP/origin not in allowlist
+                  value:
+                    error: Access denied
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/Gone"
+
+  /calculator/{id}/mcp:
+    get:
+      x-internal: true
+      operationId: getCalculatorMcpConfig
+      summary: Get MCP connection config for a calculator
+      description: |
+        Admin-only endpoint returning MCP connection details and a Claude Desktop configuration snippet.
+        Returns 404 if MCP is not enabled for this calculator.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+        - $ref: "#/components/parameters/AdminToken"
+      responses:
+        "200":
+          description: MCP connection config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpConnectionConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Calculator not found or MCP not enabled
+
+  /mcp/calculator/{id}:
+    post:
+      operationId: mcpCalculator
+      summary: MCP Streamable HTTP endpoint (JSON-RPC 2.0)
+      description: |
+        Per-calculator MCP endpoint. Accepts JSON-RPC 2.0 messages.
+        Supported methods: `initialize`, `ping`, `tools/list`, `tools/call`.
+        Notifications (no `id` field) return 202.
+        Requires `X-Auth-Token` for `tools/call`. Rate limiting applies.
+
+        **`tools/list` schema enrichment:**
+        The input schema returned by `tools/list` is cleaned and enriched for LLM consumption:
+        - Internal fields stripped: `mapping`, `transform`, `order`, `selection_mapping_*`
+        - `oneOf` converted to `enum` array for LLM compatibility
+        - Auto-generated `description` on each property with type hint + constraints:
+          - `number` → "Number (e.g. -1, 5, 6.5)"
+          - `integer` → "Whole number (e.g. -3, 2, 5)"
+          - `string` → "Text"
+          - `boolean` → "true or false"
+          - `transform: date` → "Date YYYY-MM-DD (e.g. 2025-06-15)"
+          - `transform: time` → "Time HH:MM or HH:MM:SS (e.g. 14:30)"
+          - `transform: datetime` → "Datetime YYYY-MM-DDTHH:MM:SS (e.g. 2025-06-15T14:30:00)"
+          - `transform: percentage` → "Percentage (e.g. 15 for 15%)"
+          - `oneOf` → "(e.g. {first_value}) Select value: Label -> value, ..."
+          - `min`/`max` → "between {min} and {max}"
+        - Property `title` prepended when present
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+        - name: X-Auth-Token
+          in: header
+          schema:
+            type: string
+          description: Calculator auth token (required for tools/call)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jsonrpc, method]
+              properties:
+                jsonrpc:
+                  type: string
+                  const: "2.0"
+                id:
+                  type: [integer, string]
+                  description: Request ID (omit for notifications)
+                method:
+                  type: string
+                  enum: [initialize, ping, "tools/list", "tools/call", "notifications/initialized"]
+                params:
+                  type: object
+            examples:
+              initialize:
+                summary: Initialize MCP session
+                value:
+                  jsonrpc: "2.0"
+                  id: 1
+                  method: initialize
+              toolsList:
+                summary: List available tools
+                value:
+                  jsonrpc: "2.0"
+                  id: 2
+                  method: "tools/list"
+              toolsCall:
+                summary: Call the calculator tool
+                value:
+                  jsonrpc: "2.0"
+                  id: 3
+                  method: "tools/call"
+                  params:
+                    name: calculate_tax
+                    arguments:
+                      salary: 50000
+      responses:
+        "200":
+          description: JSON-RPC response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jsonrpc:
+                    type: string
+                    const: "2.0"
+                  id:
+                    type: [integer, string, "null"]
+                  result:
+                    type: object
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: integer
+                      message:
+                        type: string
+                      data:
+                        type: object
+        "202":
+          description: Notification acknowledged (no response body)
+
+  /execute/calculator/{id}:
+    post:
+      operationId: executeCalculator
+      summary: Execute a calculator with flat input
+      description: |
+        Send a flat object matching the input schema, get a flat object matching the output schema.
+        Missing input fields use defaults from the schema.
+        Requires `X-Auth-Token` header matching the token set on creation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+        - name: X-Auth-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Auth token set when creating the calculator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Flat input object matching the calculator's input schema
+            examples:
+              allInputs:
+                summary: All inputs provided
+                value:
+                  val1: 5
+                  val2: 15
+              partialInputs:
+                summary: Partial input (defaults fill the rest)
+                value:
+                  val1: 100
+              withTransforms:
+                summary: Transformed inputs (dates as ISO strings, percentage as number)
+                value:
+                  start_date: "2025-02-27"
+                  meeting_time: "12:30:00"
+                  tax_rate: 15
+              empty:
+                summary: All defaults
+                value: {}
+      responses:
+        "200":
+          description: Calculation result (flat object matching output schema)
+          headers:
+            X-Cache:
+              schema:
+                type: string
+                enum: [HIT, MISS]
+              description: Whether the result was served from cache (HIT) or freshly calculated (MISS)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+              example:
+                sum1: 15
+                sum2: 35
+        "400":
+          description: Input validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                  details:
+                    type: array
+                    description: ajv validation errors
+        "401":
+          description: Missing X-Auth-Token header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Invalid auth token, access denied (IP/origin not allowed), or account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidToken:
+                  summary: Invalid auth token
+                  value:
+                    error: Invalid auth token
+                accessDenied:
+                  summary: IP/origin not in allowlist
+                  value:
+                    error: Access denied
+                accountNotFound:
+                  summary: Account not found
+                  value:
+                    error: Account not found
+        "410":
+          $ref: "#/components/responses/Gone"
+        "422":
+          description: Output fields contain engine errors (e.g. #N/A, #VALUE!, #REF!)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutputError"
+              example:
+                error: Calculation produced errors
+                code: OUTPUT_ERROR
+                fields:
+                  - field: total
+                    error:
+                      type: NA
+                      message: "Did not find value"
+                      value: "#N/A"
+                  - field: "items[0].amount"
+                    error:
+                      type: VALUE
+                      message: "Function expects numeric values"
+                      value: "#VALUE!"
+        "429":
+          description: Rate limit exceeded (per-account RPS or monthly quota)
+          headers:
+            Retry-After:
+              schema:
+                type: string
+                example: "1"
+              description: Present on RPS limit (1 second)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                rpsExceeded:
+                  summary: RPS limit exceeded
+                  value:
+                    error: Rate limit exceeded
+                monthlyExceeded:
+                  summary: Monthly quota exceeded
+                  value:
+                    error: Monthly quota exceeded
+        "500":
+          description: Calculation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithDetail"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+
+  /functions:
+    get:
+      x-internal: true
+      operationId: getFunctions
+      summary: List function documentation
+      description: Returns the full function catalog or a filtered subset. Powered by bl-excel's built-in function metadata.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by function category (e.g. math, statistical, text, lookup, date, logical, engineering, financial, information, array)
+        - name: names
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of function names to retrieve (e.g. SUM,AVERAGE,IF)
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search term matched against function name and description
+      responses:
+        "200":
+          description: Function catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionCatalogResponse"
+              examples:
+                filtered:
+                  summary: Category filter
+                  value:
+                    count: 1
+                    functions:
+                      - name: SUM
+                        category: math
+                        description: Adds all the numbers in a range of cells
+                        syntax: "SUM(number1, [number2], ...)"
+                        args:
+                          - name: number1
+                            type: number
+                            required: true
+                            description: The first number or range to add
+                          - name: number2
+                            type: number
+                            required: false
+                            description: Additional numbers or ranges
+                            repeating: true
+                        variadic: true
+                        example: "SUM(1,2,3)"
+                        exampleDescription: Returns 6
+                        returns: number
+                        returnsArray: false
+                        volatile: false
+        "401":
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Function docs not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /functions/{name}:
+    get:
+      x-internal: true
+      operationId: getFunction
+      summary: Get single function documentation
+      description: Returns detailed documentation for a specific Excel function by name.
+      security:
+        - AdminToken: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Function name (case-insensitive, e.g. SUM, vlookup)
+      responses:
+        "200":
+          description: Function documentation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunctionDoc"
+        "401":
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Function not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Function "NOTREAL" not found
+        "500":
+          description: Function docs not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Locale:
+      type: string
+      maxLength: 10
+      enum: [en, da, de, es, fi, fr, hu, it, nb, nl, pl, pt, sv, tr, cs, ru, el, et, id, ja, ko, ms, pt-br, sl, uk]
+      description: "Locale short code. First 16 supported by HyperFormula + bl-excel. Last 9 (el–uk) supported by bl-excel only — fall back to enUS on HyperFormula."
+
+    DataGrid:
+      type: array
+      items:
+        type: array
+        items: {}
+      description: 2D array of cell values
+
+    SheetsObject:
+      type: object
+      minProperties: 1
+      additionalProperties:
+        type: array
+        items:
+          type: array
+          items: {}
+      description: Named sheets — string keys mapped to 2D arrays
+
+    SheetFormula:
+      type: object
+      required: [cell, formula]
+      properties:
+        cell:
+          type: string
+          pattern: ^[A-Za-z]+[0-9]+$
+          description: "Cell reference (e.g. C1, AA10)"
+        formula:
+          type: string
+          minLength: 1
+        sheet:
+          type: string
+          description: Target sheet name. Defaults to first sheet if omitted.
+
+    NamedExpression:
+      type: object
+      required: [name, expression]
+      properties:
+        name:
+          type: string
+          description: Named range/expression name
+        expression:
+          type: string
+          description: "Formula expression (e.g. =Sheet1!$A$1:$C$10)"
+        scope:
+          type: string
+          description: Sheet name for sheet-scoped expressions (omit for global)
+
+    FormulaResult:
+      type: object
+      required: [result, formula, format, cached]
+      properties:
+        result:
+          description: Scalar value or 2D array for spill formulas
+        formula:
+          type: string
+        format:
+          type: string
+          enum: [scalar, array]
+        cached:
+          type: boolean
+
+    BatchResultItem:
+      oneOf:
+        - type: object
+          required: [result, formula, format, cached]
+          properties:
+            result: {}
+            formula:
+              type: string
+            format:
+              type: string
+              enum: [scalar, array]
+            cached:
+              type: boolean
+        - type: object
+          required: [error, type, formula]
+          properties:
+            error:
+              type: string
+            type:
+              type: string
+              description: "Excel error type (NAME, VALUE, REF, etc.)"
+            formula:
+              type: string
+            unresolvedFunctions:
+              type: array
+              items:
+                type: string
+              description: "Unresolved function names extracted from formula (present on NAME errors only)"
+
+    InputSchema:
+      type: object
+      required: [type, properties]
+      properties:
+        type:
+          type: string
+          const: object
+        required:
+          type: array
+          items:
+            type: string
+        properties:
+          type: object
+          additionalProperties:
+            type: object
+            description: |
+              JSON Schema property with mapping extensions:
+              `mapping` — cell reference (e.g. `'Sheet1'!A1`),
+              `default` — default value,
+              `transform` — preprocess value before cell injection (`date`, `time`, `datetime`, `percentage`),
+              `oneOf` — dropdown options (UI metadata only, not enforced server-side).
+      description: |
+        JSON Schema (draft-07) with mapping extensions for input fields.
+
+        **Transforms** preprocess user-facing values into Excel-native values before cell injection:
+        - `date` — ISO date string (`YYYY-MM-DD`) → Excel serial number. E.g. `"2025-02-27"` → `45715`
+        - `time` — time string (`HH:MM` or `HH:MM:SS`) → fractional day (0–1). E.g. `"12:30:00"` → `0.520833`
+        - `datetime` — ISO datetime (`YYYY-MM-DDTHH:MM:SS`) → serial + fraction. E.g. `"2025-02-27T12:30:00"` → `45715.520833`
+        - `percentage` — number ÷ 100. E.g. `15` → `0.15`
+      example:
+        type: object
+        required: [start_date]
+        properties:
+          start_date: { type: string, transform: date, mapping: "'S'!A1" }
+          start_time: { type: string, transform: time, mapping: "'S'!B1", default: "09:00" }
+          event_at: { type: string, transform: datetime, mapping: "'S'!C1" }
+          tax_rate: { type: number, transform: percentage, mapping: "'S'!D1", default: 0, minimum: 0, maximum: 100 }
+
+    OutputSchema:
+      type: object
+      required: [type, properties]
+      properties:
+        type:
+          type: string
+          const: object
+        properties:
+          type: object
+          additionalProperties:
+            type: object
+            description: |
+              JSON Schema property with mapping extensions:
+              `mapping` — cell or range reference (e.g. `'Sheet1'!C1`, `'Budget'!A1:B10`),
+              `mapping_item` — column letter for array items,
+              `transform` — convert Excel-native value to user-friendly format (`date`, `time`, `datetime`, `percentage`).
+      description: |
+        JSON Schema (draft-07) with mapping extensions for output fields.
+
+        **Output transforms** convert Excel-native values back to user-friendly formats after calculation:
+        - `date` — Excel serial number → ISO date string (`YYYY-MM-DD`). E.g. `45715` → `"2025-02-27"`
+        - `time` — fractional day (0–1) → time string (`HH:MM:SS`). E.g. `0.520833` → `"12:30:00"`
+        - `datetime` — serial + fraction → ISO datetime (`YYYY-MM-DDTHH:MM:SS`). E.g. `45715.520833` → `"2025-02-27T12:30:00"`
+        - `percentage` — decimal × 100. E.g. `0.15` → `15`
+
+    CalculatorMeta:
+      type: object
+      required: [calculatorId, ttl, name, version, hasToken, input, output]
+      properties:
+        calculatorId:
+          type: string
+        ttl:
+          type: integer
+          description: TTL in seconds
+        expiresAt:
+          type: string
+          format: date-time
+        name:
+          type: ["string", "null"]
+          description: Human-readable calculator name
+        version:
+          type: ["string", "null"]
+          description: Calculator version string
+        hasToken:
+          type: boolean
+          description: Whether a token is set (token value never exposed)
+        accountId:
+          type: ["string", "null"]
+          description: Account ID for rate limiting
+        allowedIps:
+          type: ["array", "null"]
+          items:
+            type: string
+          description: IP/CIDR allowlist (null = allow all). Patchable.
+        allowedOrigins:
+          type: ["array", "null"]
+          items:
+            type: string
+          description: Origin allowlist (null = allow all). Patchable.
+        locale:
+          type: string
+          description: Present when set
+        description:
+          type: string
+          description: Calculator description (omitted when null)
+        test:
+          type: boolean
+          description: Present when set
+        integration:
+          type: ["object", "null"]
+          description: Integration type flags. Requires mcp.enabled.
+          properties:
+            skill:
+              type: boolean
+              description: Expose as Claude Code skill
+            plugin:
+              type: boolean
+              description: Expose as Cowork plugin
+        mcp:
+          $ref: "#/components/schemas/McpConfig"
+        profile:
+          $ref: "#/components/schemas/MeasuredProfile"
+        unresolvedFunctions:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Unresolved function name
+              references:
+                type: array
+                items:
+                  type: string
+                description: Cell references containing the unresolved function
+          description: "Functions the engine couldn't resolve during creation (bl-excel only, omitted when empty)"
+        input:
+          $ref: "#/components/schemas/InputSchema"
+        output:
+          $ref: "#/components/schemas/OutputSchema"
+
+    McpConfig:
+      type: object
+      description: MCP (Model Context Protocol) configuration. When enabled, exposes calculator as an MCP tool.
+      properties:
+        enabled:
+          type: boolean
+          description: Whether MCP endpoint is active for this calculator
+        toolName:
+          type: string
+          description: MCP tool name (required when enabled)
+        toolDescription:
+          type: ["string", "null"]
+          description: MCP tool description shown to AI clients
+        responseTemplate:
+          type: ["string", "null"]
+          description: "Markdown template with {{param}} placeholders for input/output. Included in tools/call response for LLM formatting."
+
+    McpConnectionConfig:
+      type: object
+      description: MCP connection configuration for AI clients
+      properties:
+        enabled:
+          type: boolean
+        endpoint:
+          type: string
+          description: MCP endpoint path
+        toolName:
+          type: string
+        toolDescription:
+          type: ["string", "null"]
+        responseTemplate:
+          type: ["string", "null"]
+        auth:
+          type: object
+          properties:
+            type:
+              type: string
+              const: header
+            name:
+              type: string
+              const: X-Auth-Token
+        claudeDesktop:
+          type: object
+          description: Claude Desktop configuration snippet
+          additionalProperties: true
+
+    CalculatorDescribe:
+      type: object
+      required: [name, version, expected_input, expected_output]
+      description: |
+        Self-describing calculator metadata for UI generation.
+        `expected_input` and `expected_output` are clean schemas — internal fields
+        (`mapping`, `transform`, `mapping_item`) are stripped. `oneOf` is preserved.
+      properties:
+        name:
+          type: ["string", "null"]
+          description: Human-readable calculator name
+        version:
+          type: ["string", "null"]
+          description: Calculator version string
+        description:
+          type: string
+          description: Calculator description (omitted when null)
+        expected_input:
+          type: object
+          description: Clean input schema (no mapping/transform fields)
+        expected_output:
+          type: object
+          description: Clean output schema (no mapping/transform fields)
+
+    HealthResponse:
+      type: object
+      required: [status, ts]
+      description: Lightweight health check response.
+      properties:
+        status:
+          type: string
+          const: ok
+        ts:
+          type: integer
+          description: Unix timestamp (ms)
+
+    ServerStatsResponse:
+      type: object
+      required: [status, ts, instanceId, cluster, instances]
+      description: Cluster-wide server stats aggregated from Redis.
+      properties:
+        status:
+          type: string
+          const: ok
+        ts:
+          type: integer
+          description: Unix timestamp (ms)
+        instanceId:
+          type: string
+          description: Current instance identifier
+        cluster:
+          type: object
+          description: Aggregated metrics across all instances.
+          properties:
+            instances:
+              type: integer
+            totalWorkers:
+              type: integer
+            totalQueuePending:
+              type: integer
+            totalQueueMax:
+              type: integer
+            totalCalculators:
+              type: integer
+            totalHeapUsedMB:
+              type: number
+        instances:
+          type: object
+          description: Per-instance snapshots keyed by instance ID.
+          additionalProperties:
+            $ref: "#/components/schemas/InstanceSnapshot"
+
+    InstanceSnapshot:
+      type: object
+      description: Single instance health snapshot.
+      properties:
+        live:
+          type: boolean
+          description: True if this is the responding instance (fresh data), false if from Redis cache.
+        instanceId:
+          type: string
+        ts:
+          type: integer
+        cache:
+          type: object
+        queue:
+          type: object
+          properties:
+            pending:
+              type: integer
+            max:
+              type: integer
+        calculators:
+          type: object
+          properties:
+            size:
+              type: integer
+            max:
+              type: integer
+        stats:
+          type: object
+          properties:
+            buffered:
+              type: integer
+            totalFlushed:
+              type: integer
+            totalDropped:
+              type: integer
+        poolSize:
+          type: integer
+        workers:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              calculators:
+                type: integer
+              calculatorIds:
+                type: array
+                items:
+                  type: string
+              heapUsedMB:
+                type: number
+        capacity:
+          type: object
+          properties:
+            totalWorkers:
+              type: integer
+            totalHeapUsedMB:
+              type: number
+            totalCalculatorDataMB:
+              type: number
+
+    Remark:
+      type: object
+      required: [level, code, message]
+      properties:
+        level:
+          type: string
+          enum: [info, warning, error]
+        code:
+          type: string
+          description: "Machine-readable code (e.g. HIGH_FORMULA_COUNT, VOLATILE_FORMULAS)"
+        message:
+          type: string
+
+    StaticProfile:
+      type: object
+      description: Static analysis profile computed from sheets + formulas (no engine needed)
+      properties:
+        sheetCount:
+          type: integer
+        totalCells:
+          type: integer
+        formulaCount:
+          type: integer
+        expressionCount:
+          type: integer
+        crossSheetRefs:
+          type: integer
+        volatileCount:
+          type: integer
+        dataBytes:
+          type: integer
+          description: JSON-serialized size of sheets + formulas in bytes
+        estimatedMemoryMB:
+          type: integer
+          description: Estimated worker heap usage in MB
+        estimatedBuildMs:
+          type: integer
+          description: Estimated engine build time in ms
+        estimatedExecMs:
+          type: number
+          description: Estimated single execution time in ms
+        functionsUsed:
+          type: array
+          items:
+            type: string
+          description: Deduplicated list of Excel functions found in formulas
+        remarks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Remark"
+
+    MeasuredProfile:
+      type: object
+      description: Full profile with static analysis + measured build metrics. When ENGINE=bl-excel, estimates are replaced with actual Rust measurements.
+      allOf:
+        - $ref: "#/components/schemas/StaticProfile"
+        - type: object
+          properties:
+            buildMs:
+              type: integer
+              description: Actual engine build time in ms
+            heapDeltaMB:
+              type: number
+              description: Worker heap/RSS increase during build in MB
+            rustMemoryMB:
+              type: number
+              description: Rust allocator memory for this calculator in MB (bl-excel only, 2 decimal precision)
+            rustMemoryBytes:
+              type: integer
+              description: Rust allocator memory for this calculator in bytes (bl-excel only)
+            cycleCount:
+              type: integer
+              description: Number of circular references resolved
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+      example:
+        error: Calculator not found
+
+    HealthErrorResponse:
+      type: object
+      required: [status, error]
+      properties:
+        status:
+          type: string
+          const: error
+        error:
+          type: string
+      example:
+        status: error
+        error: Calculator not found
+
+    OutputError:
+      type: object
+      required: [error, code, fields]
+      properties:
+        error:
+          type: string
+          example: Calculation produced errors
+        code:
+          type: string
+          enum: [OUTPUT_ERROR]
+        fields:
+          type: array
+          items:
+            type: object
+            required: [field, error]
+            properties:
+              field:
+                type: string
+                description: "Dot-notation path to the error field (e.g. 'total', 'items[0].amount')"
+              error:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    description: "Excel error type (NA, VALUE, REF, DIV_BY_ZERO, NUM, NAME, etc.)"
+                  message:
+                    type: string
+                  value:
+                    type: string
+                  unresolvedFunctions:
+                    type: array
+                    items:
+                      type: string
+                    description: "Function names the engine couldn't resolve (present on NAME errors, bl-excel only)"
+
+    ErrorWithDetail:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+      example:
+        error: Validation error
+        detail: "body/formula must NOT have fewer than 1 characters"
+
+    FormulaError:
+      type: object
+      required: [error, type, formula]
+      properties:
+        error:
+          type: string
+        type:
+          type: string
+          description: "Excel error type (NAME, VALUE, REF, DIV/0, NUM, N/A, NULL)"
+        formula:
+          type: string
+        unresolvedFunctions:
+          type: array
+          items:
+            type: string
+          description: "Unresolved function names extracted from formula (present on NAME errors only)"
+      example:
+        error: Formula error
+        type: NAME
+        formula: "NOTAFUNCTION(1)"
+        unresolvedFunctions: ["NOTAFUNCTION"]
+
+    FunctionCatalogResponse:
+      type: object
+      required: [count, functions]
+      properties:
+        count:
+          type: integer
+          description: Number of functions returned
+        functions:
+          type: array
+          items:
+            $ref: "#/components/schemas/FunctionDoc"
+
+    FunctionDoc:
+      type: object
+      required: [name, category, description, syntax, args, variadic, returns, returnsArray, volatile]
+      properties:
+        name:
+          type: string
+          description: Function name (uppercase)
+        category:
+          type: string
+          description: Function category
+        description:
+          type: string
+          description: Brief description of what the function does
+        syntax:
+          type: string
+          description: Function syntax with argument placeholders
+        args:
+          type: array
+          items:
+            $ref: "#/components/schemas/FunctionArg"
+        variadic:
+          type: boolean
+          description: Whether the function accepts a variable number of arguments
+        example:
+          type: string
+          description: Example formula
+        exampleDescription:
+          type: string
+          description: What the example returns
+        returns:
+          type: string
+          description: Return type (number, string, boolean, array, any)
+        returnsArray:
+          type: boolean
+          description: Whether the function can return an array
+        volatile:
+          type: boolean
+          description: Whether the function is volatile (recalculates on every change)
+      example:
+        name: SUM
+        category: math
+        description: Adds all the numbers in a range of cells
+        syntax: "SUM(number1, [number2], ...)"
+        args:
+          - name: number1
+            type: number
+            required: true
+            description: The first number or range to add
+          - name: number2
+            type: number
+            required: false
+            description: Additional numbers or ranges
+            repeating: true
+        variadic: true
+        example: "SUM(1,2,3)"
+        exampleDescription: Returns 6
+        returns: number
+        returnsArray: false
+        volatile: false
+
+    FunctionArg:
+      type: object
+      required: [name, type, required, description]
+      properties:
+        name:
+          type: string
+          description: Argument name
+        type:
+          type: string
+          description: Expected type (number, string, boolean, any, range)
+        required:
+          type: boolean
+          description: Whether the argument is required
+        description:
+          type: string
+          description: Brief description of the argument
+        default:
+          type: string
+          description: Default value if omitted
+        repeating:
+          type: boolean
+          description: Whether this argument can be repeated (variadic tail)
+
+  securitySchemes:
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+      description: Global admin token for management endpoints (calculators CRUD, list, parse). Set via ADMIN_TOKEN env var.
+    FormulaToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+      description: Formula auth token for stateless /execute endpoints. Validated against Admin API or FORMULA_TEST_TOKEN env var.
+    CalculatorToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+      description: Per-calculator token set at creation time. Required for execute and describe endpoints.
+
+  responses:
+    AdminUnauthorized:
+      description: Admin access not configured or missing X-Admin-Token header
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    AdminForbidden:
+      description: Invalid admin token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing X-Auth-Token header
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Invalid auth token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Validation error (bad request body)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorWithDetail"
+
+    FormulaError:
+      description: Formula evaluation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FormulaError"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Gone:
+      description: Resource expired or lost (calculator gone — client must recreate)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    ServiceBusy:
+      description: Service overloaded — retry after delay
+      headers:
+        Retry-After:
+          schema:
+            type: string
+            example: "5"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorWithDetail"

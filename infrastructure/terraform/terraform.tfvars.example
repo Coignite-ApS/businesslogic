@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and fill in real values.
+# NEVER commit terraform.tfvars to git.
+
+hcloud_token         = "your-hetzner-api-token"
+ssh_public_key       = "ssh-ed25519 AAAA..."
+location             = "nbg1"
+environment          = "production"
+
+# Optional: Cloudflare DNS
+cloudflare_api_token = ""
+cloudflare_zone_id   = ""
+domain               = "businesslogic.online"

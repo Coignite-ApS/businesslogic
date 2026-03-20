@@ -1,0 +1,64 @@
+[package]
+name = "flow-trigger"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HTTP trigger service for BusinessLogic flows"
+
+[[bin]]
+name = "flow-trigger"
+path = "src/main.rs"
+
+[dependencies]
+flow-common = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# IDs & time
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Redis
+redis = { workspace = true }
+deadpool-redis = { workspace = true }
+
+# Cron scheduling
+cron = { workspace = true }
+
+# SSE streaming
+tokio-stream = { workspace = true }
+
+# Logging / Observability
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+
+# HMAC webhook signatures
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Flow engine (node registry, validation)
+flow-engine = { workspace = true }
+
+# Errors
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

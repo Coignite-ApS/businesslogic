@@ -1,0 +1,90 @@
+{
+  "name": "KB Document Ingestion",
+  "description": "Pre-built flow that replaces BullMQ ingestion pipeline. Triggered by bl-ai-api when flow_kb_ingest=true.",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "methods": ["POST"]
+    }
+  },
+  "settings": {
+    "timeout_ms": 300000,
+    "budget_limit_usd": 0.0
+  },
+  "nodes": [
+    {
+      "id": "parse",
+      "type": "ai:parse_document",
+      "config": {
+        "document_id": "$trigger.body.document_id",
+        "knowledge_base_id": "$trigger.body.knowledge_base_id"
+      }
+    },
+    {
+      "id": "chunk",
+      "type": "ai:chunk_text",
+      "config": {
+        "content": "$nodes.parse.content",
+        "source_file": "$nodes.parse.file_name",
+        "target_size": 512,
+        "min_size": 128,
+        "max_size": 768,
+        "overlap_ratio": 0.1
+      }
+    },
+    {
+      "id": "status_processing",
+      "type": "ai:update_status",
+      "config": {
+        "document_id": "$trigger.body.document_id",
+        "status": "processing"
+      }
+    },
+    {
+      "id": "filter",
+      "type": "ai:filter_unchanged",
+      "config": {
+        "document_id": "$trigger.body.document_id",
+        "chunks": "$nodes.chunk.chunks"
+      }
+    },
+    {
+      "id": "embed",
+      "type": "core:embedding",
+      "config": {
+        "input": "$nodes.filter.texts_to_embed"
+      }
+    },
+    {
+      "id": "store",
+      "type": "ai:store_vectors",
+      "config": {
+        "document_id": "$trigger.body.document_id",
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "to_embed": "$nodes.filter.to_embed",
+        "embeddings": "$nodes.embed",
+        "to_reuse": "$nodes.filter.to_reuse",
+        "to_delete_ids": "$nodes.filter.to_delete_ids"
+      }
+    },
+    {
+      "id": "status_done",
+      "type": "ai:update_status",
+      "config": {
+        "document_id": "$trigger.body.document_id",
+        "status": "indexed",
+        "chunk_count": "$nodes.store.total_chunks",
+        "token_count": "$nodes.chunk.total_tokens"
+      }
+    }
+  ],
+  "edges": [
+    { "from": "parse", "to": "chunk" },
+    { "from": "parse", "to": "status_processing" },
+    { "from": "chunk", "to": "filter" },
+    { "from": "filter", "to": "embed" },
+    { "from": "embed", "to": "store" },
+    { "from": "store", "to": "status_done" }
+  ]
+}

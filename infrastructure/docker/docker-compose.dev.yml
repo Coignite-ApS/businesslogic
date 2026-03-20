@@ -15,6 +15,7 @@
 #   bl-flow-worker  — Flow DAG executor (no HTTP port)
 #   bl-ai-api  — AI chat, KB, embeddings (host 13200 → container 3200) — Iteration 1
 #   bl-gateway — API gateway (host 18080 → container 8080) — Iteration 2
+#   otel-collector — OpenTelemetry Collector (host 14317/14318 → container 4317/4318)
 #
 # Legacy (for comparison testing):
 #   legacy-cms — Original Directus with embedded AI (host 18056 → container 8055)
@@ -59,6 +60,23 @@ services:
     ports:
       - "11080:1080"    # Web UI
       - "11025:1025"    # SMTP
+
+  # ════════════════════════════════════════════════════
+  # OpenTelemetry Collector (traces, metrics, logs)
+  # ════════════════════════════════════════════════════
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    ports:
+      - "14317:4317"   # OTLP gRPC
+      - "14318:4318"   # OTLP HTTP
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # ════════════════════════════════════════════════════
   # bl-cms (Directus — Back-Office)
@@ -135,6 +153,8 @@ services:
       - POOL_SIZE=2
       - REDIS_URL=redis://redis:6379
       - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
       - FORMULA_TEST_TOKEN=${FORMULA_TEST_TOKEN:-}
       - TEST_ACCOUNT_ID=${TEST_ACCOUNT_ID:-}
       - ENGINE=${ENGINE:-hyperformula}
@@ -167,6 +187,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - RUST_LOG=info
       - ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -189,6 +211,8 @@ services:
       - RUST_LOG=info
       - WORKER_CONCURRENCY=10
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -196,63 +220,69 @@ services:
   # ════════════════════════════════════════════════════
   # bl-ai-api (AI Chat, KB, Embeddings) — Iteration 1
   # ════════════════════════════════════════════════════
-  # Uncomment after Iteration 1 scaffolding is complete
 
-  # bl-ai-api:
-  #   build:
-  #     context: ../../services/ai-api
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "13200:3200"
-  #   environment:
-  #     - PORT=3200
-  #     - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
-  #     - REDIS_URL=redis://redis:6379
-  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #     - FORMULA_API_URL=http://bl-formula-api:3000
-  #     - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
-  #     - CHAT_POOL_SIZE=2
-  #     - EMBED_POOL_SIZE=1
-  #     - INGEST_POOL_SIZE=1
-  #     - DAILY_BUDGET_USD=10.00
-  #     - MONTHLY_BUDGET_USD=100.00
-  #   depends_on:
-  #     postgres: { condition: service_healthy }
-  #     redis: { condition: service_healthy }
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
+  bl-ai-api:
+    build:
+      context: ../../services/ai-api
+      dockerfile: Dockerfile
+    ports:
+      - "${AI_API_HOST_PORT:-13200}:3200"
+    environment:
+      - PORT=3200
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_API_ADMIN_TOKEN=${AI_API_ADMIN_TOKEN}
+      - FORMULA_API_URL=http://bl-formula-api:3000
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY}
+      - KB_EMBEDDING_MODEL=${KB_EMBEDDING_MODEL:-text-embedding-3-small}
+      - KB_MIN_SIMILARITY=${KB_MIN_SIMILARITY:-0.2}
+      - KB_RRF_K=${KB_RRF_K:-60}
+      - LOG_LEVEL=${AI_API_LOG_LEVEL:-warn}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
   # ════════════════════════════════════════════════════
   # bl-gateway (Go API Gateway) — Iteration 2
   # ════════════════════════════════════════════════════
-  # Uncomment after Iteration 2 scaffolding is complete
 
-  # bl-gateway:
-  #   build:
-  #     context: ../../services/gateway
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "18080:8080"
-  #   environment:
-  #     - PORT=8080
-  #     - REDIS_URL=redis://redis:6379
-  #     - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
-  #     - AI_API_URL=http://bl-ai-api:3200
-  #     - FORMULA_API_URL=http://bl-formula-api:3000
-  #     - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
-  #     - CMS_URL=http://bl-cms:8055
-  #     - LOG_LEVEL=debug
-  #   depends_on:
-  #     redis: { condition: service_healthy }
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 3
+  bl-gateway:
+    build:
+      context: ../../services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "18080:8080"
+    environment:
+      - PORT=8080
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - AI_API_URL=http://bl-ai-api:3200
+      - FORMULA_API_URL=http://bl-formula-api:3000
+      - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
+      - CMS_URL=http://bl-cms:8055
+      - LOG_LEVEL=debug
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
+      - OTEL_ENABLED=true
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   # ════════════════════════════════════════════════════
   # Legacy CMS (for comparison testing)

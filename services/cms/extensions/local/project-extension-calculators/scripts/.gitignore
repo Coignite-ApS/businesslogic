@@ -1,0 +1,4 @@
+node_modules/
+template-excels/
+# seed-templates.sql is generated output (also blocked by root *.sql gitignore)
+# Regenerate: npx tsx generate-templates.ts

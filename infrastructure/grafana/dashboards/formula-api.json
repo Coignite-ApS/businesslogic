@@ -1,0 +1,85 @@
+{
+  "dashboard": {
+    "title": "BusinessLogic — Formula API",
+    "uid": "bl-formula-api",
+    "tags": ["businesslogic", "formula-api"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Evaluate Request Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-formula-api\", http_route=\"/evaluate\"}[5m]))",
+            "legendFormat": "eval RPS"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Evaluate p95 Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"bl-formula-api\", http_route=\"/evaluate\"}[5m])) by (le))",
+            "legendFormat": "p95"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "id": 3,
+        "title": "Calculator Build Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-formula-api\", http_route=~\"/calculators.*\"}[5m]))",
+            "legendFormat": "calc RPS"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "formula_cache_hit_total / (formula_cache_hit_total + formula_cache_miss_total)",
+            "legendFormat": "hit rate"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } }
+      },
+      {
+        "id": 5,
+        "title": "Worker Pool Queue Depth",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "formula_queue_depth",
+            "legendFormat": "queue depth"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Error Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-formula-api\", http_response_status_code=~\"5..\"}[5m]))",
+            "legendFormat": "5xx/s"
+          }
+        ]
+      }
+    ]
+  }
+}

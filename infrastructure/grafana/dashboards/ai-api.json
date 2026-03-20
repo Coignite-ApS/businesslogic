@@ -1,0 +1,85 @@
+{
+  "dashboard": {
+    "title": "BusinessLogic — AI API",
+    "uid": "bl-ai-api",
+    "tags": ["businesslogic", "ai-api"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Chat Request Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-ai-api\", http_route=~\"/v1/chat.*\"}[5m]))",
+            "legendFormat": "chat RPS"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Chat p95 Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"bl-ai-api\", http_route=~\"/v1/chat.*\"}[5m])) by (le))",
+            "legendFormat": "p95"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "id": 3,
+        "title": "KB Search Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-ai-api\", http_route=~\"/v1/kb/.*/search\"}[5m]))",
+            "legendFormat": "search RPS"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "KB Search p95 Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"bl-ai-api\", http_route=~\"/v1/kb/.*/search\"}[5m])) by (le))",
+            "legendFormat": "p95"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "id": 5,
+        "title": "Error Rate by Endpoint",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"bl-ai-api\", http_response_status_code=~\"5..\"}[5m])) by (http_route)",
+            "legendFormat": "{{http_route}}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Ingest Queue Depth",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "ai_ingest_queue_depth",
+            "legendFormat": "queue depth"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,175 @@
+# =============================================================================
+# Businesslogic CMS Directus - Local Development
+# =============================================================================
+# Full local stack: Directus + PostgreSQL + Redis + MailDev
+#
+# Configuration approach:
+#   - config.local.yaml  -> Local Docker development (this file)
+#   - config.dev.yaml    -> App Platform dev server
+#   - config.live.yaml   -> App Platform production
+#
+# Usage:
+#   make init                         # Initialize submodule
+#   make dev                          # Quick start
+#   docker compose up -d --build      # Start in background
+#   docker compose logs -f directus   # Watch logs
+#   docker compose down               # Stop
+#   docker compose down -v            # Stop and remove data
+# =============================================================================
+
+# Include base services (postgres, redis, maildev)
+include:
+  - path: base/docker-compose.base.yml
+
+services:
+  # ---------------------------------------------------------------------------
+  # Directus CMS (project-specific configuration)
+  # ---------------------------------------------------------------------------
+  directus:
+    build:
+      context: .
+      dockerfile: base/Dockerfile
+      args:
+        DIRECTUS_VERSION: ${DIRECTUS_VERSION}
+        PROJECT_VERSION: ${PROJECT_VERSION}
+      secrets:
+        - npm_token
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8056:8055"
+    volumes:
+      # Configuration file (mirrors App Platform approach)
+      - ./config.local.yaml:/directus/config.local.yaml:ro
+
+      # Base extensions for local development (hot reload)
+      - ./base/extensions/local/base-extension-sentry:/directus/extensions/base-extension-sentry
+      - ./base/extensions/local/base-extension-memory-stats:/directus/extensions/base-extension-memory-stats
+
+      # Project extensions (hot reload)
+      - ./extensions/local/project-extension-calculators:/directus/extensions/project-extension-calculators
+      - ./extensions/local/project-extension-calculator-api:/directus/extensions/project-extension-calculator-api
+      - ./extensions/local/project-extension-stripe:/directus/extensions/project-extension-stripe
+      - ./extensions/local/project-extension-account:/directus/extensions/project-extension-account
+      - ./extensions/local/project-extension-admin:/directus/extensions/project-extension-admin
+      - ./extensions/local/project-extension-flow-hooks:/directus/extensions/project-extension-flow-hooks
+      - ./extensions/local/project-extension-flows:/directus/extensions/project-extension-flows
+      - ./extensions/local/project-extension-formulas:/directus/extensions/project-extension-formulas
+      - ./extensions/local/project-extension-ai-api:/directus/extensions/project-extension-ai-api
+      - ./extensions/local/project-extension-ai-assistant:/directus/extensions/project-extension-ai-assistant
+      - ./extensions/local/project-extension-knowledge-api:/directus/extensions/project-extension-knowledge-api
+      - ./extensions/local/project-extension-knowledge:/directus/extensions/project-extension-knowledge
+
+      # Uploads persistence
+      - directus_uploads:/directus/uploads
+
+      # Schema snapshots
+      - ./snapshots:/directus/snapshots
+
+      # Email templates (for editing)
+      - ./email-templates:/directus/email-templates
+    environment:
+      # Load config from YAML file (same approach as App Platform)
+      CONFIG_PATH: '/directus/config.local.yaml'
+
+      # Core secrets (override config.local.yaml)
+      KEY: '${KEY:-local-dev-key-minimum-32-characters}'
+      SECRET: '${SECRET:-local-dev-secret-minimum-32-chars}'
+      PUBLIC_URL: 'http://localhost:8056'
+
+      # Admin bootstrap can be overridden in .env
+      ADMIN_EMAIL: '${ADMIN_EMAIL:-admin@example.com}'
+      ADMIN_PASSWORD: '${ADMIN_PASSWORD:-admin123}'
+
+      # Formula API proxy (host.docker.internal resolves to the host machine)
+      FORMULA_API_URL: '${FORMULA_API_URL:-}'
+      FORMULA_API_ADMIN_TOKEN: '${FORMULA_API_ADMIN_TOKEN:-}'
+
+      # Flow trigger proxy (host.docker.internal resolves to the host machine)
+      FLOW_TRIGGER_URL: '${FLOW_TRIGGER_URL:-}'
+      FLOW_TRIGGER_ADMIN_TOKEN: '${FLOW_TRIGGER_ADMIN_TOKEN:-}'
+
+      # Stripe billing
+      STRIPE_SECRET_KEY: '${STRIPE_SECRET_KEY:-}'
+      STRIPE_WEBHOOK_SECRET: '${STRIPE_WEBHOOK_SECRET:-}'
+
+      # Token encryption (generate with: openssl rand -hex 32)
+      TOKEN_ENCRYPTION_KEY: '${TOKEN_ENCRYPTION_KEY:-}'
+
+      # Health snapshot cron
+      HEALTH_SNAPSHOT_INTERVAL_MINUTES: '${HEALTH_SNAPSHOT_INTERVAL_MINUTES:-5}'
+      HEALTH_SNAPSHOT_RETENTION_DAYS: '${HEALTH_SNAPSHOT_RETENTION_DAYS:-7}'
+
+      # AI features
+      AI_ENABLED: '${AI_ENABLED:-true}'
+      MCP_ENABLED: '${MCP_ENABLED:-true}'
+      ANTHROPIC_API_KEY: '${ANTHROPIC_API_KEY:-}'
+      AI_ASSISTANT_ENABLED: '${AI_ASSISTANT_ENABLED:-true}'
+      AI_DEFAULT_MODEL: '${AI_DEFAULT_MODEL:-claude-sonnet-4-6}'
+      AI_MAX_TOOL_ROUNDS: '${AI_MAX_TOOL_ROUNDS:-5}'
+      AI_MAX_CONVERSATION_MESSAGES: '${AI_MAX_CONVERSATION_MESSAGES:-50}'
+      AI_RATE_LIMIT_PER_MINUTE: '${AI_RATE_LIMIT_PER_MINUTE:-20}'
+      AI_MAX_MESSAGE_LENGTH: '${AI_MAX_MESSAGE_LENGTH:-10000}'
+      AI_MAX_CONVERSATIONS: '${AI_MAX_CONVERSATIONS:-50}'
+
+      # Knowledge Base — Embeddings & Indexing
+      # OPENAI_API_KEY: required for embeddings (text-embedding-3-small)
+      OPENAI_API_KEY: '${OPENAI_API_KEY:-}'
+      # KB_EMBEDDING_MODEL: OpenAI embedding model for vector search
+      KB_EMBEDDING_MODEL: '${KB_EMBEDDING_MODEL:-text-embedding-3-small}'
+      # KB_CHUNK_SIZE: target chunk size in tokens (midpoint for variable chunking)
+      KB_CHUNK_SIZE: '${KB_CHUNK_SIZE:-512}'
+      # KB_CHUNK_MIN_SIZE: minimum chunk size in tokens (smaller sections kept as-is)
+      KB_CHUNK_MIN_SIZE: '${KB_CHUNK_MIN_SIZE:-128}'
+      # KB_CHUNK_MAX_SIZE: maximum chunk size before splitting at paragraph boundaries
+      KB_CHUNK_MAX_SIZE: '${KB_CHUNK_MAX_SIZE:-768}'
+      # KB_CHUNK_OVERLAP: overlap ratio between chunks within same section (0-1)
+      KB_CHUNK_OVERLAP: '${KB_CHUNK_OVERLAP:-0.1}'
+      # KB_CONTEXTUAL_RETRIEVAL: use Claude Haiku to generate contextual prefix per chunk at index time
+      # Improves retrieval 49-67% but costs ~$1/M tokens and requires ANTHROPIC_API_KEY
+      KB_CONTEXTUAL_RETRIEVAL: '${KB_CONTEXTUAL_RETRIEVAL:-true}'
+
+      # Knowledge Base — Search & Retrieval
+      # KB_MIN_SIMILARITY: vector cosine similarity floor (0-1). Results below this are excluded.
+      # With hybrid search (vector + FTS + RRF), 0.2 works well. Higher = stricter, fewer results.
+      KB_MIN_SIMILARITY: '${KB_MIN_SIMILARITY:-0.2}'
+      # KB_RRF_K: Reciprocal Rank Fusion smoothing constant. Higher = more weight to lower-ranked results.
+      KB_RRF_K: '${KB_RRF_K:-60}'
+      # KB_ANSWER_CACHE_TTL: seconds to cache generated answers in Redis (0 = disabled)
+      KB_ANSWER_CACHE_TTL: '${KB_ANSWER_CACHE_TTL:-3600}'
+
+      # Knowledge Base — Cross-encoder Reranking (optional, improves precision)
+      # After hybrid search produces candidates, reranker scores query-document pairs for better ordering.
+      # Adds ~200ms latency and ~$0.002/query (Cohere). Disabled by default.
+      KB_RERANKER_ENABLED: '${KB_RERANKER_ENABLED:-false}'
+      # KB_RERANKER_PROVIDER: 'cohere' (default, best docs) or 'jina' (cheaper, multilingual)
+      KB_RERANKER_PROVIDER: '${KB_RERANKER_PROVIDER:-cohere}'
+      # KB_RERANKER_API_KEY: API key for the reranker provider
+      KB_RERANKER_API_KEY: '${KB_RERANKER_API_KEY:-}'
+      # KB_RERANKER_MODEL: model to use (cohere: rerank-v3.5, jina: jina-reranker-v2-base-multilingual)
+      KB_RERANKER_MODEL: '${KB_RERANKER_MODEL:-rerank-v3.5}'
+      # KB_RERANKER_TOP_K: number of results to keep after reranking
+      KB_RERANKER_TOP_K: '${KB_RERANKER_TOP_K:-10}'
+
+      # File watcher polling for Docker on macOS/Windows
+      CHOKIDAR_USEPOLLING: 'true'
+      CHOKIDAR_INTERVAL: '1000'
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8055/server/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  directus_uploads:
+
+# Build-time secrets (not stored in image)
+secrets:
+  npm_token:
+    file: .npm_token

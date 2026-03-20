@@ -1,0 +1,1080 @@
+openapi: 3.1.0
+info:
+  title: Excel Formula API
+  description: Fast Excel formula evaluation service with caching, batch processing, multi-sheet support, and calculator functions.
+  version: 1.23.0
+  license:
+    name: GPL-3.0
+    identifier: GPL-3.0-only
+servers:
+  - url: http://localhost:3000
+    description: Local development
+paths:
+  /ping:
+    get:
+      operationId: ping
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    const: ok
+              example:
+                status: ok
+  /health:
+    get:
+      operationId: health
+      summary: Lightweight health check
+      description: Returns minimal status. No authentication required.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                default:
+                  value:
+                    status: ok
+                    ts: 1740100000000
+  /execute:
+    post:
+      operationId: executeSingle
+      summary: Evaluate a single Excel formula
+      security:
+        - FormulaToken: []
+      description: |
+        Evaluates one formula. Optional `data` provides a 2D cell grid for cell references.
+        When `data` is present, cache is bypassed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - formula
+              properties:
+                formula:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                data:
+                  $ref: "#/components/schemas/DataGrid"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges (only used when data is present)
+            examples:
+              basic:
+                summary: Basic formula
+                value:
+                  formula: SUM(1,2,3)
+              withLocale:
+                summary: German locale
+                value:
+                  formula: SUMME(1;2;3)
+                  locale: de
+              withData:
+                summary: Cell references against data
+                value:
+                  formula: SUM(A1:B2)
+                  data:
+                    - - 1
+                      - 2
+                    - - 3
+                      - 4
+              arrayFormula:
+                summary: Array/spill formula
+                value:
+                  formula: SORT({5,3,1,4,2})
+      responses:
+        "200":
+          description: Formula result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormulaResult"
+              examples:
+                scalar:
+                  summary: Scalar result
+                  value:
+                    result: 6
+                    formula: SUM(1,2,3)
+                    format: scalar
+                    cached: false
+                array:
+                  summary: Array/spill result
+                  value:
+                    result:
+                      - - 1
+                      - - 2
+                      - - 3
+                      - - 4
+                      - - 5
+                    formula: SORT({5,3,1,4,2})
+                    format: array
+                    cached: false
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/FormulaError"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+  /execute/batch:
+    post:
+      operationId: executeBatch
+      summary: Evaluate multiple formulas in one request
+      security:
+        - FormulaToken: []
+      description: |
+        Evaluates up to 1000 formulas. Each result is either a success or an inline error.
+        Optional `data` provides a shared 2D grid; cache is bypassed when present.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - formulas
+              properties:
+                formulas:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 10000
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                data:
+                  $ref: "#/components/schemas/DataGrid"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges (only used when data is present)
+            examples:
+              basic:
+                summary: Basic batch
+                value:
+                  formulas:
+                    - SUM(1,2)
+                    - MAX(3,4)
+                    - AVERAGE(10,20,30)
+              withData:
+                summary: Batch with shared data
+                value:
+                  data:
+                    - - 100
+                      - 200
+                    - - 300
+                      - 400
+                  formulas:
+                    - SUM(A1:B1)
+                    - A1*B1
+                    - SUM(A1:B2)
+              withLocale:
+                summary: Danish locale
+                value:
+                  formulas:
+                    - SUM(1;2;3)
+                    - MIDDEL(10;20;30)
+                  locale: da
+      responses:
+        "200":
+          description: Batch results (each element is a success or inline error)
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - results
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BatchResultItem"
+              example:
+                results:
+                  - result: 3
+                    formula: SUM(1,2)
+                    format: scalar
+                    cached: false
+                  - result: 4
+                    formula: MAX(3,4)
+                    format: scalar
+                    cached: false
+                  - result: 20
+                    formula: AVERAGE(10,20,30)
+                    format: scalar
+                    cached: false
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+  /execute/sheet:
+    post:
+      operationId: executeSheet
+      summary: Evaluate formulas placed at specific cells in a sheet grid
+      security:
+        - FormulaToken: []
+      description: |
+        Formulas are placed at named cells so they can reference each other and the data grid.
+        Returns the full grid(s) with formula results filled in.
+
+        Provide either `data` (single sheet) or `sheets` (named multi-sheet), not both.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - formulas
+              properties:
+                data:
+                  $ref: "#/components/schemas/DataGrid"
+                sheets:
+                  $ref: "#/components/schemas/SheetsObject"
+                formulas:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SheetFormula"
+                locale:
+                  $ref: "#/components/schemas/Locale"
+                expressions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/NamedExpression"
+                  description: Named expressions/ranges for the engine
+            examples:
+              singleSheet:
+                summary: Single sheet
+                value:
+                  data:
+                    - - 1
+                      - 2
+                    - - 3
+                      - 4
+                  formulas:
+                    - cell: C1
+                      formula: A1+B1
+                    - cell: C2
+                      formula: SUM(A1:B2)
+              multiSheet:
+                summary: Multi-sheet with cross-sheet references
+                value:
+                  sheets:
+                    Sales:
+                      - - 100
+                        - 200
+                      - - 300
+                        - 400
+                    Tax:
+                      - - 0.1
+                      - - 0.2
+                  formulas:
+                    - sheet: Sales
+                      cell: C1
+                      formula: A1*Tax!A1
+                    - sheet: Sales
+                      cell: C2
+                      formula: A2*Tax!A2
+      responses:
+        "200":
+          description: |
+            With `data`: `{results: 2D array}`.
+            With `sheets`: `{results: {sheetName: 2D array, ...}}`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - results
+                properties:
+                  results:
+                    oneOf:
+                      - $ref: "#/components/schemas/DataGrid"
+                      - $ref: "#/components/schemas/SheetsObject"
+              examples:
+                singleSheet:
+                  summary: Single sheet result
+                  value:
+                    results:
+                      - - 1
+                        - 2
+                        - 3
+                      - - 3
+                        - 4
+                        - 10
+                multiSheet:
+                  summary: Multi-sheet result
+                  value:
+                    results:
+                      Sales:
+                        - - 100
+                          - 200
+                          - 10
+                        - - 300
+                          - 400
+                          - 60
+                      Tax:
+                        - - 0.1
+                        - - 0.2
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/FormulaError"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+  /calculator/{id}/health:
+    get:
+      operationId: calculatorHealth
+      summary: Liveness check for a specific calculator (non-test only)
+      description: |
+        Lightweight health check — no auth required. Returns 200 if the calculator is live
+        and running (or can be rebuilt from Redis/Admin API). Test calculators return 404.
+        Calling this on an unloaded calculator transparently rebuilds it (warms cache).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+      responses:
+        "200":
+          description: Calculator is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - calculatorId
+                  - name
+                  - version
+                  - expiresAt
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  calculatorId:
+                    type: string
+                  name:
+                    type:
+                      - string
+                      - "null"
+                  version:
+                    type:
+                      - string
+                      - "null"
+                  expiresAt:
+                    type: string
+                    format: date-time
+              example:
+                status: ok
+                calculatorId: my-tax-calculator
+                name: Tax Calculator
+                version: "2.0"
+                expiresAt: "2026-03-05T13:00:00.000Z"
+        "404":
+          description: Calculator not found or is a test calculator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthErrorResponse"
+        "503":
+          description: Calculator rebuild failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthErrorResponse"
+  /calculator/{id}/describe:
+    get:
+      operationId: describeCalculator
+      summary: Self-describing endpoint for dynamic UI generation
+      security:
+        - CalculatorToken: []
+      description: |
+        Returns human-readable metadata and clean I/O schemas (mapping/transform fields stripped,
+        oneOf preserved). Does not require the engine to be running —
+        rebuilds from Redis if needed. Requires X-Auth-Token header matching the calculator's token.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+      responses:
+        "200":
+          description: Calculator description
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculatorDescribe"
+              example:
+                name: Tax Calculator
+                version: "2.0"
+                description: Computes income tax
+                expected_input:
+                  type: object
+                  properties:
+                    salary:
+                      type: number
+                      minimum: 0
+                expected_output:
+                  type: object
+                  properties:
+                    tax:
+                      type: number
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Invalid auth token or access denied (IP/origin not in allowlist)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidToken:
+                  summary: Invalid auth token
+                  value:
+                    error: Invalid auth token
+                accessDenied:
+                  summary: IP/origin not in allowlist
+                  value:
+                    error: Access denied
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/Gone"
+  /mcp/calculator/{id}:
+    post:
+      operationId: mcpCalculator
+      summary: MCP Streamable HTTP endpoint (JSON-RPC 2.0)
+      description: |
+        Per-calculator MCP endpoint. Accepts JSON-RPC 2.0 messages.
+        Supported methods: `initialize`, `ping`, `tools/list`, `tools/call`.
+        Notifications (no `id` field) return 202.
+        Requires `X-Auth-Token` for `tools/call`. Rate limiting applies.
+
+        **`tools/list` schema enrichment:**
+        The input schema returned by `tools/list` is cleaned and enriched for LLM consumption:
+        - Internal fields stripped: `mapping`, `transform`, `order`, `selection_mapping_*`
+        - `oneOf` converted to `enum` array for LLM compatibility
+        - Auto-generated `description` on each property with type hint + constraints:
+          - `number` → "Number (e.g. -1, 5, 6.5)"
+          - `integer` → "Whole number (e.g. -3, 2, 5)"
+          - `string` → "Text"
+          - `boolean` → "true or false"
+          - `transform: date` → "Date YYYY-MM-DD (e.g. 2025-06-15)"
+          - `transform: time` → "Time HH:MM or HH:MM:SS (e.g. 14:30)"
+          - `transform: datetime` → "Datetime YYYY-MM-DDTHH:MM:SS (e.g. 2025-06-15T14:30:00)"
+          - `transform: percentage` → "Percentage (e.g. 15 for 15%)"
+          - `oneOf` → "(e.g. {first_value}) Select value: Label -> value, ..."
+          - `min`/`max` → "between {min} and {max}"
+        - Property `title` prepended when present
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+        - name: X-Auth-Token
+          in: header
+          schema:
+            type: string
+          description: Calculator auth token (required for tools/call)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - jsonrpc
+                - method
+              properties:
+                jsonrpc:
+                  type: string
+                  const: "2.0"
+                id:
+                  type:
+                    - integer
+                    - string
+                  description: Request ID (omit for notifications)
+                method:
+                  type: string
+                  enum:
+                    - initialize
+                    - ping
+                    - tools/list
+                    - tools/call
+                    - notifications/initialized
+                params:
+                  type: object
+            examples:
+              initialize:
+                summary: Initialize MCP session
+                value:
+                  jsonrpc: "2.0"
+                  id: 1
+                  method: initialize
+              toolsList:
+                summary: List available tools
+                value:
+                  jsonrpc: "2.0"
+                  id: 2
+                  method: tools/list
+              toolsCall:
+                summary: Call the calculator tool
+                value:
+                  jsonrpc: "2.0"
+                  id: 3
+                  method: tools/call
+                  params:
+                    name: calculate_tax
+                    arguments:
+                      salary: 50000
+      responses:
+        "200":
+          description: JSON-RPC response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jsonrpc:
+                    type: string
+                    const: "2.0"
+                  id:
+                    type:
+                      - integer
+                      - string
+                      - "null"
+                  result:
+                    type: object
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: integer
+                      message:
+                        type: string
+                      data:
+                        type: object
+        "202":
+          description: Notification acknowledged (no response body)
+  /execute/calculator/{id}:
+    post:
+      operationId: executeCalculator
+      summary: Execute a calculator with flat input
+      description: |
+        Send a flat object matching the input schema, get a flat object matching the output schema.
+        Missing input fields use defaults from the schema.
+        Requires `X-Auth-Token` header matching the token set on creation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Calculator ID
+        - name: X-Auth-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Auth token set when creating the calculator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Flat input object matching the calculator's input schema
+            examples:
+              allInputs:
+                summary: All inputs provided
+                value:
+                  val1: 5
+                  val2: 15
+              partialInputs:
+                summary: Partial input (defaults fill the rest)
+                value:
+                  val1: 100
+              withTransforms:
+                summary: Transformed inputs (dates as ISO strings, percentage as number)
+                value:
+                  start_date: "2025-02-27"
+                  meeting_time: "12:30:00"
+                  tax_rate: 15
+              empty:
+                summary: All defaults
+                value: {}
+      responses:
+        "200":
+          description: Calculation result (flat object matching output schema)
+          headers:
+            X-Cache:
+              schema:
+                type: string
+                enum:
+                  - HIT
+                  - MISS
+              description: Whether the result was served from cache (HIT) or freshly calculated (MISS)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+              example:
+                sum1: 15
+                sum2: 35
+        "400":
+          description: Input validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  details:
+                    type: array
+                    description: ajv validation errors
+        "401":
+          description: Missing X-Auth-Token header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Invalid auth token, access denied (IP/origin not allowed), or account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidToken:
+                  summary: Invalid auth token
+                  value:
+                    error: Invalid auth token
+                accessDenied:
+                  summary: IP/origin not in allowlist
+                  value:
+                    error: Access denied
+                accountNotFound:
+                  summary: Account not found
+                  value:
+                    error: Account not found
+        "410":
+          $ref: "#/components/responses/Gone"
+        "422":
+          description: Output fields contain engine errors (e.g.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutputError"
+              example:
+                error: Calculation produced errors
+                code: OUTPUT_ERROR
+                fields:
+                  - field: total
+                    error:
+                      type: NA
+                      message: Did not find value
+                      value: "#N/A"
+                  - field: items[0].amount
+                    error:
+                      type: VALUE
+                      message: Function expects numeric values
+                      value: "#VALUE!"
+        "429":
+          description: Rate limit exceeded (per-account RPS or monthly quota)
+          headers:
+            Retry-After:
+              schema:
+                type: string
+                example: "1"
+              description: Present on RPS limit (1 second)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                rpsExceeded:
+                  summary: RPS limit exceeded
+                  value:
+                    error: Rate limit exceeded
+                monthlyExceeded:
+                  summary: Monthly quota exceeded
+                  value:
+                    error: Monthly quota exceeded
+        "500":
+          description: Calculation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorWithDetail"
+        "503":
+          $ref: "#/components/responses/ServiceBusy"
+components:
+  schemas:
+    Locale:
+      type: string
+      maxLength: 10
+      enum:
+        - en
+        - da
+        - de
+        - es
+        - fi
+        - fr
+        - hu
+        - it
+        - nb
+        - nl
+        - pl
+        - pt
+        - sv
+        - tr
+        - cs
+        - ru
+        - el
+        - et
+        - id
+        - ja
+        - ko
+        - ms
+        - pt-br
+        - sl
+        - uk
+      description: Locale short code. First 16 supported by HyperFormula + bl-excel. Last 9 (el–uk) supported by bl-excel only — fall back to enUS on HyperFormula.
+    DataGrid:
+      type: array
+      items:
+        type: array
+        items: {}
+      description: 2D array of cell values
+    SheetsObject:
+      type: object
+      minProperties: 1
+      additionalProperties:
+        type: array
+        items:
+          type: array
+          items: {}
+      description: Named sheets — string keys mapped to 2D arrays
+    SheetFormula:
+      type: object
+      required:
+        - cell
+        - formula
+      properties:
+        cell:
+          type: string
+          pattern: ^[A-Za-z]+[0-9]+$
+          description: Cell reference (e.g. C1, AA10)
+        formula:
+          type: string
+          minLength: 1
+        sheet:
+          type: string
+          description: Target sheet name. Defaults to first sheet if omitted.
+    NamedExpression:
+      type: object
+      required:
+        - name
+        - expression
+      properties:
+        name:
+          type: string
+          description: Named range/expression name
+        expression:
+          type: string
+          description: Formula expression (e.g. =Sheet1!$A$1:$C$10)
+        scope:
+          type: string
+          description: Sheet name for sheet-scoped expressions (omit for global)
+    FormulaResult:
+      type: object
+      required:
+        - result
+        - formula
+        - format
+        - cached
+      properties:
+        result:
+          description: Scalar value or 2D array for spill formulas
+        formula:
+          type: string
+        format:
+          type: string
+          enum:
+            - scalar
+            - array
+        cached:
+          type: boolean
+    BatchResultItem:
+      oneOf:
+        - type: object
+          required:
+            - result
+            - formula
+            - format
+            - cached
+          properties:
+            result: {}
+            formula:
+              type: string
+            format:
+              type: string
+              enum:
+                - scalar
+                - array
+            cached:
+              type: boolean
+        - type: object
+          required:
+            - error
+            - type
+            - formula
+          properties:
+            error:
+              type: string
+            type:
+              type: string
+              description: Excel error type (NAME, VALUE, REF, etc.)
+            formula:
+              type: string
+            unresolvedFunctions:
+              type: array
+              items:
+                type: string
+              description: Unresolved function names extracted from formula (present on NAME errors only)
+    CalculatorDescribe:
+      type: object
+      required:
+        - name
+        - version
+        - expected_input
+        - expected_output
+      description: |
+        Self-describing calculator metadata for UI generation.
+        `expected_input` and `expected_output` are clean schemas — internal fields
+        (`mapping`, `transform`, `mapping_item`) are stripped. `oneOf` is preserved.
+      properties:
+        name:
+          type:
+            - string
+            - "null"
+          description: Human-readable calculator name
+        version:
+          type:
+            - string
+            - "null"
+          description: Calculator version string
+        description:
+          type: string
+          description: Calculator description (omitted when null)
+        expected_input:
+          type: object
+          description: Clean input schema (no mapping/transform fields)
+        expected_output:
+          type: object
+          description: Clean output schema (no mapping/transform fields)
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - ts
+      description: Lightweight health check response.
+      properties:
+        status:
+          type: string
+          const: ok
+        ts:
+          type: integer
+          description: Unix timestamp (ms)
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+      example:
+        error: Calculator not found
+    HealthErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          const: error
+        error:
+          type: string
+      example:
+        status: error
+        error: Calculator not found
+    OutputError:
+      type: object
+      required:
+        - error
+        - code
+        - fields
+      properties:
+        error:
+          type: string
+          example: Calculation produced errors
+        code:
+          type: string
+          enum:
+            - OUTPUT_ERROR
+        fields:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - error
+            properties:
+              field:
+                type: string
+                description: Dot-notation path to the error field (e.g. 'total', 'items[0].amount')
+              error:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    description: Excel error type (NA, VALUE, REF, DIV_BY_ZERO, NUM, NAME, etc.)
+                  message:
+                    type: string
+                  value:
+                    type: string
+                  unresolvedFunctions:
+                    type: array
+                    items:
+                      type: string
+                    description: Function names the engine couldn't resolve (present on NAME errors, bl-excel only)
+    ErrorWithDetail:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+      example:
+        error: Validation error
+        detail: body/formula must NOT have fewer than 1 characters
+    FormulaError:
+      type: object
+      required:
+        - error
+        - type
+        - formula
+      properties:
+        error:
+          type: string
+        type:
+          type: string
+          description: Excel error type (NAME, VALUE, REF, DIV/0, NUM, N/A, NULL)
+        formula:
+          type: string
+        unresolvedFunctions:
+          type: array
+          items:
+            type: string
+          description: Unresolved function names extracted from formula (present on NAME errors only)
+      example:
+        error: Formula error
+        type: NAME
+        formula: NOTAFUNCTION(1)
+        unresolvedFunctions:
+          - NOTAFUNCTION
+  responses:
+    Unauthorized:
+      description: Missing X-Auth-Token header
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Invalid auth token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Validation error (bad request body)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorWithDetail"
+    FormulaError:
+      description: Formula evaluation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FormulaError"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Gone:
+      description: Resource expired or lost (calculator gone — client must recreate)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceBusy:
+      description: Service overloaded — retry after delay
+      headers:
+        Retry-After:
+          schema:
+            type: string
+            example: "5"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorWithDetail"

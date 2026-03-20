@@ -1,0 +1,61 @@
+{
+  "name": "KB Hybrid Search",
+  "description": "Pre-built flow for KB search with local embeddings, vector + FTS, and RRF merge. Budget-enforced via flow engine.",
+  "version": "1.0.0",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "methods": ["POST"]
+    }
+  },
+  "settings": {
+    "timeout_ms": 30000,
+    "budget_limit_usd": 0.0
+  },
+  "nodes": [
+    {
+      "id": "embed_query",
+      "type": "core:embedding",
+      "config": {
+        "input": "$trigger.body.query"
+      }
+    },
+    {
+      "id": "vector_search",
+      "type": "core:vector_search",
+      "config": {
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "query_embedding": "$nodes.embed_query",
+        "top_k": 15,
+        "similarity_threshold": 0.2
+      }
+    },
+    {
+      "id": "text_search",
+      "type": "ai:text_search",
+      "config": {
+        "query": "$trigger.body.query",
+        "knowledge_base_id": "$trigger.body.knowledge_base_id",
+        "limit": 15,
+        "ts_config": "simple"
+      }
+    },
+    {
+      "id": "merge",
+      "type": "ai:merge_rrf",
+      "config": {
+        "vector_results": "$nodes.vector_search",
+        "text_results": "$nodes.text_search",
+        "k": 60,
+        "top_k": 5,
+        "min_similarity": 0.2
+      }
+    }
+  ],
+  "edges": [
+    { "from": "embed_query", "to": "vector_search" },
+    { "from": "embed_query", "to": "text_search" },
+    { "from": "vector_search", "to": "merge" },
+    { "from": "text_search", "to": "merge" }
+  ]
+}

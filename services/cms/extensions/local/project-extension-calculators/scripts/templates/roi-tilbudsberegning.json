@@ -1,0 +1,151 @@
+{
+  "name": "ROI - Tilbudsberegning",
+  "description": "Beregn hvor meget tid og penge din virksomhed sparer ved at automatisere tilbudsprocessen. Perfekt til salgsorganisationer der vil dokumentere ROI på automatisering.",
+  "icon": "savings",
+  "industry": "general",
+  "featured": false,
+  "sort": 99,
+  "sheets": {
+    "Parameters": [
+      ["Parameter", "Værdi"],
+      ["Antal medarbejdere der laver tilbud", 3],
+      ["Gennemsnitlig tid pr. tilbud (minutter)", 45],
+      ["Tilbud pr. medarbejder pr. dag", 5],
+      ["Timeløn inkl. overhead (kr)", 450],
+      ["Forventet tidsbesparelse (%)", 50],
+      ["Arbejdsdage pr. år", 225]
+    ],
+    "Calculations": [
+      ["Resultat", "Værdi"],
+      ["Samlet tilbud pr. dag", 0],
+      ["Tid brugt pr. dag (timer)", 0],
+      ["Tid sparet pr. dag (timer)", 0],
+      ["FTE frigjort", 0],
+      ["Besparelse pr. år (kr)", 0],
+      ["Vurdering", ""]
+    ],
+    "Data": [
+      ["Note"],
+      ["En FTE (fuldtidsækvivalent) er baseret på 7,4 effektive timer pr. arbejdsdag i Danmark."],
+      ["Timeløn bør inkludere alle omkostninger: løn, pension, forsikring, kontor og IT."],
+      ["Tidsbesparelsen afhænger af kompleksiteten af jeres tilbud og graden af automatisering."]
+    ]
+  },
+  "formulas": {
+    "Calculations": {
+      "B2": "=Parameters!B2*Parameters!B4",
+      "B3": "=(Parameters!B2*Parameters!B4*Parameters!B3)/60",
+      "B4": "=B3*Parameters!B6",
+      "B5": "=IF(7.4>0,B4/7.4,0)",
+      "B6": "=ROUND(B4*Parameters!B5*Parameters!B7,0)",
+      "B7": "=IF(B5>=2,\"Stor effekt: I kan frigøre flere fuldtidsmedarbejdere ved at automatisere tilbudsprocessen. Den årlige besparelse er betydelig — overvej at investere i en løsning hurtigst muligt.\",IF(B5>=1,\"Klar gevinst: Automatisering frigør over én fuldtidsmedarbejder. Jeres tilbudsproces er en flaskehals der koster dyrt i tabt produktivitet.\",IF(B5>=0.5,\"God investering: I sparer næsten en halv medarbejders tid dagligt. Automatisering vil mærkbart lette presset på teamet og øge kvaliteten af jeres tilbud.\",IF(B4>=1,\"Positiv effekt: I sparer over en times arbejde dagligt. Automatisering reducerer også fejl og øger ensartetheden af jeres tilbud.\",\"Lille men positiv gevinst. Automatisering sparer tid og sikrer mere ensartede tilbud — og gevinsten vokser i takt med tilbudsvolumen.\"))))"
+    }
+  },
+  "input": {
+    "type": "object",
+    "properties": {
+      "antal_medarbejdere": {
+        "mapping": "Parameters!B2",
+        "title": "Antal medarbejdere",
+        "description": "Hvor mange medarbejdere udarbejder tilbud i jeres team?",
+        "type": "integer",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 100,
+        "order": 1
+      },
+      "tid_pr_tilbud": {
+        "mapping": "Parameters!B3",
+        "title": "Tid pr. tilbud (minutter)",
+        "description": "Hvor lang tid tager det i gennemsnit at udarbejde ét tilbud fra start til slut?",
+        "type": "integer",
+        "default": 45,
+        "minimum": 5,
+        "maximum": 480,
+        "order": 2
+      },
+      "tilbud_pr_dag": {
+        "mapping": "Parameters!B4",
+        "title": "Tilbud pr. medarbejder pr. dag",
+        "description": "Hvor mange tilbud laver hver medarbejder i gennemsnit pr. dag?",
+        "type": "integer",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 50,
+        "order": 3
+      },
+      "timeloen": {
+        "mapping": "Parameters!B5",
+        "title": "Timeløn inkl. overhead (kr)",
+        "description": "Gennemsnitlig timeomkostning inkl. løn, pension, forsikring og kontor",
+        "type": "number",
+        "default": 450,
+        "minimum": 100,
+        "maximum": 2000,
+        "order": 4
+      },
+      "tidsbesparelse_pct": {
+        "mapping": "Parameters!B6",
+        "title": "Forventet tidsbesparelse",
+        "description": "Hvor stor en andel af tilbudstiden kan spares ved automatisering? 30% er konservativt, 70% er ambitiøst.",
+        "type": "number",
+        "default": 50,
+        "minimum": 10,
+        "maximum": 90,
+        "transform": "percentage",
+        "order": 5
+      },
+      "arbejdsdage": {
+        "mapping": "Parameters!B7",
+        "title": "Arbejdsdage pr. år",
+        "description": "Standard i Danmark er ca. 225 (52 uger × 5 dage minus ferie og helligdage)",
+        "type": "integer",
+        "default": 225,
+        "minimum": 100,
+        "maximum": 300,
+        "order": 6
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "samlet_tilbud_pr_dag": {
+        "mapping": "Calculations!B2",
+        "title": "Samlet tilbud pr. dag",
+        "type": "number",
+        "order": 1
+      },
+      "tid_brugt_pr_dag": {
+        "mapping": "Calculations!B3",
+        "title": "Tid brugt pr. dag (timer)",
+        "type": "number",
+        "order": 2
+      },
+      "tid_sparet_pr_dag": {
+        "mapping": "Calculations!B4",
+        "title": "Tid sparet pr. dag (timer)",
+        "type": "number",
+        "order": 3
+      },
+      "fte_frigjort": {
+        "mapping": "Calculations!B5",
+        "title": "FTE frigjort",
+        "type": "number",
+        "order": 4
+      },
+      "besparelse_pr_aar": {
+        "mapping": "Calculations!B6",
+        "title": "Besparelse pr. år (kr)",
+        "type": "number",
+        "order": 5
+      },
+      "vurdering": {
+        "mapping": "Calculations!B7",
+        "title": "Vurdering",
+        "type": "string",
+        "order": 6
+      }
+    }
+  }
+}

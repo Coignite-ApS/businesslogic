@@ -1,0 +1,42 @@
+# Local development stack for the flow engine.
+# Provides PostgreSQL and Redis for the trigger + worker.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.dev.yml up -d
+#   cargo run --bin flow-trigger   # in terminal 1
+#   cargo run --bin flow-worker    # in terminal 2
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: businesslogic
+      POSTGRES_USER: bl
+      POSTGRES_PASSWORD: bl_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bl"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
