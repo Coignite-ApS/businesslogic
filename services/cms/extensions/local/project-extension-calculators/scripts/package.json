@@ -1,0 +1,9 @@
+{
+  "name": "calculator-template-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "tsx": "^4.19.0"
+  }
+}

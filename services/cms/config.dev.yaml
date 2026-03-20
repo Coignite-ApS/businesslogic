@@ -1,0 +1,149 @@
+####################################################################################################
+# Businesslogic CMS Directus - Development/Staging Configuration
+####################################################################################################
+
+####################################################################################################
+# General
+
+# ENV: <securely set by Terraform>
+# PUBLIC_URL: <securely set by Terraform>
+# KEY: <securely set by Terraform>
+# SECRET: <securely set by Terraform>
+MAX_PAYLOAD_SIZE: '20mb'
+
+####################################################################################################
+# DATABASE
+
+DB_CLIENT: 'pg'
+DB_SSL__REJECT_UNAUTHARIZED: 'true'
+
+REDIS_ENABLED: 'true'
+#REDIS: <securely set by Terraform>
+
+####################################################################################################
+# Storage
+
+STORAGE_LOCATIONS: 'local'
+STORAGE_LOCAL_ROOT: '/directus/uploads'
+
+# TODO: Configure cloud storage if needed
+# STORAGE_LOCATIONS: 'digitalocean'
+# STORAGE_DIGITALOCEAN_DRIVER: 's3'
+#STORAGE_DIGITALOCEAN_KEY: <securely set by Terraform>
+# STORAGE_DIGITALOCEAN_SECRET: <securely set by Terraform>
+# STORAGE_DIGITALOCEAN_ENDPOINT: 'fra1.digitaloceanspaces.com'
+#STORAGE_DIGITALOCEAN_BUCKET: <securely set by Terraform>
+# STORAGE_DIGITALOCEAN_REGION: 'fra1'
+
+
+####################################################################################################
+# Email
+
+EMAIL_VERIFY_SETUP: 'true'
+#EMAIL_FROM: <securely set by Terraform>
+EMAIL_TRANSPORT: 'mailgun'
+EMAIL_MAILGUN_HOST: 'api.eu.mailgun.net'
+#EMAIL_MAILGUN_DOMAIN: <securely set by Terraform>
+# EMAIL_MAILGUN_API_KEY: <securely set by Terraform>
+EMAIL_TEMPLATES_PATH: '/directus/email-templates'
+
+####################################################################################################
+# Caching
+
+CACHE_ENABLED: 'true'
+CACHE_STORE: 'redis'
+CACHE_STATUS_HEADER: 'REDIS-Cache-Status'
+CACHE_TTL: '10m'
+CACHE_AUTO_PURGE: 'true'
+CACHE_NAMESPACE: 'directus-bsl-cms-dev-cache'
+
+####################################################################################################
+# Rate Limiting
+
+RATE_LIMITER_ENABLED: 'true'
+RATE_LIMITER_STORE: 'redis'
+
+# 1000 requests per 5 seconds
+RATE_LIMITER_POINTS: '1000'
+RATE_LIMITER_DURATION: '5'
+
+####################################################################################################
+# Synchronization
+
+SYNCHRONIZATION_STORE: 'redis'
+SYNCHRONIZATION_NAMESPACE: 'directus-bsl-cms-dev-sync'
+
+####################################################################################################
+# Messenger Store
+
+MESSENGER_STORE: 'redis'
+MESSENGER_NAMESPACE: 'directus-bsl-cms-dev-messenger'
+
+####################################################################################################
+# Security
+
+ACCESS_TOKEN_TTL: '15m'
+REFRESH_TOKEN_TTL: '7d'
+REFRESH_TOKEN_COOKIE_SECURE: 'false'
+REFRESH_TOKEN_COOKIE_SAME_SITE: 'lax'
+REFRESH_TOKEN_COOKIE_NAME: 'directus_refresh_token'
+
+####################################################################################################
+# CORS
+
+CORS_ENABLED: 'true'
+CORS_ORIGIN: 'true'
+CORS_METHODS: 'GET,POST,PATCH,DELETE'
+CORS_ALLOWED_HEADERS: 'Content-Type,Authorization'
+CORS_EXPOSED_HEADERS: 'Content-Range'
+CORS_CREDENTIALS: 'true'
+CORS_MAX_AGE: 18000
+
+####################################################################################################
+# Websockets
+
+WEBSOCKETS_ENABLED: 'true'
+WEBSOCKETS_HEARTBEAT_ENABLED: 'true'
+WEBSOCKETS_HEARTBEAT_PERIOD: 30
+WEBSOCKETS_REST_ENABLED: 'true'
+
+####################################################################################################
+# Telemetry
+
+TELEMETRY: 'false'
+
+####################################################################################################
+# Extensions
+
+# Path to extensions directory (default: ./extensions)
+EXTENSIONS_PATH: './extensions'
+
+# Exit if any API extension fails to load (default: false)
+EXTENSIONS_MUST_LOAD: 'true'
+
+# Auto-reload on changes - DISABLE in deployed environments (default: false)
+EXTENSIONS_AUTO_RELOAD: 'false'
+
+# Browser cache TTL for app extensions (default: not cached)
+# EXTENSIONS_CACHE_TTL: '1h'
+
+# Load from storage location instead of filesystem (breaks auto-reload)
+# EXTENSIONS_LOCATION: 'digitalocean'
+
+####################################################################################################
+# Logging
+
+DE_SENTRY_DSN: 'https://0cf5fc70a8ca74cdf68bd5c5945eac68@sentry.coignite.dk/16'
+DE_SENTRY_LOGGER: false
+DE_SENTRY_LOGS_LEVEL: 'error,warn'
+
+DE_SENTRY_TRACES_SAMPLE_RATE: 0.5
+DE_SENTRY_PROFILING_ENABLED: true
+DE_SENTRY_PROFILES_SAMPLE_RATE: 0.5
+
+####################################################################################################
+### Custom cache settings
+
+CUSTOM_API_CACHE: true
+CUSTOM_API_CACHE_NAMESPACE: 'custom-api-cache-bsl-cms-dev'
+CUSTOM_API_CACHE_TTL: '1m'

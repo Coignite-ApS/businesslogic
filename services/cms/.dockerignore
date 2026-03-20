@@ -1,0 +1,61 @@
+# =============================================================================
+# Docker Build Ignore
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# Documentation (not needed in image)
+*.md
+!README.md
+
+# Node modules (will be installed in container)
+node_modules
+**/node_modules
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist
+**/dist
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+coverage
+.nyc_output
+
+# Local development overrides
+docker-compose.override.yml
+
+# Shell scripts in root (not needed in image)
+/*.sh
+
+# Keep scripts/ directory (needed for production maintenance)
+!scripts/
+
+# Config files are now copied into image (used via CONFIG_PATH env var)
+# config.dev.yaml - keep
+# config.live.yaml - keep
+
+# Shared UI library (not a Directus extension, breaks build-extensions.sh)
+extensions/local/project-shared-ui
+
+# Package lock from root (using extensions/package.json now)
+package-lock.json

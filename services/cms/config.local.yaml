@@ -1,0 +1,165 @@
+####################################################################################################
+# Businesslogic CMS Directus - Local Development Configuration
+#
+# This config is for local Docker development.
+# Use config.dev.yaml or config.live.yaml for App Platform deployments.
+####################################################################################################
+
+####################################################################################################
+# General
+
+# These are set in docker-compose.yml or .env
+# KEY: set in docker-compose.yml
+# SECRET: set in docker-compose.yml
+# PUBLIC_URL: set in docker-compose.yml
+MAX_PAYLOAD_SIZE: '20mb'
+ENV: 'localhost'
+
+####################################################################################################
+# DATABASE (local PostgreSQL container)
+
+DB_CLIENT: 'pg'
+DB_HOST: 'postgres'
+DB_PORT: 5432
+DB_DATABASE: 'directus'
+DB_USER: 'directus'
+DB_PASSWORD: 'directus'
+# No SSL for local development
+DB_SSL: 'false'
+
+####################################################################################################
+# Redis (local Redis container)
+
+REDIS_ENABLED: 'true'
+REDIS: 'redis://redis:6379'
+
+####################################################################################################
+# Storage (local only - no cloud storage for template)
+
+STORAGE_LOCATIONS: 'local'
+STORAGE_LOCAL_ROOT: '/directus/uploads'
+
+####################################################################################################
+# Email (MailDev for local testing - view at http://localhost:1080)
+
+EMAIL_VERIFY_SETUP: 'false'
+EMAIL_FROM: 'dev@localhost'
+EMAIL_TRANSPORT: 'smtp'
+EMAIL_SMTP_HOST: 'maildev'
+EMAIL_SMTP_PORT: 1025
+EMAIL_SMTP_SECURE: 'false'
+EMAIL_SMTP_IGNORE_TLS: 'true'
+EMAIL_TEMPLATES_PATH: '/directus/email-templates'
+
+####################################################################################################
+# Caching (shorter TTL for development)
+
+CACHE_ENABLED: 'true'
+CACHE_STORE: 'redis'
+CACHE_STATUS_HEADER: 'REDIS-Cache-Status'
+CACHE_TTL: '5m'
+CACHE_AUTO_PURGE: 'true'
+CACHE_NAMESPACE: 'directus-bsl-cms-local-cache'
+
+####################################################################################################
+# Rate Limiting (more lenient for development)
+
+RATE_LIMITER_ENABLED: 'true'
+RATE_LIMITER_STORE: 'redis'
+RATE_LIMITER_POINTS: '1000'
+RATE_LIMITER_DURATION: '5'
+
+####################################################################################################
+# Synchronization
+
+SYNCHRONIZATION_STORE: 'redis'
+SYNCHRONIZATION_NAMESPACE: 'directus-bsl-cms-local-sync'
+
+####################################################################################################
+# Messenger Store
+
+MESSENGER_STORE: 'redis'
+MESSENGER_NAMESPACE: 'directus-bsl-cms-local-messenger'
+
+####################################################################################################
+# Security (relaxed for local development)
+
+ACCESS_TOKEN_TTL: '1h'
+REFRESH_TOKEN_TTL: '7d'
+REFRESH_TOKEN_COOKIE_SECURE: 'false'
+REFRESH_TOKEN_COOKIE_SAME_SITE: 'lax'
+REFRESH_TOKEN_COOKIE_NAME: 'directus_refresh_token'
+
+####################################################################################################
+# CORS (allow all for local development)
+
+CORS_ENABLED: 'true'
+CORS_ORIGIN: 'true'
+CORS_METHODS: 'GET,POST,PATCH,DELETE'
+CORS_ALLOWED_HEADERS: 'Content-Type,Authorization'
+CORS_EXPOSED_HEADERS: 'Content-Range'
+CORS_CREDENTIALS: 'true'
+CORS_MAX_AGE: 18000
+
+####################################################################################################
+# Websockets
+
+WEBSOCKETS_ENABLED: 'true'
+WEBSOCKETS_HEARTBEAT_ENABLED: 'true'
+WEBSOCKETS_HEARTBEAT_PERIOD: 30
+WEBSOCKETS_REST_ENABLED: 'true'
+
+####################################################################################################
+# Telemetry
+
+TELEMETRY: 'false'
+
+####################################################################################################
+# Extensions (auto-reload enabled for snappy local development)
+
+# Path to extensions directory (default: ./extensions)
+EXTENSIONS_PATH: './extensions'
+
+# Exit if any API extension fails to load (default: false)
+EXTENSIONS_MUST_LOAD: 'true'
+
+# Auto-reload on changes - ENABLED for local dev (default: false)
+# Note: Does NOT work if EXTENSIONS_LOCATION is set
+# Note: CHOKIDAR_USEPOLLING is set in docker-compose.yml for Docker file watching
+EXTENSIONS_AUTO_RELOAD: 'true'
+
+# Browser cache TTL for app extensions - disabled for dev (default: not cached)
+# EXTENSIONS_CACHE_TTL: ''
+
+# Load from storage location instead of filesystem (breaks auto-reload)
+# EXTENSIONS_LOCATION: 'local'
+
+####################################################################################################
+# Logging (verbose for local development)
+
+# Log level: error, warn, info, debug, trace
+LOG_LEVEL: 'info'
+LOG_STYLE: 'pretty'
+
+# Sentry configuration (optional - set your DSN)
+DE_SENTRY_DSN: 'https://0cf5fc70a8ca74cdf68bd5c5945eac68@sentry.coignite.dk/16'
+DE_SENTRY_LOGGER: false
+DE_SENTRY_LOGS_LEVEL: 'error,warn'
+
+DE_SENTRY_TRACES_SAMPLE_RATE: 1.0
+DE_SENTRY_PROFILING_ENABLED: 'true'
+DE_SENTRY_PROFILES_SAMPLE_RATE: 1.0
+
+####################################################################################################
+# Custom cache settings
+
+CUSTOM_API_CACHE: 'true'
+CUSTOM_API_CACHE_NAMESPACE: 'custom-api-cache-bsl-cms-local'
+CUSTOM_API_CACHE_TTL: '1m'
+
+####################################################################################################
+# Admin Bootstrap (first run only)
+# Override in .env if needed
+
+ADMIN_EMAIL: 'admin@example.com'
+ADMIN_PASSWORD: 'admin123'

@@ -1,0 +1,2199 @@
+openapi: 3.0.3
+info:
+  title: BusinessLogic CMS API
+  description: |
+    Complete API for the BusinessLogic CMS platform.
+
+    **Audience markers:**
+    - `x-internal: true` — frontend-only endpoints (called by Directus extension UI)
+    - `x-formula-api: true` — callback endpoints (called BY the Formula API service)
+    - Neither — public endpoints (registration, Stripe webhooks)
+
+    **Excluded:** 3 formula execution proxy routes (`/calc/formula/execute*`) — see Formula API docs.
+  version: 1.0.0
+
+servers:
+  - url: '{cmsBaseUrl}'
+    description: Directus CMS instance
+    variables:
+      cmsBaseUrl:
+        default: http://localhost:8055
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Formula API Callbacks
+    description: Called BY the Formula API to fetch recipes, record stats, query accounts
+    x-formula-api: true
+  - name: Calculator Info
+    description: Info endpoints for the calculator frontend
+    x-internal: true
+  - name: Calculator Lifecycle
+    description: Enable/disable test, activate, deploy, sync, remove
+    x-internal: true
+  - name: Calculator Execution
+    description: Upload XLSX, execute, describe, generate Excel, MCP config
+    x-internal: true
+  - name: API Keys
+    description: Decrypt API keys, manage formula tokens
+    x-internal: true
+  - name: Admin Dashboard
+    description: Admin KPI overview, account/calculator lists, trial management
+    x-internal: true
+  - name: Admin Infrastructure
+    description: Health, server stats, health history
+    x-internal: true
+  - name: Registration
+    description: Public user registration
+  - name: Stripe Billing
+    description: Checkout, portal, webhooks
+  - name: Flows
+    description: Flow trigger proxy, validation, executions
+    x-internal: true
+
+paths:
+  # ──────────────────────────────────────────────────────────
+  # Formula API Callbacks
+  # ──────────────────────────────────────────────────────────
+
+  /accounts/{accountId}:
+    get:
+      operationId: getAccountLimits
+      summary: Get account rate limits & usage
+      description: Returns subscription rate limits and monthly usage for Formula API rate limiting.
+      tags: [Formula API Callbacks]
+      x-formula-api: true
+      parameters:
+        - $ref: '#/components/parameters/accountIdPath'
+      responses:
+        '200':
+          description: Account rate limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountLimits'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /management/calc/recipes/{id}:
+    get:
+      operationId: getRecipe
+      summary: Get calculator recipe
+      description: Returns full recipe (config) so Formula API can restore/rebuild the calculator.
+      tags: [Formula API Callbacks]
+      x-formula-api: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Calculator ID, ID with `-test` suffix, or Formula API calculator ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Calculator recipe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipe'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /management/calc/mcp-config/{id}:
+    get:
+      operationId: getMcpConfig
+      summary: Get MCP tool config
+      description: Returns MCP configuration for a calculator so Formula API can register it as an MCP tool.
+      tags: [Formula API Callbacks]
+      x-formula-api: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Calculator ID or ID with `-test` suffix
+          schema:
+            type: string
+      responses:
+        '200':
+          description: MCP configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpConfigResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /management/calc/stats:
+    post:
+      operationId: recordStats
+      summary: Record calculator call stats
+      description: Records one or more calculator call stats. Accepts a single object or an array.
+      tags: [Formula API Callbacks]
+      x-formula-api: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CallStat'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/CallStat'
+      responses:
+        '201':
+          description: Stats recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /management/calc/validate-token:
+    get:
+      operationId: validateToken
+      summary: Validate formula token
+      description: Validates a formula API token and returns associated account info if valid.
+      tags: [Formula API Callbacks]
+      x-formula-api: true
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  account_id:
+                    type: string
+                    format: uuid
+                  label:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ──────────────────────────────────────────────────────────
+  # Calculator Info
+  # ──────────────────────────────────────────────────────────
+
+  /calc/formula-api-url:
+    get:
+      operationId: getFormulaApiUrl
+      summary: Get Formula API URL
+      tags: [Calculator Info]
+      x-internal: true
+      responses:
+        '200':
+          description: Formula API base URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /calc/my-ip:
+    get:
+      operationId: getMyIp
+      summary: Get requester IP
+      tags: [Calculator Info]
+      x-internal: true
+      responses:
+        '200':
+          description: Requester's IP address
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ip:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /calc/subscription-info:
+    get:
+      operationId: getSubscriptionInfo
+      summary: Get subscription limits
+      description: Returns calculator limits, usage counts, and subscription status for the user's active account.
+      tags: [Calculator Info]
+      x-internal: true
+      responses:
+        '200':
+          description: Subscription info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionInfo'
+        '400':
+          description: No active account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ──────────────────────────────────────────────────────────
+  # Calculator Lifecycle
+  # ──────────────────────────────────────────────────────────
+
+  /calc/enable-test/{calcId}:
+    post:
+      operationId: enableTest
+      summary: Enable 6h test window
+      description: Enables a 6-hour test window and deploys test config to Formula API if complete.
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Test enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  test_expires_at:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/disable-test/{calcId}:
+    post:
+      operationId: disableTest
+      summary: Disable test mode
+      description: Disables test and removes test calculator from Formula API.
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Test disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  disabled:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/activate/{calcId}:
+    post:
+      operationId: activateCalculator
+      summary: Activate calculator
+      description: Activates calculator with subscription limit check. Over-limit activation allowed for one calculator (1h expiry).
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activated:
+                    type: boolean
+                  over_limit:
+                    type: boolean
+                  activation_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '400':
+          description: Config incomplete or no account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Over-limit or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/status/{calcId}:
+    get:
+      operationId: getCalculatorStatus
+      summary: Get calculator status from Formula API
+      description: Proxies calculator info from Formula API. Self-heals (recreates) if calculator expired.
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Calculator status from Formula API
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Formula API calculator object (schema varies)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Could not recreate calculator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/deploy/{calcId}:
+    post:
+      operationId: deployCalculator
+      summary: Deploy calculator to Formula API
+      description: Deploys (creates or updates) calculator on Formula API. For test deploys, checks test window expiry.
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Updated existing calculator
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Formula API update response
+        '201':
+          description: Created new calculator
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calculatorId:
+                    type: string
+        '400':
+          description: Config incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Test window expired or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/sync/{calcId}:
+    patch:
+      operationId: syncCalculator
+      summary: Sync calculator with Formula API
+      description: Updates calculator on Formula API from stored config. Self-heals if expired.
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Synced (or recreated)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calculatorId:
+                    type: string
+                  recreated:
+                    type: boolean
+        '400':
+          description: Config incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/access/{calcId}:
+    patch:
+      operationId: updateAccess
+      summary: Update IP/origin restrictions
+      description: Pushes allowed_ips and allowed_origins from stored config to Formula API.
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Access restrictions updated
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Config not found or calculator not deployed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/remove/{calcId}:
+    delete:
+      operationId: removeCalculator
+      summary: Remove calculator from Formula API
+      tags: [Calculator Lifecycle]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '204':
+          description: Removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ──────────────────────────────────────────────────────────
+  # Calculator Execution
+  # ──────────────────────────────────────────────────────────
+
+  /parse/xlsx:
+    post:
+      operationId: parseXlsx
+      summary: Upload & parse XLSX
+      description: Proxies multipart XLSX upload to Formula API for parsing.
+      tags: [Calculator Execution]
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Parsed XLSX data (sheets, formulas, input/output candidates)
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /calc/execute/{calcId}:
+    post:
+      operationId: executeCalculator
+      summary: Execute calculator
+      description: Executes a deployed calculator via Formula API. Requires active subscription.
+      tags: [Calculator Execution]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Input parameters as key-value pairs
+      responses:
+        '200':
+          description: Execution result
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Calculator output from Formula API
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/generate-xlsx:
+    post:
+      operationId: generateXlsx
+      summary: Generate annotated Excel
+      description: Generates an annotated XLSX with input/output highlights and comments.
+      tags: [Calculator Execution]
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [config_id]
+              properties:
+                config_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: XLSX binary file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="my-calc-live-v1.0.xlsx"'
+        '400':
+          description: Missing config_id or no sheets/formulas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Config or calculator not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/describe/{calcId}:
+    get:
+      operationId: describeCalculator
+      summary: Get calculator schema
+      description: Returns expected_input/expected_output schema from Formula API. Strips internal fields.
+      tags: [Calculator Execution]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: Calculator schema (input/output)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expected_input:
+                    type: object
+                    description: JSON Schema for inputs
+                  expected_output:
+                    type: object
+                    description: JSON Schema for outputs
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/mcp/{calcId}:
+    get:
+      operationId: getMcpSnippets
+      summary: Get MCP config & snippets
+      description: Returns MCP SSE URL, auth info, tool definition, and integration snippets for a calculator.
+      tags: [Calculator Execution]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+      responses:
+        '200':
+          description: MCP configuration and snippets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  url:
+                    type: string
+                    format: uri
+                  transport:
+                    type: string
+                    enum: [sse]
+                  auth:
+                    type: object
+                    nullable: true
+                    properties:
+                      type:
+                        type: string
+                        enum: [bearer]
+                      token:
+                        type: string
+                  tool:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      inputSchema:
+                        type: object
+                  snippets:
+                    type: object
+                    description: Integration code snippets (claude_desktop, cursor, etc.)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ──────────────────────────────────────────────────────────
+  # API Keys
+  # ──────────────────────────────────────────────────────────
+
+  /calc/api-key/{configId}:
+    get:
+      operationId: getApiKey
+      summary: Decrypt API key
+      description: Returns the decrypted api_key for a calculator config. Ownership verified.
+      tags: [API Keys]
+      x-internal: true
+      parameters:
+        - name: configId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Decrypted API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_key:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/formula-tokens:
+    post:
+      operationId: createFormulaToken
+      summary: Create formula token
+      description: Creates a new formula API token. Plaintext returned once.
+      tags: [API Keys]
+      x-internal: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                  default: API Key
+      responses:
+        '201':
+          description: Token created (plaintext shown once)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormulaTokenCreated'
+        '400':
+          description: No active account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      operationId: listFormulaTokens
+      summary: List formula tokens
+      description: Lists all formula tokens for the user's active account. Token values are NOT returned.
+      tags: [API Keys]
+      x-internal: true
+      responses:
+        '200':
+          description: Token list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FormulaTokenMeta'
+        '400':
+          description: No active account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /calc/formula-tokens/{id}:
+    delete:
+      operationId: revokeFormulaToken
+      summary: Revoke formula token
+      tags: [API Keys]
+      x-internal: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Token revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revoked:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Token not found or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/formula-token-value:
+    get:
+      operationId: getFormulaTokenValue
+      summary: Get first active token value
+      description: Returns the decrypted value of the first non-revoked formula token.
+      tags: [API Keys]
+      x-internal: true
+      responses:
+        '200':
+          description: Token value
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: string
+        '400':
+          description: No active account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No API key found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ──────────────────────────────────────────────────────────
+  # Admin Dashboard
+  # ──────────────────────────────────────────────────────────
+
+  /calc/admin/overview:
+    get:
+      operationId: adminOverview
+      summary: Admin KPI overview
+      description: Returns aggregated KPIs (accounts, subscriptions, calculators, calls, revenue) and chart data.
+      tags: [Admin Dashboard]
+      x-internal: true
+      responses:
+        '200':
+          description: Overview KPIs and charts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOverview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/admin/accounts:
+    get:
+      operationId: adminListAccounts
+      summary: Paginated account list
+      description: Lists accounts with subscription status, calculator counts, and monthly calls.
+      tags: [Admin Dashboard]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/searchParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [trialing, active, canceled, expired]
+        - $ref: '#/components/parameters/paginationPage'
+        - $ref: '#/components/parameters/paginationLimit'
+        - $ref: '#/components/parameters/sortParam'
+      responses:
+        '200':
+          description: Account list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminAccountSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/admin/accounts/{accountId}:
+    get:
+      operationId: adminAccountDetail
+      summary: Account detail
+      description: Returns account info, subscription, calculators with profiles, and 30-day usage chart.
+      tags: [Admin Dashboard]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/accountIdPath'
+      responses:
+        '200':
+          description: Account detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAccountDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /calc/admin/calculators:
+    get:
+      operationId: adminListCalculators
+      summary: Cross-account calculator list
+      description: Lists all calculators with account info, profile, monthly calls, and config metadata.
+      tags: [Admin Dashboard]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/paginationPage'
+        - $ref: '#/components/parameters/paginationLimit'
+        - $ref: '#/components/parameters/sortParam'
+      responses:
+        '200':
+          description: Calculator list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminCalculatorSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginatedMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/admin/calculators/{calcId}/errors:
+    get:
+      operationId: adminCalculatorErrors
+      summary: Recent calculator errors
+      tags: [Admin Dashboard]
+      x-internal: true
+      parameters:
+        - $ref: '#/components/parameters/calcIdPath'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Error list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        timestamp:
+                          type: string
+                          format: date-time
+                        error_message:
+                          type: string
+                          nullable: true
+                        response_time_ms:
+                          type: integer
+                        test:
+                          type: boolean
+                        cached:
+                          type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/admin/extend-trial:
+    post:
+      operationId: adminExtendTrial
+      summary: Extend account trial
+      tags: [Admin Dashboard]
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountId, days]
+              properties:
+                accountId:
+                  type: string
+                  format: uuid
+                days:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Trial extended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trial_end:
+                    type: string
+                    format: date-time
+        '400':
+          description: Missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /calc/admin/set-exempt:
+    post:
+      operationId: adminSetExempt
+      summary: Toggle subscription exemption
+      tags: [Admin Dashboard]
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountId, exempt]
+              properties:
+                accountId:
+                  type: string
+                  format: uuid
+                exempt:
+                  type: boolean
+      responses:
+        '200':
+          description: Exemption updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exempt:
+                    type: boolean
+        '400':
+          description: Missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ──────────────────────────────────────────────────────────
+  # Admin Infrastructure
+  # ──────────────────────────────────────────────────────────
+
+  /calc/health:
+    get:
+      operationId: getHealth
+      summary: Formula API health
+      description: Proxies Formula API health endpoint. Admin only.
+      tags: [Admin Infrastructure]
+      x-internal: true
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/server-stats:
+    get:
+      operationId: getServerStats
+      summary: Formula API cluster stats
+      description: Proxies Formula API server/stats endpoint. Admin only.
+      tags: [Admin Infrastructure]
+      x-internal: true
+      responses:
+        '200':
+          description: Server statistics
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /calc/admin/health-history:
+    get:
+      operationId: adminHealthHistory
+      summary: Health snapshots history
+      description: Returns stored health snapshots for the given number of days (max 30).
+      tags: [Admin Infrastructure]
+      x-internal: true
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+            maximum: 30
+      responses:
+        '200':
+          description: Health snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HealthSnapshot'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ──────────────────────────────────────────────────────────
+  # Registration
+  # ──────────────────────────────────────────────────────────
+
+  /register:
+    get:
+      operationId: getRegistrationPage
+      summary: Serve registration form
+      tags: [Registration]
+      security: []
+      responses:
+        '200':
+          description: HTML registration page
+          content:
+            text/html:
+              schema:
+                type: string
+    post:
+      operationId: register
+      summary: Create user, account, and trial
+      tags: [Registration]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ──────────────────────────────────────────────────────────
+  # Stripe Billing
+  # ──────────────────────────────────────────────────────────
+
+  /stripe/checkout:
+    post:
+      operationId: createCheckoutSession
+      summary: Create Stripe checkout session
+      tags: [Stripe Billing]
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          description: Missing plan_id or plan misconfigured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /stripe/portal:
+    post:
+      operationId: createPortalSession
+      summary: Create Stripe billing portal session
+      tags: [Stripe Billing]
+      x-internal: true
+      responses:
+        '200':
+          description: Portal session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          description: No billing account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /stripe/webhook:
+    post:
+      operationId: stripeWebhook
+      summary: Stripe webhook handler
+      description: Handles checkout.session.completed, subscription.updated/deleted, invoice.payment_failed, product.updated.
+      tags: [Stripe Billing]
+      security: []
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Event received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '400':
+          description: Invalid signature
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  # ──────────────────────────────────────────────────────────
+  # Flows
+  # ──────────────────────────────────────────────────────────
+
+  /flow/trigger-url:
+    get:
+      operationId: getFlowTriggerUrl
+      summary: Get flow trigger URL
+      tags: [Flows]
+      x-internal: true
+      responses:
+        '200':
+          description: Flow trigger service URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /flow/health:
+    get:
+      operationId: getFlowHealth
+      summary: Flow service health
+      tags: [Flows]
+      x-internal: true
+      responses:
+        '200':
+          description: Health status from flow trigger service
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: Flow trigger service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /flow/validate:
+    post:
+      operationId: validateFlow
+      summary: Validate flow graph
+      tags: [Flows]
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateFlowRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateFlowResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: Flow trigger service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /flow/trigger/{flowId}:
+    post:
+      operationId: triggerFlow
+      summary: Trigger flow execution
+      description: Triggers a flow with the given input. Injects the user's active account_id.
+      tags: [Flows]
+      x-internal: true
+      parameters:
+        - name: flowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Flow input data
+      responses:
+        '200':
+          description: Execution started
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: Flow trigger service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /flow/executions/{id}:
+    get:
+      operationId: getFlowExecution
+      summary: Get execution details
+      tags: [Flows]
+      x-internal: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: include
+          in: query
+          description: 'Comma-separated includes (e.g. "node_runs")'
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Execution details
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: Flow trigger service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /flow/executions/{id}/stream:
+    get:
+      operationId: streamFlowExecution
+      summary: SSE execution stream
+      description: Server-Sent Events stream proxied from the flow trigger service.
+      tags: [Flows]
+      x-internal: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /flow/flows/{flowId}/executions:
+    get:
+      operationId: listFlowExecutions
+      summary: List executions for a flow
+      tags: [Flows]
+      x-internal: true
+      parameters:
+        - name: flowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Execution list
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: Flow trigger service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Directus static token (Formula API role) or user access token
+
+  parameters:
+    calcIdPath:
+      name: calcId
+      in: path
+      required: true
+      description: Calculator ID (user-defined string, e.g. `my-calculator` or `my-calculator-test`)
+      schema:
+        type: string
+
+    accountIdPath:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    paginationPage:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+
+    paginationLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 25
+        maximum: 100
+
+    sortParam:
+      name: sort
+      in: query
+      description: 'Sort field. Prefix with `-` for descending (e.g. `-date_created`)'
+      schema:
+        type: string
+        default: '-date_created'
+
+    searchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+
+    Recipe:
+      type: object
+      required: [sheets, formulas, inputSchema, outputSchema, name, version]
+      properties:
+        sheets:
+          type: object
+        formulas:
+          type: object
+        inputSchema:
+          type: array
+          items:
+            type: object
+        outputSchema:
+          type: array
+          items:
+            type: object
+        dataMappings:
+          type: array
+          items:
+            type: object
+        locale:
+          type: string
+          nullable: true
+        generation:
+          type: integer
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+          nullable: true
+        test:
+          type: boolean
+          nullable: true
+        token:
+          type: string
+          nullable: true
+        accountId:
+          type: string
+          format: uuid
+          nullable: true
+        expressions:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              expression:
+                type: string
+              scope:
+                type: string
+
+    CallStat:
+      type: object
+      required: [calculator, timestamp]
+      properties:
+        calculator:
+          type: string
+          description: Calculator ID or UUID
+        calculator_id:
+          type: string
+          description: Alternative field for calculator ID
+        timestamp:
+          type: string
+          format: date-time
+        response_time_ms:
+          type: integer
+        error:
+          type: boolean
+          default: false
+        error_message:
+          type: string
+          nullable: true
+        cached:
+          type: boolean
+          default: false
+        test:
+          type: boolean
+          default: false
+        type:
+          type: string
+          default: calculator
+        account:
+          type: string
+          nullable: true
+
+    AccountLimits:
+      type: object
+      required: [rateLimitRps, rateLimitMonthly, monthlyUsed]
+      properties:
+        rateLimitRps:
+          type: integer
+          nullable: true
+          description: Max requests per second (null = unlimited or no subscription)
+        rateLimitMonthly:
+          type: integer
+          nullable: true
+          description: Max calls per month (null = unlimited or no subscription)
+        monthlyUsed:
+          type: integer
+          description: Calculator calls this calendar month
+
+    McpConfigResponse:
+      type: object
+      properties:
+        calculatorId:
+          type: string
+        mcp:
+          nullable: true
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            toolName:
+              type: string
+            toolDescription:
+              type: string
+              nullable: true
+            inputSchema:
+              type: object
+            responseTemplate:
+              type: string
+              nullable: true
+
+    SubscriptionInfo:
+      type: object
+      description: Subscription limits and current usage for an account
+      properties:
+        calculator_limit:
+          type: integer
+          nullable: true
+        calls_per_month:
+          type: integer
+          nullable: true
+        calls_per_second:
+          type: integer
+          nullable: true
+        active_count:
+          type: integer
+        total_count:
+          type: integer
+        monthly_calls:
+          type: integer
+        status:
+          type: string
+        exempt:
+          type: boolean
+        trial_end:
+          type: string
+          format: date-time
+          nullable: true
+
+    FormulaTokenCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        token:
+          type: string
+          description: Plaintext token — shown once only
+
+    FormulaTokenMeta:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        date_created:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked:
+          type: boolean
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminOverview:
+      type: object
+      properties:
+        accounts:
+          type: object
+          properties:
+            total:
+              type: integer
+        subscriptions:
+          type: object
+          properties:
+            by_plan:
+              type: array
+              items:
+                type: object
+                properties:
+                  plan:
+                    type: string
+                  count:
+                    type: integer
+        calculators:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+        calls:
+          type: object
+          properties:
+            today:
+              type: integer
+            week:
+              type: integer
+            month:
+              type: integer
+            errors_month:
+              type: integer
+        revenue:
+          type: object
+          properties:
+            mrr:
+              type: integer
+            active_subscriptions:
+              type: integer
+            churned_30d:
+              type: integer
+            trial_total:
+              type: integer
+            trial_converted:
+              type: integer
+        charts:
+          type: object
+          properties:
+            calls_per_day:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  total:
+                    type: integer
+                  errors:
+                    type: integer
+            accounts_per_month:
+              type: array
+              items:
+                type: object
+                properties:
+                  month:
+                    type: string
+                  count:
+                    type: integer
+            deletions_per_month:
+              type: array
+              items:
+                type: object
+                properties:
+                  month:
+                    type: string
+                  count:
+                    type: integer
+            conversions_per_month:
+              type: array
+              items:
+                type: object
+                properties:
+                  month:
+                    type: string
+                  count:
+                    type: integer
+
+    AdminAccountSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        date_created:
+          type: string
+          format: date-time
+        exempt_from_subscription:
+          type: boolean
+        subscription_status:
+          type: string
+          nullable: true
+        trial_end:
+          type: string
+          format: date-time
+          nullable: true
+        plan_name:
+          type: string
+          nullable: true
+        calculator_count:
+          type: integer
+        active_count:
+          type: integer
+        monthly_calls:
+          type: integer
+
+    AdminAccountDetail:
+      type: object
+      properties:
+        account:
+          type: object
+        subscription:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+            plan_name:
+              type: string
+            calculator_limit:
+              type: integer
+              nullable: true
+            calls_per_month:
+              type: integer
+              nullable: true
+            calls_per_second:
+              type: integer
+              nullable: true
+            trial_end:
+              type: string
+              format: date-time
+              nullable: true
+        calculators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              activated:
+                type: boolean
+              over_limit:
+                type: boolean
+              date_created:
+                type: string
+                format: date-time
+              date_updated:
+                type: string
+                format: date-time
+                nullable: true
+              profile:
+                type: object
+                nullable: true
+              monthly_calls:
+                type: integer
+              monthly_errors:
+                type: integer
+        usage:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              total:
+                type: integer
+              errors:
+                type: integer
+
+    AdminCalculatorSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        activated:
+          type: boolean
+        over_limit:
+          type: boolean
+        date_created:
+          type: string
+          format: date-time
+        date_updated:
+          type: string
+          format: date-time
+          nullable: true
+        account_name:
+          type: string
+        account_id:
+          type: string
+          format: uuid
+        monthly_calls:
+          type: integer
+        monthly_errors:
+          type: integer
+        profile:
+          type: object
+          nullable: true
+        unresolved_functions:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              references:
+                type: array
+                items:
+                  type: string
+        config_version:
+          type: integer
+          nullable: true
+        file_version:
+          type: integer
+          nullable: true
+
+    HealthSnapshot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        date_created:
+          type: string
+          format: date-time
+        status:
+          type: string
+        response_time_ms:
+          type: integer
+        heap_used_mb:
+          type: number
+        queue_pending:
+          type: integer
+        queue_max:
+          type: integer
+        worker_count:
+          type: integer
+        cache_size:
+          type: integer
+        instance_count:
+          type: integer
+        total_calculators:
+          type: integer
+
+    ValidateFlowRequest:
+      type: object
+      required: [graph]
+      properties:
+        graph:
+          type: object
+          required: [nodes, edges]
+          properties:
+            nodes:
+              type: array
+              items:
+                type: object
+                required: [id, node_type, config]
+                properties:
+                  id:
+                    type: string
+                  node_type:
+                    type: string
+                  config:
+                    type: object
+                  on_error:
+                    type: string
+                  position:
+                    type: object
+                    properties:
+                      x:
+                        type: number
+                      y:
+                        type: number
+            edges:
+              type: array
+              items:
+                type: object
+                required: [from, to]
+                properties:
+                  from:
+                    type: string
+                  to:
+                    type: string
+                  from_port:
+                    type: string
+                  to_port:
+                    type: string
+                  back_edge:
+                    type: object
+                    nullable: true
+                    properties:
+                      guard:
+                        type: string
+                      max_iterations:
+                        type: integer
+        caller_role:
+          type: string
+          enum: [Any, Admin]
+
+    ValidateFlowResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        node_permissions:
+          type: object
+          additionalProperties:
+            type: string
+
+    PaginatedMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            errors:
+              - message: Authentication required
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            errors:
+              - message: Access denied
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            errors:
+              - message: Not found

@@ -1,0 +1,41 @@
+
+!.env.example
+!.db-credentials.example
+# Claude Code — ignore settings, track skills/commands
+.claude/*
+!.claude/skills/
+!.claude/commands/
+.DS_Store
+.env
+.env.*
+.db-credentials
+.db-credentials.mk
+.idea/
+.npm_token
+.vscode/
+
+# Database sync backups
+backups/
+*.dump
+*.sql
+*.log
+*.swo
+*.swp
+**/dist/
+**/node_modules/
+
+# Local extension lock files (parent manages dependencies)
+extensions/local/*/package-lock.json
+# Build artifacts
+# Dependencies
+# Docker volumes (if accidentally created locally)
+# Environment files (contain secrets)
+# IDE
+# Logs
+# OS files
+dist/
+node_modules/
+npm-debug.log*
+pgdata/
+redisdata/
+Thumbs.db

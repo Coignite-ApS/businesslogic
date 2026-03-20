@@ -1,0 +1,9 @@
+{
+  "name": "directus-extensions",
+  "private": true,
+  "description": "Directus extensions for Businesslogic CMS",
+  "dependencies": {
+    "@sentry/node": "^10.43.0",
+    "@sentry/profiling-node": "^10.43.0"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "project-extension-knowledge-api",
+  "version": "1.0.0",
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "path": "dist/index.js",
+    "source": "src/index.ts",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^17.0.11",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.1"
+  },
+  "dependencies": {
+    "cohere-ai": "^7.14.0",
+    "openai": "^4.73.0",
+    "@anthropic-ai/sdk": "^0.51.0",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.8.0",
+    "xlsx": "^0.18.5",
+    "ioredis": "^5.4.1",
+    "franc": "^6.2.0"
+  }
+}

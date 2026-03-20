@@ -1,0 +1,21 @@
+{
+  "name": "base-extension-pool-stats",
+  "version": "1.0.0",
+  "description": "Database connection pool monitoring endpoint for Directus",
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "path": "dist/index.js",
+    "source": "src/index.ts",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^17.0.11",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  }
+}

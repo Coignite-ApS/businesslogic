@@ -1,0 +1,24 @@
+{
+  "name": "project-extension-account",
+  "version": "1.0.0",
+  "description": "Account selector, subscription display, and trial management module",
+  "type": "module",
+  "directus:extension": {
+    "type": "module",
+    "path": "dist/index.js",
+    "source": "src/index.ts",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify"
+  },
+  "dependencies": {
+    "project-shared-ui": "file:../../shared/project-shared-ui"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^17.0.11",
+    "vue": "^3.5.30",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "project-extension-stripe",
+  "version": "1.0.0",
+  "description": "Stripe billing, registration, and trial management for accounts",
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "path": "dist/index.js",
+    "source": "src/index.ts",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w --no-minify"
+  },
+  "dependencies": {
+    "stripe": "^20.4.1"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^17.0.11",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  }
+}

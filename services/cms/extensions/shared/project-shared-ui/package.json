@@ -1,0 +1,9 @@
+{
+  "name": "project-shared-ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./plan-cards.vue": "./src/plan-cards.vue"
+  }
+}
