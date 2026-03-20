@@ -5,6 +5,7 @@ import { getActiveAccount } from '../utils/auth.js';
 import { EmbeddingClient } from '../services/embeddings.js';
 import { hybridSearch } from '../services/search.js';
 import { generateAnswer } from '../services/answer.js';
+import { enqueueIngest } from '../services/ingest-queue.js';
 
 /** Verify account owns the KB, return KB row or send 404 */
 async function verifyKbOwnership(req, reply) {
@@ -136,18 +137,21 @@ export async function registerRoutes(app) {
       [docId, req.params.kbId, ctx.accountId, file_id, title || null],
     );
 
-    // Fire-and-forget indexing (BullMQ in step 1.5)
-    setTimeout(async () => {
-      try {
-        await indexDocument(docId, req.params.kbId, ctx.accountId, file_id);
-      } catch (err) {
-        console.error(`Indexing failed for doc ${docId}:`, err.message);
-        await query(
-          "UPDATE kb_documents SET status = 'error', date_updated = NOW() WHERE id = $1",
-          [docId],
-        ).catch(() => {});
-      }
-    }, 0);
+    // Enqueue for BullMQ processing (falls back to inline if no Redis)
+    const enqueued = await enqueueIngest({
+      documentId: docId,
+      kbId: req.params.kbId,
+      accountId: ctx.accountId,
+      fileId: file_id,
+      reindex: false,
+    });
+    if (!enqueued) {
+      // No Redis — mark as error (queue unavailable)
+      await query(
+        "UPDATE kb_documents SET status = 'error', date_updated = NOW() WHERE id = $1",
+        [docId],
+      ).catch(() => {});
+    }
 
     const doc = await queryOne('SELECT * FROM kb_documents WHERE id = $1', [docId]);
     return { data: doc };
@@ -186,18 +190,20 @@ export async function registerRoutes(app) {
     );
     await query('DELETE FROM kb_chunks WHERE document = $1', [req.params.docId]);
 
-    // Fire-and-forget re-index
-    setTimeout(async () => {
-      try {
-        await indexDocument(req.params.docId, req.params.kbId, ctx.accountId, doc.file_id);
-      } catch (err) {
-        console.error(`Re-indexing failed for doc ${req.params.docId}:`, err.message);
-        await query(
-          "UPDATE kb_documents SET status = 'error', date_updated = NOW() WHERE id = $1",
-          [req.params.docId],
-        ).catch(() => {});
-      }
-    }, 0);
+    // Enqueue re-index (lower priority)
+    const enqueued = await enqueueIngest({
+      documentId: req.params.docId,
+      kbId: req.params.kbId,
+      accountId: ctx.accountId,
+      fileId: doc.file_id,
+      reindex: true,
+    });
+    if (!enqueued) {
+      await query(
+        "UPDATE kb_documents SET status = 'error', date_updated = NOW() WHERE id = $1",
+        [req.params.docId],
+      ).catch(() => {});
+    }
 
     return { data: { id: req.params.docId, status: 'pending' } };
   });
@@ -433,12 +439,3 @@ export async function registerRoutes(app) {
   });
 }
 
-// ─── Document indexing (placeholder — BullMQ in step 1.5) ────
-async function indexDocument(docId, kbId, accountId, fileId) {
-  // TODO: step 1.5 replaces with BullMQ worker
-  // For now, mark as indexed (no actual file processing)
-  await query(
-    "UPDATE kb_documents SET status = 'indexed', date_updated = NOW() WHERE id = $1",
-    [docId],
-  );
-}
