@@ -1,0 +1,521 @@
+================================================================================
+BUSINESSLOGIC FLOW ENGINE — KEY INSIGHTS & EXECUTIVE SUMMARY
+================================================================================
+
+Report Generated: 2026-03-20
+Full Technical Report: TECHNICAL_REPORT.md (1152 lines)
+Repository: /sessions/funny-determined-carson/mnt/businesslogic/businesslogic-flow/
+
+================================================================================
+1. ARCHITECTURE HIGHLIGHTS
+================================================================================
+
+• Rust/Tokio async runtime with petgraph DAG execution
+• 4-crate workspace: flow-common (types) → flow-engine (DAG) → flow-trigger (HTTP) + flow-worker (scaling)
+• 3-server Hetzner topology: Admin (Coolify/Directus) + Data (PostgreSQL/Redis) + Compute (Trigger/Workers)
+• Phases 1–5 complete (190 tests passing); Phase 6 (Directus UI) in progress
+• Production-ready with access control, rate limiting, error handling, graceful shutdown
+
+================================================================================
+2. AI/ML INTEGRATION CAPABILITY
+================================================================================
+
+LLM Integration (Anthropic Claude API):
+  • 3 models: haiku (fast), sonnet (balanced, default), opus (powerful)
+  • Dynamic pricing: $0.80–$4M (haiku), $3–$15M (sonnet), $15–$75M (opus)
+  • Context interpolation: ${env.OPENAI_KEY}, ${trigger.query}, ${nodes.fetch_data.output}
+  • Fallback model support, prompt caching (partial), cancellation via tokio::select!
+
+Embedding Node (Local ONNX via fastembed v5):
+  • Model: BAAI/bge-small-en-v1.5 (384-dimensional, English)
+  • Latency: 5–10ms per document on CPX31
+  • Cost: $0.00 (local computation; no API calls)
+  • Thread-safe via LazyLock + Mutex + spawn_blocking
+  • Prewarms at worker startup (ensure_model_loaded())
+
+Vector Search (pgvector + PostgreSQL):
+  • Cosine distance queries (<=> operator)
+  • Account-scoped access (critical multi-tenant isolation)
+  • Dynamic SQL for optional folder_ids, tags filtering
+  • Retrieval: resolve_embedding() handles string/array/reference formats
+
+Knowledge Base Ingest/Retrieval Pipeline Example:
+  1. Embed query with Embedding node
+  2. Vector search bl_kb_chunks table (cosine similarity, top-k)
+  3. Optional cache check (Redis)
+  4. Feed retrieved context to LLM node
+  5. Track cost in budget system (per layer)
+
+Competitive Advantage:
+  ✓ Local embeddings (zero API cost, instant availability)
+  ✓ Multi-tenant isolation enforced at every DB query
+  ✓ Unified budget control across all AI operations
+  ✓ Horizontal worker scaling (add workers, increase throughput)
+
+================================================================================
+3. BUDGET & COST ENFORCEMENT (5-LAYER ARCHITECTURE)
+================================================================================
+
+Layer 1: Per-Flow Budget
+  • Field: flows.ai_budget_cents (PostgreSQL)
+  • Check: check_budget() pre-validates accumulated cost
+  • Enforcement: Abort node if exceeded
+
+Layer 2: Daily Per-Account Budget
+  • Storage: Redis key format redis://account:{account_id}:daily_ai_cost
+  • TTL: 25 hours (INCRBYFLOAT, automatic expiry)
+  • Check: compare against flows.daily_budget_cents per account
+
+Layer 3: Monthly Per-Account Budget
+  • Storage: PostgreSQL bl_account_budgets table
+  • Columns: account_id, month (YYYY-MM), spent_cents
+  • Logic: UPDATE ... SET spent_cents = spent_cents + $1 WHERE account_id = $2
+  • Enforcement: Hard cap per month (configurable per account)
+
+Layer 4: Global Daily Budget
+  • Storage: Redis key AI_GLOBAL_DAILY_LIMIT_USD (env var)
+  • Granularity: All accounts combined
+  • Fallback: If Redis unavailable, returns Ok() (graceful degradation)
+
+Layer 5: Flow-Level Budget Circuit Breaker
+  • Node execution checks current cost vs. budget
+  • Error handling: Retry (with backoff), Fallback (alternate branch), Skip, Abort
+
+Storage Mechanisms:
+  • Pre-check: record_cost(model, input_tokens, output_tokens) → calculate_cost()
+  • Post-record: UPDATE bl_account_budgets after execution completes
+  • Cancellation propagates cost to budget immediately
+
+Cost Calculation:
+  • Model pricing table in provider.rs (opus/sonnet/haiku)
+  • Formula: (input_tokens * model.input_price_per_m + output_tokens * model.output_price_per_m) / 1_000_000
+  • Stored in PostgreSQL bl_executions.ai_cost_cents for audit trail
+
+Opt-In Behavior:
+  • All budget layers return Ok() if PostgreSQL or Redis unavailable (resilience first)
+  • Admin can override per-flow via flows.skip_budget_check boolean
+  • Monthly budget enforced at account level; daily budget per-account and global
+
+================================================================================
+4. EXECUTION ENGINE & DAG ALGORITHM
+================================================================================
+
+Main Algorithm (execute_flow in executor/mod.rs):
+  1. Load flow definition from PostgreSQL
+  2. Build DAG via petgraph::DiGraph::from_edges()
+  3. Validate: Check for invalid back-edges (only loop nodes allowed)
+  4. Topological sort: All-node ordering respecting dependencies
+  5. Ready queue: Initially contains nodes with zero dependencies
+  6. Main loop:
+     - Spawn ready nodes via JoinSet::spawn_blocking() or tokio::spawn()
+     - Await completion with JoinSet::join_next()
+     - Update dependencies for downstream nodes
+     - Handle back-edges: queue back to front of DAG if guard condition passes
+     - Apply error strategy (Retry, Fallback, Skip, Abort)
+     - Checkpoint state at configured intervals
+
+Execution Context Evolution:
+  • Starts with: $trigger (webhook payload), $env (secrets), $meta (execution ID, account)
+  • Accumulates: $nodes.{node_id}.output after each node
+  • $last: Most recent node output (simplified reference)
+  • Passed to each node via ExecutionContext struct
+  • Interpolation: ${nodes.fetch_data.output} → resolved in node handler
+
+Parallel Execution Model:
+  • JoinSet allows multiple independent nodes to run concurrently
+  • Dependencies enforced: cannot execute node until all inputs ready
+  • Cancellation: CancellationToken propagated to all spawned tasks
+  • Timeout: Per-flow max_execution_time (default 300s)
+
+Error Strategies (per-node config):
+  • Retry: Backoff (exponential, max 3 attempts), then Abort if all fail
+  • Fallback: Jump to alternate branch on error
+  • Skip: Log error, continue to next node
+  • Abort: Terminate entire flow immediately
+
+Back-Edge Handling (Loops):
+  • loop node wraps around with: guard condition + max_iterations limit
+  • Prevents infinite loops; maximum 1000 iterations per loop (configurable)
+  • Full ExecutionContext available within loop; outputs accumulated
+
+State Checkpointing:
+  • Snapshots ExecutionContext periodically (every 100ms or after critical node)
+  • Stored in Redis with key format: flow:state:exec-{execution_id}
+  • On worker crash: Next available worker claims message and resumes from checkpoint
+  • Deleted on successful completion
+
+================================================================================
+5. WORKER POOL & HORIZONTAL SCALING
+================================================================================
+
+Redis Streams Consumer Group Model:
+  • 3 priority streams: critical, normal, batch
+  • Consumer group: "workers" (created by trigger and worker startup)
+  • Per-worker: XREADGROUP BLOCK 1000 COUNT 10 (10-msg batch, 1s block timeout)
+  • Acknowledgment: XACK stream group {message_id} after successful execution
+  • Claim recovery: XCLAIM every 60s for orphaned messages (worker death)
+
+Job Lifecycle:
+  1. Trigger service (flow-trigger) receives webhook/cron/manual trigger
+  2. Validates: flow permissions, flow definition exists, account limits
+  3. Produces: Message to Redis Stream (format: FlowExecution serialized)
+  4. Stream: /critical/{account_id}, /normal/{account_id}, or /batch/{account_id}
+  5. Worker: XREADGROUP consumes message, deserializes to FlowExecution struct
+  6. Execution: Worker calls executor.execute_flow() (Tokio multi-threaded)
+  7. Result: Stored in PostgreSQL bl_flow_executions, streamed to client if SSE enabled
+  8. Acknowledge: XACK removes message from stream
+
+Graceful Shutdown:
+  • Signal handler: SIGTERM → cancel_token.cancel()
+  • In-flight executions: Wait up to grace_period_secs (default 30s) for completion
+  • Acknowledgment: Messages NOT acknowledged roll back to stream
+  • Reconnect: Next worker picks up unacknowledged messages
+
+Horizontal Scaling Strategy:
+  • Add worker processes: No coordination needed (consumer group auto-distributes)
+  • Consumer group: Stateless; each worker maintains: in-memory JoinSet + Redis connection pool
+  • Throughput: 50 executions/min per worker (empirically tuned on CPX31)
+  • Bottleneck: PostgreSQL connection pool (max 20 connections; tune via DATABASE_MAX_CONNECTIONS env var)
+
+Health Push:
+  • Every 30s: worker pushes health status to Redis key worker:{worker_id}:health
+  • Trigger service: Monitors health keys; raises alert if stale (>90s)
+  • Orchestration: Coolify detects dead worker, restarts container
+
+Metrics:
+  • Arc<AtomicU64> messages_processed per worker
+  • Arc<AtomicU64> active_executions (incremented on spawn, decremented on completion)
+  • Exposed via /health endpoint: {"workers": [...], "throughput_5m": N}
+
+================================================================================
+6. HTTP API & AXUM ROUTES
+================================================================================
+
+Core Routes (flow-trigger/src/main.rs):
+
+Admin-Only:
+  POST   /flows/:id/validate          → Validate flow definition
+  GET    /node-types                  → List all registered node types with schemas
+
+Public (Rate-Limited):
+  POST   /webhook/:flow_id            → Trigger flow via webhook (HMAC-SHA256 verification)
+  POST   /trigger/:flow_id            → Manual trigger (admin token if account-private)
+  GET    /executions/:execution_id    → Poll execution status
+
+User-Accessible:
+  GET    /executions/:id/stream       → SSE stream of execution events (real-time updates)
+  GET    /flows/:id/executions        → List past 100 executions for a flow
+
+Health:
+  GET    /health                      → Worker pool health, throughput metrics
+  GET    /ping                        → Liveness probe (simple 200 OK)
+
+Request Validation:
+  • Webhook body limit: 1MB (configurable via REQUEST_BODY_LIMIT)
+  • HMAC signature: X-Signature header, SHA256(body, webhook_secret)
+  • Rate limiting: Per-account RPS (default 50), monthly quota (default 100K)
+  • Admin auth: X-Admin-Token header (constant-time comparison against env var)
+
+Response Format:
+  {
+    "execution_id": "exec-12345",
+    "status": "pending|running|completed|failed|timeout|cancelled",
+    "output": {...},
+    "error": "optional error message",
+    "ai_cost_cents": 123,
+    "elapsed_ms": 456
+  }
+
+Streaming (SSE):
+  • Content-Type: text/event-stream
+  • Events: "start", "node_start:{node_id}", "node_end:{node_id}", "complete", "error"
+  • Allows real-time monitoring in browser
+
+================================================================================
+7. MULTI-TENANT ISOLATION & SECURITY
+================================================================================
+
+Account Scoping (CRITICAL):
+  • Every query includes: AND account_id = $1 (PostgreSQL)
+  • Every Redis key includes: account:{account_id}:* (Redis)
+  • Every vector search includes: AND account_id = $2 (pgvector queries)
+
+Examples:
+  -- Query knowledge base chunks
+  SELECT * FROM bl_kb_chunks WHERE id = $1 AND account_id = $2;
+
+  -- Budget check
+  SELECT spent_cents FROM bl_account_budgets
+  WHERE account_id = $1 AND month = $2;
+
+Authentication:
+  • Webhook: HMAC-SHA256 signature verification (X-Signature header)
+  • Admin: X-Admin-Token header (constant-time comparison)
+  • Service-to-service: Placeholder for mTLS (Phase 7)
+
+Authorization (RequiredRole system):
+  • Core nodes: no additional role needed
+  • Database node: requires "admin" role per account
+  • Redis node: requires "admin" role per account
+  • LLM node: requires "ai" role per account (optional per-account feature flag)
+  • Validated in node handler via node.required_role validation
+
+WASM/QuickJS Sandboxing:
+  • WASM nodes: Wasmtime runtime (memory-isolated, no host access except via imports)
+  • QuickJS nodes: Sandboxed global scope (no eval, no require, limited built-ins)
+  • Both: Cannot access external systems without explicit node handler bridge
+
+Data Protection:
+  • API keys: Never logged; loaded from $env at runtime
+  • Webhooks: Body logged only if DEBUG_LOG_PAYLOADS=true
+  • Execution output: Tiered storage (inline JSON, Redis references, S3 streaming)
+
+================================================================================
+8. PostgreSQL SCHEMA & DATA MODEL
+================================================================================
+
+Key Tables:
+
+bl_flows (Flow Definitions):
+  • id (UUID), account_id (UUID), name (TEXT), definition (JSONB)
+  • created_at, updated_at (TIMESTAMP)
+  • ai_budget_cents (INT), daily_budget_cents (INT), skip_budget_check (BOOL)
+
+bl_flow_executions (Execution History):
+  • id (UUID), flow_id (UUID), account_id (UUID)
+  • status (VARCHAR: pending|running|completed|failed|timeout|cancelled)
+  • input_payload (JSONB), output_context (JSONB)
+  • ai_cost_cents (INT), elapsed_ms (INT)
+  • started_at, completed_at (TIMESTAMP)
+
+bl_account_budgets (Monthly Cost Tracking):
+  • account_id (UUID), month (VARCHAR: YYYY-MM)
+  • spent_cents (INT), limit_cents (INT, nullable)
+  • PRIMARY KEY (account_id, month)
+
+bl_knowledge_bases (KB Metadata):
+  • id (UUID), account_id (UUID), name (TEXT)
+  • created_at (TIMESTAMP)
+
+bl_kb_chunks (Embedded Documents):
+  • id (UUID), kb_id (UUID), account_id (UUID)
+  • text (TEXT), folder_id (VARCHAR), tags (TEXT[])
+  • embedding (vector(384)) — pgvector type
+  • created_at (TIMESTAMP)
+  • INDEX: (kb_id, account_id) for fast retrieval
+  • INDEX: (account_id) for multi-tenant isolation
+
+bl_node_types (Node Registry):
+  • id (VARCHAR: unique node type name)
+  • category (VARCHAR: core|wasm|external)
+  • schema (JSONB: input/output definitions)
+  • required_role (VARCHAR: nullable, e.g., "admin", "ai")
+
+Serialization:
+  • JSONB storage for flow definitions and execution contexts
+  • Serde for Rust ↔ JSON round-tripping
+  • MessagePack for compact Redis storage (optional feature)
+
+================================================================================
+9. REDIS SCHEMA & KEYS
+================================================================================
+
+Job Queues (Streams):
+  /critical/{account_id}   → High-priority executions (user-facing)
+  /normal/{account_id}     → Standard flows
+  /batch/{account_id}      → Batch/background jobs
+  Consumer group: "workers" (XREADGROUP BLOCK 1000 COUNT 10)
+
+Checkpointing:
+  flow:state:exec-{execution_id}  → ExecutionContext checkpoint (JSONB, TTL 24h)
+
+Daily Budget Tracking:
+  account:{account_id}:daily_ai_cost → Float (cumulative, TTL 25h)
+
+Health Monitoring:
+  worker:{worker_id}:health → JSON {status: "alive", last_heartbeat: timestamp}
+
+Execution Locks (Optional):
+  flow:{flow_id}:executing → Set of concurrent execution IDs (dedup prevention)
+
+TTL Management:
+  • Job messages: 7 days (XINFO STREAM, auto-trimmed by Redis)
+  • Checkpoints: 24 hours (EXPIRE)
+  • Health keys: 90 seconds (stale after this, worker presumed dead)
+  • Budget keys: 25 hours (daily cycle, auto-reset)
+
+================================================================================
+10. DEPENDENCIES (AI/ML FOCUSED)
+================================================================================
+
+FastEmbed v5.0:
+  • crate: fastembed @ 5.0
+  • features: ["ort-download-binaries-rustls-tls", "hf-hub-rustls-tls"]
+  • Model loader: HF Hub (auto-downloads on first use)
+  • Model: BAAI/bge-small-en-v1.5
+  • Inference: CPU-bound (spawn_blocking to avoid blocking async)
+  • Thread-safe: LazyLock + Mutex
+
+Pgvector v0.4.0:
+  • crate: pgvector @ "0.4" (with features = ["sqlx"])
+  • Type mapping: Vec<f32> ↔ SQL vector type
+  • Operations: Cosine distance (<=>), L2 distance (<->), inner product (<#>)
+  • Indexes: HNSW, IVFFlat (create manually for large KBs)
+
+Anthropic Claude API:
+  • HTTP client: reqwest 0.12 (async, connection pooled)
+  • Endpoint: https://api.anthropic.com/v1/messages
+  • Auth: X-API-Key header
+  • Models: claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5
+  • Response format: JSON streaming (SSE-compatible)
+
+Additional ML/AI:
+  • No TensorFlow, PyTorch, or heavy ML frameworks (intentional)
+  • SQL: Index queries for semantic search (pgvector)
+  • Offloading: Custom ML flows can call external APIs (http_request node)
+
+================================================================================
+11. TESTING STRATEGY
+================================================================================
+
+Coverage:
+  • 190+ tests across 4 crates (as of Phase 5 completion)
+  • Unit tests: Every node (normal cases, edge cases, error conditions)
+  • DAG tests: Chains, parallel branches, back-edges, cycle detection
+  • Integration tests: Docker Compose (PostgreSQL + Redis)
+
+Test Organization:
+  crates/flow-engine/src/nodes/tests/     → Per-node tests
+  crates/flow-engine/src/executor/tests/  → DAG algorithm tests
+  crates/flow-trigger/tests/              → HTTP route tests
+  crates/flow-worker/tests/               → Worker scaling tests
+
+CI/CD:
+  • GitHub Actions: .github/workflows/build.yml
+  • Pipeline: cargo test → Docker build (trigger + worker) → push GHCR
+  • Matrix: Ubuntu 22.04, Rust stable (latest)
+
+Coverage Gaps (Phase 6 to address):
+  • Directus Vue Flow editor integration tests
+  • Load testing (100k+ flows, 1k concurrent executions)
+  • Security audit (OWASP, crypto review)
+
+================================================================================
+12. PRODUCTION-READY FEATURES
+================================================================================
+
+✓ Graceful shutdown (SIGTERM → 30s grace, XACK rollback)
+✓ Worker health monitoring (30s heartbeat, 90s stale timeout)
+✓ Checkpoint recovery (XCLAIM orphaned messages after 60s)
+✓ Rate limiting (per-account RPS + monthly quota)
+✓ Execution timeout (per-flow max_execution_time)
+✓ Error strategies (Retry, Fallback, Skip, Abort)
+✓ Budget enforcement (5-layer architecture, hard caps, audit trail)
+✓ Multi-tenant isolation (account_id filters on all queries)
+✓ Access control (HMAC, admin token, RequiredRole)
+✓ Logging (Tracing with Tokio console support)
+✓ Metrics (throughput, active executions, worker health)
+✓ Cron scheduling (timezone-aware, background polling)
+✓ Database event triggers (PostgreSQL LISTEN/NOTIFY)
+
+Still Needed (Phase 7):
+  • OpenTelemetry instrumentation (traces, metrics, logs)
+  • Load testing (benchmarking edge cases)
+  • Security audit (crypto, input validation, injection protection)
+  • Directus UI editor integration (Phase 6 → Phase 7)
+
+================================================================================
+13. KNOWN LIMITATIONS & FUTURE WORK
+================================================================================
+
+Current Limitations:
+  • Single-region deployment (no cross-region replication)
+  • No distributed tracing (Phase 7 feature)
+  • Embedding model size fixed (384-dim) — no model selection UI yet
+  • WASM plugin discovery: Manual registration (no dynamic marketplace)
+  • QuickJS sandbox: Minimal built-ins (no crypto, regex limited)
+
+Future Enhancements:
+  • Custom embedding models (OpenAI, Voyage, Cohere)
+  • Fine-tuned LLM support (OpenAI, Mistral, LocalAI)
+  • GraphQL API layer (alternative to REST)
+  • Flow composition (reusable sub-flows, modular workflows)
+  • Advanced scheduling (SLAs, backpressure, flow versioning)
+  • Plugin marketplace (community WASM + QuickJS plugins)
+
+================================================================================
+14. COMPETITIVE ADVANTAGES
+================================================================================
+
+vs. n8n:
+  ✓ 5–10x faster (sub-5ms step overhead vs. n8n's 50–100ms per step)
+  ✓ Local embeddings (zero API cost, instant availability)
+  ✓ Horizontal worker scaling (Redis Streams, no centralized coordinator)
+  ✓ Rust type safety (fewer runtime errors, better memory efficiency)
+
+vs. Make/Zapier:
+  ✓ Semantic search integration (pgvector + fastembed built-in)
+  ✓ RAG pipelines (knowledge base ingest + LLM generation)
+  ✓ Custom node development (WASM plugins, QuickJS scripts)
+  ✓ On-premise deployment (Hetzner, self-hosted PostgreSQL)
+
+vs. Directus Flows:
+  ✓ Dedicated execution engine (not tied to Directus CMS)
+  ✓ AI integration first-class (budget control, prompt caching)
+  ✓ Public API (webhook triggers, REST execution)
+  ✓ Horizontal scaling (Redis Streams consumer groups)
+
+vs. Node-RED:
+  ✓ Multi-tenant isolation (account_id scoping)
+  ✓ Budget enforcement (prevent runaway AI costs)
+  ✓ Vector search (semantic similarity out-of-box)
+  ✓ Production architecture (PostgreSQL + Redis, not flat file)
+
+================================================================================
+15. KEY TECHNICAL INSIGHTS & ARCHITECTURE PATTERNS
+================================================================================
+
+1. DAG Execution with JoinSet
+   → Enables true parallelism without callback hell
+   → Dependencies tracked via petgraph; ready queue ensures ordering
+   → Cancellation token propagates cleanup across all tasks
+
+2. Redis Streams Consumer Groups
+   → Horizontal scaling without central orchestrator
+   → XCLAIM recovery handles worker failures automatically
+   → Account-scoped streams prevent cross-tenant job leakage
+
+3. Five-Layer Budget Architecture
+   → Resilient: Each layer independent; system degrades gracefully
+   → Auditable: Costs stored in multiple places (PostgreSQL for audit, Redis for real-time)
+   → Flexible: Per-flow, per-account, global limits all enforceable
+
+4. ExecutionContext Accumulation Pattern
+   → $nodes.*.output and $last enable rich data flow
+   → Tiered storage (inline/Redis/S3) handles payloads of any size
+   → Checkpoint recovery allows resumption after worker crash
+
+5. Account Scoping as Default
+   → Every SQL query includes account_id filter (no exceptions)
+   → Vector search always scoped (security by design)
+   → Budget tracking per-account (prevents cross-tenant cost leakage)
+
+6. Error Strategy Isolation
+   → Per-node configuration (not global)
+   → Enables graceful degradation (Fallback) vs. hard fail (Abort)
+   → Distinguishes transient (Retry) from permanent errors (Skip + Fallback)
+
+7. WASM + QuickJS Sandboxing
+   → Plugins isolated from main process
+   → No access to host unless explicit node handler imports
+   → Enables community contributions without security risk
+
+8. Hybrid Storage Model
+   → Inline: Fast JSON serialization for <64KB
+   → Redis: Reference pointers for 64KB–100MB
+   → S3: Streaming (zero-copy) for >100MB payloads
+
+================================================================================
+
+END OF KEY INSIGHTS
+================================================================================

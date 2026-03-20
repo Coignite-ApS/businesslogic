@@ -1,0 +1,68 @@
+[package]
+name = "flow-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core execution engine for BusinessLogic flows — DAG executor, core nodes, plugin host"
+
+[features]
+default = ["core-nodes"]
+core-nodes = ["dep:businesslogic-excel"]
+wasm-plugins = ["dep:wasmtime", "dep:sha2"]
+scripting = ["dep:rquickjs"]
+ai-nodes = ["dep:pgvector", "dep:fastembed"]
+
+[dependencies]
+flow-common = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+
+# IDs & time
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Errors
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# DAG
+petgraph = { workspace = true }
+
+# HTTP client (for HTTP Request node)
+reqwest = { workspace = true }
+url = { workspace = true }
+
+# Database (for Database node + state persistence)
+sqlx = { workspace = true }
+
+# Redis (for state + reference tier)
+redis = { workspace = true }
+deadpool-redis = { workspace = true }
+
+# Excel formula engine
+businesslogic-excel = { workspace = true, optional = true }
+
+# Logging
+tracing = { workspace = true }
+
+# WASM runtime (feature-gated)
+wasmtime = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+
+# Embedded JS (feature-gated)
+rquickjs = { workspace = true, optional = true }
+
+# AI / Vector (feature-gated)
+pgvector = { workspace = true, optional = true }
+fastembed = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+axum = { workspace = true }

@@ -1,0 +1,49 @@
+# Production deployment via Coolify on Hetzner.
+# Deploy this on Server 3 (Compute).
+# PostgreSQL and Redis run on Server 2 (Data) — use private network IPs.
+#
+# Environment variables set in Coolify:
+#   DATABASE_URL, REDIS_URL, INSTANCE_ID, LOG_LEVEL, etc.
+
+services:
+  flow-trigger:
+    image: ${REGISTRY}/bl-flow-trigger:${VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      - INSTANCE_ID=${INSTANCE_ID:-flow-trigger-1}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - WEBHOOK_PORT=3100
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RUST_LOG=${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+
+  flow-worker:
+    image: ${REGISTRY}/bl-flow-worker:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      - INSTANCE_ID=${INSTANCE_ID:-flow-worker-1}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-50}
+      - WORKER_GROUP=${WORKER_GROUP:-default}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RUST_LOG=${LOG_LEVEL:-info}
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: "4"
+          memory: 2G
