@@ -1,6 +1,7 @@
 import { createDecipheriv, randomUUID } from 'node:crypto';
 import { queryAll, queryOne, query } from '../db.js';
 import { config } from '../config.js';
+import { executeToolViaFlow, isFlowToolEnabled } from './flow-tools.js';
 
 export const AI_TOOLS = [
   {
@@ -197,6 +198,14 @@ export function filterToolsByPermissions(tools, permissions) {
 
 export async function executeTool(toolName, toolInput, deps) {
   const { accountId, logger } = deps;
+
+  // Try flow-based execution first (if enabled)
+  if (isFlowToolEnabled()) {
+    const flowResult = await executeToolViaFlow(toolName, toolInput, accountId, logger);
+    if (flowResult.viaFlow && flowResult.result !== undefined) {
+      return { result: flowResult.result, _flowExecutionId: flowResult.flowExecutionId };
+    }
+  }
 
   try {
     switch (toolName) {

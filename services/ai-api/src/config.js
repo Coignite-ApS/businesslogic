@@ -65,6 +65,11 @@ export const config = {
   flowAdminToken: env.FLOW_TRIGGER_ADMIN_TOKEN || env.FLOW_ADMIN_TOKEN || '',
   flowIngestFlowId: env.FLOW_INGEST_FLOW_ID || '',
 
+  // Flow-based tool execution (wraps tool calls in micro-flows)
+  flowToolExecution: env.FLOW_TOOL_EXECUTION === 'true',
+  flowToolFlowId: env.FLOW_TOOL_FLOW_ID || '',
+  flowToolTimeoutMs: parseInt(env.FLOW_TOOL_TIMEOUT_MS || '30000', 10),
+
   // Budget
   dailyBudgetUsd: parseFloat(env.DAILY_BUDGET_USD || '100'),
   monthlyBudgetUsd: parseFloat(env.MONTHLY_BUDGET_USD || '1000'),

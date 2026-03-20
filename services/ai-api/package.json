@@ -11,7 +11,7 @@
     "start": "node --env-file=.env src/server.js",
     "dev": "node --env-file=.env --watch src/server.js",
     "test": "node --test test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js",
-    "test:all": "node --test --test-concurrency=1 test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js test/kb.test.js",
+    "test:all": "node --test --test-concurrency=1 test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js test/kb.test.js test/flow-ingest.test.js test/flow-tools.test.js",
     "test:chat": "node --test test/chat.test.js",
     "test:kb": "node --test test/kb.test.js",
     "test:contracts": "node --test test/contracts/producer.test.js"
