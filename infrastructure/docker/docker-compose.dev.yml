@@ -232,30 +232,29 @@ services:
   # ════════════════════════════════════════════════════
   # bl-gateway (Go API Gateway) — Iteration 2
   # ════════════════════════════════════════════════════
-  # Uncomment after Iteration 2 scaffolding is complete
 
-  # bl-gateway:
-  #   build:
-  #     context: ../../services/gateway
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "18080:8080"
-  #   environment:
-  #     - PORT=8080
-  #     - REDIS_URL=redis://redis:6379
-  #     - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
-  #     - AI_API_URL=http://bl-ai-api:3200
-  #     - FORMULA_API_URL=http://bl-formula-api:3000
-  #     - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
-  #     - CMS_URL=http://bl-cms:8055
-  #     - LOG_LEVEL=debug
-  #   depends_on:
-  #     redis: { condition: service_healthy }
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 3
+  bl-gateway:
+    build:
+      context: ../../services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "18080:8080"
+    environment:
+      - PORT=8080
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - AI_API_URL=http://bl-ai-api:3200
+      - FORMULA_API_URL=http://bl-formula-api:3000
+      - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
+      - CMS_URL=http://bl-cms:8055
+      - LOG_LEVEL=debug
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   # ════════════════════════════════════════════════════
   # Legacy CMS (for comparison testing)
