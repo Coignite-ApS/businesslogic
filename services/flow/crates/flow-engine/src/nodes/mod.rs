@@ -182,7 +182,18 @@ impl NodeRegistry {
         self.register(
             "ai:update_status",
             ai::kb::update_status::metadata(),
-            ai::kb::update_status::handler(pg),
+            ai::kb::update_status::handler(pg.clone()),
+        );
+        // KB search pipeline nodes
+        self.register(
+            "ai:text_search",
+            ai::kb::text_search::metadata(),
+            ai::kb::text_search::handler(pg),
+        );
+        self.register(
+            "ai:merge_rrf",
+            ai::kb::merge_rrf::metadata(),
+            ai::kb::merge_rrf::handler(),
         );
     }
 }
