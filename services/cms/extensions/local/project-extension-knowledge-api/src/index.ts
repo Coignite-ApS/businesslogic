@@ -14,6 +14,7 @@ import type { RerankerConfig } from './rerank.js';
 import type { DB, CuratedAnswer } from './types.js';
 import { ensureKbSchema } from './migrate.js';
 import { detectLanguageShort } from './language.js';
+import { proxyToKbApi } from './proxy.js';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -74,6 +75,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		// ─── KB CRUD ─────────────────────────────────────────────────
 
 		app.get('/kb/list', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -92,6 +95,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.post('/kb/create', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -132,6 +137,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.get('/kb/:kbId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -150,6 +157,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.patch('/kb/:kbId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -179,6 +188,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.delete('/kb/:kbId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -208,6 +219,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		// ─── Documents ───────────────────────────────────────────────
 
 		app.get('/kb/:kbId/documents', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -231,6 +244,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.post('/kb/:kbId/upload', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -325,6 +340,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.delete('/kb/:kbId/documents/:docId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -350,6 +367,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.post('/kb/:kbId/reindex/:docId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -407,6 +426,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		// ─── Curated Answers ─────────────────────────────────────────
 
 		app.get('/kb/:kbId/curated', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -430,6 +451,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.post('/kb/:kbId/curated', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -485,6 +508,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.patch('/kb/:kbId/curated/:answerId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -533,6 +558,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.delete('/kb/:kbId/curated/:answerId', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -563,6 +590,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		// ─── Search & Ask ────────────────────────────────────────────
 
 		app.post('/kb/search', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -614,6 +643,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.post('/kb/ask', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -757,6 +788,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		// ─── Feedback ───────────────────────────────────────────────
 
 		app.post('/kb/feedback', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -830,6 +863,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.get('/kb/:kbId/feedback/stats', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
@@ -910,6 +945,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.get('/kb/:kbId/feedback/suggestions', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToKbApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const accountId = await getActiveAccount(db, req.accountability.user);
 				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });

@@ -7,6 +7,7 @@ import { AI_TOOLS, executeTool } from './tools.js';
 import { DEFAULT_SYSTEM_PROMPT } from './system-prompt.js';
 import { createRateLimitMiddleware } from './rate-limit.js';
 import { createSanitizeMiddleware } from './sanitize.js';
+import { proxyToAiApi } from './proxy.js';
 import type { ChatRequest, ConversationMessage, ContentBlock, DB } from './types.js';
 
 function calculateCost(model: string, input: number, output: number): number {
@@ -50,6 +51,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 
 		// ─── Conversation CRUD ─────────────────────────────────────────
 		app.get('/assistant/conversations', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -68,6 +71,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.post('/assistant/conversations', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -103,6 +108,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.get('/assistant/conversations/:id', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -117,6 +124,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.patch('/assistant/conversations/:id', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -135,6 +144,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.delete('/assistant/conversations/:id', requireAuth, subMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -150,6 +161,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 
 		// ─── Prompts ───────────────────────────────────────────────────
 		app.get('/assistant/prompts', requireAuth, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -168,6 +181,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 
 		// ─── Model config (admin) ──────────────────────────────────────
 		app.get('/assistant/model-config', requireAuth, requireAdmin, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -180,6 +195,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.patch('/assistant/model-config/:id', requireAuth, requireAdmin, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const schema = await getSchema();
 				const { ItemsService } = services;
@@ -194,6 +211,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 
 		// ─── Usage ────────────────────────────────────────────────────
 		app.get('/assistant/usage', requireAuth, subMiddleware, quotaMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			try {
 				const userId = req.accountability.user;
 				const accountId = await getActiveAccount(db, userId);
@@ -237,6 +256,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 
 		// ─── Chat (SSE) ────────────────────────────────────────────────
 		app.post('/assistant/chat', requireAuth, subMiddleware, quotaMiddleware, rateLimitMiddleware, sanitizeMiddleware, async (req: any, res: any) => {
+			const proxied = await proxyToAiApi(req, res, env, logger);
+			if (proxied) return;
 			if (!apiKey) {
 				return res.status(503).json({ errors: [{ message: 'AI Assistant not configured' }] });
 			}
@@ -519,6 +540,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 
 		// ─── Admin Dashboard API ──────────────────────────────────────
 		app.get('/assistant/admin/overview', requireAuth, requireAdmin, async (_req: any, res: any) => {
+			const proxied = await proxyToAiApi(_req, res, env, logger);
+			if (proxied) return;
 			try {
 				const now = new Date();
 				const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -591,6 +614,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 		});
 
 		app.get('/assistant/admin/accounts', requireAuth, requireAdmin, async (_req: any, res: any) => {
+			const proxied = await proxyToAiApi(_req, res, env, logger);
+			if (proxied) return;
 			try {
 				const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
