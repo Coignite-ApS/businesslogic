@@ -6,6 +6,7 @@ import { EmbeddingClient } from '../services/embeddings.js';
 import { hybridSearch } from '../services/search.js';
 import { generateAnswer } from '../services/answer.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
+import { triggerFlowIngest, isFlowIngestEnabled } from '../services/flow-ingest.js';
 
 /** Check AI permission on gateway-forwarded requests */
 function checkAiPermission(req, reply) {
@@ -150,16 +151,25 @@ export async function registerRoutes(app) {
       [docId, req.params.kbId, ctx.accountId, file_id, title || null],
     );
 
-    // Enqueue for BullMQ processing (falls back to inline if no Redis)
-    const enqueued = await enqueueIngest({
+    // Dispatch to flow engine or BullMQ
+    const ingestData = {
       documentId: docId,
       kbId: req.params.kbId,
       accountId: ctx.accountId,
       fileId: file_id,
       reindex: false,
-    });
-    if (!enqueued) {
-      // No Redis — mark as error (queue unavailable)
+    };
+
+    let dispatched = false;
+    if (isFlowIngestEnabled()) {
+      const flowResult = await triggerFlowIngest(ingestData, req.log);
+      dispatched = flowResult.triggered;
+    }
+    if (!dispatched) {
+      const enqueued = await enqueueIngest(ingestData);
+      dispatched = !!enqueued;
+    }
+    if (!dispatched) {
       await query(
         "UPDATE kb_documents SET status = 'error', date_updated = NOW() WHERE id = $1",
         [docId],
@@ -203,15 +213,25 @@ export async function registerRoutes(app) {
     );
     await query('DELETE FROM kb_chunks WHERE document = $1', [req.params.docId]);
 
-    // Enqueue re-index (lower priority)
-    const enqueued = await enqueueIngest({
+    // Dispatch to flow engine or BullMQ
+    const ingestData = {
       documentId: req.params.docId,
       kbId: req.params.kbId,
       accountId: ctx.accountId,
       fileId: doc.file_id,
       reindex: true,
-    });
-    if (!enqueued) {
+    };
+
+    let dispatched = false;
+    if (isFlowIngestEnabled()) {
+      const flowResult = await triggerFlowIngest(ingestData, req.log);
+      dispatched = flowResult.triggered;
+    }
+    if (!dispatched) {
+      const enqueued = await enqueueIngest(ingestData);
+      dispatched = !!enqueued;
+    }
+    if (!dispatched) {
       await query(
         "UPDATE kb_documents SET status = 'error', date_updated = NOW() WHERE id = $1",
         [req.params.docId],

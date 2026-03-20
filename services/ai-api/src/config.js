@@ -59,6 +59,12 @@ export const config = {
   ingestConcurrency: parseInt(env.INGEST_CONCURRENCY || '2', 10),
   ingestRetries: parseInt(env.INGEST_RETRIES || '3', 10),
 
+  // Flow-based ingestion (replaces BullMQ when enabled)
+  flowKbIngest: env.FLOW_KB_INGEST === 'true',
+  flowTriggerUrl: (env.FLOW_TRIGGER_URL || '').replace(/\/+$/, ''),
+  flowAdminToken: env.FLOW_TRIGGER_ADMIN_TOKEN || env.FLOW_ADMIN_TOKEN || '',
+  flowIngestFlowId: env.FLOW_INGEST_FLOW_ID || '',
+
   // Budget
   dailyBudgetUsd: parseFloat(env.DAILY_BUDGET_USD || '100'),
   monthlyBudgetUsd: parseFloat(env.MONTHLY_BUDGET_USD || '1000'),

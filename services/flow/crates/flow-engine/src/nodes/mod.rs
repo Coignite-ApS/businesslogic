@@ -156,7 +156,33 @@ impl NodeRegistry {
         self.register(
             "core:vector_search",
             ai::vector_search::metadata(),
-            ai::vector_search::handler(pg),
+            ai::vector_search::handler(pg.clone()),
+        );
+        // KB ingestion pipeline nodes
+        self.register(
+            "ai:parse_document",
+            ai::kb::parse_document::metadata(),
+            ai::kb::parse_document::handler(pg.clone()),
+        );
+        self.register(
+            "ai:chunk_text",
+            ai::kb::chunk_text::metadata(),
+            ai::kb::chunk_text::handler(),
+        );
+        self.register(
+            "ai:filter_unchanged",
+            ai::kb::filter_unchanged::metadata(),
+            ai::kb::filter_unchanged::handler(pg.clone()),
+        );
+        self.register(
+            "ai:store_vectors",
+            ai::kb::store_vectors::metadata(),
+            ai::kb::store_vectors::handler(pg.clone()),
+        );
+        self.register(
+            "ai:update_status",
+            ai::kb::update_status::metadata(),
+            ai::kb::update_status::handler(pg),
         );
     }
 }

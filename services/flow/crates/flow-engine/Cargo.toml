@@ -10,7 +10,7 @@ default = ["core-nodes"]
 core-nodes = ["dep:businesslogic-excel"]
 wasm-plugins = ["dep:wasmtime", "dep:sha2"]
 scripting = ["dep:rquickjs"]
-ai-nodes = ["dep:pgvector", "dep:fastembed"]
+ai-nodes = ["dep:pgvector", "dep:fastembed", "dep:sha2", "dep:hex"]
 
 [dependencies]
 flow-common = { workspace = true }
@@ -55,6 +55,7 @@ tracing = { workspace = true }
 # WASM runtime (feature-gated)
 wasmtime = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
 
 # Embedded JS (feature-gated)
 rquickjs = { workspace = true, optional = true }
