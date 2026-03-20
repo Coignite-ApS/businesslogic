@@ -1,3 +1,6 @@
+import { initTelemetry, shutdownTelemetry } from './telemetry.js';
+initTelemetry();
+
 import Fastify from 'fastify';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
@@ -89,6 +92,7 @@ const shutdown = async (signal) => {
   } finally {
     stopCleanup();
     await closeDb();
+    await shutdownTelemetry();
     process.exit(0);
   }
 };

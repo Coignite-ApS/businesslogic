@@ -15,6 +15,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { initTelemetry, shutdownTelemetry } from './telemetry.js';
+initTelemetry();
+
 import Fastify from 'fastify';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
@@ -119,6 +122,7 @@ const shutdown = async (signal) => {
     try { await stats.shutdown(); } catch { /* best-effort */ }
     try { pool.destroy(); } catch { /* best-effort */ }
     try { await cache.close(); } catch { /* best-effort */ }
+    try { await shutdownTelemetry(); } catch { /* best-effort */ }
     process.exit(0);
   }
 };

@@ -14,6 +14,7 @@ import (
 	"github.com/coignite-aps/bl-gateway/internal/proxy"
 	"github.com/coignite-aps/bl-gateway/internal/routes"
 	"github.com/coignite-aps/bl-gateway/internal/service"
+	"github.com/coignite-aps/bl-gateway/internal/telemetry"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
@@ -33,6 +34,10 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Initialize OpenTelemetry
+	shutdownOtel := telemetry.Init(ctx)
+	defer shutdownOtel(ctx)
 
 	// Connect to Redis
 	var rdb *redis.Client
@@ -102,6 +107,7 @@ func main() {
 	handler = middleware.CORS(handler)
 	handler = middleware.RateLimit(keyService)(handler)
 	handler = middleware.Auth(keyService)(handler)
+	handler = middleware.Tracing(handler)
 	handler = middleware.Logging(handler)
 	handler = middleware.RequestID(handler)
 

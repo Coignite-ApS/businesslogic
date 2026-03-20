@@ -64,6 +64,8 @@ rquickjs = { version = "0.8", features = ["bindgen", "loader", "allocator"] }
 
 # Observability
 opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["http-proto", "reqwest-client"] }
 tracing-opentelemetry = "0.28"
 
 # Excel formula engine

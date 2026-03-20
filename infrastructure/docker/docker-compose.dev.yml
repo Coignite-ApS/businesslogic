@@ -15,6 +15,7 @@
 #   bl-flow-worker  — Flow DAG executor (no HTTP port)
 #   bl-ai-api  — AI chat, KB, embeddings (host 13200 → container 3200) — Iteration 1
 #   bl-gateway — API gateway (host 18080 → container 8080) — Iteration 2
+#   otel-collector — OpenTelemetry Collector (host 14317/14318 → container 4317/4318)
 #
 # Legacy (for comparison testing):
 #   legacy-cms — Original Directus with embedded AI (host 18056 → container 8055)
@@ -59,6 +60,23 @@ services:
     ports:
       - "11080:1080"    # Web UI
       - "11025:1025"    # SMTP
+
+  # ════════════════════════════════════════════════════
+  # OpenTelemetry Collector (traces, metrics, logs)
+  # ════════════════════════════════════════════════════
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    ports:
+      - "14317:4317"   # OTLP gRPC
+      - "14318:4318"   # OTLP HTTP
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # ════════════════════════════════════════════════════
   # bl-cms (Directus — Back-Office)
@@ -135,6 +153,8 @@ services:
       - POOL_SIZE=2
       - REDIS_URL=redis://redis:6379
       - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
       - FORMULA_TEST_TOKEN=${FORMULA_TEST_TOKEN:-}
       - TEST_ACCOUNT_ID=${TEST_ACCOUNT_ID:-}
       - ENGINE=${ENGINE:-hyperformula}
@@ -167,6 +187,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - RUST_LOG=info
       - ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -189,6 +211,8 @@ services:
       - RUST_LOG=info
       - WORKER_CONCURRENCY=10
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -217,6 +241,8 @@ services:
       - KB_MIN_SIMILARITY=${KB_MIN_SIMILARITY:-0.2}
       - KB_RRF_K=${KB_RRF_K:-60}
       - LOG_LEVEL=${AI_API_LOG_LEVEL:-warn}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_ENABLED=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -248,6 +274,8 @@ services:
       - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
       - CMS_URL=http://bl-cms:8055
       - LOG_LEVEL=debug
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
+      - OTEL_ENABLED=true
     depends_on:
       redis: { condition: service_healthy }
     healthcheck:

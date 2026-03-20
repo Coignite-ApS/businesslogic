@@ -13,7 +13,10 @@ use redis::AsyncCommands;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use opentelemetry::trace::TracerProvider as _;
 use tracing::{error, info, warn};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
 
 /// Max XACK retry attempts before logging error and moving on.
@@ -37,13 +40,39 @@ struct WorkerState {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .with_writer(std::io::stdout)
-        .init();
+    let env_filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive(tracing::Level::INFO.into());
+    let fmt_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stdout);
+
+    let _otel_guard: Option<opentelemetry_sdk::trace::TracerProvider>;
+    if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_ok()
+        || std::env::var("OTEL_ENABLED").ok().as_deref() == Some("true")
+    {
+        let exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_http()
+            .build()?;
+        let provider = opentelemetry_sdk::trace::TracerProvider::builder()
+            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+            .with_resource(opentelemetry_sdk::Resource::new(vec![
+                opentelemetry::KeyValue::new("service.name", "bl-flow-worker"),
+            ]))
+            .build();
+        let tracer = provider.tracer("flow-worker");
+        let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .with(otel_layer)
+            .init();
+        info!("[otel] tracing enabled");
+        _otel_guard = Some(provider);
+    } else {
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .init();
+        _otel_guard = None;
+    }
 
     info!("Starting BusinessLogic Flow Worker");
 

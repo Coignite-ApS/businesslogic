@@ -34,9 +34,13 @@ sqlx = { workspace = true }
 redis = { workspace = true }
 deadpool-redis = { workspace = true }
 
-# Logging
+# Logging / Observability
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-opentelemetry = { workspace = true }
 
 # Errors
 anyhow = { workspace = true }
