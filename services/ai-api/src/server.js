@@ -8,6 +8,7 @@ import { startCleanup, stopCleanup } from './utils/rate-limit.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
 import { registerRoutes as registerChatRoutes } from './routes/chat.js';
 import { registerRoutes as registerConversationRoutes } from './routes/conversations.js';
+import { registerRoutes as registerKbRoutes } from './routes/kb.js';
 
 export const app = Fastify({
   logger: { level: config.logLevel },
@@ -76,6 +77,7 @@ app.decorate('verifyAuth', verifyAuth);
 await registerHealthRoutes(app);
 await registerChatRoutes(app);
 await registerConversationRoutes(app);
+await registerKbRoutes(app);
 
 // Graceful shutdown
 const shutdown = async (signal) => {
