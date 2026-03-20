@@ -38,6 +38,9 @@ export const config = {
   embedPoolSize: parseInt(env.EMBED_POOL_SIZE || '2', 10),
   embeddingModel: env.KB_EMBEDDING_MODEL || 'text-embedding-3-small',
 
+  // Local embeddings (replaces OpenAI when enabled)
+  useLocalEmbeddings: env.USE_LOCAL_EMBEDDINGS === 'true',
+
   // Knowledge base
   kbChunkSize: parseInt(env.KB_CHUNK_SIZE || '512', 10),
   kbChunkOverlap: parseFloat(env.KB_CHUNK_OVERLAP || '0.1'),

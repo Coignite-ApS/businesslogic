@@ -176,6 +176,8 @@ async fn main() -> Result<(), anyhow::Error> {
         // Admin-auth management endpoints
         .route("/flows/validate", post(handle_validate_flow))
         .route("/node-types", get(handle_node_types))
+        // Internal API: local embedding (for bl-ai-api local-embeddings client)
+        .route("/internal/embed", post(handle_internal_embed))
         .layer(DefaultBodyLimit::max(body_limit))
         .with_state(state);
 
@@ -648,6 +650,47 @@ async fn handle_node_types(
         .collect();
 
     Ok(Json(serde_json::json!(node_types)))
+}
+
+// ─── Internal Embedding API ──────────────────────────────────────────────────
+
+/// POST /internal/embed (admin-auth)
+/// Direct access to the fastembed embedding model for bl-ai-api.
+async fn handle_internal_embed(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    verify_admin_token(&headers, &state.admin_token)?;
+
+    let texts = body
+        .get("texts")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| json_error(StatusCode::BAD_REQUEST, "Missing 'texts' array"))?;
+
+    let text_strings: Vec<String> = texts
+        .iter()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect();
+
+    if text_strings.is_empty() {
+        return Err(json_error(StatusCode::BAD_REQUEST, "No valid text strings in 'texts'"));
+    }
+
+    // Use the embedding node handler directly
+    let input = flow_common::node::NodeInput::new(
+        serde_json::json!({"input": text_strings}),
+        serde_json::json!({}),
+        serde_json::json!({}),
+    );
+
+    let result = state
+        .node_registry
+        .execute("core:embedding", input)
+        .await
+        .map_err(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("Embed failed: {}", e)))?;
+
+    Ok(Json(result.data))
 }
 
 // ─── Execution Status API ────────────────────────────────────────────────────
