@@ -111,10 +111,12 @@ businesslogic/
 │   └── gateway/                 # API gateway (Go) — auth, rate limiting, routing
 │
 ├── packages/                    # Shared libraries (avoid duplicating DB queries)
-│   ├── db-accounts/             # @coignite/db-accounts (TypeScript)
-│   ├── db-ratelimit/            # @coignite/db-ratelimit (TypeScript)
-│   ├── db-cache/                # @coignite/db-cache (TypeScript)
-│   └── bl-common/               # Rust crate shared by flow engine
+│   ├── bl-sdk/                  # Public SDKs for the BusinessLogic AI API
+│   │   └── typescript/          # @coignite/sdk — TypeScript SDK (npm)
+│   ├── db-accounts/             # @coignite/db-accounts (TypeScript) — planned
+│   ├── db-ratelimit/            # @coignite/db-ratelimit (TypeScript) — planned
+│   ├── db-cache/                # @coignite/db-cache (TypeScript) — planned
+│   └── bl-common/               # Rust crate shared by flow engine — planned
 │
 ├── infrastructure/              # Deployment configuration
 │   ├── terraform/               # Hetzner servers, networks, firewalls (run rarely)
@@ -148,6 +150,22 @@ businesslogic/
 | **bl-formula-api** | `services/formula-api/` | Fastify (Node.js) + Rust | 3000 | Formula eval, calculators, MCP |
 | **bl-flow** | `services/flow/` | Axum + Tokio (Rust) | 3100/3110 | DAG workflows, AI orchestration |
 | **bl-gateway** | `services/gateway/` | Go (net/http) | 8080 | Auth, rate limiting, routing, CORS |
+
+## Public SDK
+
+| Package | Location | npm | Purpose |
+|---------|----------|-----|---------|
+| **@coignite/sdk** | `packages/bl-sdk/typescript/` | Published to npm | TypeScript client for the BusinessLogic AI API |
+
+The SDK wraps all public AI API endpoints: chat (sync + streaming), conversations, knowledge base (CRUD, search, ask), and embeddings.
+
+```typescript
+import { BusinessLogic } from '@coignite/sdk';
+
+const bl = new BusinessLogic({ apiKey: 'xxx' });
+const response = await bl.chat.send({ message: 'Hello' });
+const results = await bl.kb.search('revenue formula');
+```
 
 ## Legacy Services (Running in Parallel During Migration)
 
