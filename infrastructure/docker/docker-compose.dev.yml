@@ -73,9 +73,9 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "/otelcol-contrib", "components"]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   # ════════════════════════════════════════════════════
@@ -146,11 +146,14 @@ services:
     build:
       context: ../../services/formula-api
       dockerfile: Dockerfile
+      secrets:
+        - npm_token
     ports:
       - "13000:3000"
     environment:
       - PORT=3000
-      - POOL_SIZE=2
+      - POOL_SIZE=4
+      - REQUEST_TIMEOUT_MS=30000
       - REDIS_URL=redis://redis:6379
       - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
@@ -160,10 +163,12 @@ services:
       - ENGINE=${ENGINE:-hyperformula}
       - MAX_QUEUE_DEPTH=256
       - CACHE_MAX_MEMORY_ITEMS=10000
+      - ADMIN_API_URL=${ADMIN_API_URL:-http://bl-cms:8055}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
     depends_on:
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -193,7 +198,7 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3100/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -249,7 +254,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3200/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -279,7 +284,7 @@ services:
     depends_on:
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
       interval: 5s
       timeout: 3s
       retries: 3

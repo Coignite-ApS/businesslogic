@@ -1212,6 +1212,31 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 		} catch (err) {
 			logger.error(`Backfill calculator_calls.type failed: ${err}`);
 		}
+
+		// Startup bulk sync: deploy all active calculator configs to Formula API
+		try {
+			const configs = await db('calculator_configs')
+				.whereNotNull('sheets')
+				.whereNotNull('formulas')
+				.select('id');
+
+			if (configs.length > 0) {
+				logger.info(`Syncing ${configs.length} calculator config(s) to Formula API...`);
+				let synced = 0;
+				let failed = 0;
+				for (const row of configs) {
+					try {
+						await syncConfig(row.id);
+						synced++;
+					} catch {
+						failed++;
+					}
+				}
+				logger.info(`Calculator sync complete: ${synced} synced, ${failed} failed`);
+			}
+		} catch (err) {
+			logger.error(`Startup calculator sync failed: ${err}`);
+		}
 	});
 
 	// ─── A3: Encrypt api_key on write ───────────────────────

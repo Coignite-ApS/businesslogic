@@ -58,10 +58,12 @@ FAILED=false
 for svc in "${CHANGED_SERVICES[@]}"; do
   case "$svc" in
     cms)
-      if [ -f "$CWD/services/cms/extensions/package.json" ]; then
-        echo "Running CMS extension tests..." >&2
-        (cd "$CWD/services/cms" && npm test 2>&1) || { echo "FAIL: CMS tests failed" >&2; FAILED=true; }
-      fi
+      echo "Running CMS extension tests..." >&2
+      for ext_dir in "$CWD"/services/cms/extensions/local/*/; do
+        if [ -f "$ext_dir/package.json" ] && grep -q '"test"' "$ext_dir/package.json" 2>/dev/null; then
+          (cd "$ext_dir" && npm test 2>&1) || { echo "FAIL: $(basename $ext_dir) tests failed" >&2; FAILED=true; }
+        fi
+      done
       ;;
     formula-api)
       if [ -f "$CWD/services/formula-api/package.json" ]; then

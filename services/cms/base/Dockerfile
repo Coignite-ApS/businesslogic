@@ -74,8 +74,9 @@ RUN /directus/docker/build-extensions.sh /tmp/base-extensions && \
 # 4. Build project-specific local extensions
 # -----------------------------------------------------------------------------
 COPY --chown=node:node extensions/local* /tmp/project-extensions/
+COPY --chown=node:node extensions/shared* /directus/shared/
 RUN /directus/docker/build-extensions.sh /tmp/project-extensions && \
-    rm -rf /tmp/project-extensions
+    rm -rf /tmp/project-extensions /directus/shared
 
 # -----------------------------------------------------------------------------
 # 5. Copy runtime scripts (from base/)

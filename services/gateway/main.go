@@ -79,12 +79,19 @@ func main() {
 		"cms":          cfg.CMSURL,
 	}
 
+	healthPaths := map[string]string{
+		"cms": "/server/ping",
+	}
+
 	backends := make(map[string]*proxy.Backend)
 	var backendList []*proxy.Backend
 	for name, rawURL := range backendDefs {
 		b, err := proxy.NewBackend(name, rawURL, cfg.CircuitBreakerThreshold, cfg.CircuitBreakerTimeout)
 		if err != nil {
 			log.Fatal().Err(err).Str("backend", name).Msg("failed to create backend")
+		}
+		if hp, ok := healthPaths[name]; ok {
+			b.HealthPath = hp
 		}
 		backends[name] = b
 		backendList = append(backendList, b)

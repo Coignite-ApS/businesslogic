@@ -11,10 +11,11 @@ import (
 )
 
 type Backend struct {
-	Name    string
-	URL     *url.URL
-	Proxy   *httputil.ReverseProxy
-	circuit *circuitBreaker
+	Name       string
+	URL        *url.URL
+	HealthPath string
+	Proxy      *httputil.ReverseProxy
+	circuit    *circuitBreaker
 }
 
 type circuitBreaker struct {
