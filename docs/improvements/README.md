@@ -52,6 +52,8 @@ AI chat, knowledge base backend, embeddings, public API.
 | 02 | AI Response Template with @mentions | planned | [ai-api/02-ai-response-template.md](ai-api/02-ai-response-template.md) |
 | 03 | AI Name & Response Template Overrides | planned | [ai-api/03-ai-name-overrides.md](ai-api/03-ai-name-overrides.md) |
 | 04 | Digital Twin / Second Brain (Personal AI Memory) | planned | [ai-api/04-digital-twin-second-brain.md](ai-api/04-digital-twin-second-brain.md) |
+| 05 | Contextual Memory Intelligence (Digital Twin Brain) | planned | [ai-api/05-contextual-memory-intelligence.md](ai-api/05-contextual-memory-intelligence.md) |
+| 06 | AI Partner Configuration (Behavioral Settings) | planned | [ai-api/06-ai-partner-configuration.md](ai-api/06-ai-partner-configuration.md) |
 
 ---
 
@@ -80,7 +82,7 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | 06 | Missing Array Functions | planned | [formula-api/engine/06-missing-array-functions.md](formula-api/engine/06-missing-array-functions.md) |
 | 07 | Numeric Precision | planned | [formula-api/engine/07-numeric-precision.md](formula-api/engine/07-numeric-precision.md) |
 | 08 | TEXT Format Engine | planned | [formula-api/engine/08-text-format-engine.md](formula-api/engine/08-text-format-engine.md) |
-| 09 | Missing Function Analysis (~150 remaining) | in-progress | [formula-api/engine/09-missing-function-analysis.md](formula-api/engine/09-missing-function-analysis.md) |
+| 09 | Missing Function Analysis (~150 remaining) | completed | [formula-api/engine/09-missing-function-analysis.md](formula-api/engine/09-missing-function-analysis.md) |
 
 ---
 
@@ -133,13 +135,13 @@ Infrastructure and multi-service concerns.
 
 ## Totals
 
-| Service | Planned | In-Progress | Total |
-|---------|---------|-------------|-------|
-| CMS | 20 | 0 | 20 |
-| AI API | 4 | 0 | 4 |
-| Formula API | 5 | 1 | 6 |
-| Formula Engine | 8 | 1 | 9 |
-| Flow | 0 | 0 | 0 |
-| Gateway | 0 | 0 | 0 |
-| Cross-Cutting | 1 | 0 | 1 |
-| **Total** | **38** | **2** | **40** |
+| Service | Planned | In-Progress | Completed | Total |
+|---------|---------|-------------|-----------|-------|
+| CMS | 20 | 0 | 0 | 20 |
+| AI API | 6 | 0 | 0 | 6 |
+| Formula API | 5 | 1 | 0 | 6 |
+| Formula Engine | 8 | 0 | 1 | 9 |
+| Flow | 0 | 0 | 0 | 0 |
+| Gateway | 0 | 0 | 0 | 0 |
+| Cross-Cutting | 1 | 0 | 0 | 1 |
+| **Total** | **40** | **1** | **1** | **42** |

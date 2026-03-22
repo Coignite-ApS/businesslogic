@@ -4,6 +4,38 @@
 
 This is the unified monorepo for the BusinessLogic platform. All services have been migrated from the legacy polyrepo into a modular, independently-scalable service mesh. The migration (iterations 00–05) is complete; historical plans are in `docs/migrations/` for reference.
 
+## On Startup — Greet the User
+
+When a new conversation starts, greet the user with a brief status overview. Do this by:
+
+1. Read `docs/improvements/README.md` and scan improvement statuses across all services
+2. Check `git branch --show-current` and `git log --oneline -3` for recent activity
+3. Present a greeting like:
+
+```
+👋 Welcome to BusinessLogic.
+
+📊 Improvements: X completed | Y in-progress | Z planned
+🌿 Branch: <current branch> | Last: "<recent commit message>"
+
+🔧 What you can do:
+  /improvements              — see full backlog, pick next task
+  /improvements <service>    — filter by service (cms, ai-api, formula-api, flow, gateway)
+  /ralph-improvement <path>  — run autonomous loop on an improvement
+  /cto-review                — technical review after changes
+  /devops-review             — infrastructure review
+  /frontend-designer         — UI design review or build
+  /bizdev-strategy           — market & pricing analysis
+  /project-review            — full health check
+  /test-all                  — run all tests
+  /dev-up                    — start Docker dev environment
+
+💡 To add a new improvement: /improvements add <service>
+```
+
+4. If any improvements are `in-progress`, highlight them — the user may want to continue
+5. Keep it concise — 10-15 lines max, no walls of text
+
 ## Documentation Index
 
 Read these before making changes:
