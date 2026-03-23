@@ -845,8 +845,10 @@ export async function registerRoutes(app) {
     }
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
-    // Auth: gateway path or legacy token path
-    if (isGatewayRequest(req)) {
+    // Auth: admin token (internal), gateway HMAC, or legacy token
+    if (!checkAdminToken(req)) {
+      // Admin token valid — trusted internal caller, skip further auth
+    } else if (isGatewayRequest(req)) {
       const gw = validateGatewayAuth(req);
       if (!gw) return reply.code(403).send({ error: 'Invalid gateway signature' });
       if (calc.accountId && gw.accountId !== calc.accountId) {

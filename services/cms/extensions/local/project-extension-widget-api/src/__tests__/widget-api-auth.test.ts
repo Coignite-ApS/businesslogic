@@ -4,12 +4,11 @@ import { describe, it, expect } from 'vitest';
  * Widget-API auth cleanup tests (CMS-29)
  *
  * Validates that the widget-api extension:
- * - Routes describe calls through gateway (not direct formula-api)
- * - Uses X-Internal-Secret (not X-Auth-Token passthrough)
- * - No longer depends on FORMULA_API_URL
+ * - Uses X-Admin-Token for describe calls (not X-Auth-Token passthrough)
+ * - Calls formula-api directly with admin auth
+ * - Still uses gateway for cache invalidation
  */
 
-// We test the source file statically — read it and verify patterns
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,38 +17,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const indexSource = readFileSync(resolve(__dirname, '../index.ts'), 'utf-8');
 
 describe('widget-api auth cleanup (CMS-29)', () => {
-  it('does not reference FORMULA_API_URL', () => {
-    expect(indexSource).not.toContain('FORMULA_API_URL');
-  });
-
-  it('does not reference formulaApiUrl', () => {
-    expect(indexSource).not.toContain('formulaApiUrl');
-  });
-
   it('does not pass X-Auth-Token to any backend', () => {
     expect(indexSource).not.toContain('X-Auth-Token');
     expect(indexSource).not.toContain('x-auth-token');
   });
 
-  it('uses GATEWAY_URL for describe calls', () => {
-    expect(indexSource).toContain('gatewayUrl');
-    // The describe fetch should use gatewayUrl, not a separate formula URL
+  it('uses FORMULA_API_URL for describe calls', () => {
+    expect(indexSource).toContain('formulaApiUrl');
     const describeMatch = indexSource.match(/fetch\(\s*`\$\{(\w+)\}.*describe/);
     expect(describeMatch).not.toBeNull();
-    expect(describeMatch![1]).toBe('gatewayUrl');
+    expect(describeMatch![1]).toBe('formulaApiUrl');
   });
 
-  it('sends X-Internal-Secret on describe requests', () => {
-    // The describe fetch should include X-Internal-Secret header
-    expect(indexSource).toContain("'X-Internal-Secret'");
+  it('sends X-Admin-Token on describe requests', () => {
+    expect(indexSource).toContain("'X-Admin-Token'");
+    expect(indexSource).toContain('formulaAdminToken');
   });
 
-  it('routes through /internal/calc/ path', () => {
-    expect(indexSource).toContain('/internal/calc/calculator/');
+  it('reads FORMULA_API_ADMIN_TOKEN from env', () => {
+    expect(indexSource).toContain("FORMULA_API_ADMIN_TOKEN");
   });
 
-  it('still has cache invalidation with X-Internal-Secret', () => {
-    // Cache invalidation should remain unchanged
+  it('still has cache invalidation via gateway with X-Internal-Secret', () => {
     expect(indexSource).toContain('/internal/cache/invalidate');
+    expect(indexSource).toContain("'X-Internal-Secret'");
   });
 });

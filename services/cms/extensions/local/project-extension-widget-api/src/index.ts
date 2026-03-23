@@ -7,6 +7,8 @@ export default defineHook(
     const db = database;
     const gatewayUrl = (env['GATEWAY_URL'] as string || '').replace(/\/+$/, '');
     const gatewayInternalSecret = env['GATEWAY_INTERNAL_SECRET'] as string || '';
+    const formulaApiUrl = (env['FORMULA_API_URL'] as string || '').replace(/\/+$/, '');
+    const formulaAdminToken = env['FORMULA_API_ADMIN_TOKEN'] as string || '';
 
     // Invalidate gateway widget cache on layout/theme/template changes
     const invalidateWidgetCache = async () => {
@@ -59,11 +61,11 @@ export default defineHook(
             }
           } catch { /* table may not exist yet */ }
 
-          // Fetch describe via gateway internal route
+          // Fetch describe from formula-api (internal, admin token)
           const describeHeaders: Record<string, string> = {};
-          if (gatewayInternalSecret) describeHeaders['X-Internal-Secret'] = gatewayInternalSecret;
+          if (formulaAdminToken) describeHeaders['X-Admin-Token'] = formulaAdminToken;
           const describeRes = await fetch(
-            `${gatewayUrl}/internal/calc/calculator/${encodeURIComponent(calcId)}/describe`,
+            `${formulaApiUrl}/calculator/${encodeURIComponent(calcId)}/describe`,
             { headers: describeHeaders },
           );
 

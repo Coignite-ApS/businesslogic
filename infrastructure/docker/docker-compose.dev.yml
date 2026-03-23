@@ -279,7 +279,7 @@ services:
       - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
       - CMS_URL=http://bl-cms:8055
       - LOG_LEVEL=debug
-      - INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
       - GATEWAY_SHARED_SECRET=${GATEWAY_SHARED_SECRET:-dev-shared-secret}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
       - OTEL_ENABLED=true

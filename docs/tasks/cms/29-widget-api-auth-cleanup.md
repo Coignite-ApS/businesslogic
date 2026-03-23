@@ -1,66 +1,51 @@
 # CMS-29: Widget-API Auth Cleanup
 
-**Status:** in-progress
+**Status:** completed
 **Priority:** MEDIUM
 **Depends on:** GW-03, CMS-23
 
 ## Problem
 
-`project-extension-widget-api` still passes `X-Auth-Token` from incoming requests to formula-api for some routes. After gateway migration, widget traffic goes through gateway — these passthrough tokens are unnecessary and create a confusing auth path.
+`project-extension-widget-api` passed `X-Auth-Token` from incoming requests to formula-api. This was a legacy pattern that created a confusing auth path.
 
-## Current State
+## Solution
 
-**File:** `services/cms/extensions/local/project-extension-widget-api/src/index.ts`
+Replaced `X-Auth-Token` passthrough with `X-Admin-Token` direct auth to formula-api.
 
-- Line 8: `FORMULA_API_URL` read from env (direct to formula-api)
-- Lines 64-67: Passes `X-Auth-Token` from request to formula-api on widget config fetch
-- Lines 9-10: Already has `GATEWAY_URL` + `GATEWAY_INTERNAL_SECRET` (added in previous commit)
-- Lines 16-18: Cache invalidation uses `X-Internal-Secret` (correct new pattern)
+### Key Decisions
 
-## Target State
+1. **Direct formula-api call with admin token** (not gateway internal route) — because gateway internal routes strip `X-Internal-Secret` and formula-api's describe endpoint requires its own auth. Gateway internal proxy does NOT forward auth context.
 
-- Remove `X-Auth-Token` passthrough from widget config routes
-- Route widget config fetches through gateway (or use internal secret for direct calls)
-- Remove `FORMULA_API_URL` dependency (widget-api should only talk to gateway)
-- Keep cache invalidation logic (already correct)
+2. **Added `X-Admin-Token` support to formula-api describe endpoint** — previously describe only accepted gateway HMAC or `X-Auth-Token`. Admin token is now a first-class auth method (priority 1).
 
-## Changes Required
+3. **Fixed gateway docker-compose env var** — was `INTERNAL_SECRET`, gateway code reads `GATEWAY_INTERNAL_SECRET`.
 
-### 1. Remove token passthrough
-- Lines 64-67: Stop forwarding `X-Auth-Token` to formula-api
-- Widget config endpoints should either:
-  - Use `X-Internal-Secret` for gateway calls, or
-  - Be served directly from CMS DB (widget configs are CMS-owned data)
+4. **Created `docs/service-auth.md`** — comprehensive auth pattern documentation to prevent future confusion.
 
-### 2. Remove FORMULA_API_URL
-- Widget-api shouldn't call formula-api directly anymore
-- All formula-api calls go through gateway
+## Changes Made
 
-### 3. Verify cache invalidation
-- Already uses correct `X-Internal-Secret` pattern — no changes needed
+| File | Change |
+|------|--------|
+| `services/cms/extensions/local/project-extension-widget-api/src/index.ts` | Replaced `X-Auth-Token` passthrough with `FORMULA_API_URL` + `X-Admin-Token` |
+| `services/formula-api/src/routes/calculators.js` | Added `checkAdminToken` as first auth path in describe endpoint |
+| `infrastructure/docker/docker-compose.dev.yml` | Fixed `INTERNAL_SECRET` → `GATEWAY_INTERNAL_SECRET` for gateway |
+| `docs/service-auth.md` | New: service-to-service auth patterns doc |
+| `CLAUDE.md` | Added `docs/service-auth.md` to documentation index |
 
-## Key Files
+## Test Coverage
 
-- `services/cms/extensions/local/project-extension-widget-api/src/index.ts`
-
-## Implementation Details
-
-### Changes Made
-1. **Removed `FORMULA_API_URL`** — widget-api no longer reads this env var
-2. **Removed `X-Auth-Token` passthrough** — no longer forwards client tokens to formula-api
-3. **Describe calls routed through gateway** — uses `${GATEWAY_URL}/internal/calc/calculator/:id/describe` with `X-Internal-Secret`
-4. **Cache invalidation unchanged** — already used correct `X-Internal-Secret` pattern
-
-### Test Coverage
-- `src/__tests__/widget-api-auth.test.ts` — 7 assertions verifying:
-  - No `FORMULA_API_URL` references
+- `widget-api/src/__tests__/widget-api-auth.test.ts` — 5 assertions verifying:
   - No `X-Auth-Token` passthrough
-  - Describe calls use `gatewayUrl` + `/internal/calc/` path
-  - `X-Internal-Secret` header sent on describe requests
-  - Cache invalidation preserved
+  - Describe calls use `formulaApiUrl` with `X-Admin-Token`
+  - `FORMULA_API_ADMIN_TOKEN` read from env
+  - Cache invalidation via gateway preserved
+- `formula-api/test/` — 29 existing tests still pass
+- End-to-end: `curl http://localhost:18055/calc/widget-config/jaap-calculator` returns full widget config
 
 ## Tests
 
 - [x] Widget config endpoints work without X-Auth-Token passthrough
 - [x] Cache invalidation still works
-- [x] FORMULA_API_URL no longer needed in widget-api env
+- [x] Formula-api describe accepts X-Admin-Token
+- [x] End-to-end widget-config returns data
+- [x] All existing tests pass
