@@ -27,8 +27,10 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 	const aiEnabled = env['AI_ASSISTANT_ENABLED'] !== 'false';
 	const maxToolRounds = parseInt(env['AI_MAX_TOOL_ROUNDS'] as string, 10) || 5;
 	const maxConversationMessages = parseInt(env['AI_MAX_CONVERSATION_MESSAGES'] as string, 10) || 50;
-	const formulaApiUrl = (env['FORMULA_API_URL'] as string || '').replace(/\/+$/, '');
-	const formulaApiAdminToken = env['FORMULA_API_ADMIN_TOKEN'] as string || '';
+	const gwUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
+	const gwSecret = env['GATEWAY_INTERNAL_SECRET'] as string || '';
+	const gatewayCalcUrl = gwUrl ? `${gwUrl}/internal/calc` : '';
+	const internalSecret = gwSecret;
 	const encryptionKey = env['TOKEN_ENCRYPTION_KEY'] as string | undefined;
 	const rateLimitPerMinute = parseInt(env['AI_RATE_LIMIT_PER_MINUTE'] as string, 10) || 20;
 	const maxMessageLength = parseInt(env['AI_MAX_MESSAGE_LENGTH'] as string, 10) || 10_000;
@@ -458,8 +460,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 						const { result, isError } = await executeTool(tu.name, tu.input, {
 							db,
 							accountId,
-							formulaApiUrl,
-							formulaApiAdminToken,
+							gatewayCalcUrl,
+							internalSecret,
 							encryptionKey,
 							authToken,
 							logger,

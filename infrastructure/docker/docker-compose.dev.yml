@@ -124,8 +124,7 @@ services:
       - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
       - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
       - FLOW_TRIGGER_ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
-      # AI proxy (Phase 1: proxy to bl-ai-api when enabled)
-      - AI_SERVICE_URL=http://bl-ai-api:3200
+      # AI proxy (routes through gateway /internal/ai/ when enabled)
       - AI_SERVICE_ENABLED=${AI_SERVICE_ENABLED:-false}
     volumes:
       # Mount local extensions for hot-reload during development

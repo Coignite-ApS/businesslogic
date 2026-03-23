@@ -42,6 +42,12 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 22 | API Key Management UI | planned | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
 | 23 | Widget Client Gateway Mode | planned | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
 | 24 | Widget Layout Builder | planned | [cms/24-widget-layout-builder.md](cms/24-widget-layout-builder.md) |
+| 25 | Calculator-API Gateway Auth Migration | completed | [cms/25-calculator-api-gateway-auth.md](cms/25-calculator-api-gateway-auth.md) |
+| 26 | Calculators Code Snippets Update (X-Auth-Token → X-API-Key) | completed | [cms/26-calculators-code-snippets-update.md](cms/26-calculators-code-snippets-update.md) |
+| 27 | AI-API & Knowledge-API Gateway Auth Migration | in-progress | [cms/27-ai-api-gateway-auth.md](cms/27-ai-api-gateway-auth.md) |
+| 28 | Flow-Hooks Gateway Auth Migration | planned | [cms/28-flow-hooks-gateway-auth.md](cms/28-flow-hooks-gateway-auth.md) |
+| 29 | Widget-API Auth Cleanup | planned | [cms/29-widget-api-auth-cleanup.md](cms/29-widget-api-auth-cleanup.md) |
+| 30 | Formulas Integration Page Update (X-Auth-Token → X-API-Key) | planned | [cms/30-formulas-integration-update.md](cms/30-formulas-integration-update.md) |
 
 ---
 
@@ -108,6 +114,8 @@ Auth, rate limiting, routing, CORS.
 | 01 | Fine-Grained Resource Permissions | planned | [gateway/01-resource-permissions.md](gateway/01-resource-permissions.md) |
 | 02 | API Key Management Endpoints | planned | [gateway/02-api-key-management.md](gateway/02-api-key-management.md) |
 | 03 | Widget Routes + Response Cache | planned | [gateway/03-widget-routes-cache.md](gateway/03-widget-routes-cache.md) |
+| 04 | Internal Service Proxy Routes | planned | [gateway/04-internal-service-proxy.md](gateway/04-internal-service-proxy.md) |
+| 05 | Internal Route Audit Logging | planned | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
 
 ---
 
@@ -140,6 +148,13 @@ Infrastructure and multi-service concerns.
 | 10 | cms | 22 | API Key Management UI | User-facing key management |
 | 11 | cms | 23 | Widget Gateway Mode | Widget uses API keys via gateway |
 | 12 | cms | 24 | Widget Layout Builder | Visual drag-drop layout design |
+| 12a | gateway | 04 | Internal Service Proxy Routes | CMS→services via gateway internal routes |
+| 12c | cms | 25 | Calculator-API Gateway Auth | CMS→formula-api uses gateway auth |
+| 12d | cms | 26 | Calculators Code Snippets | X-Auth-Token → X-API-Key in all snippets |
+| 12e | cms | 27 | AI-API Gateway Auth | CMS→ai-api uses gateway auth |
+| 12f | cms | 28 | Flow-Hooks Gateway Auth | CMS→flow uses gateway auth |
+| 12g | cms | 29 | Widget-API Auth Cleanup | Remove token passthrough |
+| 12h | cms | 30 | Formulas Integration Update | Formulas snippets → gateway |
 | 13 | cms | 06 | Lead Capture | Makes widget a marketing tool |
 | 14 | cms | 07 | Template Gallery | Marketing + onboarding + SEO |
 | 15 | cms | 01 | Calculator Testing | Quality foundation |
@@ -155,11 +170,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 22 | 0 | 1 | 23 |
+| CMS | 26 | 1 | 2 | 29 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
-| Gateway | 3 | 0 | 0 | 3 |
+| Gateway | 5 | 0 | 0 | 5 |
 | Cross-Cutting | 4 | 0 | 0 | 4 |
-| **Total** | **49** | **0** | **3** | **52** |
+| **Total** | **55** | **1** | **4** | **60** |

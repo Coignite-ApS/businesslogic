@@ -1,13 +1,14 @@
 /**
- * Feature-flagged proxy to bl-ai-api service.
- * When AI_SERVICE_ENABLED=true, forwards requests to the standalone AI API.
+ * Feature-flagged proxy to bl-ai-api via gateway internal route.
+ * When GATEWAY_URL is set and AI_SERVICE_ENABLED=true, forwards requests
+ * through gateway /internal/ai/ with X-Internal-Secret auth.
  * On any error, returns false to fall through to local Directus handling.
  */
 
 interface ProxyEnv {
 	AI_SERVICE_ENABLED?: string;
-	AI_SERVICE_URL?: string;
-	AI_API_ADMIN_TOKEN?: string;
+	GATEWAY_URL?: string;
+	GATEWAY_INTERNAL_SECRET?: string;
 }
 
 export async function proxyToAiApi(
@@ -16,20 +17,20 @@ export async function proxyToAiApi(
 	env: ProxyEnv,
 	logger: any,
 ): Promise<boolean> {
-	if (env.AI_SERVICE_ENABLED !== 'true' || !env.AI_SERVICE_URL) {
+	if (env.AI_SERVICE_ENABLED !== 'true' || !env.GATEWAY_URL) {
 		return false;
 	}
 
-	const baseUrl = env.AI_SERVICE_URL.replace(/\/+$/, '');
-	const targetUrl = `${baseUrl}/v1/ai${req.path}`;
+	const gwUrl = env.GATEWAY_URL.replace(/\/+$/, '');
+	const targetUrl = `${gwUrl}/internal/ai/v1/ai${req.path}`;
 
 	try {
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json',
 		};
 
-		if (env.AI_API_ADMIN_TOKEN) {
-			headers['X-Admin-Token'] = env.AI_API_ADMIN_TOKEN;
+		if (env.GATEWAY_INTERNAL_SECRET) {
+			headers['X-Internal-Secret'] = env.GATEWAY_INTERNAL_SECRET;
 		}
 
 		if (req.accountability?.user) {

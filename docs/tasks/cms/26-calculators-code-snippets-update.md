@@ -1,6 +1,6 @@
 # CMS-26: Calculators Module — Code Snippets & Integration Update
 
-**Status:** in-progress
+**Status:** completed
 **Priority:** HIGH
 **Depends on:** GW-02, CMS-23
 
