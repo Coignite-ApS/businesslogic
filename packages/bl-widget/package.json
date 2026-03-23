@@ -24,6 +24,8 @@
     "build:no-sri": "vite build && tsc --emitDeclarationOnly",
     "dev": "vite build --watch",
     "test": "vitest run",
+    "test:e2e": "node --test test/e2e.test.js",
+    "test:all": "vitest run && node --test test/e2e.test.js",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
