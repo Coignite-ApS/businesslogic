@@ -5,7 +5,6 @@ import { generateAutoLayout } from './auto-layout.js';
 export default defineHook(
   ({ init, action }, { env, logger, database }) => {
     const db = database;
-    const formulaApiUrl = (env['FORMULA_API_URL'] as string || 'http://localhost:3000').replace(/\/+$/, '');
     const gatewayUrl = (env['GATEWAY_URL'] as string || '').replace(/\/+$/, '');
     const gatewayInternalSecret = env['GATEWAY_INTERNAL_SECRET'] as string || '';
 
@@ -60,11 +59,12 @@ export default defineHook(
             }
           } catch { /* table may not exist yet */ }
 
-          // Fetch describe from formula-api
-          const token = req.headers['x-auth-token'] || '';
+          // Fetch describe via gateway internal route
+          const describeHeaders: Record<string, string> = {};
+          if (gatewayInternalSecret) describeHeaders['X-Internal-Secret'] = gatewayInternalSecret;
           const describeRes = await fetch(
-            `${formulaApiUrl}/calculator/${encodeURIComponent(calcId)}/describe`,
-            { headers: token ? { 'X-Auth-Token': token } : {} },
+            `${gatewayUrl}/internal/calc/calculator/${encodeURIComponent(calcId)}/describe`,
+            { headers: describeHeaders },
           );
 
           if (!describeRes.ok) {
