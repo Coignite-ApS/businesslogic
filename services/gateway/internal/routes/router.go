@@ -71,6 +71,9 @@ func (r *Router) setup() {
 	// Widget routes (GW-03)
 	r.setupWidgetRoutes()
 
+	// Internal service proxy routes (GW-04)
+	r.setupInternalServiceProxy()
+
 	// Internal routes (GW-02 + cache invalidation)
 	r.setupInternalRoutes()
 }
@@ -204,6 +207,37 @@ func (r *Router) setupInternalRoutes() {
 		r.responseCache.Invalidate(req.Context(), "gw:rc:*")
 		w.WriteHeader(http.StatusNoContent)
 	})))
+}
+
+func (r *Router) setupInternalServiceProxy() {
+	if r.internalSecret == "" {
+		return
+	}
+
+	internalAuth := middleware.InternalAuth(r.internalSecret)
+
+	// /internal/calc/* → formula-api, /internal/ai/* → ai-api, /internal/flow/* → flow-trigger
+	internalRoutes := map[string]string{
+		"/internal/calc/": "formula-api",
+		"/internal/ai/":   "ai-api",
+		"/internal/flow/": "flow-trigger",
+	}
+
+	for prefix, backendName := range internalRoutes {
+		backend, ok := r.backends[backendName]
+		if !ok {
+			continue
+		}
+		p := prefix
+		b := backend
+		r.mux.Handle(p, internalAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// Strip internal secret — don't leak to backend
+			req.Header.Del("X-Internal-Secret")
+			// Rewrite path: /internal/calc/foo → /foo
+			req.URL.Path = "/" + strings.TrimPrefix(req.URL.Path, p)
+			b.ServeHTTP(w, req)
+		})))
+	}
 }
 
 func rewritePath(path, prefix, backendName string) string {
