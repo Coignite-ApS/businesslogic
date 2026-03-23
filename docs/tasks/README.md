@@ -22,7 +22,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 01 | Calculator Testing | planned | [cms/01-calculator-testing.md](cms/01-calculator-testing.md) |
 | 02 | Cell Mapping UX | planned | [cms/02-cell-mapping-ux.md](cms/02-cell-mapping-ux.md) |
 | 03 | Calculator Onboarding Wizard | planned | [cms/03-onboarding-wizard.md](cms/03-onboarding-wizard.md) |
-| 04 | Embeddable Calculator Widget (Render Library) | planned | [cms/04-widget-render-library.md](cms/04-widget-render-library.md) |
+| 04 | Embeddable Calculator Widget (Render Library) | in-progress | [cms/04-widget-render-library.md](cms/04-widget-render-library.md) |
 | 05 | Widget Layout Builder (Directus Module) | planned | [cms/05-widget-layout-builder.md](cms/05-widget-layout-builder.md) |
 | 06 | Lead Capture & CRM Integration | planned | [cms/06-lead-capture.md](cms/06-lead-capture.md) |
 | 07 | Template Gallery & Showcase | planned | [cms/07-template-gallery.md](cms/07-template-gallery.md) |
@@ -137,11 +137,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 20 | 0 | 0 | 20 |
+| CMS | 19 | 1 | 0 | 20 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 0 | 0 | 0 | 0 |
 | Gateway | 0 | 0 | 0 | 0 |
 | Cross-Cutting | 1 | 0 | 0 | 1 |
-| **Total** | **40** | **0** | **2** | **42** |
+| **Total** | **39** | **1** | **2** | **42** |

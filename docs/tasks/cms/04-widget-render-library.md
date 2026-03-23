@@ -1,6 +1,6 @@
 # 04. Embeddable Calculator Widget (Render Library)
 
-**Status:** planned
+**Status:** in-progress
 **Phase:** 3 — Embeddable Widgets
 **Replaces:** old #2 (Display Components) — render library portion
 
@@ -225,41 +225,40 @@ The auto-generation reads the calculator's existing schema (same format used by 
 ## Key Tasks
 
 ### Collections & Schema
-- New collection: `widget_components` — component registry (seeded with all standard components above)
-- New collection: `widget_themes` — theme presets (seeded with "Default", "Dark", "Minimal")
-- New collection: `widget_templates` — layout templates with skeleton JSON (seeded with "Single Column", "Two Column", "Card with Sidebar")
-- New collection: `calculator_layouts` — per-calculator layout config (references components by slug, linked to calculator, versioned)
-- Permissions: `widget_components`, `widget_themes`, `widget_templates` readable by all authenticated users; writable by admin only. `calculator_layouts` scoped to `$CURRENT_USER.active_account`.
+- [ ] New collection: `widget_components` — component registry (seeded with all standard components above)
+- [ ] New collection: `widget_themes` — theme presets (seeded with "Default", "Dark", "Minimal")
+- [ ] New collection: `widget_templates` — layout templates with skeleton JSON (seeded with "Single Column", "Two Column", "Card with Sidebar")
+- [ ] New collection: `calculator_layouts` — per-calculator layout config (references components by slug, linked to calculator, versioned)
+- [ ] Permissions: `widget_components`, `widget_themes`, `widget_templates` readable by all authenticated users; writable by admin only. `calculator_layouts` scoped to `$CURRENT_USER.active_account`.
 
 ### API
-- `GET /calc/widget-config/:calcId` — returns merged layout config + calculator describe + resolved component definitions
-- Fallback: if no layout config, auto-generate from input/output JSON Schema using best-fit component matching (field_types)
-- `GET /calc/widget-components` — returns all published components (for the layout builder)
-- `GET /calc/widget-themes` — returns all published themes
-- `GET /calc/widget-templates` — returns all published layout templates
+- [x] `GET /calc/widget-config/:calcId` — returns merged layout config + calculator describe + resolved component definitions
+- [x] Fallback: if no layout config, auto-generate from input/output JSON Schema using best-fit component matching (field_types)
+- [x] `GET /calc/widget-components` — returns all published components (for the layout builder)
+- [x] `GET /calc/widget-themes` — returns all published themes
+- [x] `GET /calc/widget-templates` — returns all published layout templates
 
 ### Render Library
-- Scaffold Vite + Lit project as npm package
-- Implement component registry (input + output components as Lit elements)
-- Implement layout resolver (JSON config → component tree)
-- API client: fetch config, execute calculator, handle debounced input changes
-- Shadow DOM encapsulation with CSS custom property theming
-- Auto-render custom element: `<bl-calculator>`
-- Programmatic API: `Calculator` class with events
-- Auto-generate layout when no config exists
+- [x] Scaffold Vite + Lit project as npm package
+- [x] Implement component registry (input + output components as Lit elements)
+- [x] Implement layout resolver (JSON config → component tree)
+- [x] API client: fetch config, execute calculator, handle debounced input changes
+- [x] Shadow DOM encapsulation with CSS custom property theming
+- [x] Auto-render custom element: `<bl-calculator>`
+- [ ] Programmatic API: `Calculator` class with events (Phase 4b)
+- [x] Auto-generate layout when no config exists
 
-### Charts
-- Chart wrapper as Lit component (evaluate uPlot vs lightweight alternatives for pie/donut support — uPlot is weak on pie charts; may need a second tiny lib or custom SVG for pie/donut)
-- Lazy-load via dynamic `import()` — only loaded when config contains chart components
-- Required chart types: bar, line, pie, donut
-- All charts must animate transitions when data changes (not just initial render)
-- Consider: uPlot for bar/line (~15KB) + custom SVG pie/donut component (~2-3KB)
+### Charts (Phase 4b)
+- [ ] Chart wrapper as Lit component
+- [ ] Lazy-load via dynamic `import()`
+- [ ] Required chart types: bar, line, pie, donut
+- [ ] All charts must animate transitions when data changes
 
 ### Distribution
-- npm package: `@businesslogic/widget`
-- ESM + IIFE builds (Vite lib mode)
-- jsDelivr CDN with versioned URLs
-- SRI hash generation in build
+- [x] npm package: `@businesslogic/widget`
+- [x] ESM + IIFE builds (Vite lib mode)
+- [ ] jsDelivr CDN with versioned URLs (publish to npm first)
+- [ ] SRI hash generation in build
 
 ---
 
