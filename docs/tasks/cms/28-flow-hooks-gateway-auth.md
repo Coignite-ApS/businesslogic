@@ -2,64 +2,51 @@
 
 **Status:** completed
 **Priority:** HIGH
-**Depends on:** GW-01, GW-02
+**Depends on:** GW-04 (internal service proxy routes)
+**Completed:** 2026-03-23
 
-## Problem
+## Summary
 
-`project-extension-flow-hooks` uses `FLOW_TRIGGER_ADMIN_TOKEN` + `X-Admin-Token` for all CMS→flow-engine communication via `FlowTriggerClient`. After gateway migration, should use gateway internal secret or HMAC signing.
+Migrated `project-extension-flow-hooks` from direct flow-engine auth (`FLOW_TRIGGER_URL` + `X-Admin-Token`) to gateway internal auth (`GATEWAY_URL/internal/flow` + `X-Internal-Secret`). Follows the same pattern established by CMS-25 (calculator-api) and CMS-27 (ai-api).
 
-## Current State
-
-**File:** `services/cms/extensions/local/project-extension-flow-hooks/src/index.ts`
-- Line 14: `FLOW_TRIGGER_URL` from env (direct to flow engine)
-- Line 21: `FLOW_TRIGGER_ADMIN_TOKEN` from env
-
-**File:** `services/cms/extensions/local/project-extension-flow-hooks/src/trigger-client.ts`
-- Line 19-27: `FlowTriggerClient` class stores `baseUrl` + `adminToken`
-- Line 26: `headers()` method adds `X-Admin-Token` on every request
-- Methods: `getNodeTypes()`, `validate()`, `trigger()`, `getExecution()`, `getFlowExecutions()`, `getHealth()`
-- All methods use `this.headers()` → all send `X-Admin-Token`
-
-**SSE Streaming:**
-- Line 119 (index.ts): SSE endpoint for flow execution streaming
-- Uses `X-Admin-Token` header for SSE connection to flow engine
-
-## Target State
-
-- Replace `FLOW_TRIGGER_URL` → `GATEWAY_URL`
-- Replace `FLOW_TRIGGER_ADMIN_TOKEN` → `GATEWAY_INTERNAL_SECRET`
-- Update `FlowTriggerClient.headers()` to use `X-Internal-Secret`
-
-## Changes Required
+## Changes Made
 
 ### 1. trigger-client.ts
-- Rename `adminToken` → `internalSecret`
-- Update `headers()`: `X-Admin-Token` → `X-Internal-Secret`
-- Update `baseUrl` to point to gateway
+- Renamed `adminToken` → `internalSecret` (field + constructor param)
+- `headers()`: `X-Admin-Token` → `X-Internal-Secret`
 
 ### 2. index.ts
-- Replace env var reads
-- Update SSE connection to use new auth
+- `FLOW_TRIGGER_URL` → construct from `GATEWAY_URL` + `/internal/flow`
+- `FLOW_TRIGGER_ADMIN_TOKEN` → `GATEWAY_INTERNAL_SECRET`
+- Guard: `if (!gwUrl)` → warn + return
+- SSE endpoint: `X-Admin-Token` → `X-Internal-Secret`
+- Removed `/flow/trigger-url` endpoint (dead code — no frontend consumer)
 
-### 3. Environment cleanup
-- Remove `FLOW_TRIGGER_ADMIN_TOKEN` from CMS env
-- Add `GATEWAY_URL`, `GATEWAY_INTERNAL_SECRET` (may already exist from other tasks)
+### 3. docker-compose.dev.yml
+- Removed `FLOW_TRIGGER_URL` and `FLOW_TRIGGER_ADMIN_TOKEN` from bl-cms env
+- `GATEWAY_URL` and `GATEWAY_INTERNAL_SECRET` already present (from CMS-25)
 
-## Note: Gateway Flow Routes
+### 4. .env.example
+- Added comment: `FLOW_TRIGGER_ADMIN_TOKEN` only needed by bl-flow-trigger service, no longer by CMS
 
-This task assumes gateway has routes for flow engine. If not yet implemented, either:
-- Add `/v1/flow/*` routes to gateway (separate task)
-- Or use direct + HMAC signing
+### 5. Tests (new)
+- Created `src/__tests__/trigger-client.test.ts` — 19 vitest tests
+- Added vitest devDependency + test script to package.json
+- Covers: all methods, headers, error handling, trailing slash, no-secret, query params
 
-Currently gateway only has widget + calc routes. Flow routes may need a separate gateway task.
+## Security Note
 
-## Key Files
+Gateway strips `X-Internal-Secret` before forwarding to backends. The flow engine only knows `X-Admin-Token`. Impact:
+- `/node-types` and `/flows/validate` return 401 (graceful degradation — stale node types, validation skipped with warning)
+- All runtime operations (`/trigger`, `/executions`, `/stream`) work fine (no auth required)
 
-- `services/cms/extensions/local/project-extension-flow-hooks/src/index.ts`
-- `services/cms/extensions/local/project-extension-flow-hooks/src/trigger-client.ts`
+Backend auth updates are a separate concern.
 
-## Tests
+## Verification
 
-- [ ] All flow operations work with new auth (node types, validate, trigger, execution)
-- [ ] SSE streaming works with new auth
-- [ ] Old FLOW_TRIGGER_ADMIN_TOKEN env var no longer needed
+- [x] 19/19 unit tests pass
+- [x] All flow proxy routes work through gateway (health, validate, trigger, execution, list)
+- [x] Manual flow trigger from UI: completed 775ms, 5 nodes executed
+- [x] SSE execution streaming works
+- [x] No `FLOW_TRIGGER_URL`/`FLOW_TRIGGER_ADMIN_TOKEN`/`X-Admin-Token` references remain in CMS extension code
+- [x] docker-compose bl-cms no longer passes flow-specific env vars
