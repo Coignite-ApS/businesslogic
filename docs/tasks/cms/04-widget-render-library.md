@@ -229,7 +229,7 @@ The auto-generation reads the calculator's existing schema (same format used by 
 - [x] New collection: `widget_themes` — theme presets (seeded with "Default", "Dark", "Minimal")
 - [x] New collection: `widget_templates` — layout templates with skeleton JSON (seeded with "Single Column", "Two Column", "Card with Sidebar")
 - [x] New collection: `calculator_layouts` — per-calculator layout config (references components by slug, linked to calculator, versioned)
-- [ ] Permissions: `widget_components`, `widget_themes`, `widget_templates` readable by all authenticated users; writable by admin only. `calculator_layouts` scoped to `$CURRENT_USER.active_account`.
+- [x] Permissions: `widget_components`, `widget_themes`, `widget_templates` readable by all authenticated users; writable by admin only. `calculator_layouts` scoped to `$CURRENT_USER.active_account`.
 
 ### API
 - [x] `GET /calc/widget-config/:calcId` — returns merged layout config + calculator describe + resolved component definitions
