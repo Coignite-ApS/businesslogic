@@ -111,6 +111,7 @@ func main() {
 
 	// Middleware chain (outermost first)
 	var handler http.Handler = mux
+	handler = middleware.SecurityHeaders(handler)
 	handler = middleware.CORS(handler)
 	handler = middleware.RateLimit(keyService)(handler)
 	handler = middleware.Auth(keyService)(handler)
