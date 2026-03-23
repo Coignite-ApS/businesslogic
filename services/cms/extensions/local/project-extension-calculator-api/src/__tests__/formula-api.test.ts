@@ -162,7 +162,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('describeCalculator', () => {
-		it('sends GET /calculator/:id/describe', async () => {
+		it('sends GET /calculator/:id/describe with internal secret', async () => {
 			const body = { schema: {} };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -170,7 +170,7 @@ describe('FormulaApiClient', () => {
 			const result = await client.describeCalculator('calc-1');
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1/describe`, {
-				headers: {},
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET },
 			});
 			expect(result).toEqual({ status: 200, body });
 		});
@@ -182,7 +182,7 @@ describe('FormulaApiClient', () => {
 			await client.describeCalculator('calc-1', 'my-token');
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1/describe`, {
-				headers: { 'X-Auth-Token': 'my-token' },
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET, 'X-Auth-Token': 'my-token' },
 			});
 		});
 
@@ -198,7 +198,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('executeCalculator', () => {
-		it('sends POST /execute/calculator/:id with input', async () => {
+		it('sends POST /execute/calculator/:id with input and internal secret', async () => {
 			const body = { result: 42 };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -208,7 +208,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/execute/calculator/calc-1`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET },
 				body: JSON.stringify(input),
 			});
 			expect(result).toEqual({ status: 200, body });
@@ -222,7 +222,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/execute/calculator/calc-1`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', 'X-Auth-Token': 'my-token' },
+				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET, 'X-Auth-Token': 'my-token' },
 				body: JSON.stringify({ a: 1 }),
 			});
 		});

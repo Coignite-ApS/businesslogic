@@ -23,7 +23,7 @@ export function curlExecute({ baseUrl, calculatorId, apiKey, sampleBody }: Snipp
   -H "Content-Type: application/json"${body}`;
 }
 
-export function curlDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function curlDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `curl "${baseUrl}/calculator/${calculatorId}/describe" \\
   -H "X-API-Key: ${apiKey}"`;
 }
@@ -44,7 +44,7 @@ const result = await response.json();
 console.log(result);`;
 }
 
-export function jsDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function jsDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `const response = await fetch("${baseUrl}/calculator/${calculatorId}/describe", {
   headers: {
     "X-API-Key": "${apiKey}",
@@ -70,7 +70,7 @@ response = requests.post(
 print(response.json())`;
 }
 
-export function pythonDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function pythonDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `import requests
 
 response = requests.get(
@@ -105,7 +105,7 @@ curl_close($ch);
 echo $response;`;
 }
 
-export function phpDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function phpDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `<?php
 $ch = curl_init("${baseUrl}/calculator/${calculatorId}/describe");
 
@@ -155,7 +155,7 @@ func main() {
 }`;
 }
 
-export function goDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function goDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `package main
 
 import (
@@ -206,7 +206,7 @@ async fn main() -> Result<(), reqwest::Error> {
 }`;
 }
 
-export function rustDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function rustDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `use reqwest;
 
 #[tokio::main]
@@ -247,7 +247,7 @@ var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 System.out.println(response.body());`;
 }
 
-export function javaDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function javaDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
