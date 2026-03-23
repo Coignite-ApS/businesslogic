@@ -32,7 +32,7 @@ export class BlMetric extends LitElement {
   @property() value: unknown = '';
   @property() format = '';
   @property({ type: Boolean }) highlight = false;
-  @property({ type: Boolean }) animate = true;
+  @property({ type: Boolean, attribute: 'animate' }) enableAnimation = true;
 
   private _animatedValue = 0;
   private _animationFrame = 0;
@@ -41,7 +41,7 @@ export class BlMetric extends LitElement {
   updated(changed: Map<string, unknown>) {
     if (changed.has('value')) {
       const num = Number(this.value);
-      if (!isNaN(num) && this.animate && this._initialized) {
+      if (!isNaN(num) && this.enableAnimation && this._initialized) {
         this._animateTo(num);
       } else {
         this._animatedValue = isNaN(num) ? 0 : num;
@@ -77,7 +77,7 @@ export class BlMetric extends LitElement {
     const num = Number(this.value);
     if (isNaN(num)) return String(this.value);
 
-    const displayNum = this.animate && this._initialized ? this._animatedValue : num;
+    const displayNum = this.enableAnimation && this._initialized ? this._animatedValue : num;
 
     switch (this.format) {
       case 'currency':

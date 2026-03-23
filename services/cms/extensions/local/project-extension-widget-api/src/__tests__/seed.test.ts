@@ -3,8 +3,8 @@ import { COMPONENTS, THEMES, TEMPLATES } from '../seed.js';
 
 describe('seed data', () => {
   describe('COMPONENTS', () => {
-    it('has 11 standard components', () => {
-      expect(COMPONENTS).toHaveLength(11);
+    it('has 20 standard components', () => {
+      expect(COMPONENTS).toHaveLength(20);
     });
 
     it('has unique slugs', () => {
@@ -16,8 +16,8 @@ describe('seed data', () => {
       const inputs = COMPONENTS.filter((c) => c.category === 'input');
       const outputs = COMPONENTS.filter((c) => c.category === 'output');
       const layout = COMPONENTS.filter((c) => c.category === 'layout');
-      expect(inputs).toHaveLength(4);
-      expect(outputs).toHaveLength(2);
+      expect(inputs).toHaveLength(7);
+      expect(outputs).toHaveLength(8);
       expect(layout).toHaveLength(5);
     });
 

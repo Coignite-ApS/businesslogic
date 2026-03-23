@@ -20,7 +20,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "vite build && tsc --emitDeclarationOnly",
+    "build": "vite build && tsc --emitDeclarationOnly && node scripts/sri.js",
+    "build:no-sri": "vite build && tsc --emitDeclarationOnly",
     "dev": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest",

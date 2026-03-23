@@ -141,7 +141,7 @@ export function renderNode(node: LayoutNode, ctx: RenderContext): TemplateResult
         .value=${ctx.outputs[field!]}
         .format=${props.format || ''}
         .highlight=${Boolean(props.highlight)}
-        .animate=${props.animate !== false}
+        .enableAnimation=${props.animate !== false}
       ></bl-metric>`;
 
     case 'text':
