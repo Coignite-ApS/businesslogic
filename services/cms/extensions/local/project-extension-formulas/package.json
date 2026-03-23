@@ -11,7 +11,8 @@
   },
   "scripts": {
     "build": "directus-extension build",
-    "dev": "directus-extension build -w --no-minify"
+    "dev": "directus-extension build -w --no-minify",
+    "test": "vitest run"
   },
   "dependencies": {
     "dompurify": "^3.3.3",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@directus/extensions-sdk": "^17.0.11",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.1",
     "vue": "^3.5.30"
   }
 }

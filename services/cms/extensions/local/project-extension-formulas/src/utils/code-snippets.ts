@@ -1,6 +1,6 @@
 export interface FormulaSnippetParams {
 	baseUrl: string;
-	token: string;
+	apiKey: string;
 }
 
 export function maskToken(token: string): string {
@@ -27,19 +27,19 @@ function sampleBody(ep: Endpoint): string {
 }
 
 // --- curl ---
-function curl(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function curl(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `curl -X POST "${baseUrl}${endpointPath(ep)}" \\
-  -H "X-Auth-Token: ${token}" \\
+  -H "X-API-Key: ${apiKey}" \\
   -H "Content-Type: application/json" \\
   -d '${sampleBody(ep)}'`;
 }
 
 // --- JavaScript ---
-function js(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function js(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `const response = await fetch("${baseUrl}${endpointPath(ep)}", {
   method: "POST",
   headers: {
-    "X-Auth-Token": "${token}",
+    "X-API-Key": "${apiKey}",
     "Content-Type": "application/json",
   },
   body: JSON.stringify(${sampleBody(ep)}),
@@ -50,14 +50,14 @@ console.log(result);`;
 }
 
 // --- Python ---
-function python(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function python(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `import requests
 
 data = ${sampleBody(ep)}
 
 response = requests.post(
     "${baseUrl}${endpointPath(ep)}",
-    headers={"X-Auth-Token": "${token}"},
+    headers={"X-API-Key": "${apiKey}"},
     json=data
 )
 
@@ -65,7 +65,7 @@ print(response.json())`;
 }
 
 // --- PHP ---
-function php(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function php(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `<?php
 $ch = curl_init("${baseUrl}${endpointPath(ep)}");
 $data = json_encode(${sampleBody(ep)});
@@ -73,7 +73,7 @@ $data = json_encode(${sampleBody(ep)});
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "X-Auth-Token: ${token}",
+    "X-API-Key: ${apiKey}",
     "Content-Type: application/json",
 ]);
 curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
@@ -85,7 +85,7 @@ echo $response;`;
 }
 
 // --- Go ---
-function go(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function go(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `package main
 
 import (
@@ -102,7 +102,7 @@ func main() {
 		panic(err)
 	}
 
-	req.Header.Set("X-Auth-Token", "${token}")
+	req.Header.Set("X-API-Key", "${apiKey}")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -117,7 +117,7 @@ func main() {
 }
 
 // --- Rust ---
-function rust(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function rust(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `use reqwest;
 
 #[tokio::main]
@@ -125,7 +125,7 @@ async fn main() -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let res = client
         .post("${baseUrl}${endpointPath(ep)}")
-        .header("X-Auth-Token", "${token}")
+        .header("X-API-Key", "${apiKey}")
         .json(&serde_json::json!(${sampleBody(ep)}))
         .send()
         .await?;
@@ -137,7 +137,7 @@ async fn main() -> Result<(), reqwest::Error> {
 }
 
 // --- Java ---
-function java(ep: Endpoint, { baseUrl, token }: FormulaSnippetParams): string {
+function java(ep: Endpoint, { baseUrl, apiKey }: FormulaSnippetParams): string {
 	return `import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -146,7 +146,7 @@ import java.net.http.HttpResponse;
 var client = HttpClient.newHttpClient();
 var request = HttpRequest.newBuilder()
     .uri(URI.create("${baseUrl}${endpointPath(ep)}"))
-    .header("X-Auth-Token", "${token}")
+    .header("X-API-Key", "${apiKey}")
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString("""
             ${sampleBody(ep)}"""))

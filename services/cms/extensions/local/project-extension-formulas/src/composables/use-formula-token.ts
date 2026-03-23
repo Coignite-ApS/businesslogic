@@ -9,22 +9,18 @@ export function useFormulaToken(api: any) {
 	async function fetchToken() {
 		tokenLoading.value = true;
 		try {
-			// Check token existence
-			const { data } = await api.get('/calc/formula-tokens');
-			const tokens = data?.data || data;
-			hasToken.value = Array.isArray(tokens) && tokens.some((t: any) => !t.revoked);
+			// Check if user has API keys via gateway
+			const { data } = await api.get('/calc/api-keys');
+			const keys = data?.data || data;
+			hasToken.value = Array.isArray(keys) && keys.length > 0;
 
-			if (hasToken.value) {
-				// Get decrypted value
-				try {
-					const { data: valData } = await api.get('/calc/formula-token-value');
-					tokenValue.value = valData?.data || valData || '';
-				} catch {
-					tokenValue.value = '';
-				}
+			if (hasToken.value && keys[0]?.key) {
+				tokenValue.value = keys[0].key;
+			} else {
+				tokenValue.value = '';
 			}
 
-			// Get formula API URL
+			// Get gateway URL for code snippets
 			try {
 				const { data: urlData } = await api.get('/calc/formula-api-url');
 				formulaApiUrl.value = urlData?.data || urlData?.url || urlData || '';

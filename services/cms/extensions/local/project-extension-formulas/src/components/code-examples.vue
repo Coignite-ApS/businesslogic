@@ -70,7 +70,7 @@ const activeLangObj = computed(() => languages.find((l) => l.id === activeLang.v
 
 const maskedParams = computed<FormulaSnippetParams>(() => ({
 	...props.snippetParams,
-	token: maskToken(props.snippetParams.token),
+	apiKey: maskToken(props.snippetParams.apiKey),
 }));
 
 const displayCode = computed(() => activeLangObj.value.snippet(endpoint.value, maskedParams.value));
