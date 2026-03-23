@@ -13,21 +13,21 @@ func CORS(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		acct, _ := r.Context().Value(AccountContextKey).(*service.AccountData)
 
-		if origin != "" {
-			allowed := true
-			if acct != nil && len(acct.AllowedOrigins) > 0 {
-				allowed = false
+		// Only set CORS headers for authenticated requests (F-012).
+		// Unauthenticated endpoints (health, ping) do not echo origins.
+		if origin != "" && acct != nil {
+			if len(acct.AllowedOrigins) > 0 {
+				allowed := false
 				for _, o := range acct.AllowedOrigins {
 					if strings.EqualFold(o, origin) {
 						allowed = true
 						break
 					}
 				}
-			}
-
-			if !allowed {
-				http.Error(w, `{"error":"origin not allowed"}`, http.StatusForbidden)
-				return
+				if !allowed {
+					http.Error(w, `{"error":"origin not allowed"}`, http.StatusForbidden)
+					return
+				}
 			}
 
 			w.Header().Set("Access-Control-Allow-Origin", origin)
