@@ -257,20 +257,22 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 
 	// ─── Formula API proxy ───────────────────────────────────
 
-	const apiUrl = env['FORMULA_API_URL'] as string | undefined;
-	if (!apiUrl) {
-		logger.warn('FORMULA_API_URL not set — calculator API proxy disabled');
+	const gwUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
+	const gwSecret = env['GATEWAY_INTERNAL_SECRET'] as string | undefined;
+	if (!gwUrl) {
+		logger.warn('GATEWAY_URL not set — calculator API proxy disabled');
 		return;
 	}
 
-	const adminToken = env['FORMULA_API_ADMIN_TOKEN'] as string | undefined;
-	const client = new FormulaApiClient(apiUrl, adminToken);
+	const apiUrl = `${gwUrl}/internal/calc`;
+	const client = new FormulaApiClient(apiUrl, gwSecret);
 
 	init('routes.custom.before', ({ app }) => {
 
-		// GET /calc/formula-api-url — expose Formula API URL to frontend
+		// GET /calc/formula-api-url — expose public Formula API URL to frontend (for code snippets)
+		const publicApiUrl = (env['FORMULA_API_PUBLIC_URL'] as string) || (env['FORMULA_API_URL'] as string) || apiUrl;
 		app.get('/calc/formula-api-url', requireAuth, (_req: any, res: any) => {
-			return res.json({ url: apiUrl });
+			return res.json({ url: publicApiUrl });
 		});
 
 		// GET /calc/health — proxy Formula API health (admin only)

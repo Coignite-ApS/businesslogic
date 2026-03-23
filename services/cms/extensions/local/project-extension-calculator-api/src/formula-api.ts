@@ -21,16 +21,16 @@ export class FormulaApiError extends Error {
 
 export class FormulaApiClient {
 	private baseUrl: string;
-	private adminToken: string | undefined;
+	private internalSecret: string | undefined;
 
-	constructor(baseUrl: string, adminToken?: string) {
+	constructor(baseUrl: string, internalSecret?: string) {
 		this.baseUrl = baseUrl.replace(/\/+$/, '');
-		this.adminToken = adminToken;
+		this.internalSecret = internalSecret;
 	}
 
 	private adminHeaders(extra?: Record<string, string>): Record<string, string> {
 		const h: Record<string, string> = { ...extra };
-		if (this.adminToken) h['X-Admin-Token'] = this.adminToken;
+		if (this.internalSecret) h['X-Internal-Secret'] = this.internalSecret;
 		return h;
 	}
 
