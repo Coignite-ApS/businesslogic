@@ -1,6 +1,6 @@
 # 04. Embeddable Calculator Widget (Render Library)
 
-**Status:** in-progress
+**Status:** completed
 **Phase:** 3 — Embeddable Widgets
 **Replaces:** old #2 (Display Components) — render library portion
 

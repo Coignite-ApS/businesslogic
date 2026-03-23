@@ -22,8 +22,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 01 | Calculator Testing | planned | [cms/01-calculator-testing.md](cms/01-calculator-testing.md) |
 | 02 | Cell Mapping UX | planned | [cms/02-cell-mapping-ux.md](cms/02-cell-mapping-ux.md) |
 | 03 | Calculator Onboarding Wizard | planned | [cms/03-onboarding-wizard.md](cms/03-onboarding-wizard.md) |
-| 04 | Embeddable Calculator Widget (Render Library) | in-progress | [cms/04-widget-render-library.md](cms/04-widget-render-library.md) |
-| 05 | Widget Layout Builder (Directus Module) | planned | [cms/05-widget-layout-builder.md](cms/05-widget-layout-builder.md) |
+| 04 | Embeddable Calculator Widget (Render Library) | completed | [cms/04-widget-render-library.md](cms/04-widget-render-library.md) |
 | 06 | Lead Capture & CRM Integration | planned | [cms/06-lead-capture.md](cms/06-lead-capture.md) |
 | 07 | Template Gallery & Showcase | planned | [cms/07-template-gallery.md](cms/07-template-gallery.md) |
 | 08 | Pricing & Billing (Tax, Enforcement, Tiers, Lifetime) | planned | [cms/08-pricing-billing.md](cms/08-pricing-billing.md) |
@@ -40,6 +39,9 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 19 | directus-extension-businesslogic (public npm) | planned | [cms/19-directus-extension-businesslogic.md](cms/19-directus-extension-businesslogic.md) |
 | 20 | Account-Level MCP (UI) | planned | [cms/20-account-mcp.md](cms/20-account-mcp.md) |
 | 21 | DOMPurify for All v-html Usage | planned | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
+| 22 | API Key Management UI | planned | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
+| 23 | Widget Client Gateway Mode | planned | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
+| 24 | Widget Layout Builder | planned | [cms/24-widget-layout-builder.md](cms/24-widget-layout-builder.md) |
 
 ---
 
@@ -101,7 +103,11 @@ DAG workflow execution, triggers, workers.
 
 Auth, rate limiting, routing, CORS.
 
-No outstanding improvements migrated from legacy. Add new improvements as the gateway service is built.
+| # | Improvement | Status | Doc |
+|---|-------------|--------|-----|
+| 01 | Fine-Grained Resource Permissions | planned | [gateway/01-resource-permissions.md](gateway/01-resource-permissions.md) |
+| 02 | API Key Management Endpoints | planned | [gateway/02-api-key-management.md](gateway/02-api-key-management.md) |
+| 03 | Widget Routes + Response Cache | planned | [gateway/03-widget-routes-cache.md](gateway/03-widget-routes-cache.md) |
 
 ---
 
@@ -114,6 +120,7 @@ Infrastructure and multi-service concerns.
 | 01 | Infrastructure & Deployment (Hetzner + Coolify) | planned | [cross-cutting/01-infrastructure.md](cross-cutting/01-infrastructure.md) |
 | 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | planned | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
 | 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | planned | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
+| 04 | Formula-API Gateway Auth Path | planned | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
 
 ---
 
@@ -125,16 +132,22 @@ Infrastructure and multi-service concerns.
 | 2 | cms | 08 | Pricing — Tax & Compliance | Stripe Tax, EUR+USD, VAT — legal foundation |
 | 3 | formula-api | 01 | Execute Auth | Per-formula tokens, encrypt at rest |
 | 4 | cms | 08 | Pricing — Enforcement | calls_per_month not enforced |
-| 5 | cms | 04 | Core Widget | THE missing product piece |
-| 6 | cms | 05 | Widget Layout Builder | Design showcase-ready layouts |
-| 7 | cms | 06 | Lead Capture | Makes widget a marketing tool |
-| 8 | cms | 07 | Template Gallery | Marketing + onboarding + SEO |
-| 9 | cms | 01 | Calculator Testing | Quality foundation |
-| 10 | cms | 02 | Cell Mapping UX | Quick authoring UX win |
-| 11 | cms | 20 | Account-Level MCP (UI) | Unified MCP endpoint |
-| 12 | formula-api | 06 | Account-Level MCP (Backend) | Backend for unified MCP |
-| 13 | ai-api | 01 | Public API + Widget | Public AI chat API |
-| 14 | formula-api/engine | 09 | Missing Functions | ~150 remaining Excel functions |
+| 5 | cms | 04 | Core Widget | THE missing product piece (completed) |
+| 6 | gateway | 01 | Resource Permissions | Foundation for API key auth |
+| 7 | gateway | 02 | API Key Management | CRUD for API keys |
+| 8 | gateway | 03 | Widget Routes + Cache | Gateway-routed widget traffic |
+| 9 | cross-cutting | 04 | Formula-API Gateway Auth | HMAC auth between gateway + formula |
+| 10 | cms | 22 | API Key Management UI | User-facing key management |
+| 11 | cms | 23 | Widget Gateway Mode | Widget uses API keys via gateway |
+| 12 | cms | 24 | Widget Layout Builder | Visual drag-drop layout design |
+| 13 | cms | 06 | Lead Capture | Makes widget a marketing tool |
+| 14 | cms | 07 | Template Gallery | Marketing + onboarding + SEO |
+| 15 | cms | 01 | Calculator Testing | Quality foundation |
+| 16 | cms | 02 | Cell Mapping UX | Quick authoring UX win |
+| 17 | cms | 20 | Account-Level MCP (UI) | Unified MCP endpoint |
+| 18 | formula-api | 06 | Account-Level MCP (Backend) | Backend for unified MCP |
+| 19 | ai-api | 01 | Public API + Widget | Public AI chat API |
+| 20 | formula-api/engine | 09 | Missing Functions | ~150 remaining Excel functions |
 
 ---
 
@@ -142,11 +155,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 20 | 1 | 0 | 21 |
+| CMS | 22 | 0 | 1 | 23 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
-| Gateway | 0 | 0 | 0 | 0 |
-| Cross-Cutting | 3 | 0 | 0 | 3 |
-| **Total** | **43** | **1** | **2** | **46** |
+| Gateway | 3 | 0 | 0 | 3 |
+| Cross-Cutting | 4 | 0 | 0 | 4 |
+| **Total** | **49** | **0** | **3** | **52** |

@@ -3,9 +3,31 @@ import { seedWidgetData } from './seed.js';
 import { generateAutoLayout } from './auto-layout.js';
 
 export default defineHook(
-  ({ init }, { env, logger, database }) => {
+  ({ init, action }, { env, logger, database }) => {
     const db = database;
     const formulaApiUrl = (env['FORMULA_API_URL'] as string || 'http://localhost:3000').replace(/\/+$/, '');
+    const gatewayUrl = (env['GATEWAY_URL'] as string || '').replace(/\/+$/, '');
+    const gatewayInternalSecret = env['GATEWAY_INTERNAL_SECRET'] as string || '';
+
+    // Invalidate gateway widget cache on layout/theme/template changes
+    const invalidateWidgetCache = async () => {
+      if (!gatewayUrl || !gatewayInternalSecret) return;
+      try {
+        await fetch(`${gatewayUrl}/internal/cache/invalidate`, {
+          method: 'POST',
+          headers: { 'X-Internal-Secret': gatewayInternalSecret },
+        });
+        logger.info('[widget-api] gateway widget cache invalidated');
+      } catch (err) {
+        logger.warn(`[widget-api] cache invalidation failed: ${(err as Error).message}`);
+      }
+    };
+
+    for (const collection of ['calculator_layouts', 'widget_themes', 'widget_templates', 'widget_components']) {
+      action(`${collection}.items.create`, () => invalidateWidgetCache());
+      action(`${collection}.items.update`, () => invalidateWidgetCache());
+      action(`${collection}.items.delete`, () => invalidateWidgetCache());
+    }
 
     // Seed widget data on startup
     init('app.after', async () => {

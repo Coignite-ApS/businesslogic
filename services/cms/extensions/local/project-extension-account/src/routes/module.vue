@@ -58,9 +58,73 @@
 			<!-- API Keys -->
 			<div class="section">
 				<h2 class="section-title">API Keys</h2>
-				<p class="section-desc">Use API keys to authenticate requests to the Formula API.</p>
+				<p class="section-desc">Authenticate widget & API requests through the gateway with resource-level permissions.</p>
 
-				<div v-if="formulaTokens.length > 0" class="tokens-table">
+				<div v-if="apiKeys.length > 0" class="tokens-table">
+					<div class="tokens-header">
+						<span>Name</span>
+						<span>Prefix</span>
+						<span>Environment</span>
+						<span>Created</span>
+						<span></span>
+					</div>
+					<div v-for="key in apiKeys" :key="key.id" class="tokens-row">
+						<span class="token-label">{{ key.name }}</span>
+						<span class="token-date"><code>{{ key.key_prefix }}...</code></span>
+						<span>
+							<v-chip small :class="key.environment === 'live' ? 'active-chip' : 'test-chip'">
+								{{ key.environment }}
+							</v-chip>
+						</span>
+						<span class="token-date">{{ formatDate(key.created_at) }}</span>
+						<span class="token-actions">
+							<v-button x-small secondary @click="handleRotateKey(key.id)">Rotate</v-button>
+							<v-button x-small kind="danger" secondary @click="handleRevokeKey(key.id)">Revoke</v-button>
+						</span>
+					</div>
+				</div>
+				<div v-else class="tokens-empty">
+					<span class="muted">No API keys yet. Create one to authenticate widget & API requests.</span>
+				</div>
+
+				<div class="token-create-row">
+					<v-input v-model="newKeyName" placeholder="Key name (e.g. Production)" small />
+					<v-select
+						v-model="newKeyEnv"
+						:items="[{ text: 'Live', value: 'live' }, { text: 'Test', value: 'test' }]"
+						small
+						inline
+					/>
+					<v-button small :loading="creatingKey" @click="handleCreateKey">
+						<v-icon name="add" left />
+						Create Key
+					</v-button>
+				</div>
+
+				<v-notice v-if="newlyCreatedKey" type="info" class="new-token-notice">
+					<div class="new-token-content">
+						<strong>Copy this key now — it won't be shown again:</strong>
+						<code class="new-token-value">{{ newlyCreatedKey }}</code>
+						<v-icon
+							name="content_copy"
+							small
+							clickable
+							class="copy-icon"
+							@click="copyToClipboard(newlyCreatedKey)"
+						/>
+					</div>
+				</v-notice>
+			</div>
+
+			<!-- Legacy Formula Tokens -->
+			<div class="section" v-if="formulaTokens.length > 0">
+				<h2 class="section-title">
+					Formula Tokens
+					<v-chip small class="legacy-chip">Legacy</v-chip>
+				</h2>
+				<p class="section-desc">Per-calculator tokens. Migrate to API Keys above for resource-level permissions.</p>
+
+				<div class="tokens-table">
 					<div class="tokens-header">
 						<span>Label</span>
 						<span>Created</span>
@@ -84,32 +148,6 @@
 						</span>
 					</div>
 				</div>
-				<div v-else class="tokens-empty">
-					<span class="muted">No API keys yet. Create one to use the Formula API.</span>
-				</div>
-
-				<div class="token-create-row">
-					<v-input v-model="newTokenLabel" placeholder="Key label (e.g. Production)" small />
-					<v-button small :loading="creatingToken" @click="handleCreateToken">
-						<v-icon name="add" left />
-						Create Key
-					</v-button>
-				</div>
-
-				<!-- Show newly created token (once) -->
-				<v-notice v-if="newlyCreatedToken" type="info" class="new-token-notice">
-					<div class="new-token-content">
-						<strong>Copy this key now — it won't be shown again:</strong>
-						<code class="new-token-value">{{ newlyCreatedToken }}</code>
-						<v-icon
-							name="content_copy"
-							small
-							clickable
-							class="copy-icon"
-							@click="copyNewToken"
-						/>
-					</div>
-				</v-notice>
 			</div>
 
 			<!-- Account Settings -->
@@ -191,6 +229,7 @@ const {
 	accounts, activeAccountId, subscription, loading, error,
 	fetchAccounts, setActiveAccount, fetchSubscription, updateAccount,
 	formulaTokens, fetchFormulaTokens, createFormulaToken, revokeFormulaToken,
+	apiKeys, fetchApiKeys, createApiKey, revokeApiKey, rotateApiKey,
 } = useAccount(api);
 
 const accountName = ref('');
@@ -200,6 +239,11 @@ const apiCallCount = ref(0);
 const newTokenLabel = ref('');
 const creatingToken = ref(false);
 const newlyCreatedToken = ref<string | null>(null);
+
+const newKeyName = ref('');
+const newKeyEnv = ref('live');
+const creatingKey = ref(false);
+const newlyCreatedKey = ref<string | null>(null);
 
 const isSubscriptionRoute = computed(() => route.path.includes('/subscription'));
 
@@ -287,6 +331,38 @@ function copyNewToken() {
 	}
 }
 
+function copyToClipboard(text: string | null) {
+	if (text) navigator.clipboard.writeText(text);
+}
+
+async function handleCreateKey() {
+	if (!newKeyName.value.trim()) return;
+	creatingKey.value = true;
+	newlyCreatedKey.value = null;
+	const result = await createApiKey({
+		name: newKeyName.value.trim(),
+		environment: newKeyEnv.value,
+		permissions: { services: { calc: { enabled: true, resources: [], actions: ['execute', 'describe'] } } },
+	});
+	if (result?.raw_key) {
+		newlyCreatedKey.value = result.raw_key;
+		newKeyName.value = '';
+	}
+	creatingKey.value = false;
+}
+
+async function handleRevokeKey(id: string) {
+	await revokeApiKey(id);
+}
+
+async function handleRotateKey(id: string) {
+	newlyCreatedKey.value = null;
+	const result = await rotateApiKey(id);
+	if (result?.raw_key) {
+		newlyCreatedKey.value = result.raw_key;
+	}
+}
+
 function formatDate(iso: string): string {
 	return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -299,7 +375,9 @@ watch(activeAccountId, () => {
 	fetchSubscription();
 	fetchUsageStats();
 	fetchFormulaTokens();
+	fetchApiKeys();
 	newlyCreatedToken.value = null;
+	newlyCreatedKey.value = null;
 });
 
 onMounted(async () => {
@@ -307,6 +385,7 @@ onMounted(async () => {
 	await fetchSubscription();
 	await fetchUsageStats();
 	await fetchFormulaTokens();
+	await fetchApiKeys();
 });
 </script>
 
@@ -473,6 +552,18 @@ onMounted(async () => {
 .revoked-chip {
 	--v-chip-background-color: var(--theme--foreground-subdued);
 	--v-chip-color: #fff;
+}
+
+.test-chip {
+	--v-chip-background-color: var(--theme--warning);
+	--v-chip-color: #fff;
+}
+
+.legacy-chip {
+	--v-chip-background-color: var(--theme--foreground-subdued);
+	--v-chip-color: #fff;
+	margin-left: 8px;
+	vertical-align: middle;
 }
 
 .tokens-empty {

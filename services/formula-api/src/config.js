@@ -77,6 +77,9 @@ export const config = {
   adminApiKey: env.ADMIN_API_KEY || null,
   statsFlushInterval: parseInt(env.STATS_FLUSH_INTERVAL_MS || '10000', 10),
   statsMaxBatch: parseInt(env.STATS_MAX_BATCH || '1000', 10),
+
+  // Gateway shared secret for HMAC-SHA256 signature verification
+  gatewaySharedSecret: env.GATEWAY_SHARED_SECRET || null,
 };
 
 // Locale mapping: short code -> engine locale

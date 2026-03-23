@@ -9,7 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coignite-aps/bl-gateway/internal/cache"
 	"github.com/coignite-aps/bl-gateway/internal/config"
+	"github.com/coignite-aps/bl-gateway/internal/handler"
 	"github.com/coignite-aps/bl-gateway/internal/middleware"
 	"github.com/coignite-aps/bl-gateway/internal/proxy"
 	"github.com/coignite-aps/bl-gateway/internal/routes"
@@ -71,6 +73,15 @@ func main() {
 	// Key service
 	keyService := service.NewKeyService(rdb, dbPool, cfg.KeyCacheTTL, cfg.NegativeCacheTTL)
 
+	// Response cache
+	responseCache := cache.New(rdb)
+
+	// API key handler
+	var apiKeyHandler *handler.APIKeyHandler
+	if dbPool != nil {
+		apiKeyHandler = handler.NewAPIKeyHandler(dbPool, rdb)
+	}
+
 	// Create backends
 	backendDefs := map[string]string{
 		"ai-api":       cfg.AIApiURL,
@@ -102,7 +113,14 @@ func main() {
 	healthChecker.Start(ctx)
 
 	// Router
-	router := routes.New(backends)
+	router := routes.New(routes.RouterConfig{
+		Backends:        backends,
+		APIKeyHandler:   apiKeyHandler,
+		ResponseCache:   responseCache,
+		InternalSecret:  cfg.InternalSecret,
+		ConfigCacheTTL:  cfg.WidgetConfigCacheTTL,
+		CatalogCacheTTL: cfg.WidgetCatalogCacheTTL,
+	})
 
 	// Build handler chain
 	mux := http.NewServeMux()
@@ -110,19 +128,20 @@ func main() {
 	mux.Handle("/", router)
 
 	// Middleware chain (outermost first)
-	var handler http.Handler = mux
-	handler = middleware.CORS(handler)
-	handler = middleware.RateLimit(keyService)(handler)
-	handler = middleware.Auth(keyService)(handler)
-	handler = middleware.Tracing(handler)
-	handler = middleware.Logging(handler)
-	handler = middleware.SecurityHeaders(handler)
-	handler = middleware.RequestID(handler)
+	var h http.Handler = mux
+	h = middleware.GatewaySign(cfg.GatewaySharedSecret)(h)
+	h = middleware.CORS(h)
+	h = middleware.RateLimit(keyService)(h)
+	h = middleware.Auth(keyService)(h)
+	h = middleware.Tracing(h)
+	h = middleware.Logging(h)
+	h = middleware.SecurityHeaders(h)
+	h = middleware.RequestID(h)
 
 	// Server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      handler,
+		Handler:      h,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  120 * time.Second,

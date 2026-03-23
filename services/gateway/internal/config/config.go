@@ -24,6 +24,11 @@ type Config struct {
 
 	KeyCacheTTL      time.Duration
 	NegativeCacheTTL time.Duration
+
+	InternalSecret        string
+	GatewaySharedSecret   string
+	WidgetConfigCacheTTL  time.Duration
+	WidgetCatalogCacheTTL time.Duration
 }
 
 func Load() *Config {
@@ -45,6 +50,11 @@ func Load() *Config {
 
 		KeyCacheTTL:      envDuration("KEY_CACHE_TTL", 10*time.Minute),
 		NegativeCacheTTL: envDuration("NEGATIVE_CACHE_TTL", 1*time.Minute),
+
+		InternalSecret:        envStr("GATEWAY_INTERNAL_SECRET", ""),
+		GatewaySharedSecret:   envStr("GATEWAY_SHARED_SECRET", ""),
+		WidgetConfigCacheTTL:  envDuration("WIDGET_CONFIG_CACHE_TTL", 1*time.Hour),
+		WidgetCatalogCacheTTL: envDuration("WIDGET_CATALOG_CACHE_TTL", 24*time.Hour),
 	}
 }
 

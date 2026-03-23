@@ -7,7 +7,7 @@ import { buildInputMappings, buildOutputMappings } from '../utils/mapping.js';
 import { applyTransform, applyOutputTransform } from '../utils/transforms.js';
 import { errorTypeMap } from '../blocked.js';
 import { getRedisClient, isRedisReady } from '../services/cache.js';
-import { safeTokenCompare, checkAdminToken } from '../utils/auth.js';
+import { safeTokenCompare, checkAdminToken, isGatewayRequest, validateGatewayAuth } from '../utils/auth.js';
 import * as stats from '../services/stats.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import { compileIpAllowlist, validateOrigins, checkAllowlist, getClientIp, setCorsHeaders } from '../utils/allowlist.js';
@@ -845,20 +845,26 @@ export async function registerRoutes(app) {
     }
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
-    // Per-calculator token auth (same as execute)
-    if (calc.token) {
-      const provided = req.headers['x-auth-token'];
-      if (!provided) return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-      if (!safeTokenCompare(provided, calc.token)) return reply.code(403).send({ error: 'Invalid auth token' });
+    // Auth: gateway path or legacy token path
+    if (isGatewayRequest(req)) {
+      const gw = validateGatewayAuth(req);
+      if (!gw) return reply.code(403).send({ error: 'Invalid gateway signature' });
+      if (calc.accountId && gw.accountId !== calc.accountId) {
+        return reply.code(403).send({ error: 'Account does not own this calculator' });
+      }
+    } else {
+      if (calc.token) {
+        const provided = req.headers['x-auth-token'];
+        if (!provided) return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
+        if (!safeTokenCompare(provided, calc.token)) return reply.code(403).send({ error: 'Invalid auth token' });
+      }
+      const clientIp = getClientIp(req);
+      const origin = req.headers['origin'] || null;
+      if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
+        return reply.code(403).send({ error: 'Access denied' });
+      }
+      setCorsHeaders(reply, origin, calc.allowedOrigins);
     }
-
-    // Allowlist check
-    const clientIp = getClientIp(req);
-    const origin = req.headers['origin'] || null;
-    if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-      return reply.code(403).send({ error: 'Access denied' });
-    }
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
 
     const resp = {
       name: calc.name ?? null,
@@ -1246,30 +1252,46 @@ export async function registerRoutes(app) {
 
     calcTestFlag = calc.test ?? undefined;
 
-    // Token auth check
-    if (calc.token) {
-      const provided = req.headers['x-auth-token'];
-      if (!provided) {
-        stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
-        return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
+    // Auth: gateway path or legacy token path
+    let authAccountId;
+    if (isGatewayRequest(req)) {
+      const gw = validateGatewayAuth(req);
+      if (!gw) {
+        stat({ cached: false, error: true, errorMessage: 'Invalid gateway signature' });
+        return reply.code(403).send({ error: 'Invalid gateway signature' });
       }
-      if (!safeTokenCompare(provided, calc.token)) {
-        stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
-        return reply.code(403).send({ error: 'Invalid auth token' });
+      // Verify ownership: gateway account must own this calculator
+      if (calc.accountId && gw.accountId !== calc.accountId) {
+        stat({ cached: false, error: true, errorMessage: 'Account mismatch' });
+        return reply.code(403).send({ error: 'Account does not own this calculator' });
       }
-    }
+      authAccountId = gw.accountId;
+    } else {
+      // Legacy token auth
+      if (calc.token) {
+        const provided = req.headers['x-auth-token'];
+        if (!provided) {
+          stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
+          return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
+        }
+        if (!safeTokenCompare(provided, calc.token)) {
+          stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
+          return reply.code(403).send({ error: 'Invalid auth token' });
+        }
+      }
 
-    // Allowlist check
-    const clientIp = getClientIp(req);
-    const origin = req.headers['origin'] || null;
-    if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-      stat({ cached: false, error: true, errorMessage: 'Access denied' });
-      return reply.code(403).send({ error: 'Access denied' });
+      // Allowlist check (only for direct requests, gateway handles this)
+      const clientIp = getClientIp(req);
+      const origin = req.headers['origin'] || null;
+      if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
+        stat({ cached: false, error: true, errorMessage: 'Access denied' });
+        return reply.code(403).send({ error: 'Access denied' });
+      }
+      setCorsHeaders(reply, origin, calc.allowedOrigins);
     }
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
 
     // Rate limiting
-    const accountId = calc.accountId;
+    const accountId = authAccountId || calc.accountId;
     if (accountId && !rateLimiter.has(accountId)) {
       const loaded = await loadAccountLimits(accountId);
       if (!loaded) {

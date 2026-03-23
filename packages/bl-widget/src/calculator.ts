@@ -7,9 +7,13 @@ type EventCallback = (data: unknown) => void;
 
 export interface CalculatorOptions {
   id: string;
-  token: string;
+  /** Per-calculator token (legacy direct mode) */
+  token?: string;
+  /** API key for gateway mode (use instead of token) */
+  apiKey?: string;
   container?: string | HTMLElement;
   apiUrl?: string;
+  gatewayUrl?: string;
   debounce?: number;
   theme?: Record<string, string>;
 }
@@ -39,7 +43,9 @@ export class Calculator {
     this._debounceMs = options.debounce ?? 300;
     this._api = new ApiClient({
       token: options.token,
+      apiKey: options.apiKey,
       apiUrl: options.apiUrl,
+      gatewayUrl: options.gatewayUrl,
       calculatorId: options.id,
     });
 

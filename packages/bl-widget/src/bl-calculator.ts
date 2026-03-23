@@ -27,14 +27,20 @@ export class BlCalculator extends LitElement {
     `,
   ];
 
-  /** Per-calculator auth token */
+  /** Per-calculator auth token (legacy direct mode) */
   @property({ attribute: 'token' }) token = '';
+
+  /** API key for gateway mode (use instead of token) */
+  @property({ attribute: 'api-key' }) apiKey = '';
 
   /** Calculator ID */
   @property({ attribute: 'calculator-id' }) calculatorId = '';
 
-  /** API base URL (defaults to production) */
+  /** API base URL for direct mode (defaults to production) */
   @property({ attribute: 'api-url' }) apiUrl = '';
+
+  /** Gateway URL for gateway mode */
+  @property({ attribute: 'gateway-url' }) gatewayUrl = '';
 
   /** Debounce delay in ms for input changes */
   @property({ type: Number, attribute: 'debounce' }) debounceMs = 300;
@@ -60,35 +66,58 @@ export class BlCalculator extends LitElement {
   }
 
   private async _init() {
-    if (!this.token || !this.calculatorId) {
-      this._error = 'Missing token or calculator-id attribute';
+    if ((!this.token && !this.apiKey) || !this.calculatorId) {
+      this._error = 'Missing token/api-key or calculator-id attribute';
       this._loading = false;
       return;
     }
 
     this._client = new ApiClient({
       apiUrl: this.apiUrl || undefined,
-      token: this.token,
+      gatewayUrl: this.gatewayUrl || undefined,
+      token: this.token || undefined,
+      apiKey: this.apiKey || undefined,
       calculatorId: this.calculatorId,
     });
 
     try {
-      const desc = await this._client.describe();
-      this._inputSchema = desc.expected_input;
-      this._outputSchema = desc.expected_output;
+      // Gateway mode: use display() for server-provided layout
+      if (this.apiKey) {
+        const display = await this._client.display();
+        this._inputSchema = display.input_schema;
+        this._outputSchema = display.output_schema;
 
-      // Set default values from schema
-      this._values = {};
-      for (const [name, prop] of Object.entries(desc.expected_input.properties)) {
-        if (prop.default != null) {
-          this._values[name] = prop.default;
-        } else if (prop.oneOf?.length) {
-          this._values[name] = prop.oneOf[0].const;
+        // Set default values from schema
+        this._values = {};
+        for (const [name, prop] of Object.entries((this._inputSchema.properties || {}) as Record<string, any>)) {
+          if (prop.default != null) {
+            this._values[name] = prop.default;
+          } else if (prop.oneOf?.length) {
+            this._values[name] = prop.oneOf[0].const;
+          }
         }
-      }
 
-      // Auto-generate layout (no custom layout support in 4a)
-      this._layout = generateLayout(desc.expected_input, desc.expected_output);
+        // Use server-provided layout or fall back to auto-generate
+        this._layout = display.layout
+          ? display.layout as LayoutConfig
+          : generateLayout(this._inputSchema, this._outputSchema);
+      } else {
+        // Legacy direct mode
+        const desc = await this._client.describe();
+        this._inputSchema = desc.expected_input;
+        this._outputSchema = desc.expected_output;
+
+        this._values = {};
+        for (const [name, prop] of Object.entries(desc.expected_input.properties)) {
+          if (prop.default != null) {
+            this._values[name] = prop.default;
+          } else if (prop.oneOf?.length) {
+            this._values[name] = prop.oneOf[0].const;
+          }
+        }
+
+        this._layout = generateLayout(desc.expected_input, desc.expected_output);
+      }
 
       this._loading = false;
 

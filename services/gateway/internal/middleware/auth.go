@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/coignite-aps/bl-gateway/internal/service"
 )
@@ -15,8 +16,8 @@ const AccountContextKey contextKey = "account"
 func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip auth for health endpoints
-			if r.URL.Path == "/health" || r.URL.Path == "/metrics" {
+			// Skip auth for health and internal endpoints
+			if r.URL.Path == "/health" || r.URL.Path == "/metrics" || strings.HasPrefix(r.URL.Path, "/internal/") {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -39,10 +40,8 @@ func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
 			r.Header.Set("X-Gateway-Auth", "true")
 
 			// Forward permissions as JSON
-			if len(account.Permissions) > 0 {
-				if permBytes, err := json.Marshal(account.Permissions); err == nil {
-					r.Header.Set("X-API-Permissions", string(permBytes))
-				}
+			if permBytes, err := json.Marshal(account.Permissions); err == nil {
+				r.Header.Set("X-API-Permissions", string(permBytes))
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))

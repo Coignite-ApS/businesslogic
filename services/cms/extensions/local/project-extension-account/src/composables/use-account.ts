@@ -187,6 +187,69 @@ export function useAccount(api: any) {
 		}
 	}
 
+	// ─── API key management (gateway-backed) ───
+
+	const apiKeys = ref<any[]>([]);
+
+	async function fetchApiKeys() {
+		try {
+			const { data } = await api.get('/calc/api-keys');
+			apiKeys.value = data.data || [];
+		} catch {
+			apiKeys.value = [];
+		}
+	}
+
+	async function createApiKey(body: {
+		name: string;
+		environment?: string;
+		permissions?: any;
+		allowed_ips?: string[];
+		allowed_origins?: string[];
+	}): Promise<any | null> {
+		error.value = null;
+		try {
+			const { data } = await api.post('/calc/api-keys', body);
+			await fetchApiKeys();
+			return data;
+		} catch (err: any) {
+			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+			return null;
+		}
+	}
+
+	async function updateApiKey(id: string, body: any) {
+		error.value = null;
+		try {
+			await api.patch(`/calc/api-keys/${id}`, body);
+			await fetchApiKeys();
+		} catch (err: any) {
+			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+		}
+	}
+
+	async function revokeApiKey(id: string) {
+		error.value = null;
+		try {
+			await api.delete(`/calc/api-keys/${id}`);
+			await fetchApiKeys();
+		} catch (err: any) {
+			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+		}
+	}
+
+	async function rotateApiKey(id: string): Promise<any | null> {
+		error.value = null;
+		try {
+			const { data } = await api.post(`/calc/api-keys/${id}/rotate`);
+			await fetchApiKeys();
+			return data;
+		} catch (err: any) {
+			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+			return null;
+		}
+	}
+
 	return {
 		accounts,
 		activeAccountId,
@@ -211,5 +274,11 @@ export function useAccount(api: any) {
 		fetchFormulaTokens,
 		createFormulaToken,
 		revokeFormulaToken,
+		apiKeys,
+		fetchApiKeys,
+		createApiKey,
+		updateApiKey,
+		revokeApiKey,
+		rotateApiKey,
 	};
 }

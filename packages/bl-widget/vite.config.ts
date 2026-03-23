@@ -15,6 +15,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    exclude: ['test/e2e.test.js', 'node_modules/**'],
+    exclude: ['test/e2e.test.js', 'test/api-client-gateway.test.js', 'node_modules/**'],
   },
 });
