@@ -4,13 +4,31 @@ const { Pool } = pg;
 
 let pool = null;
 
+/**
+ * Derive pg SSL config from a connection URL's sslmode parameter.
+ * Returns false (no SSL) or an SSL options object.
+ */
+export function sslConfigFromUrl(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const mode = parsed.searchParams.get('sslmode');
+    if (mode === 'require') return { rejectUnauthorized: false };
+    if (mode === 'verify-ca' || mode === 'verify-full') return { rejectUnauthorized: true };
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function getPool() {
   return pool;
 }
 
 export async function initDb(databaseUrl) {
   if (!databaseUrl) return null;
-  pool = new Pool({ connectionString: databaseUrl, max: 20 });
+  const ssl = sslConfigFromUrl(databaseUrl);
+  pool = new Pool({ connectionString: databaseUrl, max: 20, ...(ssl && { ssl }) });
   // Test connection
   const client = await pool.connect();
   client.release();

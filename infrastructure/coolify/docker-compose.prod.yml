@@ -67,7 +67,7 @@ services:
     environment:
       - PORT=8080
       - REDIS_URL=redis://10.0.0.20:6379
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
       - AI_API_URL=http://10.0.0.40:3200
       - FORMULA_API_URL=http://10.0.0.30:3000
       - FLOW_TRIGGER_URL=http://10.0.0.40:3100
@@ -133,7 +133,7 @@ services:
       - "3200:3200"
     environment:
       - PORT=3200
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
       - REDIS_URL=redis://10.0.0.20:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -164,7 +164,7 @@ services:
       - "3100:3100"
     environment:
       - PORT=3100
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
       - REDIS_URL=redis://10.0.0.20:6379
       - RUST_LOG=info
       - ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN}
@@ -210,7 +210,7 @@ services:
       dockerfile: docker/Dockerfile
       target: worker
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
       - REDIS_URL=redis://10.0.0.20:6379
       - RUST_LOG=info
       - WORKER_CONCURRENCY=10
