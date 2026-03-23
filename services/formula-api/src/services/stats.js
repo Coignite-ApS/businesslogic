@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import { getRedisClient, isRedisReady } from './cache.js';
+import { logger } from '../logger.js';
 
 const REDIS_KEY = 'stats:queue';
 const fallback = []; // in-memory fallback when Redis unavailable
@@ -52,7 +53,7 @@ function pushFallback(entry) {
     const drop = fallback.length - MAX_FALLBACK + 1;
     fallback.splice(0, drop);
     totalDropped += drop;
-    console.warn(`[stats] fallback overflow, dropped ${drop} oldest entries`);
+    logger.warn('[stats] fallback overflow, dropped %d oldest entries', drop);
   }
   fallback.push(entry);
 }
@@ -117,7 +118,7 @@ async function sendBatch(batch) {
   }
 
   if (dropped > 0) {
-    console.warn(`[stats] dropped ${dropped} invalid entries (4xx), flushed ${flushed}`);
+    logger.warn({ dropped, flushed }, '[stats] dropped invalid entries (4xx)');
   }
 
   return { flushed, dropped };
@@ -156,12 +157,12 @@ async function flushFromRedis(redis) {
       totalDropped += dropped;
       backoffDelay = 10000;
       backoffUntil = 0;
-      if (flushed > 0) console.log(`[stats] flushed ${flushed} entries (total: ${totalFlushed})`);
+      if (flushed > 0) logger.info({ flushed, totalFlushed }, '[stats] flushed entries');
     } catch (err) {
       // Network or 5xx — entries stay in Redis, backoff
       backoffUntil = Date.now() + backoffDelay;
       backoffDelay = Math.min(backoffDelay * 2, MAX_BACKOFF);
-      console.warn(`[stats] flush failed (${err.message}), backoff ${backoffDelay / 1000}s — entries remain in Redis`);
+      logger.warn({ err: err.message, backoffSec: backoffDelay / 1000 }, '[stats] flush failed — entries remain in Redis');
       return;
     }
   }
@@ -179,13 +180,13 @@ async function flushFromMemory() {
       totalDropped += dropped;
       backoffDelay = 10000;
       backoffUntil = 0;
-      if (flushed > 0) console.log(`[stats] flushed ${flushed} entries from fallback (total: ${totalFlushed})`);
+      if (flushed > 0) logger.info({ flushed, totalFlushed }, '[stats] flushed entries from fallback');
     } catch (err) {
       // Network or 5xx — re-queue, backoff
       fallback.unshift(...batch);
       backoffUntil = Date.now() + backoffDelay;
       backoffDelay = Math.min(backoffDelay * 2, MAX_BACKOFF);
-      console.warn(`[stats] fallback flush failed (${err.message}), backoff ${backoffDelay / 1000}s`);
+      logger.warn({ err: err.message, backoffSec: backoffDelay / 1000 }, '[stats] fallback flush failed');
       return;
     }
   }
@@ -195,7 +196,7 @@ export function start() {
   if (!enabled) return;
   timer = setInterval(flush, config.statsFlushInterval);
   timer.unref();
-  console.log(`[stats] enabled → ${config.adminApiUrl}/management/calc/stats (flush every ${config.statsFlushInterval}ms, Redis-backed)`);
+  logger.info({ url: `${config.adminApiUrl}/management/calc/stats`, flushIntervalMs: config.statsFlushInterval }, '[stats] enabled');
 }
 
 export async function shutdown() {

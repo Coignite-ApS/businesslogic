@@ -138,12 +138,12 @@ const sheetSchema = {
 const formulaAuth = async (req, reply) => {
   const token = req.headers['x-auth-token'];
   if (!token) {
-    console.warn(`[auth] missing formula token from ${req.ip} ${req.method} ${req.url}`);
+    req.log.warn({ ip: req.ip }, '[auth] missing formula token');
     return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
   }
   const result = await validateFormulaToken(token);
   if (!result) {
-    console.warn(`[auth] invalid formula token from ${req.ip} ${req.method} ${req.url}`);
+    req.log.warn({ ip: req.ip }, '[auth] invalid formula token');
     return reply.code(403).send({ error: 'Invalid auth token' });
   }
   req.formulaAccount = result; // { accountId, label }

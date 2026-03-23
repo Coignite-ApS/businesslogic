@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 export function safeTokenCompare(a, b) {
   const ha = createHash('sha256').update(String(a)).digest();
@@ -80,7 +81,7 @@ export async function validateFormulaToken(token) {
     return { accountId: entry.accountId, label: entry.label };
   } catch (err) {
     // Network error: fail closed, don't cache (allow immediate retry)
-    console.warn(`[auth] formula token validation failed: ${err.message}`);
+    logger.warn({ err: err.message }, '[auth] formula token validation failed');
     return null;
   }
 }

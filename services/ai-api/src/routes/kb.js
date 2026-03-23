@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
 import { getActiveAccount } from '../utils/auth.js';
 import { EmbeddingClient } from '../services/embeddings.js';
@@ -271,7 +272,7 @@ export async function registerRoutes(app) {
         const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
         embedding = await embedClient.embedQuery(question);
       } catch (err) {
-        console.error('Failed to embed curated question:', err.message);
+        logger.error({ err: err.message }, 'Failed to embed curated question');
       }
     }
 
@@ -312,7 +313,7 @@ export async function registerRoutes(app) {
         updates.push(`question_embedding = $${idx++}`);
         params.push(`[${embedding.join(',')}]`);
       } catch (err) {
-        console.error('Failed to re-embed curated question:', err.message);
+        logger.error({ err: err.message }, 'Failed to re-embed curated question');
       }
     }
 

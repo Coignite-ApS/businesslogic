@@ -1,5 +1,6 @@
 import { Worker } from 'node:worker_threads';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 function workerUrlFor(engine) {
   const file = engine === 'bl-excel' ? 'engine-worker-bl.js' : 'engine-worker.js';
@@ -223,7 +224,7 @@ class ABPool {
     this.comparisons++;
     if (!deepEqual(primaryResult, shadowResult)) {
       this.discrepancies++;
-      console.warn('[ab-test] discrepancy in %s: %j', label, {
+      logger.warn('[ab-test] discrepancy in %s: %j', label, {
         ...meta,
         hf: typeof primaryResult === 'object' ? JSON.stringify(primaryResult).slice(0, 200) : primaryResult,
         bl: typeof shadowResult === 'object' ? JSON.stringify(shadowResult).slice(0, 200) : shadowResult,

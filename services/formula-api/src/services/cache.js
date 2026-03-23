@@ -1,5 +1,6 @@
 import { LRUCache } from 'lru-cache';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 let redis = null;
 let redisReady = false;
@@ -32,7 +33,7 @@ export async function initCache() {
 
     await redis.connect();
   } catch (e) {
-    console.warn('Redis unavailable, using LRU only');
+    logger.warn('Redis unavailable, using LRU only');
     redis = null;
   }
 }
