@@ -179,7 +179,7 @@
 					:calculator-name="current.name || effectiveId"
 					:calculator-description="current.description || null"
 					:formula-api-url="formulaApiUrl || ''"
-					:token="apiKey"
+					:api-key="apiKey"
 					:tool-name="mcpConfigLocal.toolName || currentId!.replace(/-/g, '_')"
 					:input-config="extractedInputParams"
 					:output-config="extractedOutputParams"
@@ -200,7 +200,7 @@
 					:calculator-name="current.name || effectiveId"
 					:calculator-description="current.description || null"
 					:formula-api-url="formulaApiUrl || ''"
-					:token="apiKey"
+					:api-key="apiKey"
 					:tool-name="mcpConfigLocal.toolName || currentId!.replace(/-/g, '_')"
 					:input-config="extractedInputParams"
 					:output-config="extractedOutputParams"
@@ -354,7 +354,7 @@ const sampleBody = computed(() => {
 const snippetParams = computed<SnippetParams>(() => ({
 	baseUrl: formulaApiUrl.value || '',
 	calculatorId: effectiveId.value,
-	token: apiKey.value,
+	apiKey: apiKey.value,
 	sampleBody: sampleBody.value,
 }));
 
@@ -445,7 +445,7 @@ const mcpDirty = computed(() => {
 const mcpSnippetParams = computed<McpSnippetParams>(() => ({
 	toolName: mcpConfigLocal.value.toolName || 'calculator',
 	mcpUrl: `${formulaApiUrl.value || ''}/mcp/calculator/${effectiveId.value}`,
-	token: apiKey.value,
+	apiKey: apiKey.value,
 }));
 
 // Sync MCP config from server data

@@ -1,7 +1,7 @@
 export interface McpSnippetParams {
 	toolName: string;
 	mcpUrl: string;
-	token: string;
+	apiKey: string;
 }
 
 export interface McpPlatformOutput {
@@ -41,10 +41,10 @@ export const mcpPlatforms: McpPlatform[] = [
 		id: 'claude_desktop',
 		label: 'Claude Desktop',
 		filePath: 'claude_desktop_config.json',
-		generate: ({ toolName, mcpUrl, token }) =>
+		generate: ({ toolName, mcpUrl, apiKey }) =>
 			splitAtServer(fmt({
 				mcpServers: {
-					[toolName]: { url: mcpUrl, headers: { 'X-Auth-Token': token } },
+					[toolName]: { url: mcpUrl, headers: { 'X-API-Key': apiKey } },
 				},
 			}), 2),
 	},
@@ -52,12 +52,12 @@ export const mcpPlatforms: McpPlatform[] = [
 		id: 'cursor',
 		label: 'Cursor',
 		filePath: '.cursor/mcp.json',
-		generate: ({ toolName, mcpUrl, token }) =>
+		generate: ({ toolName, mcpUrl, apiKey }) =>
 			splitAtServer(fmt({
 				mcpServers: {
 					[toolName]: {
 						command: 'npx',
-						args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-Auth-Token:${token}`],
+						args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-API-Key:${apiKey}`],
 					},
 				},
 			}), 2),
@@ -66,14 +66,14 @@ export const mcpPlatforms: McpPlatform[] = [
 		id: 'vscode',
 		label: 'VS Code',
 		filePath: '.vscode/settings.json',
-		generate: ({ toolName, mcpUrl, token }) =>
+		generate: ({ toolName, mcpUrl, apiKey }) =>
 			splitAtServer(fmt({
 				mcp: {
 					servers: {
 						[toolName]: {
 							type: 'stdio',
 							command: 'npx',
-							args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-Auth-Token:${token}`],
+							args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-API-Key:${apiKey}`],
 						},
 					},
 				},
@@ -83,12 +83,12 @@ export const mcpPlatforms: McpPlatform[] = [
 		id: 'windsurf',
 		label: 'Windsurf',
 		filePath: '~/.codeium/windsurf/mcp_config.json',
-		generate: ({ toolName, mcpUrl, token }) =>
+		generate: ({ toolName, mcpUrl, apiKey }) =>
 			splitAtServer(fmt({
 				mcpServers: {
 					[toolName]: {
 						command: 'npx',
-						args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-Auth-Token:${token}`],
+						args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-API-Key:${apiKey}`],
 					},
 				},
 			}), 2),

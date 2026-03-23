@@ -619,7 +619,7 @@ const sampleBody = computed(() => {
 const snippetParams = computed<SnippetParams>(() => ({
 	baseUrl: props.formulaApiUrl || '',
 	calculatorId: props.calculator.id,
-	token: prodConfig.value?.api_key || 'YOUR_API_KEY',
+	apiKey: prodConfig.value?.api_key || 'YOUR_API_KEY',
 	sampleBody: sampleBody.value,
 }));
 

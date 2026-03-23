@@ -54,7 +54,7 @@ const realParts = computed(() => activeObj.value.generate(props.snippetParams));
 const maskedParts = computed(() =>
 	activeObj.value.generate({
 		...props.snippetParams,
-		token: maskToken(props.snippetParams.token),
+		apiKey: maskToken(props.snippetParams.apiKey),
 	}),
 );
 

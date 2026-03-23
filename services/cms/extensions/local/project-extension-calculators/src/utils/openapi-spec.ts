@@ -4,7 +4,7 @@
  * Generates a per-calculator spec with:
  * - POST /execute/calculator/{id} — run a calculation
  * - GET  /calculator/{id}/describe — get schema metadata
- * - ApiKeyAuth via X-Auth-Token header
+ * - ApiKeyAuth via X-API-Key header
  *
  * Type mapping:
  * - date/time/datetime → string + format
@@ -165,7 +165,7 @@ export function generateOpenApiSpec(params: OpenApiSpecParams): Record<string, u
 				ApiKeyAuth: {
 					type: 'apiKey',
 					in: 'header',
-					name: 'X-Auth-Token',
+					name: 'X-API-Key',
 				},
 			},
 		},

@@ -90,7 +90,7 @@ const props = defineProps<{
 	calculatorName: string;
 	calculatorDescription: string | null;
 	formulaApiUrl: string;
-	token: string;
+	apiKey: string;
 	toolName: string;
 	inputConfig: Record<string, InputParameter>;
 	outputConfig: Record<string, OutputParameter>;
@@ -120,7 +120,7 @@ const fileParams = computed(() => ({
 	effectiveId: props.effectiveId,
 	toolName: props.toolName,
 	formulaApiUrl: props.formulaApiUrl,
-	token: props.token,
+	apiKey: props.apiKey,
 	inputParams: props.inputConfig,
 	outputParams: props.outputConfig,
 }));
