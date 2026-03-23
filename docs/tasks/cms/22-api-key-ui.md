@@ -12,24 +12,48 @@ Replace the per-calculator formula token UI with a full API key management inter
 
 ---
 
+## Current State
+
+Basic CRUD is already implemented in `project-extension-account`:
+- List keys (name, prefix, environment, created)
+- Create key (name + environment selector)
+- Rotate key (generates new key, revokes old)
+- Revoke key
+- Raw key shown once on creation with copy button
+- Legacy formula tokens shown with deprecation label
+
+**Missing:** resource-level permissions. Keys are created with hardcoded blanket permissions (`module.vue:345`). No UI to select which calculators/KBs the key can access.
+
+---
+
 ## Key Tasks
 
-- [ ] New Directus module: `project-extension-api-keys`
-- [ ] List view: all API keys for current account (name, status, created, last used)
-- [ ] Create dialog: name, select resources + actions via resource picker
-- [ ] Resource picker component: tree of calculators/KBs with action checkboxes
-- [ ] Key detail view: edit name, permissions; rotate; revoke
-- [ ] Show raw key only once on creation (copy-to-clipboard)
-- [ ] Masked key display after creation (last 4 chars visible)
-- [ ] Rotate flow: confirm dialog, show new key, warn about 24h grace
-- [ ] Revoke flow: confirm dialog, immediate effect
-- [ ] Deprecation banner on old formula token UI → points to new key mgmt
+- [x] List view: all API keys for current account (name, status, created, last used)
+- [x] Create flow: name + environment, returns raw key once
+- [x] Show raw key only once on creation (copy-to-clipboard)
+- [x] Rotate flow: new key generated, old revoked
+- [x] Revoke flow: immediate soft delete
+- [x] Deprecation banner on old formula token UI
+- [ ] Resource picker component: tree of account's calculators with action checkboxes (execute, describe)
+- [ ] KB picker: list of account's knowledge bases with action checkboxes (search, ask)
+- [ ] Wire resource picker into create flow — send permissions to gateway
+- [ ] Key detail/edit view: show current permissions, allow editing
+- [ ] Permissions display in key list (e.g. "3 calculators, 1 KB" summary)
+- [ ] Wildcard option: "All calculators" / "All KBs" toggle
 - [ ] Unit tests for resource picker component
-- [ ] E2E test: create key → use key → revoke key
 
 ---
 
 ## Key Files
 
-- `services/cms/extensions/local/project-extension-api-keys/` (new module)
-- `services/cms/extensions/local/project-extension-account/` (add link)
+- `services/cms/extensions/local/project-extension-account/src/routes/module.vue` — existing key UI
+- `services/cms/extensions/local/project-extension-account/src/composables/use-account.ts` — API calls
+- `services/gateway/internal/handler/apikeys.go` — gateway CRUD (already supports permissions JSONB)
+- `services/gateway/internal/service/permissions.go` — ResourcePermissions model
+
+## Design Notes
+
+- Gateway already stores and enforces `permissions` JSONB with per-resource grants
+- Current hardcoded permissions at `module.vue:345`: `{ services: { calc: { enabled: true, resources: [], actions: ['execute', 'describe'] } } }`
+- Resource picker needs to fetch calculators from CMS (`calculators` collection) and KBs from AI schema (`knowledge_bases`)
+- Empty `resources: []` currently means no resource-level restriction — gateway treats it as "all resources"
