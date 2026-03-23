@@ -39,6 +39,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 18 | Admin Financials — Revenue, Spending & P/L Dashboard | planned | [cms/18-admin-financials.md](cms/18-admin-financials.md) |
 | 19 | directus-extension-businesslogic (public npm) | planned | [cms/19-directus-extension-businesslogic.md](cms/19-directus-extension-businesslogic.md) |
 | 20 | Account-Level MCP (UI) | planned | [cms/20-account-mcp.md](cms/20-account-mcp.md) |
+| 21 | DOMPurify for All v-html Usage | planned | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
 
 ---
 
@@ -90,7 +91,9 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 
 DAG workflow execution, triggers, workers.
 
-No outstanding improvements migrated from legacy. Add new improvements as the flow engine matures.
+| # | Improvement | Status | Doc |
+|---|-------------|--------|-----|
+| 01 | Replace Production unwrap() with Error Handling | planned | [flow/01-unwrap-error-handling.md](flow/01-unwrap-error-handling.md) |
 
 ---
 
@@ -109,6 +112,8 @@ Infrastructure and multi-service concerns.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | Infrastructure & Deployment (Hetzner + Coolify) | planned | [cross-cutting/01-infrastructure.md](cross-cutting/01-infrastructure.md) |
+| 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | planned | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
+| 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | planned | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
 
 ---
 
@@ -137,11 +142,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 19 | 1 | 0 | 20 |
+| CMS | 20 | 1 | 0 | 21 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
-| Flow | 0 | 0 | 0 | 0 |
+| Flow | 1 | 0 | 0 | 1 |
 | Gateway | 0 | 0 | 0 | 0 |
-| Cross-Cutting | 1 | 0 | 0 | 1 |
-| **Total** | **39** | **1** | **2** | **42** |
+| Cross-Cutting | 3 | 0 | 0 | 3 |
+| **Total** | **43** | **1** | **2** | **46** |
