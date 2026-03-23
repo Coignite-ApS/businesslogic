@@ -147,6 +147,16 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-commit-task-eval.sh",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "SessionStart": [

@@ -13,26 +13,26 @@ echo "Branch: ${BRANCH:-unknown}"
 echo "Last commit: ${LAST_COMMIT:-none}"
 
 # Improvements status from README
-if [ -f "docs/improvements/README.md" ]; then
-  COMPLETED=$(grep -c '| completed |' docs/improvements/README.md 2>/dev/null) || COMPLETED=0
-  IN_PROGRESS=$(grep -c '| in-progress |' docs/improvements/README.md 2>/dev/null) || IN_PROGRESS=0
-  PLANNED=$(grep -c '| planned |' docs/improvements/README.md 2>/dev/null) || PLANNED=0
-  BLOCKED=$(grep -c '| blocked |' docs/improvements/README.md 2>/dev/null) || BLOCKED=0
+if [ -f "docs/tasks/README.md" ]; then
+  COMPLETED=$(grep -c '| completed |' docs/tasks/README.md 2>/dev/null) || COMPLETED=0
+  IN_PROGRESS=$(grep -c '| in-progress |' docs/tasks/README.md 2>/dev/null) || IN_PROGRESS=0
+  PLANNED=$(grep -c '| planned |' docs/tasks/README.md 2>/dev/null) || PLANNED=0
+  BLOCKED=$(grep -c '| blocked |' docs/tasks/README.md 2>/dev/null) || BLOCKED=0
   TOTAL=$((COMPLETED + IN_PROGRESS + PLANNED + BLOCKED))
-  echo "Improvements: ${COMPLETED}/${TOTAL} completed | ${IN_PROGRESS} in-progress | ${PLANNED} planned | ${BLOCKED} blocked"
+  echo "Tasks: ${COMPLETED}/${TOTAL} completed | ${IN_PROGRESS} in-progress | ${PLANNED} planned | ${BLOCKED} blocked"
 
   # Highlight in-progress items
   if [ "$IN_PROGRESS" -gt 0 ]; then
     echo ""
     echo "IN-PROGRESS:"
-    grep '| in-progress |' docs/improvements/README.md 2>/dev/null | sed 's/^/  /'
+    grep '| in-progress |' docs/tasks/README.md 2>/dev/null | sed 's/^/  /'
   fi
 
   # Flag blocked items
   if [ "$BLOCKED" -gt 0 ]; then
     echo ""
     echo "BLOCKED:"
-    grep '| blocked |' docs/improvements/README.md 2>/dev/null | sed 's/^/  /'
+    grep '| blocked |' docs/tasks/README.md 2>/dev/null | sed 's/^/  /'
   fi
 fi
 

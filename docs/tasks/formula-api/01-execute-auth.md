@@ -1,6 +1,6 @@
 # 01. Auth for Execute Endpoints
 
-**Status:** in-progress
+**Status:** completed
 **Mirrors:** businesslogic-cms #04 (Formula API Security)
 
 ---

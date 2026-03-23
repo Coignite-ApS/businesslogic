@@ -63,7 +63,7 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
-| 01 | Account-Level Auth for Execute Endpoints | in-progress | [formula-api/01-execute-auth.md](formula-api/01-execute-auth.md) |
+| 01 | Account-Level Auth for Execute Endpoints | completed | [formula-api/01-execute-auth.md](formula-api/01-execute-auth.md) |
 | 02 | OpenAPI Spec Completion | planned | [formula-api/02-openapi-completion.md](formula-api/02-openapi-completion.md) |
 | 03 | Redis Error Logging | planned | [formula-api/03-redis-error-logging.md](formula-api/03-redis-error-logging.md) |
 | 04 | MCP Error Code Mapping | planned | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
@@ -139,9 +139,9 @@ Infrastructure and multi-service concerns.
 |---------|---------|-------------|-----------|-------|
 | CMS | 20 | 0 | 0 | 20 |
 | AI API | 6 | 0 | 0 | 6 |
-| Formula API | 5 | 1 | 0 | 6 |
+| Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 0 | 0 | 0 | 0 |
 | Gateway | 0 | 0 | 0 | 0 |
 | Cross-Cutting | 1 | 0 | 0 | 1 |
-| **Total** | **40** | **1** | **1** | **42** |
+| **Total** | **40** | **0** | **2** | **42** |
