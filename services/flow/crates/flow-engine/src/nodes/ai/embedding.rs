@@ -21,7 +21,13 @@ static EMBEDDING_MODEL: LazyLock<Mutex<Option<TextEmbedding>>> =
 
 /// Initialize the embedding model (call at worker startup for pre-warming).
 pub fn prewarm_model() {
-    let mut guard = EMBEDDING_MODEL.lock().unwrap();
+    let mut guard = match EMBEDDING_MODEL.lock() {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!("Embedding model lock poisoned: {}", e);
+            return;
+        }
+    };
     if guard.is_none() {
         tracing::info!("Pre-warming embedding model: {}", DEFAULT_MODEL);
         match TextEmbedding::try_new(

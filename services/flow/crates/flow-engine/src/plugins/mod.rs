@@ -76,7 +76,7 @@ impl WasmPluginHost {
 
         // Check cache
         {
-            let cache = self.cache.lock().unwrap();
+            let cache = self.cache.lock().map_err(|e| anyhow::anyhow!("wasm: cache lock poisoned: {}", e))?;
             if let Some(module) = cache.get(&hash) {
                 return Ok(WasmModule {
                     module: module.clone(),
@@ -88,7 +88,7 @@ impl WasmPluginHost {
         // Compile and cache
         let module = Arc::new(Module::new(&self.engine, wasm_bytes)?);
         {
-            let mut cache = self.cache.lock().unwrap();
+            let mut cache = self.cache.lock().map_err(|e| anyhow::anyhow!("wasm: cache lock poisoned: {}", e))?;
             cache.insert(hash, module.clone());
         }
 
@@ -106,7 +106,7 @@ impl WasmPluginHost {
     /// Get cache size (for testing).
     #[cfg(feature = "wasm-plugins")]
     pub fn cache_size(&self) -> usize {
-        self.cache.lock().unwrap().len()
+        self.cache.lock().map(|c| c.len()).unwrap_or(0)
     }
 }
 

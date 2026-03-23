@@ -211,9 +211,9 @@ pub fn calculator_handler() -> NodeHandler {
                     let mut f = f.clone();
                     if let Some(formula_str) = f.get("formula").and_then(|v| v.as_str()) {
                         let interpolated = interpolate_string(formula_str, trigger, last, nodes);
-                        f.as_object_mut()
-                            .unwrap()
-                            .insert("formula".to_string(), serde_json::Value::String(interpolated));
+                        if let Some(obj) = f.as_object_mut() {
+                            obj.insert("formula".to_string(), serde_json::Value::String(interpolated));
+                        }
                     }
                     f
                 })
