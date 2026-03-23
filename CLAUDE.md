@@ -425,6 +425,7 @@ Hooks are configured in `.claude/settings.json` (committed to git, shared with t
 |------|-------|-------------|
 | `protect-branches.sh` | PreToolUse (Bash) | Blocks direct commits to main/master |
 | `pre-commit-tests.sh` | PreToolUse (Bash) | Runs service-specific tests before git commit/push |
+| `pre-commit-docs-check.sh` | PreToolUse (Bash) | Warns if service code changed but no task doc updated |
 | `post-edit-lint.sh` | PostToolUse (Edit/Write) | Auto-formats files after edits (eslint, cargo fmt, gofmt) |
 | `post-commit-task-eval.sh` | PostToolUse (Bash) | After git commit, evaluates in-progress tasks and prompts status update |
 
@@ -434,6 +435,7 @@ Hooks are configured in `.claude/settings.json` (committed to git, shared with t
 - `pre-commit-tests.sh` detects which services have staged changes, runs their tests
 - If ANY test fails, the commit is blocked with exit code 2
 - Claude must fix the failing tests before retrying the commit
+- `pre-commit-docs-check.sh` warns when service code changes without a corresponding task doc update — ensures functionality changes are documented
 - After a successful commit, `post-commit-task-eval.sh` checks in-progress tasks — if all Key Tasks checkboxes are checked, it tells Claude to mark the task as completed
 
 **Hook files:** `.claude/hooks/` — all scripts must be executable (`chmod +x`)
