@@ -1,7 +1,7 @@
 # 01. Fine-Grained Resource Permissions
 
 **Service:** gateway
-**Status:** planned
+**Status:** completed
 **Depends on:** none
 
 ---

@@ -1,7 +1,7 @@
 # 02. API Key Management Endpoints
 
 **Service:** gateway
-**Status:** planned
+**Status:** completed
 **Depends on:** GW-01 (Resource Permissions)
 
 ---

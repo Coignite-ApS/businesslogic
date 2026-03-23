@@ -1,7 +1,7 @@
 # 04. Internal Service Proxy Routes
 
 **Service:** gateway
-**Status:** in-progress
+**Status:** completed
 **Depends on:** GW-01, GW-02 (internal auth pattern already exists)
 
 ---

@@ -1,7 +1,7 @@
 # 04. Formula-API Gateway Auth Path
 
 **Service:** cross-cutting (formula-api + gateway)
-**Status:** planned
+**Status:** completed
 **Depends on:** GW-01 (Resource Permissions)
 
 ---

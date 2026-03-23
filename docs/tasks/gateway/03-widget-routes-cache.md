@@ -1,7 +1,7 @@
 # 03. Widget Routes + Response Cache
 
 **Service:** gateway
-**Status:** planned
+**Status:** completed
 **Depends on:** GW-01 (Resource Permissions)
 
 ---

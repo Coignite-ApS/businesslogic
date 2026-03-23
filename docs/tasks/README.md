@@ -111,10 +111,10 @@ Auth, rate limiting, routing, CORS.
 
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
-| 01 | Fine-Grained Resource Permissions | planned | [gateway/01-resource-permissions.md](gateway/01-resource-permissions.md) |
-| 02 | API Key Management Endpoints | planned | [gateway/02-api-key-management.md](gateway/02-api-key-management.md) |
-| 03 | Widget Routes + Response Cache | planned | [gateway/03-widget-routes-cache.md](gateway/03-widget-routes-cache.md) |
-| 04 | Internal Service Proxy Routes | planned | [gateway/04-internal-service-proxy.md](gateway/04-internal-service-proxy.md) |
+| 01 | Fine-Grained Resource Permissions | completed | [gateway/01-resource-permissions.md](gateway/01-resource-permissions.md) |
+| 02 | API Key Management Endpoints | completed | [gateway/02-api-key-management.md](gateway/02-api-key-management.md) |
+| 03 | Widget Routes + Response Cache | completed | [gateway/03-widget-routes-cache.md](gateway/03-widget-routes-cache.md) |
+| 04 | Internal Service Proxy Routes | completed | [gateway/04-internal-service-proxy.md](gateway/04-internal-service-proxy.md) |
 | 05 | Internal Route Audit Logging | planned | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
 
 ---
@@ -128,7 +128,7 @@ Infrastructure and multi-service concerns.
 | 01 | Infrastructure & Deployment (Hetzner + Coolify) | planned | [cross-cutting/01-infrastructure.md](cross-cutting/01-infrastructure.md) |
 | 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | planned | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
 | 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | planned | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
-| 04 | Formula-API Gateway Auth Path | planned | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
+| 04 | Formula-API Gateway Auth Path | completed | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
 
 ---
 
@@ -170,11 +170,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 24 | 0 | 5 | 29 |
+| CMS | 22 | 0 | 7 | 29 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
-| Gateway | 5 | 0 | 0 | 5 |
-| Cross-Cutting | 4 | 0 | 0 | 4 |
-| **Total** | **53** | **0** | **7** | **60** |
+| Gateway | 1 | 0 | 4 | 5 |
+| Cross-Cutting | 3 | 0 | 1 | 4 |
+| **Total** | **46** | **0** | **14** | **60** |
