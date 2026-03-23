@@ -19,6 +19,7 @@ import { initTelemetry, shutdownTelemetry } from './telemetry.js';
 initTelemetry();
 
 import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
 import { config } from './config.js';
@@ -42,6 +43,9 @@ const app = Fastify({
   bodyLimit: config.maxPayloadSize,
   trustProxy: true,
 });
+
+// Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, etc.)
+await app.register(helmet, { contentSecurityPolicy: false });
 
 await app.register(multipart, {
   limits: { fileSize: config.maxPayloadSize },
@@ -97,7 +101,7 @@ if (config.requestLogging) {
   app.addHook('onResponse', (req, reply, done) => {
     if (req.url === '/ping' || req.url === '/health') return done();
     const ms = reply.elapsedTime?.toFixed(0) ?? '-';
-    console.log(`${req.method} ${req.url} ${reply.statusCode} ${ms}ms`);
+    req.log.info({ method: req.method, url: req.url, statusCode: reply.statusCode, ms }, 'request completed');
     done();
   });
 }
@@ -130,6 +134,16 @@ const shutdown = async (signal) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+process.on('unhandledRejection', (reason) => {
+  app.log.fatal({ err: reason }, 'unhandled rejection');
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  app.log.fatal({ err }, 'uncaught exception');
+  process.exit(1);
+});
+
 // Start
 const start = async () => {
   try {
@@ -138,7 +152,7 @@ const start = async () => {
     healthPush.start();
     hashRing.start();
     await app.listen({ port: config.port, host: config.host });
-    console.log(`API ready on ${config.host}:${config.port} | pool=${config.poolSize} | maxQueue=${pool.maxPending}`);
+    app.log.info({ host: config.host, port: config.port, poolSize: config.poolSize, maxQueue: pool.maxPending }, 'API ready');
   } catch (err) {
     app.log.error(err);
     process.exit(1);
