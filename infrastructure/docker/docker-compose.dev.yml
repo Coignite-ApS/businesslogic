@@ -122,8 +122,6 @@ services:
       # Direct service URLs (for public URL exposure + legacy)
       - FORMULA_API_URL=http://bl-formula-api:3000
       - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
-      - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
-      - FLOW_TRIGGER_ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
       # AI proxy (routes through gateway /internal/ai/ when enabled)
       - AI_SERVICE_ENABLED=${AI_SERVICE_ENABLED:-false}
     volumes:
