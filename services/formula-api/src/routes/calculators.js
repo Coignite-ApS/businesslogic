@@ -13,6 +13,7 @@ import * as rateLimiter from '../services/rate-limiter.js';
 import { compileIpAllowlist, validateOrigins, checkAllowlist, getClientIp, setCorsHeaders } from '../utils/allowlist.js';
 import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
+import { loadAccountLimits } from '../services/account-limits.js';
 
 
 function cleanSchemaForDescribe(schema) {
@@ -41,7 +42,6 @@ function sanitizeDetail(msg) {
 
 const REDIS_PREFIX = 'calc:';
 const RESULT_PREFIX = 'calcr:';
-const ACCOUNT_LIMITS_PREFIX = 'accl:';
 
 // Server-side calculator store
 const store = new LRUCache({
@@ -179,51 +179,6 @@ async function enrichMcpConfig(id, entry, recipe) {
     if (entry.mcpInputSchema) recipe.mcpInputSchema = entry.mcpInputSchema;
     saveToRedis(id, recipe);
   }
-}
-
-// --- Account rate limiting ---
-
-async function loadAccountLimitsFromRedis(accountId) {
-  if (!isRedisReady()) return null;
-  try {
-    const redis = getRedisClient();
-    const raw = await redis.get(ACCOUNT_LIMITS_PREFIX + accountId);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveAccountLimitsToRedis(accountId, data) {
-  if (!isRedisReady()) return;
-  const redis = getRedisClient();
-  redis.setex(ACCOUNT_LIMITS_PREFIX + accountId, config.accountLimitsRedisTtl, JSON.stringify(data)).catch(() => {});
-}
-
-async function loadAccountLimits(accountId, force = false) {
-  if (!accountId) return true;
-  if (!force && rateLimiter.has(accountId)) return true;
-
-  // Try Redis first (unless forcing refresh from Admin API)
-  if (!force) {
-    const cached = await loadAccountLimitsFromRedis(accountId);
-    if (cached) {
-      rateLimiter.configure(accountId, cached);
-      return true;
-    }
-  }
-
-  // Fetch from Admin API (if not configured, allow — graceful degradation)
-  if (!config.adminApiUrl || !config.adminApiKey) return true;
-  try {
-    const res = await fetch(`${config.adminApiUrl}/accounts/${accountId}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    rateLimiter.configure(accountId, data);
-    saveAccountLimitsToRedis(accountId, data);
-    return true;
-  } catch { return false; }
 }
 
 // --- Build + rebuild ---
