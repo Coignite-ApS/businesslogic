@@ -80,7 +80,17 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import type { AskResult } from '../composables/use-search';
+
+const ALLOWED_TAGS = [
+	'p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i',
+	'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+	'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+	'span', 'div', 'hr', 'del', 'sup', 'sub',
+];
+
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'id'];
 
 const props = defineProps<{
 	result: AskResult | null;
@@ -133,7 +143,8 @@ function sendFeedback() {
 
 const renderedAnswer = computed(() => {
 	if (!props.result?.answer) return '';
-	return marked.parse(props.result.answer) as string;
+	const raw = marked.parse(props.result.answer) as string;
+	return DOMPurify.sanitize(raw, { ALLOWED_TAGS, ALLOWED_ATTR });
 });
 
 const confidenceClass = computed(() => {

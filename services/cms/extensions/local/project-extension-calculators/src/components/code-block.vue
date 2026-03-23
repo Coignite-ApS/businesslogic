@@ -11,6 +11,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import hljs from 'highlight.js/lib/core';
+import DOMPurify from 'dompurify';
 import bash from 'highlight.js/lib/languages/bash';
 import javascript from 'highlight.js/lib/languages/javascript';
 import python from 'highlight.js/lib/languages/python';
@@ -19,6 +20,9 @@ import go from 'highlight.js/lib/languages/go';
 import rust from 'highlight.js/lib/languages/rust';
 import java from 'highlight.js/lib/languages/java';
 import json from 'highlight.js/lib/languages/json';
+
+const CODE_ALLOWED_TAGS = ['span', 'b', 'i', 'em', 'strong'];
+const CODE_ALLOWED_ATTR = ['class'];
 
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('javascript', javascript);
@@ -36,10 +40,10 @@ const props = defineProps<{
 }>();
 
 const highlighted = computed(() => {
-	if (props.language && hljs.getLanguage(props.language)) {
-		return hljs.highlight(props.code, { language: props.language }).value;
-	}
-	return hljs.highlightAuto(props.code).value;
+	const raw = props.language && hljs.getLanguage(props.language)
+		? hljs.highlight(props.code, { language: props.language }).value
+		: hljs.highlightAuto(props.code).value;
+	return DOMPurify.sanitize(raw, { ALLOWED_TAGS: CODE_ALLOWED_TAGS, ALLOWED_ATTR: CODE_ALLOWED_ATTR });
 });
 
 const copied = ref(false);

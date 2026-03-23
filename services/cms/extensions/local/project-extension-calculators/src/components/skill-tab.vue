@@ -84,7 +84,17 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import CodeBlock from './code-block.vue';
+
+const ALLOWED_TAGS = [
+	'p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i',
+	'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+	'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+	'span', 'div', 'hr', 'del', 'sup', 'sub',
+];
+
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'id'];
 import TemplateEditor from './template-editor.vue';
 import { downloadZip } from '../utils/download-zip';
 import { generateSkillMd } from '../utils/integration-files';
@@ -141,7 +151,8 @@ const skillMd = computed(() =>
 
 const renderedMd = computed(() => {
 	if (!skillMd.value) return '';
-	return marked(skillMd.value);
+	const raw = marked(skillMd.value) as string;
+	return DOMPurify.sanitize(raw, { ALLOWED_TAGS, ALLOWED_ATTR });
 });
 
 const projectInstall = computed(() =>

@@ -28,10 +28,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import hljs from 'highlight.js/lib/core';
+import DOMPurify from 'dompurify';
 import json from 'highlight.js/lib/languages/json';
 import { mcpPlatforms, dedent } from '../utils/mcp-snippets';
 import { maskToken } from '../utils/code-snippets';
 import type { McpSnippetParams } from '../utils/mcp-snippets';
+
+const CODE_ALLOWED_TAGS = ['span', 'b', 'i', 'em', 'strong'];
+const CODE_ALLOWED_ATTR = ['class'];
 
 hljs.registerLanguage('json', json);
 
@@ -55,7 +59,10 @@ const maskedParts = computed(() =>
 );
 
 const highlightedInner = computed(() =>
-	hljs.highlight(maskedParts.value.inner, { language: 'json' }).value,
+	DOMPurify.sanitize(
+		hljs.highlight(maskedParts.value.inner, { language: 'json' }).value,
+		{ ALLOWED_TAGS: CODE_ALLOWED_TAGS, ALLOWED_ATTR: CODE_ALLOWED_ATTR },
+	),
 );
 
 const copyText = computed(() => dedent(realParts.value.inner));

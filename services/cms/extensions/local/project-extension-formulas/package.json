@@ -14,6 +14,7 @@
     "dev": "directus-extension build -w --no-minify"
   },
   "dependencies": {
+    "dompurify": "^3.3.3",
     "highlight.js": "^11.11.1"
   },
   "devDependencies": {
