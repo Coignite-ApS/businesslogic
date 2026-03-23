@@ -225,10 +225,10 @@ The auto-generation reads the calculator's existing schema (same format used by 
 ## Key Tasks
 
 ### Collections & Schema
-- [ ] New collection: `widget_components` — component registry (seeded with all standard components above)
-- [ ] New collection: `widget_themes` — theme presets (seeded with "Default", "Dark", "Minimal")
-- [ ] New collection: `widget_templates` — layout templates with skeleton JSON (seeded with "Single Column", "Two Column", "Card with Sidebar")
-- [ ] New collection: `calculator_layouts` — per-calculator layout config (references components by slug, linked to calculator, versioned)
+- [x] New collection: `widget_components` — component registry (seeded with all standard components above)
+- [x] New collection: `widget_themes` — theme presets (seeded with "Default", "Dark", "Minimal")
+- [x] New collection: `widget_templates` — layout templates with skeleton JSON (seeded with "Single Column", "Two Column", "Card with Sidebar")
+- [x] New collection: `calculator_layouts` — per-calculator layout config (references components by slug, linked to calculator, versioned)
 - [ ] Permissions: `widget_components`, `widget_themes`, `widget_templates` readable by all authenticated users; writable by admin only. `calculator_layouts` scoped to `$CURRENT_USER.active_account`.
 
 ### API
