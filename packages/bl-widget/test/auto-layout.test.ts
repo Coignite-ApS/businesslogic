@@ -9,16 +9,28 @@ describe('mapInputComponent', () => {
     expect(node.field).toBe('active');
   });
 
-  it('maps string with oneOf to dropdown', () => {
+  it('maps oneOf with <=4 options to radio-group', () => {
     const node = mapInputComponent('country', {
       type: 'string',
       oneOf: [{ const: 'dk', title: 'Denmark' }, { const: 'us', title: 'USA' }],
     });
-    expect(node.type).toBe('dropdown');
+    expect(node.type).toBe('radio-group');
   });
 
-  it('maps string with enum to dropdown', () => {
+  it('maps enum with <=4 options to radio-group', () => {
     const node = mapInputComponent('color', { type: 'string', enum: ['red', 'blue'] });
+    expect(node.type).toBe('radio-group');
+  });
+
+  it('maps oneOf with >4 options to dropdown', () => {
+    const node = mapInputComponent('country', {
+      type: 'string',
+      oneOf: [
+        { const: 'a', title: 'A' }, { const: 'b', title: 'B' },
+        { const: 'c', title: 'C' }, { const: 'd', title: 'D' },
+        { const: 'e', title: 'E' },
+      ],
+    });
     expect(node.type).toBe('dropdown');
   });
 
@@ -37,9 +49,25 @@ describe('mapInputComponent', () => {
     expect(node.type).toBe('text-input');
   });
 
-  it('maps number to text-input', () => {
+  it('maps number without min/max to text-input', () => {
     const node = mapInputComponent('amount', { type: 'number' });
     expect(node.type).toBe('text-input');
+  });
+
+  it('maps number with min+max to slider', () => {
+    const node = mapInputComponent('rate', { type: 'number', minimum: 0, maximum: 100 });
+    expect(node.type).toBe('slider');
+    expect(node.props).toEqual({ min: 0, max: 100, step: 1 });
+  });
+
+  it('maps date transform to date-picker', () => {
+    const node = mapInputComponent('start_date', { type: 'string', transform: 'date' });
+    expect(node.type).toBe('date-picker');
+  });
+
+  it('maps date format to date-picker', () => {
+    const node = mapInputComponent('end_date', { type: 'string', format: 'date' });
+    expect(node.type).toBe('date-picker');
   });
 });
 
@@ -58,6 +86,11 @@ describe('mapOutputComponent', () => {
   it('maps string to text', () => {
     const node = mapOutputComponent('message', { type: 'string' });
     expect(node.type).toBe('text');
+  });
+
+  it('maps array to table', () => {
+    const node = mapOutputComponent('rows', { type: 'array' });
+    expect(node.type).toBe('table');
   });
 });
 
@@ -100,7 +133,7 @@ describe('generateLayout', () => {
     expect(types).toContain('text-input');
     expect(types).toContain('checkbox');
     expect(types).toContain('number-stepper');
-    expect(types).toContain('dropdown');
+    expect(types).toContain('radio-group');
   });
 
   it('respects order field for sorting', () => {

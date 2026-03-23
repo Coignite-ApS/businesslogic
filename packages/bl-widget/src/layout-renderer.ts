@@ -11,8 +11,17 @@ import './components/inputs/bl-text-input.js';
 import './components/inputs/bl-dropdown.js';
 import './components/inputs/bl-checkbox.js';
 import './components/inputs/bl-number-stepper.js';
+import './components/inputs/bl-slider.js';
+import './components/inputs/bl-radio-group.js';
+import './components/inputs/bl-date-picker.js';
 import './components/outputs/bl-metric.js';
 import './components/outputs/bl-text.js';
+import './components/outputs/bl-table.js';
+import './components/outputs/bl-gauge.js';
+import './components/outputs/bl-bar-chart.js';
+import './components/outputs/bl-line-chart.js';
+import './components/outputs/bl-pie-chart.js';
+import './components/outputs/bl-donut-chart.js';
 
 export interface RenderContext {
   inputSchema: JsonSchema;
@@ -92,6 +101,38 @@ export function renderNode(node: LayoutNode, ctx: RenderContext): TemplateResult
         @bl-input=${(e: CustomEvent) => ctx.onInput(field!, e.detail.value)}
       ></bl-number-stepper>`;
 
+    case 'slider':
+      return html`<bl-slider
+        .field=${field || ''}
+        .label=${label}
+        .description=${description}
+        .value=${Number(ctx.values[field!] ?? schema?.default ?? 0)}
+        .min=${props.min ?? schema?.minimum ?? 0}
+        .max=${props.max ?? schema?.maximum ?? 100}
+        .step=${props.step ?? 1}
+        .format=${props.format || ''}
+        @bl-input=${(e: CustomEvent) => ctx.onInput(field!, e.detail.value)}
+      ></bl-slider>`;
+
+    case 'radio-group':
+      return html`<bl-radio-group
+        .field=${field || ''}
+        .label=${label}
+        .description=${description}
+        .value=${ctx.values[field!] ?? schema?.default ?? ''}
+        .options=${schema?.oneOf || schema?.enum?.map((v: unknown) => ({ const: v, title: String(v) })) || []}
+        @bl-input=${(e: CustomEvent) => ctx.onInput(field!, e.detail.value)}
+      ></bl-radio-group>`;
+
+    case 'date-picker':
+      return html`<bl-date-picker
+        .field=${field || ''}
+        .label=${label}
+        .description=${description}
+        .value=${String(ctx.values[field!] ?? schema?.default ?? '')}
+        @bl-input=${(e: CustomEvent) => ctx.onInput(field!, e.detail.value)}
+      ></bl-date-picker>`;
+
     // Output components
     case 'metric':
       return html`<bl-metric
@@ -99,6 +140,8 @@ export function renderNode(node: LayoutNode, ctx: RenderContext): TemplateResult
         .label=${label}
         .value=${ctx.outputs[field!]}
         .format=${props.format || ''}
+        .highlight=${Boolean(props.highlight)}
+        .animate=${props.animate !== false}
       ></bl-metric>`;
 
     case 'text':
@@ -107,6 +150,52 @@ export function renderNode(node: LayoutNode, ctx: RenderContext): TemplateResult
         .label=${label}
         .value=${ctx.outputs[field!] ?? ''}
       ></bl-text>`;
+
+    case 'table':
+      return html`<bl-table
+        .field=${field || ''}
+        .label=${label}
+        .value=${ctx.outputs[field!] ?? []}
+      ></bl-table>`;
+
+    case 'gauge':
+      return html`<bl-gauge
+        .field=${field || ''}
+        .label=${label}
+        .value=${Number(ctx.outputs[field!] ?? 0)}
+        .min=${props.min ?? 0}
+        .max=${props.max ?? 100}
+        .format=${props.format || ''}
+      ></bl-gauge>`;
+
+    case 'bar-chart':
+      return html`<bl-bar-chart
+        .field=${field || ''}
+        .label=${label}
+        .value=${ctx.outputs[field!] ?? []}
+      ></bl-bar-chart>`;
+
+    case 'line-chart':
+      return html`<bl-line-chart
+        .field=${field || ''}
+        .label=${label}
+        .value=${ctx.outputs[field!] ?? []}
+      ></bl-line-chart>`;
+
+    case 'pie-chart':
+      return html`<bl-pie-chart
+        .field=${field || ''}
+        .label=${label}
+        .value=${ctx.outputs[field!] ?? []}
+      ></bl-pie-chart>`;
+
+    case 'donut-chart':
+      return html`<bl-donut-chart
+        .field=${field || ''}
+        .label=${label}
+        .value=${ctx.outputs[field!] ?? []}
+        .centerLabel=${props.centerLabel || ''}
+      ></bl-donut-chart>`;
 
     default:
       return html`<div class="bl-unknown">[Unknown: ${node.type}]</div>`;

@@ -245,14 +245,14 @@ The auto-generation reads the calculator's existing schema (same format used by 
 - [x] API client: fetch config, execute calculator, handle debounced input changes
 - [x] Shadow DOM encapsulation with CSS custom property theming
 - [x] Auto-render custom element: `<bl-calculator>`
-- [ ] Programmatic API: `Calculator` class with events (Phase 4b)
+- [x] Programmatic API: `Calculator` class with events (Phase 4b)
 - [x] Auto-generate layout when no config exists
 
 ### Charts (Phase 4b)
-- [ ] Chart wrapper as Lit component
-- [ ] Lazy-load via dynamic `import()`
-- [ ] Required chart types: bar, line, pie, donut
-- [ ] All charts must animate transitions when data changes
+- [x] Chart wrapper as Lit component
+- [x] Lazy-load via dynamic `import()`
+- [x] Required chart types: bar, line, pie, donut
+- [x] All charts must animate transitions when data changes
 
 ### Distribution
 - [x] npm package: `@businesslogic/widget`

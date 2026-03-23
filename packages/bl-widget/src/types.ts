@@ -10,6 +10,9 @@ export interface SchemaProperty {
   enum?: unknown[];
   items?: { type: string; properties?: Record<string, SchemaProperty> };
   order?: number;
+  step?: number;
+  transform?: string;
+  format?: string;
 }
 
 /** JSON Schema object from describe */

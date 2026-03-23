@@ -5,8 +5,18 @@ export function mapInputComponent(name: string, prop: SchemaProperty): LayoutNod
   if (prop.type === 'boolean') {
     return { type: 'checkbox', field: name };
   }
+  // Date fields (transform: 'date' or format: 'date')
+  if (prop.transform === 'date' || prop.format === 'date') {
+    return { type: 'date-picker', field: name };
+  }
+  // Enum/oneOf: radio-group for <=4 options, dropdown for more
   if (prop.oneOf || prop.enum) {
-    return { type: 'dropdown', field: name };
+    const count = prop.oneOf?.length ?? prop.enum?.length ?? 0;
+    return { type: count <= 4 ? 'radio-group' : 'dropdown', field: name };
+  }
+  // Number with min+max: slider
+  if (prop.type === 'number' && prop.minimum != null && prop.maximum != null) {
+    return { type: 'slider', field: name, props: { min: prop.minimum, max: prop.maximum, step: prop.step ?? 1 } };
   }
   if (prop.type === 'integer') {
     const node: LayoutNode = { type: 'number-stepper', field: name };
@@ -22,6 +32,9 @@ export function mapInputComponent(name: string, prop: SchemaProperty): LayoutNod
 
 /** Map a schema property to the best-fit output component type */
 export function mapOutputComponent(name: string, prop: SchemaProperty): LayoutNode {
+  if (prop.type === 'array') {
+    return { type: 'table', field: name };
+  }
   if (prop.type === 'number' || prop.type === 'integer') {
     return { type: 'metric', field: name };
   }
