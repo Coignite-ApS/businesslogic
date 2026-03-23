@@ -26,13 +26,13 @@ resource "hcloud_firewall" "gateway" {
     description = "HTTP redirect"
   }
 
-  # SSH (restricted to admin IPs in production)
+  # SSH (restricted to admin IPs)
   rule {
     direction   = "in"
     protocol    = "tcp"
     port        = "22"
-    source_ips  = ["0.0.0.0/0", "::/0"]
-    description = "SSH access"
+    source_ips  = var.admin_ips
+    description = "SSH access — admin IPs only"
   }
 
   # Private network (inter-service)
@@ -62,13 +62,13 @@ resource "hcloud_firewall" "internal" {
     description = "Private network"
   }
 
-  # SSH (restricted to admin IPs in production)
+  # SSH (restricted to admin IPs)
   rule {
     direction   = "in"
     protocol    = "tcp"
     port        = "22"
-    source_ips  = ["0.0.0.0/0", "::/0"]
-    description = "SSH access"
+    source_ips  = var.admin_ips
+    description = "SSH access — admin IPs only"
   }
 
   labels = {

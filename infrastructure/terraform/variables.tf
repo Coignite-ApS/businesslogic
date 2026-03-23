@@ -39,3 +39,9 @@ variable "environment" {
   type        = string
   default     = "production"
 }
+
+variable "admin_ips" {
+  description = "CIDR blocks allowed SSH access (never use 0.0.0.0/0 in production)"
+  type        = list(string)
+  # No default — must be explicitly set per environment
+}
