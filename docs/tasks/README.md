@@ -45,7 +45,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 25 | Calculator-API Gateway Auth Migration | completed | [cms/25-calculator-api-gateway-auth.md](cms/25-calculator-api-gateway-auth.md) |
 | 26 | Calculators Code Snippets Update (X-Auth-Token → X-API-Key) | completed | [cms/26-calculators-code-snippets-update.md](cms/26-calculators-code-snippets-update.md) |
 | 27 | AI-API & Knowledge-API Gateway Auth Migration | completed | [cms/27-ai-api-gateway-auth.md](cms/27-ai-api-gateway-auth.md) |
-| 28 | Flow-Hooks Gateway Auth Migration | planned | [cms/28-flow-hooks-gateway-auth.md](cms/28-flow-hooks-gateway-auth.md) |
+| 28 | Flow-Hooks Gateway Auth Migration | completed | [cms/28-flow-hooks-gateway-auth.md](cms/28-flow-hooks-gateway-auth.md) |
 | 29 | Widget-API Auth Cleanup | planned | [cms/29-widget-api-auth-cleanup.md](cms/29-widget-api-auth-cleanup.md) |
 | 30 | Formulas Integration Page Update (X-Auth-Token → X-API-Key) | planned | [cms/30-formulas-integration-update.md](cms/30-formulas-integration-update.md) |
 
@@ -170,11 +170,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 26 | 0 | 3 | 29 |
+| CMS | 25 | 0 | 4 | 29 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 5 | 0 | 1 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
 | Gateway | 5 | 0 | 0 | 5 |
 | Cross-Cutting | 4 | 0 | 0 | 4 |
-| **Total** | **55** | **0** | **5** | **60** |
+| **Total** | **54** | **0** | **6** | **60** |

@@ -1,6 +1,6 @@
 # CMS-28: Flow-Hooks Gateway Auth Migration
 
-**Status:** planned
+**Status:** completed
 **Priority:** HIGH
 **Depends on:** GW-01, GW-02
 
