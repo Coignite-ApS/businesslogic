@@ -148,23 +148,49 @@ The lead (you) should:
 - Redirect teammates that are stuck
 - Resolve interface contract disagreements between service teammates
 
+### 4.5. Browser Verification (UI Tasks)
+
+After implementation completes, before wrap-up, verify any UI changes in a real browser:
+
+1. **Identify UI tasks** — filter completed tasks for CMS extensions, frontend modules, or any task with visible UI changes
+2. **Skip if no UI tasks** — if the sprint had only backend/API work, proceed directly to wrap-up
+3. **Verify dev environment** — confirm Docker is running and CMS is accessible at localhost:8055. If not, instruct user to run `/dev-up`
+4. **Build extensions** — run `cd services/cms && make ext-build-all` to compile all extension changes
+5. **Restart CMS** — run `docker compose -f infrastructure/docker/docker-compose.dev.yml restart bl-cms` to pick up rebuilt extensions
+6. **Generate test plan** — for each UI task, read the task doc's acceptance criteria and create structured test cases
+7. **Spawn Browser QA agent** (Opus):
+   ```
+   Agent tool → model: "opus"
+   prompt: "You are a Browser QA Agent. Read and follow ALL instructions in
+   .claude/skills/browser-qa/SKILL.md. Project root: [cwd].
+   Test plan: [generated test cases from UI tasks].
+   Execute all tests. Save report to docs/reports/browser-qa-YYYY-MM-DD.md.
+   Return pass/fail summary."
+   ```
+8. **Handle failures**:
+   - If CRITICAL or HIGH failures → message the responsible implementation teammate with the failure details and screenshot paths → teammate fixes → re-build extensions → re-run Browser QA
+   - If only MEDIUM/LOW failures → note in sprint summary, continue to wrap-up
+9. **Report** — include browser QA results in the sprint completion summary
+
 ### 5. Post-Sprint Wrap-Up
 
-After all tasks complete:
+After all tasks complete (and browser QA passes for UI tasks):
 1. Run full test suite: `./scripts/test-all.sh`
 2. Run contract tests: `./scripts/test-contracts.sh`
 3. Update all task statuses in `docs/tasks/README.md`
 4. Suggest running `/cto-review` for technical review
 5. Suggest running `/project-review` for health check
-6. Output completion summary
+6. Output completion summary (include browser QA report link if applicable)
 
 ## Team Sizing Guidelines
 
-| Total Tasks | Service Teammates (Sonnet) | QA (Opus) | Lead (Opus) | Total |
-|-------------|---------------------------|-----------|-------------|-------|
-| 2-5 tasks   | 2-3                       | —         | 1           | 3-4   |
-| 6-10 tasks  | 3-5                       | 1         | 1           | 5-7   |
-| 10+ tasks   | 4-5                       | 1         | 1           | 6-7   |
+| Total Tasks | Service Teammates (Sonnet) | QA (Opus) | Browser QA (Opus) | Lead (Opus) | Total |
+|-------------|---------------------------|-----------|-------------------|-------------|-------|
+| 2-5 tasks   | 2-3                       | —         | if UI tasks       | 1           | 3-5   |
+| 6-10 tasks  | 3-5                       | 1         | if UI tasks       | 1           | 5-8   |
+| 10+ tasks   | 4-5                       | 1         | if UI tasks       | 1           | 6-8   |
+
+**Browser QA** is spawned late (Phase 4.5), only when the sprint includes UI tasks. It is not part of the initial team — the lead spawns it after implementation completes.
 
 ## Safety
 

@@ -27,6 +27,7 @@ When a new conversation starts, greet the user with a brief status overview. Do 
   /cto-review                — technical review after changes
   /devops-review             — infrastructure review
   /frontend-designer         — UI design review or build
+  /browser-qa                — verify UI changes in Chrome
   /bizdev-strategy           — market & pricing analysis
   /project-review            — full health check
   /test-all                  — run all tests
@@ -57,6 +58,7 @@ Read these before making changes:
 | `.claude/skills/cto-review/SKILL.md` | CTO-level technical review: security audit, architecture evaluation, code quality, operational readiness |
 | `.claude/skills/devops-review/SKILL.md` | DevOps infrastructure review: Terraform, Docker, Coolify, networking, backups, monitoring |
 | `.claude/skills/bizdev-strategy/SKILL.md` | Business development: market research, pricing, competitive analysis, opportunity discovery |
+| `.claude/skills/browser-qa/SKILL.md` | Browser-based QA: Chrome DevTools verification, screenshot evidence, pass/fail reports |
 | `docs/strategy/` | Strategy documents maintained by BizDev agent (pricing, marketing, gaps, GTM) |
 
 ## Agent Model Policy
@@ -72,6 +74,7 @@ Read these before making changes:
 | BizDev Strategy | **Opus** | Market evaluation, pricing, competitive analysis |
 | Frontend Designer (review) | **Opus** | UX judgment, accessibility audits |
 | QA Reviewer (robo-sprint) | **Opus** | Code quality judgment, test coverage validation |
+| Browser QA | **Opus** | Visual verification, UI judgment, interpreting browser state |
 | Frontend Designer (build) | **Sonnet** | Implementation speed, cost efficiency |
 | Implementation Teammate | **Sonnet** | TDD coding, focused task execution |
 
@@ -98,6 +101,8 @@ This project has four specialist agents that run as **independent sub-agents** (
 | When identifying product gaps or customer pains | **BizDev Strategy** | `/bizdev-strategy gaps` |
 | When evaluating competitive threats or opportunities | **BizDev Strategy** | `/bizdev-strategy competitors` |
 | When discussing what to build next | **BizDev Strategy** | `/bizdev-strategy opportunities` |
+| After UI/extension changes need verification | **Browser QA** | `/browser-qa cms/22` or `/browser-qa` |
+| When robo-sprint completes UI tasks | **Browser QA** | Auto-triggered in Phase 4.5 |
 
 ### How to Invoke
 
@@ -122,6 +127,7 @@ Agent 1 (CTO):      model: "opus" — "Read .claude/skills/cto-review/SKILL.md �
 Agent 2 (DevOps):   model: "opus" — "Read .claude/skills/devops-review/SKILL.md — full review"
 Agent 3 (Frontend): model: "opus" — "Read .claude/skills/frontend-designer/SKILL.md — review all UI"
 Agent 4 (BizDev):   model: "opus" — "Read .claude/skills/bizdev-strategy/SKILL.md — full strategic review"
+Agent 5 (BrowserQA): model: "opus" — "Read .claude/skills/browser-qa/SKILL.md — verify UI changes"
 ```
 
 All four run concurrently in their own context, each can spawn their own sub-agents for research, and only the summaries return. Reports are saved to `docs/reports/`, strategy documents to `docs/strategy/`.
@@ -152,6 +158,7 @@ All four run concurrently in their own context, each can spawn their own sub-age
 | `opportunities` | — | — | — | Opportunity list | Feature prioritization |
 | `positioning` | — | — | — | Value proposition | Positioning & messaging |
 | `gtm` | — | — | — | Go-to-market | GTM strategy review |
+| `<task-path>` | — | — | — | — | Browser QA: verify specific task(s) |
 
 ## Project Structure
 

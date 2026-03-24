@@ -110,6 +110,8 @@
       "Bash(pdftoppm *)",
       "Bash(libreoffice *)",
       "Bash(./scripts/*)",
+      "Edit(*)",
+      "Write(*)",
       "Read(*)",
       "WebFetch(*)",
       "WebSearch(*)",
