@@ -1,12 +1,16 @@
 Spawn the DevOps Infrastructure Review as an **independent agent** that does NOT consume the main conversation's context window.
 
+## Model Policy
+
+**This command MUST use Opus.** Infrastructure review requires Opus-level reasoning for security analysis, network topology evaluation, and disaster recovery assessment. When spawning the sub-agent, always specify `model: "opus"`.
+
 **How it works:**
 1. Read the full skill file at `.claude/skills/devops-review/SKILL.md`
-2. Spawn a sub-agent (using the Agent tool) with the skill contents as its prompt
+2. Spawn a sub-agent (using the Agent tool with `model: "opus"`) with the skill contents as its prompt
 3. The agent runs the full review autonomously — including web research, config scanning, and report generation
 4. Only the final report/findings come back to the main conversation
 
-**To execute:** Use the Agent tool with this prompt structure:
+**To execute:** Use the Agent tool (model: "opus") with this prompt structure:
 
 ```
 You are a DevOps Infrastructure Review Agent. Read and follow ALL

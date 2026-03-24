@@ -1,12 +1,16 @@
 Spawn the Business Development & Strategy agent as an **independent agent** that does NOT consume the main conversation's context window.
 
+## Model Policy
+
+**This command MUST use Opus.** Strategic analysis requires Opus-level reasoning for market evaluation, pricing model assessment, and competitive positioning. When spawning the sub-agent, always specify `model: "opus"`.
+
 **How it works:**
 1. Read the full skill file at `.claude/skills/bizdev-strategy/SKILL.md`
-2. Spawn a sub-agent (using the Agent tool) with the skill contents as its prompt
+2. Spawn a sub-agent (using the Agent tool with `model: "opus"`) with the skill contents as its prompt
 3. The agent runs the full analysis autonomously — including market research, competitor analysis, and strategy document generation
 4. Only the final strategy/summary comes back to the main conversation
 
-**To execute:** Use the Agent tool with this prompt structure:
+**To execute:** Use the Agent tool (model: "opus") with this prompt structure:
 
 ```
 You are a Business Development & Strategy Agent. Read and follow ALL

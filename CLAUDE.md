@@ -22,6 +22,8 @@ When a new conversation starts, greet the user with a brief status overview. Do 
   /tasks                     — see full backlog, pick next task
   /tasks <service>           — filter by service (cms, ai-api, formula-api, flow, gateway)
   /robo-task <path>          — run autonomous loop on a task
+  /robo-sprint               — run multiple tasks in parallel (Agent Teams)
+  /robo-sprint formula-api   — parallel tasks for specific services
   /cto-review                — technical review after changes
   /devops-review             — infrastructure review
   /frontend-designer         — UI design review or build
@@ -57,6 +59,24 @@ Read these before making changes:
 | `.claude/skills/bizdev-strategy/SKILL.md` | Business development: market research, pricing, competitive analysis, opportunity discovery |
 | `docs/strategy/` | Strategy documents maintained by BizDev agent (pricing, marketing, gaps, GTM) |
 
+## Agent Model Policy
+
+**Opus** is required for roles that involve judgment, review, or strategic decisions.
+**Sonnet** is used for implementation work where speed and cost matter.
+
+| Role | Model | Rationale |
+|------|-------|-----------|
+| Sprint Lead (robo-sprint) | **Opus** | Orchestration, cross-service coordination, quality gates |
+| CTO Review | **Opus** | Architecture evaluation, security analysis |
+| DevOps Review | **Opus** | Infrastructure security, DR assessment |
+| BizDev Strategy | **Opus** | Market evaluation, pricing, competitive analysis |
+| Frontend Designer (review) | **Opus** | UX judgment, accessibility audits |
+| QA Reviewer (robo-sprint) | **Opus** | Code quality judgment, test coverage validation |
+| Frontend Designer (build) | **Sonnet** | Implementation speed, cost efficiency |
+| Implementation Teammate | **Sonnet** | TDD coding, focused task execution |
+
+When spawning any sub-agent or agent team, always specify the model explicitly. Never default — be intentional.
+
 ## Specialist Agent Team
 
 This project has four specialist agents that run as **independent sub-agents** (they do NOT consume your context window). Consult them proactively — don't wait for the user to ask.
@@ -65,11 +85,12 @@ This project has four specialist agents that run as **independent sub-agents** (
 
 | Trigger | Agent | Command |
 |---------|-------|---------|
+| Run multiple tasks in parallel across services | **Robo-Sprint** (Agent Team) | `/robo-sprint` or `/robo-sprint formula-api ai-api` |
 | After completing a major code change | **CTO Review** | `/cto-review` or `/cto-review quick` |
 | After infrastructure/Terraform/Docker/Coolify changes | **DevOps Review** | `/devops-review` or `/devops-review docker` |
 | Before building or after modifying any UI component | **Frontend Designer** | `/frontend-designer review` or `/frontend-designer build <desc>` |
 | When planning features, evaluating pricing, or assessing market | **BizDev Strategy** | `/bizdev-strategy` or `/bizdev-strategy pricing` |
-| Before a release or production deployment | **All four** | Run in parallel for comprehensive assessment |
+| Before a release or production deployment | **All four reviewers** | Run in parallel for comprehensive assessment |
 | When a security concern arises in code | **CTO Review** | `/cto-review security` |
 | When a security concern arises in infrastructure | **DevOps Review** | `/devops-review security` |
 | When evaluating technology choices | **CTO Review** | `/cto-review architecture` |
@@ -78,12 +99,16 @@ This project has four specialist agents that run as **independent sub-agents** (
 | When evaluating competitive threats or opportunities | **BizDev Strategy** | `/bizdev-strategy competitors` |
 | When discussing what to build next | **BizDev Strategy** | `/bizdev-strategy opportunities` |
 
-### How to Invoke (All Four Follow the Same Pattern)
+### How to Invoke
 
 ```bash
-# Spawn as independent agent — reads SKILL.md, does full work, returns summary only
-Agent tool → prompt: "You are a [Role] Agent. Read and follow ALL instructions
-in .claude/skills/[skill-name]/SKILL.md. Project root: [cwd].
+# Robo-Sprint — spawns agent team (lead=Opus, implementation=Sonnet, QA=Opus)
+/robo-sprint
+/robo-sprint formula-api ai-api
+
+# Specialist agents — spawn as independent agent (Opus unless noted)
+Agent tool → model: "opus", prompt: "You are a [Role] Agent. Read and follow ALL
+instructions in .claude/skills/[skill-name]/SKILL.md. Project root: [cwd].
 Review scope: [arguments]. Execute the review. Save the report to
 docs/reports/[skill-name]-[DATE].md. Return an executive summary with top findings."
 ```
@@ -93,10 +118,10 @@ docs/reports/[skill-name]-[DATE].md. Return an executive summary with top findin
 For comprehensive project assessment (e.g., before a release), spawn all four simultaneously:
 
 ```
-Agent 1 (CTO):      "Read .claude/skills/cto-review/SKILL.md — full review"
-Agent 2 (DevOps):   "Read .claude/skills/devops-review/SKILL.md — full review"
-Agent 3 (Frontend): "Read .claude/skills/frontend-designer/SKILL.md — review all UI"
-Agent 4 (BizDev):   "Read .claude/skills/bizdev-strategy/SKILL.md — full strategic review"
+Agent 1 (CTO):      model: "opus" — "Read .claude/skills/cto-review/SKILL.md — full review"
+Agent 2 (DevOps):   model: "opus" — "Read .claude/skills/devops-review/SKILL.md — full review"
+Agent 3 (Frontend): model: "opus" — "Read .claude/skills/frontend-designer/SKILL.md — review all UI"
+Agent 4 (BizDev):   model: "opus" — "Read .claude/skills/bizdev-strategy/SKILL.md — full strategic review"
 ```
 
 All four run concurrently in their own context, each can spawn their own sub-agents for research, and only the summaries return. Reports are saved to `docs/reports/`, strategy documents to `docs/strategy/`.
