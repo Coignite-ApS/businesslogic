@@ -50,7 +50,10 @@ export class ApiClient {
       `${this.gatewayUrl}/v1/widget/${encodeURIComponent(this.calculatorId)}/display`,
       { headers: this.authHeaders() },
     );
-    if (!res.ok) throw new Error(`Display failed: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw this.buildError(res.status, body);
+    }
     return res.json();
   }
 
@@ -70,7 +73,10 @@ export class ApiClient {
       `${this.apiUrl}/calculator/${encodeURIComponent(this.calculatorId)}/describe`,
       { headers: this.authHeaders() },
     );
-    if (!res.ok) throw new Error(`Describe failed: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw this.buildError(res.status, body);
+    }
     return res.json();
   }
 
@@ -89,9 +95,17 @@ export class ApiClient {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Execute failed: ${res.status}`);
+      throw this.buildError(res.status, body);
     }
     return res.json();
+  }
+
+  private buildError(status: number, body: Record<string, unknown>): Error {
+    if (this.gatewayMode) {
+      if (status === 403) return new Error(body.error as string || 'Insufficient permissions — check API key resource grants');
+      if (status === 429) return new Error('Rate limit exceeded — try again later');
+    }
+    return new Error(body.error as string || `Request failed: ${status}`);
   }
 
   private authHeaders(): Record<string, string> {

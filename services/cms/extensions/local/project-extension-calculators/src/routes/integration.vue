@@ -64,6 +64,13 @@
 			<div class="type-tabs">
 				<button
 					class="type-tab"
+					:class="{ active: integrationTab === 'widget' }"
+					@click="integrationTab = 'widget'"
+				>
+					Widget
+				</button>
+				<button
+					class="type-tab"
 					:class="{ active: integrationTab === 'api' }"
 					@click="integrationTab = 'api'"
 				>
@@ -101,6 +108,31 @@
 					Cowork Plugin
 				</button>
 			</div>
+
+			<!-- Widget tab -->
+			<template v-if="integrationTab === 'widget'">
+				<div v-if="!isDeployed" class="deploy-notice">
+					<v-icon name="cloud_off" />
+					<span>Not deployed to Formula API. Deploy from the dashboard first.</span>
+				</div>
+				<template v-else>
+					<div class="code-section">
+						<h2 class="section-title">Embed Widget (Gateway Mode)</h2>
+						<p class="code-section-desc">
+							Add this to your HTML page. The widget authenticates via your API key through the gateway.
+						</p>
+						<code-block :code="widgetEmbedGateway" :copy-code="widgetEmbedGateway" language="html" />
+					</div>
+
+					<div class="code-section">
+						<h2 class="section-title">Embed Widget (Legacy Direct Mode)</h2>
+						<p class="code-section-desc">
+							Uses a per-calculator token to connect directly to the Formula API. Use Gateway Mode above for new integrations.
+						</p>
+						<code-block :code="widgetEmbedDirect" :copy-code="widgetEmbedDirect" language="html" />
+					</div>
+				</template>
+			</template>
 
 			<!-- API tab -->
 			<template v-if="integrationTab === 'api'">
@@ -259,6 +291,7 @@ import McpSnippets from '../components/mcp-snippets.vue';
 import AiTab from '../components/ai-tab.vue';
 import SkillTab from '../components/skill-tab.vue';
 import PluginTab from '../components/plugin-tab.vue';
+import { maskToken } from '../utils/code-snippets';
 import type { SnippetParams } from '../utils/code-snippets';
 import type { McpSnippetParams } from '../utils/mcp-snippets';
 import { extractParams } from '../utils/param-transforms';
@@ -279,7 +312,7 @@ const { activeAccountId, fetchActiveAccount } = useActiveAccount(api);
 
 const formulaApiUrl = ref<string | null>(null);
 const env = ref<'test' | 'live'>('test');
-const integrationTab = ref<'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('api');
+const integrationTab = ref<'widget' | 'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('widget');
 const mcpSaving = ref(false);
 const currentId = computed(() => (route.params.id as string) || null);
 
@@ -349,6 +382,29 @@ const sampleBody = computed(() => {
 		}
 	}
 	return Object.keys(body).length > 0 ? body : undefined;
+});
+
+const widgetEmbedGateway = computed(() => {
+	const maskedKey = apiKey.value ? maskToken(apiKey.value) : 'YOUR_API_KEY';
+	return `<!-- BusinessLogic Calculator Widget -->
+<script src="https://cdn.businesslogic.online/widget/bl-widget.js"><\/script>
+
+<bl-calculator
+  api-key="${maskedKey}"
+  calculator-id="${effectiveId.value}"
+></bl-calculator>`;
+});
+
+const widgetEmbedDirect = computed(() => {
+	const maskedKey = apiKey.value ? maskToken(apiKey.value) : 'YOUR_TOKEN';
+	return `<!-- BusinessLogic Calculator Widget (Legacy) -->
+<script src="https://cdn.businesslogic.online/widget/bl-widget.js"><\/script>
+
+<bl-calculator
+  token="${maskedKey}"
+  calculator-id="${effectiveId.value}"
+  api-url="${formulaApiUrl.value || 'https://api.businesslogic.online'}"
+></bl-calculator>`;
 });
 
 const snippetParams = computed<SnippetParams>(() => ({
@@ -532,7 +588,7 @@ watch([() => mcpConfigLocal.value.enabled, () => integrationLocal.value.skill, (
 // Reset env when switching calculators — default to live if activated
 watch(currentId, () => {
 	env.value = current.value?.activated ? 'live' : 'test';
-	integrationTab.value = 'api';
+	integrationTab.value = 'widget';
 });
 
 // Default to live when activated, switch back to test if deactivated

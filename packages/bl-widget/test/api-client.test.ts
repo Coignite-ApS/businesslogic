@@ -41,8 +41,12 @@ describe('ApiClient', () => {
     });
 
     it('throws on non-OK response', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 });
-      await expect(client.describe()).rejects.toThrow('Describe failed: 401');
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.reject(new Error('no json')),
+      });
+      await expect(client.describe()).rejects.toThrow('Request failed: 401');
     });
 
     it('uses custom API URL', async () => {
@@ -106,7 +110,71 @@ describe('ApiClient', () => {
         json: () => Promise.reject(new Error('no json')),
       });
 
-      await expect(client.execute({})).rejects.toThrow('Execute failed: 500');
+      await expect(client.execute({})).rejects.toThrow('Request failed: 500');
+    });
+  });
+
+  describe('gateway mode', () => {
+    let gwClient: ApiClient;
+
+    beforeEach(() => {
+      gwClient = new ApiClient({ apiKey: 'blk_test123', calculatorId: CALC_ID });
+    });
+
+    it('execute() routes through gateway /v1/widget/', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ result: 42 }),
+      });
+
+      await gwClient.execute({ x: 10 });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://gateway.businesslogic.online/v1/widget/vat-calc/execute',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ 'X-API-Key': 'blk_test123' }),
+        }),
+      );
+    });
+
+    it('throws permission error on 403', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: 'Calculator not in key resources' }),
+      });
+
+      await expect(gwClient.execute({})).rejects.toThrow('Calculator not in key resources');
+    });
+
+    it('throws rate limit error on 429', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({}),
+      });
+
+      await expect(gwClient.execute({})).rejects.toThrow('Rate limit exceeded');
+    });
+
+    it('display() calls gateway /v1/widget/:id/display', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          calculator_id: CALC_ID, name: 'Test', description: null,
+          layout: null,
+          input_schema: { type: 'object', properties: {} },
+          output_schema: { type: 'object', properties: {} },
+        }),
+      });
+
+      await gwClient.display();
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://gateway.businesslogic.online/v1/widget/vat-calc/display',
+        { headers: { 'X-API-Key': 'blk_test123' } },
+      );
     });
   });
 });
