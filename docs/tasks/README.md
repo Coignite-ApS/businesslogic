@@ -129,6 +129,7 @@ Infrastructure and multi-service concerns.
 | 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | planned | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
 | 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | planned | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
 | 04 | Formula-API Gateway Auth Path | completed | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
+| 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
 
 ---
 
