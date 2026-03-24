@@ -11,7 +11,8 @@
   },
   "scripts": {
     "build": "directus-extension build",
-    "dev": "directus-extension build -w --no-minify"
+    "dev": "directus-extension build -w --no-minify",
+    "test": "vitest run"
   },
   "dependencies": {
     "project-shared-ui": "file:../../shared/project-shared-ui"
