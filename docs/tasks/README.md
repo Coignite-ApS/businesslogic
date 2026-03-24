@@ -20,7 +20,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | Calculator Testing | planned | [cms/01-calculator-testing.md](cms/01-calculator-testing.md) |
-| 02 | Cell Mapping UX | planned | [cms/02-cell-mapping-ux.md](cms/02-cell-mapping-ux.md) |
+| 02 | Cell Mapping UX | planned | [cms/02-cell-mapping-ux.md](cms/02-cell-mapping-ux.md) | <!-- partial: visual highlighting done -->
 | 03 | Calculator Onboarding Wizard | planned | [cms/03-onboarding-wizard.md](cms/03-onboarding-wizard.md) |
 | 04 | Embeddable Calculator Widget (Render Library) | completed | [cms/04-widget-render-library.md](cms/04-widget-render-library.md) |
 | 06 | Lead Capture & CRM Integration | planned | [cms/06-lead-capture.md](cms/06-lead-capture.md) |
@@ -39,8 +39,8 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 19 | directus-extension-businesslogic (public npm) | planned | [cms/19-directus-extension-businesslogic.md](cms/19-directus-extension-businesslogic.md) |
 | 20 | Account-Level MCP (UI) | planned | [cms/20-account-mcp.md](cms/20-account-mcp.md) |
 | 21 | DOMPurify for All v-html Usage | planned | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
-| 22 | API Key Management UI | planned | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
-| 23 | Widget Client Gateway Mode | planned | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
+| 22 | API Key Management UI | completed | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
+| 23 | Widget Client Gateway Mode | completed | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
 | 24 | Widget Layout Builder | planned | [cms/24-widget-layout-builder.md](cms/24-widget-layout-builder.md) |
 | 25 | Calculator-API Gateway Auth Migration | completed | [cms/25-calculator-api-gateway-auth.md](cms/25-calculator-api-gateway-auth.md) |
 | 26 | Calculators Code Snippets Update (X-Auth-Token → X-API-Key) | completed | [cms/26-calculators-code-snippets-update.md](cms/26-calculators-code-snippets-update.md) |
@@ -73,7 +73,7 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | Account-Level Auth for Execute Endpoints | completed | [formula-api/01-execute-auth.md](formula-api/01-execute-auth.md) |
-| 02 | OpenAPI Spec Completion | planned | [formula-api/02-openapi-completion.md](formula-api/02-openapi-completion.md) |
+| 02 | OpenAPI Spec Completion | completed | [formula-api/02-openapi-completion.md](formula-api/02-openapi-completion.md) |
 | 03 | Redis Error Logging | completed | [formula-api/03-redis-error-logging.md](formula-api/03-redis-error-logging.md) |
 | 04 | MCP Error Code Mapping | completed | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
 | 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
@@ -170,11 +170,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 21 | 0 | 8 | 29 |
+| CMS | 19 | 0 | 10 | 29 |
 | AI API | 6 | 0 | 0 | 6 |
-| Formula API | 2 | 0 | 4 | 6 |
+| Formula API | 1 | 0 | 5 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
 | Gateway | 1 | 0 | 4 | 5 |
 | Cross-Cutting | 3 | 0 | 1 | 4 |
-| **Total** | **42** | **0** | **18** | **60** |
+| **Total** | **39** | **0** | **21** | **60** |

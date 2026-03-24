@@ -64,10 +64,10 @@ Sheet Grid (left)              Parameter List (right)
 ## Acceptance Criteria
 
 - [ ] Click a parameter field, then click a cell → cell reference auto-fills
-- [ ] Mapped cells are visually highlighted in the sheet grid
+- [x] Mapped cells are visually highlighted in the sheet grid
 - [ ] Clicking a mapped cell highlights its associated parameter
-- [ ] Input and output mappings use distinct colors
-- [ ] Duplicate cell mapping shows a warning
+- [x] Input and output mappings use distinct colors (blue=input, green=output)
+- [x] Duplicate cell mapping shows a warning
 - [ ] Sheet auto-switches when selecting a parameter mapped to a different sheet
 
 ---

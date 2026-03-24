@@ -1,7 +1,7 @@
 # 22. API Key Management UI
 
 **Service:** cms
-**Status:** planned
+**Status:** completed
 **Depends on:** GW-02 (API Key Management Endpoints)
 
 ---
@@ -34,13 +34,13 @@ Basic CRUD is already implemented in `project-extension-account`:
 - [x] Rotate flow: new key generated, old revoked
 - [x] Revoke flow: immediate soft delete
 - [x] Deprecation banner on old formula token UI
-- [ ] Resource picker component: tree of account's calculators with action checkboxes (execute, describe)
-- [ ] KB picker: list of account's knowledge bases with action checkboxes (search, ask)
-- [ ] Wire resource picker into create flow — send permissions to gateway
-- [ ] Key detail/edit view: show current permissions, allow editing
-- [ ] Permissions display in key list (e.g. "3 calculators, 1 KB" summary)
-- [ ] Wildcard option: "All calculators" / "All KBs" toggle
-- [ ] Unit tests for resource picker component
+- [x] Resource picker component: tree of account's calculators with action checkboxes (execute, describe)
+- [x] KB picker: list of account's knowledge bases with action checkboxes (search, ask)
+- [x] Wire resource picker into create flow — send permissions to gateway
+- [x] Key detail/edit view: show current permissions, allow editing
+- [x] Permissions display in key list (e.g. "3 calculators, 1 KB" summary)
+- [x] Wildcard option: "All calculators" / "All KBs" toggle
+- [x] Unit tests for resource picker component (14 tests in permissions.test.ts)
 
 ---
 

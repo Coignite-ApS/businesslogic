@@ -1,7 +1,7 @@
 # 23. Widget Client Gateway Mode
 
 **Service:** cms
-**Status:** planned
+**Status:** completed
 **Depends on:** GW-03 (Widget Routes + Cache), CC-04 (Formula-API Gateway Auth)
 
 ---
@@ -31,13 +31,13 @@ Widget `<bl-calculator>` supports dual mode: `api-key` attribute routes through 
 
 ## Key Tasks
 
-- [ ] Widget API client: detect `api-key` vs `token` attribute
-- [ ] Gateway base URL config (default: `https://api.businesslogic.online`)
-- [ ] Route config/execute/catalog requests through gateway when `api-key`
-- [ ] Handle gateway-specific errors (403 insufficient permissions, 429 rate limit)
-- [ ] Update embed snippet generator in CMS to use `api-key` mode
-- [ ] CMS integration tab: show gateway embed code for keys with widget perms
-- [ ] Unit tests for dual-mode routing logic
+- [x] Widget API client: detect `api-key` vs `token` attribute
+- [x] Gateway base URL config (default: `https://gateway.businesslogic.online`)
+- [x] Route config/execute/catalog requests through gateway when `api-key`
+- [x] Handle gateway-specific errors (403 insufficient permissions, 429 rate limit)
+- [x] Update embed snippet generator in CMS to use `api-key` mode
+- [x] CMS integration tab: show gateway embed code for keys with widget perms
+- [x] Unit tests for dual-mode routing logic (4 gateway tests)
 - [ ] E2E test: widget renders via gateway path
 
 ---
