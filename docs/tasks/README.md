@@ -19,7 +19,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
-| 01 | Calculator Testing | planned | [cms/01-calculator-testing.md](cms/01-calculator-testing.md) |
+| 01 | Calculator Testing | completed | [cms/01-calculator-testing.md](cms/01-calculator-testing.md) |
 | 02 | Cell Mapping UX | planned | [cms/02-cell-mapping-ux.md](cms/02-cell-mapping-ux.md) | <!-- partial: visual highlighting done -->
 | 03 | Calculator Onboarding Wizard | planned | [cms/03-onboarding-wizard.md](cms/03-onboarding-wizard.md) |
 | 04 | Embeddable Calculator Widget (Render Library) | completed | [cms/04-widget-render-library.md](cms/04-widget-render-library.md) |
@@ -58,7 +58,7 @@ AI chat, knowledge base backend, embeddings, public API.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | AI Assistant — Public API + Widget | planned | [ai-api/01-public-api-widget.md](ai-api/01-public-api-widget.md) |
-| 02 | AI Response Template with @mentions | planned | [ai-api/02-ai-response-template.md](ai-api/02-ai-response-template.md) |
+| 02 | AI Response Template with @mentions | completed | [ai-api/02-ai-response-template.md](ai-api/02-ai-response-template.md) |
 | 03 | AI Name & Response Template Overrides | planned | [ai-api/03-ai-name-overrides.md](ai-api/03-ai-name-overrides.md) |
 | 04 | Digital Twin / Second Brain (Personal AI Memory) | planned | [ai-api/04-digital-twin-second-brain.md](ai-api/04-digital-twin-second-brain.md) |
 | 05 | Contextual Memory Intelligence (Digital Twin Brain) | planned | [ai-api/05-contextual-memory-intelligence.md](ai-api/05-contextual-memory-intelligence.md) |
@@ -170,11 +170,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 19 | 0 | 10 | 29 |
-| AI API | 6 | 0 | 0 | 6 |
+| CMS | 18 | 0 | 11 | 29 |
+| AI API | 5 | 0 | 1 | 6 |
 | Formula API | 1 | 0 | 5 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
 | Gateway | 1 | 0 | 4 | 5 |
 | Cross-Cutting | 3 | 0 | 1 | 4 |
-| **Total** | **39** | **0** | **21** | **60** |
+| **Total** | **37** | **0** | **23** | **60** |
