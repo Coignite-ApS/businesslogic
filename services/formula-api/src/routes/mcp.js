@@ -5,7 +5,7 @@ import { getClientIp, checkAllowlist, setCorsHeaders } from '../utils/allowlist.
 import * as rateLimiter from '../services/rate-limiter.js';
 import * as stats from '../services/stats.js';
 import { routeByCalcId } from '../utils/routing.js';
-import { cleanInputSchemaForTools } from '../utils/integration.js';
+import { cleanInputSchemaForTools, resolveResponseTemplate } from '../utils/integration.js';
 
 const MCP_PROTOCOL_VERSION = '2025-03-26';
 const SERVER_NAME = 'excel-formula-api';
@@ -161,9 +161,11 @@ export async function registerRoutes(app) {
           // Build MCP content
           const content = [{ type: 'text', text: JSON.stringify(result) }];
 
-          // Append response template as additional instruction if present
-          if (calc.mcp.responseTemplate) {
-            content.push({ type: 'text', text: `\n---\nResponse template (use this to format your response):\n${calc.mcp.responseTemplate}` });
+          // Resolve and append response template (MCP-specific override takes precedence over global)
+          const rawTemplate = calc.mcp.responseTemplate || calc.integration?.responseTemplate || '';
+          if (rawTemplate && rawTemplate.trim()) {
+            const resolved = resolveResponseTemplate(rawTemplate, inputData, result);
+            content.push({ type: 'text', text: `\n---\nResponse template (use this to format your response):\n${resolved}` });
           }
 
           return reply.send(jsonRpcResult(id, { content }));
