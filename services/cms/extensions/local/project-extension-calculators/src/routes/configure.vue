@@ -113,6 +113,7 @@
 				<input-parameters
 					:model-value="localInput"
 					:sheets="testConfig?.sheets || null"
+					:output-mappings="outputMappingMap"
 					@update:model-value="localInput = $event"
 				/>
 			</div>
@@ -121,6 +122,7 @@
 				<output-parameters
 					:model-value="localOutput"
 					:sheets="testConfig?.sheets || null"
+					:input-mappings="inputMappingMap"
 					@update:model-value="localOutput = $event"
 				/>
 			</div>
@@ -319,6 +321,23 @@ const originalInput = computed(() =>
 const originalOutput = computed(() =>
 	extractParams<OutputParameter>(testConfig.value?.output as Record<string, unknown> | null),
 );
+
+// Cross-parameter mapping maps for cell highlighting
+const inputMappingMap = computed(() => {
+	const map: Record<string, string> = {};
+	for (const [key, param] of Object.entries(localInput.value)) {
+		if (param.mapping) map[param.title || key] = param.mapping;
+	}
+	return map;
+});
+
+const outputMappingMap = computed(() => {
+	const map: Record<string, string> = {};
+	for (const [key, param] of Object.entries(localOutput.value)) {
+		if (param.mapping) map[param.title || key] = param.mapping;
+	}
+	return map;
+});
 
 const hasParamChanges = computed(() =>
 	JSON.stringify(localInput.value) !== JSON.stringify(originalInput.value)

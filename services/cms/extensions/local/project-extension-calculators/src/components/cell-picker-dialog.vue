@@ -47,8 +47,8 @@
 								<td
 									v-for="(_, ci) in colCount"
 									:key="ci"
-									class="cell"
-									:class="{ selected: isCellSelected(ri, ci) }"
+									:class="cellClass(ri, ci)"
+									v-tooltip.bottom="getMappedCell(ri, ci)?.label"
 									@mousedown="handleMouseDown(ri, ci, $event)"
 									@mouseenter="handleMouseEnter(ri, ci)"
 									@mouseup="handleMouseUp"
@@ -65,6 +65,12 @@
 					<code v-if="selection" class="bar-value">{{ selection }}</code>
 					<span v-else class="bar-hint">{{ allowRange ? 'Drag to select a range' : 'Click a cell' }}</span>
 					<span v-if="selection && allowRange && !isRange" class="bar-hint bar-warn">Drag to select a range</span>
+					<span v-if="duplicateWarning" class="bar-hint bar-warn">{{ duplicateWarning }}</span>
+					<span class="bar-spacer"></span>
+					<span v-if="mappedCells && mappedCells.length > 0" class="bar-legend">
+						<span class="legend-dot legend-input"></span> Input
+						<span class="legend-dot legend-output"></span> Output
+					</span>
 				</div>
 			</div>
 
@@ -94,6 +100,12 @@ function scrollTabs(dir: number) {
 	el.scrollBy({ left: dir * 120, behavior: 'smooth' });
 }
 
+export interface MappedCell {
+	ref: string;
+	type: 'input' | 'output';
+	label: string;
+}
+
 const props = defineProps<{
 	modelValue: boolean;
 	sheets: Record<string, unknown[][]> | null;
@@ -103,6 +115,7 @@ const props = defineProps<{
 	fixedRangeLength?: number | null;
 	title?: string;
 	description?: string;
+	mappedCells?: MappedCell[];
 }>();
 
 const emit = defineEmits<{
@@ -139,6 +152,13 @@ const selection = computed(() => {
 const isRange = computed(() => {
 	if (!startCell.value || !endCell.value) return false;
 	return startCell.value.row !== endCell.value.row || startCell.value.col !== endCell.value.col;
+});
+
+const duplicateWarning = computed(() => {
+	if (!selection.value || !props.mappedCells) return '';
+	const existing = props.mappedCells.find((mc) => mc.ref === selection.value);
+	if (existing) return `Already mapped to "${existing.label}"`;
+	return '';
 });
 
 const canConfirm = computed(() => {
@@ -180,6 +200,35 @@ function parseRangeRef(ref: string): { sheet: string; startCol: number; startRow
 		startRow: parseInt(match[3]) - 1,
 		endCol: letterToCol(match[4]),
 		endRow: parseInt(match[5]) - 1,
+	};
+}
+
+// Build a lookup map: "SheetName!A1" → MappedCell for highlight rendering
+const mappedCellMap = computed(() => {
+	const map = new Map<string, MappedCell>();
+	if (!props.mappedCells) return map;
+	for (const mc of props.mappedCells) {
+		const parsed = parseCellRef(mc.ref);
+		if (parsed) {
+			map.set(`${parsed.sheet}!${colLetter(parsed.col)}${parsed.row + 1}`, mc);
+		}
+	}
+	return map;
+});
+
+function getMappedCell(row: number, col: number): MappedCell | undefined {
+	if (!activeTab.value) return undefined;
+	const key = `${activeTab.value}!${colLetter(col)}${row + 1}`;
+	return mappedCellMap.value.get(key);
+}
+
+function cellClass(row: number, col: number): Record<string, boolean> {
+	const mapped = getMappedCell(row, col);
+	return {
+		cell: true,
+		selected: isCellSelected(row, col),
+		'mapped-input': !!mapped && mapped.type === 'input',
+		'mapped-output': !!mapped && mapped.type === 'output',
 	};
 }
 
@@ -478,6 +527,22 @@ thead .row-header {
 	color: var(--theme--primary-inverted, #fff);
 }
 
+.cell.mapped-input {
+	background: rgba(59, 130, 246, 0.15);
+	border-color: rgba(59, 130, 246, 0.3);
+}
+
+.cell.mapped-output {
+	background: rgba(34, 197, 94, 0.15);
+	border-color: rgba(34, 197, 94, 0.3);
+}
+
+.cell.mapped-input.selected,
+.cell.mapped-output.selected {
+	background: var(--theme--primary);
+	color: var(--theme--primary-inverted, #fff);
+}
+
 /* Bottom bar content */
 .bar-label {
 	font-weight: 600;
@@ -512,5 +577,29 @@ thead .row-header {
 	padding: 40px;
 	text-align: center;
 	color: var(--theme--foreground-subdued);
+}
+
+.bar-legend {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--theme--foreground-subdued);
+}
+
+.legend-dot {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+}
+
+.legend-input {
+	background: rgba(59, 130, 246, 0.4);
+}
+
+.legend-output {
+	background: rgba(34, 197, 94, 0.4);
+	margin-left: 8px;
 }
 </style>
