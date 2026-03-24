@@ -1230,7 +1230,12 @@ paths:
           schema:
             type: string
           description: Calculator ID
-        - $ref: "#/components/parameters/AdminToken"
+        - name: X-Admin-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Admin authentication token
       responses:
         "200":
           description: MCP connection config
@@ -1569,13 +1574,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Function docs not available
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/ErrorResponse"
 
   /functions/{name}:
     get:
@@ -1604,13 +1609,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Function not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Function "NOTREAL" not found
         "500":
@@ -1618,7 +1623,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
