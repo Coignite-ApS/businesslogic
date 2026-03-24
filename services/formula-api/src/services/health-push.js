@@ -3,6 +3,7 @@ import * as cache from './cache.js';
 import { pool } from './engine-pool.js';
 import { getCalculatorStats } from '../routes/calculators.js';
 import * as stats from './stats.js';
+import { redisWarn } from '../utils/redis-warn.js';
 
 let timer = null;
 const REDIS_KEY_PREFIX = 'health:';
@@ -76,7 +77,7 @@ async function push() {
     const snapshot = await collectSnapshot();
     const ttl = Math.ceil(config.healthPushInterval / 1000) * TTL_MULTIPLIER;
     await redis.setex(redisKey(), ttl, JSON.stringify(snapshot));
-  } catch { /* fire-and-forget */ }
+  } catch (e) { redisWarn('healthPush.push', e); }
 }
 
 export function start() {
@@ -95,7 +96,7 @@ export async function stop() {
   // Remove own key on graceful shutdown
   const redis = cache.getRedisClient();
   if (redis && cache.isRedisReady()) {
-    try { await redis.del(redisKey()); } catch { /* best-effort */ }
+    try { await redis.del(redisKey()); } catch (e) { redisWarn('healthPush.stop', e); }
   }
 }
 

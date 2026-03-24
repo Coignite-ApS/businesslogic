@@ -1,4 +1,5 @@
 import { getRedisClient, isRedisReady } from './cache.js';
+import { redisWarn } from '../utils/redis-warn.js';
 
 const accounts = new Map();
 
@@ -32,7 +33,7 @@ export function configure(accountId, { rateLimitRps, rateLimitMonthly, monthlyUs
   if (isRedisReady() && monthlyUsed) {
     const redis = getRedisClient();
     const mk = `rl:mo:${accountId}:${monthKey()}`;
-    redis.set(mk, String(monthlyUsed), 'EX', MONTHLY_TTL, 'NX').catch(() => {});
+    redis.set(mk, String(monthlyUsed), 'EX', MONTHLY_TTL, 'NX').catch((e) => redisWarn('rateLimiter.configure', e));
   }
 }
 
@@ -116,7 +117,7 @@ export function record(accountId) {
       const sec = Math.floor(Date.now() / 1000);
       const rpsKey = `rl:rps:${accountId}:${sec}`;
       const moKey = `rl:mo:${accountId}:${monthKey()}`;
-      redis.eval(RECORD_SCRIPT, 2, rpsKey, moKey, String(RPS_TTL), String(MONTHLY_TTL)).catch(() => {});
+      redis.eval(RECORD_SCRIPT, 2, rpsKey, moKey, String(RPS_TTL), String(MONTHLY_TTL)).catch((e) => redisWarn('rateLimiter.record', e));
     } catch { /* silent */ }
   }
 }

@@ -8,6 +8,7 @@ import { applyTransform, applyOutputTransform } from '../utils/transforms.js';
 import { errorTypeMap } from '../blocked.js';
 import { getRedisClient, isRedisReady } from '../services/cache.js';
 import { safeTokenCompare, checkAdminToken, isGatewayRequest, validateGatewayAuth } from '../utils/auth.js';
+import { redisWarn } from '../utils/redis-warn.js';
 import * as stats from '../services/stats.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import { compileIpAllowlist, validateOrigins, checkAllowlist, getClientIp, setCorsHeaders } from '../utils/allowlist.js';
@@ -50,7 +51,7 @@ const store = new LRUCache({
   updateAgeOnGet: true,
   noDisposeOnSet: true,
   dispose: (val, key) => {
-    pool.destroyCalculator(key, val.workerId).catch(() => {});
+    pool.destroyCalculator(key, val.workerId).catch((e) => redisWarn('calculators.dispose', e));
   },
 });
 
@@ -68,19 +69,19 @@ const rebuilding = new Map();
 function saveToRedis(id, recipe) {
   if (!isRedisReady()) return;
   const redis = getRedisClient();
-  redis.setex(REDIS_PREFIX + id, config.calculatorRedisTtl, JSON.stringify(recipe)).catch(() => {});
+  redis.setex(REDIS_PREFIX + id, config.calculatorRedisTtl, JSON.stringify(recipe)).catch((e) => redisWarn('calculators.saveToRedis', e));
 }
 
 function deleteFromRedis(id) {
   if (!isRedisReady()) return Promise.resolve(0);
   const redis = getRedisClient();
-  return redis.del(REDIS_PREFIX + id).catch(() => 0);
+  return redis.del(REDIS_PREFIX + id).catch((e) => { redisWarn('calculators.deleteFromRedis', e); return 0; });
 }
 
 function refreshRedisTtl(id) {
   if (!isRedisReady()) return;
   const redis = getRedisClient();
-  redis.expire(REDIS_PREFIX + id, config.calculatorRedisTtl).catch(() => {});
+  redis.expire(REDIS_PREFIX + id, config.calculatorRedisTtl).catch((e) => redisWarn('calculators.refreshTtl', e));
 }
 
 async function loadFromRedis(id) {
@@ -113,7 +114,7 @@ function setCachedResult(calcId, generation, values, result) {
   // Fire-and-forget Redis
   if (isRedisReady()) {
     const redis = getRedisClient();
-    redis.setex(RESULT_PREFIX + k, config.calculatorResultTtl, JSON.stringify(result)).catch(() => {});
+    redis.setex(RESULT_PREFIX + k, config.calculatorResultTtl, JSON.stringify(result)).catch((e) => redisWarn('calculators.cacheResult', e));
   }
 }
 

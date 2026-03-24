@@ -1,6 +1,6 @@
 # 04. MCP Error Code Mapping
 
-**Status:** planned
+**Status:** completed
 
 ---
 

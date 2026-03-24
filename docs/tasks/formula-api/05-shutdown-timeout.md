@@ -1,6 +1,6 @@
 # 05. Graceful Shutdown Timeout
 
-**Status:** planned
+**Status:** completed
 
 ---
 

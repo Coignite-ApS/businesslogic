@@ -74,9 +74,9 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 |---|-------------|--------|-----|
 | 01 | Account-Level Auth for Execute Endpoints | completed | [formula-api/01-execute-auth.md](formula-api/01-execute-auth.md) |
 | 02 | OpenAPI Spec Completion | planned | [formula-api/02-openapi-completion.md](formula-api/02-openapi-completion.md) |
-| 03 | Redis Error Logging | planned | [formula-api/03-redis-error-logging.md](formula-api/03-redis-error-logging.md) |
-| 04 | MCP Error Code Mapping | planned | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
-| 05 | Graceful Shutdown Timeout | planned | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
+| 03 | Redis Error Logging | completed | [formula-api/03-redis-error-logging.md](formula-api/03-redis-error-logging.md) |
+| 04 | MCP Error Code Mapping | completed | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
+| 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
 | 06 | Account-Level MCP, Skill & Plugin | planned | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
 
 ### Formula Engine — bl-excel (Rust)
@@ -172,9 +172,9 @@ Infrastructure and multi-service concerns.
 |---------|---------|-------------|-----------|-------|
 | CMS | 22 | 0 | 7 | 29 |
 | AI API | 6 | 0 | 0 | 6 |
-| Formula API | 5 | 0 | 1 | 6 |
+| Formula API | 2 | 0 | 4 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
 | Gateway | 1 | 0 | 4 | 5 |
 | Cross-Cutting | 3 | 0 | 1 | 4 |
-| **Total** | **46** | **0** | **14** | **60** |
+| **Total** | **43** | **0** | **17** | **60** |

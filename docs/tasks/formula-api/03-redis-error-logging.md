@@ -1,6 +1,6 @@
 # 03. Redis Error Logging
 
-**Status:** planned
+**Status:** completed
 
 ---
 

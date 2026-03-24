@@ -80,6 +80,9 @@ export const config = {
 
   // Gateway shared secret for HMAC-SHA256 signature verification
   gatewaySharedSecret: env.GATEWAY_SHARED_SECRET || null,
+
+  // Graceful shutdown timeout (ms) — hard exit if app.close() hangs
+  shutdownTimeoutMs: parseInt(env.SHUTDOWN_TIMEOUT_MS || '5000', 10),
 };
 
 // Locale mapping: short code -> engine locale

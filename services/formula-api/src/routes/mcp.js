@@ -18,6 +18,8 @@ const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
+const SERVER_ERROR_RETRYABLE = -32000;
+const SERVER_ERROR_PERMANENT = -32001;
 
 function jsonRpcError(id, code, message, data) {
   const resp = { jsonrpc: '2.0', id: id ?? null, error: { code, message } };
@@ -74,7 +76,7 @@ export async function registerRoutes(app) {
       return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'Calculator rebuild failed'));
     }
     if (!calc) {
-      return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'Calculator not found or expired', { httpStatus: 410 }));
+      return reply.send(jsonRpcError(id, SERVER_ERROR_PERMANENT, 'Calculator not found or expired', { httpStatus: 410, retryable: false }));
     }
 
     // Guard: MCP must be enabled
@@ -143,7 +145,8 @@ export async function registerRoutes(app) {
         if (!rl.allowed) {
           const msg = rl.reason === 'monthly' ? 'Monthly quota exceeded' : 'Rate limit exceeded';
           stat({ cached: false, error: true, errorMessage: msg });
-          return reply.send(jsonRpcError(id, INVALID_REQUEST, msg, { httpStatus: 429 }));
+          const retryAfterMs = rl.retryAfter ? rl.retryAfter * 1000 : 1000;
+          return reply.send(jsonRpcError(id, SERVER_ERROR_RETRYABLE, msg, { httpStatus: 429, retryable: true, retryAfterMs }));
         }
 
         refreshRedisTtl(calcId);
@@ -170,9 +173,17 @@ export async function registerRoutes(app) {
 
           const httpStatus = err.status || 500;
           let rpcCode = INTERNAL_ERROR;
-          if (httpStatus === 400 || httpStatus === 422) rpcCode = INVALID_PARAMS;
-
           const data = { httpStatus };
+          if (httpStatus === 400 || httpStatus === 422) {
+            rpcCode = INVALID_PARAMS;
+          } else if (httpStatus === 503 || httpStatus === 429) {
+            rpcCode = SERVER_ERROR_RETRYABLE;
+            data.retryable = true;
+            if (httpStatus === 429) data.retryAfterMs = 1000;
+          } else if (httpStatus === 410) {
+            rpcCode = SERVER_ERROR_PERMANENT;
+            data.retryable = false;
+          }
           if (err.body?.details) data.details = err.body.details;
           if (err.body?.fields) data.fields = err.body.fields;
           if (err.body?.code) data.code = err.body.code;

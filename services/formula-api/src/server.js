@@ -119,7 +119,14 @@ await registerDocsRoutes(app);
 const shutdown = async (signal) => {
   app.log.info(`${signal} received, shutting down`);
   try {
-    await app.close();
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('shutdown timeout')), config.shutdownTimeoutMs),
+    );
+    await Promise.race([app.close(), timeout]);
+  } catch (err) {
+    if (err.message === 'shutdown timeout') {
+      app.log.warn(`shutdown timed out after ${config.shutdownTimeoutMs}ms, forcing exit`);
+    }
   } finally {
     try { hashRing.stop(); } catch { /* best-effort */ }
     try { await healthPush.stop(); } catch { /* best-effort */ }
