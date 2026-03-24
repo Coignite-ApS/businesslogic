@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, requireCalculatorAccess, requireActiveSubscr
 import { handleFormulaApiError, buildPayload, buildRecipe, configIsComplete, toSnakeCase, buildMcpInputSchema, buildMcpSnippets, lookupCalculatorConfig } from './helpers.js';
 import { registerAdminRoutes } from './admin-routes.js';
 import { encrypt, decrypt, isEncrypted } from './crypto.js';
+import { compareOutputs } from './test-runner.js';
 import type { CalculatorConfig, DB } from './types.js';
 
 /** Strip internal fields from describe response (mapping, available_data) */
@@ -643,6 +644,116 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				}
 			} catch (err) {
 				return handleFormulaApiError(err, res);
+			}
+		});
+
+		// POST /calc/test/:calcId — run all test cases for a calculator
+		app.post('/calc/test/:calcId', requireAuth, requireCalculatorAccess(db), async (req: any, res: any) => {
+			const { calcId } = req.params;
+			const { calculatorId, isTest } = parseCalcId(calcId);
+			try {
+				// Load config api_key for execute calls
+				const config = await db('calculator_configs')
+					.where('calculator', calculatorId)
+					.where('test_environment', isTest)
+					.select('api_key')
+					.first();
+				if (!config) {
+					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
+				}
+				const token = decryptToken(config.api_key);
+
+				// Load all test cases for this calculator
+				const rows = await db('calculator_test_cases')
+					.where('calculator', calculatorId)
+					.orderBy([{ column: 'sort', order: 'asc' }, { column: 'name', order: 'asc' }])
+					.select('id', 'name', 'input', 'expected_outputs', 'tolerance');
+
+				// Execute each test case in sequence and collect results
+				const results = [];
+				for (const tc of rows) {
+					const input = tc.input || {};
+					const expected = tc.expected_outputs || {};
+					const tolerance = tc.tolerance ?? 0;
+					try {
+						const execResult = await client.executeCalculator(calcId, input, token);
+						const actual = (execResult.body as Record<string, unknown>) || {};
+						const { passed, diff } = compareOutputs(actual, expected, tolerance);
+						results.push({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
+					} catch (err: any) {
+						results.push({
+							id: tc.id,
+							name: tc.name,
+							passed: false,
+							expected,
+							actual: {},
+							diff: {},
+							error: err instanceof FormulaApiError
+								? `Formula API error ${err.status}`
+								: (err.message || 'Execution failed'),
+						});
+					}
+				}
+
+				return res.json({ results });
+			} catch (err: any) {
+				if (err instanceof FormulaApiError) return handleFormulaApiError(err, res);
+				logger.error(`Test run failed for ${calcId}: ${err}`);
+				return res.status(500).json({ errors: [{ message: 'Test run failed' }] });
+			}
+		});
+
+		// POST /calc/test/:calcId/:testId — run a single test case
+		app.post('/calc/test/:calcId/:testId', requireAuth, requireCalculatorAccess(db), async (req: any, res: any) => {
+			const { calcId, testId } = req.params;
+			const { calculatorId, isTest } = parseCalcId(calcId);
+			try {
+				const config = await db('calculator_configs')
+					.where('calculator', calculatorId)
+					.where('test_environment', isTest)
+					.select('api_key')
+					.first();
+				if (!config) {
+					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
+				}
+				const token = decryptToken(config.api_key);
+
+				const tc = await db('calculator_test_cases')
+					.where('id', testId)
+					.where('calculator', calculatorId)
+					.select('id', 'name', 'input', 'expected_outputs', 'tolerance')
+					.first();
+
+				if (!tc) {
+					return res.status(404).json({ errors: [{ message: 'Test case not found' }] });
+				}
+
+				const input = tc.input || {};
+				const expected = tc.expected_outputs || {};
+				const tolerance = tc.tolerance ?? 0;
+
+				try {
+					const execResult = await client.executeCalculator(calcId, input, token);
+					const actual = (execResult.body as Record<string, unknown>) || {};
+					const { passed, diff } = compareOutputs(actual, expected, tolerance);
+					return res.json({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
+				} catch (err: any) {
+					return res.json({
+						id: tc.id,
+						name: tc.name,
+						passed: false,
+						expected,
+						actual: {},
+						diff: {},
+						error: err instanceof FormulaApiError
+							? `Formula API error ${err.status}`
+							: (err.message || 'Execution failed'),
+					});
+				}
+			} catch (err: any) {
+				if (err instanceof FormulaApiError) return handleFormulaApiError(err, res);
+				logger.error(`Single test run failed for ${calcId}/${testId}: ${err}`);
+				return res.status(500).json({ errors: [{ message: 'Test run failed' }] });
 			}
 		});
 

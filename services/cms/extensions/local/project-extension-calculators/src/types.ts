@@ -107,7 +107,20 @@ export interface CalculatorTestCase {
 	id: string;
 	name: string;
 	input: Record<string, unknown> | null;
+	expected_outputs: Record<string, unknown> | null;
+	tolerance: number | null;
+	sort: number | null;
 	calculator: string | null;
+	// runtime-only (not persisted)
+	_result?: TestCaseResult | null;
+}
+
+export interface TestCaseResult {
+	passed: boolean;
+	expected: Record<string, unknown>;
+	actual: Record<string, unknown>;
+	diff: Record<string, { expected: unknown; actual: unknown }>;
+	error?: string | null;
 }
 
 export interface McpConfig {

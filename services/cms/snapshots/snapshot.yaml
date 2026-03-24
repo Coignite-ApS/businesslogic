@@ -1934,7 +1934,7 @@ fields:
       foreign_key_column: null
   - collection: calculator_test_cases
     field: input
-    type: string
+    type: json
     meta:
       collection: calculator_test_cases
       conditions: null
@@ -1944,12 +1944,14 @@ fields:
       group: null
       hidden: false
       interface: input-code
-      note: null
-      options: null
+      note: 'Input values matching the calculator input schema'
+      options:
+        language: json
       readonly: false
       required: false
       sort: 2
-      special: null
+      special:
+        - cast-json
       translations: null
       validation: null
       validation_message: null
@@ -1957,9 +1959,9 @@ fields:
     schema:
       name: input
       table: calculator_test_cases
-      data_type: character varying
+      data_type: json
       default_value: null
-      max_length: 255
+      max_length: null
       numeric_precision: null
       numeric_scale: null
       is_nullable: true
@@ -2010,6 +2012,164 @@ fields:
       has_auto_increment: false
       foreign_key_table: calculators
       foreign_key_column: id
+  - collection: calculator_test_cases
+    field: name
+    type: string
+    meta:
+      collection: calculator_test_cases
+      conditions: null
+      display: null
+      display_options: null
+      field: name
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: true
+      sort: 8
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: name
+      table: calculator_test_cases
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_test_cases
+    field: expected_outputs
+    type: json
+    meta:
+      collection: calculator_test_cases
+      conditions: null
+      display: null
+      display_options: null
+      field: expected_outputs
+      group: null
+      hidden: false
+      interface: input-code
+      note: 'Expected output values (subset) for pass/fail comparison'
+      options:
+        language: json
+      readonly: false
+      required: false
+      sort: 9
+      special:
+        - cast-json
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: expected_outputs
+      table: calculator_test_cases
+      data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_test_cases
+    field: tolerance
+    type: float
+    meta:
+      collection: calculator_test_cases
+      conditions: null
+      display: null
+      display_options: null
+      field: tolerance
+      group: null
+      hidden: false
+      interface: input
+      note: 'Floating-point tolerance for numeric comparisons (e.g. 0.01)'
+      options: null
+      readonly: false
+      required: false
+      sort: 10
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: tolerance
+      table: calculator_test_cases
+      data_type: double precision
+      default_value: '0'
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_test_cases
+    field: sort
+    type: integer
+    meta:
+      collection: calculator_test_cases
+      conditions: null
+      display: null
+      display_options: null
+      field: sort
+      group: null
+      hidden: true
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      sort: 11
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: sort
+      table: calculator_test_cases
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
   - collection: calculators
     field: id
     type: string
