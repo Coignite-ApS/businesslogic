@@ -228,6 +228,16 @@
 				</div>
 			</sidebar-detail>
 		</template>
+		<v-dialog v-model="showUnsavedDialog" @esc="cancelLeave">
+			<v-card>
+				<v-card-title>Unsaved Changes</v-card-title>
+				<v-card-text>You have unsaved changes. Are you sure you want to leave?</v-card-text>
+				<v-card-actions>
+					<v-button secondary @click="cancelLeave">Stay</v-button>
+					<v-button kind="danger" @click="confirmLeave">Leave</v-button>
+				</v-card-actions>
+			</v-card>
+		</v-dialog>
 	</private-view>
 </template>
 
@@ -236,6 +246,7 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
+import { useUnsavedGuard } from '../composables/use-unsaved-guard';
 import CalculatorNavigation from '../components/navigation.vue';
 import InputParameters from '../components/input-parameters.vue';
 import OutputParameters from '../components/output-parameters.vue';
@@ -324,6 +335,9 @@ const hasAccessChanges = computed(() => {
 });
 
 const hasChanges = computed(() => hasCalcEdits.value || hasParamChanges.value || hasAccessChanges.value);
+
+// Unsaved changes navigation guard
+const { showDialog: showUnsavedDialog, confirmLeave, cancelLeave } = useUnsavedGuard(hasChanges);
 
 // IP validation: IPv4 with optional CIDR, or IPv6 (must contain : and be 3+ chars)
 const IP_V4_RE = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;

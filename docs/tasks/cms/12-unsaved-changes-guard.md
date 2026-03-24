@@ -1,6 +1,6 @@
 # #12 — Unsaved Changes Navigation Guard
 
-**Status:** planned
+**Status:** completed
 **Phase:** 4 — Calculator Authoring & Platform
 **Priority:** TBD
 

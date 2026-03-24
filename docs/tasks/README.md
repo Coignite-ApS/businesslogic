@@ -29,7 +29,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 09 | Event-Driven Communication & Client Data | planned | [cms/09-event-communication.md](cms/09-event-communication.md) |
 | 10 | Real-time Stats via WebSockets | planned | [cms/10-realtime-stats.md](cms/10-realtime-stats.md) |
 | 11 | Integration Tabs — Claude Skill & Cowork Plugin | planned | [cms/11-integration-tabs.md](cms/11-integration-tabs.md) |
-| 12 | Unsaved Changes Navigation Guard | planned | [cms/12-unsaved-changes-guard.md](cms/12-unsaved-changes-guard.md) |
+| 12 | Unsaved Changes Navigation Guard | completed | [cms/12-unsaved-changes-guard.md](cms/12-unsaved-changes-guard.md) |
 | 13 | OpenAPI Spec in Integration Tab | planned | [cms/13-openapi-integration-tab.md](cms/13-openapi-integration-tab.md) |
 | 14 | Cowork Plugin Integration Research | planned | [cms/14-cowork-plugin-integration.md](cms/14-cowork-plugin-integration.md) |
 | 15 | Claude Skill Tab Improvements | planned | [cms/15-claude-skill-tab.md](cms/15-claude-skill-tab.md) |
@@ -170,11 +170,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 22 | 0 | 7 | 29 |
+| CMS | 21 | 0 | 8 | 29 |
 | AI API | 6 | 0 | 0 | 6 |
 | Formula API | 2 | 0 | 4 | 6 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 1 | 0 | 0 | 1 |
 | Gateway | 1 | 0 | 4 | 5 |
 | Cross-Cutting | 3 | 0 | 1 | 4 |
-| **Total** | **43** | **0** | **17** | **60** |
+| **Total** | **42** | **0** | **18** | **60** |
