@@ -37,7 +37,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 17 | Formula Dashboard & Statistics | planned | [cms/17-formula-dashboard.md](cms/17-formula-dashboard.md) |
 | 18 | Admin Financials — Revenue, Spending & P/L Dashboard | planned | [cms/18-admin-financials.md](cms/18-admin-financials.md) |
 | 19 | directus-extension-businesslogic (public npm) | planned | [cms/19-directus-extension-businesslogic.md](cms/19-directus-extension-businesslogic.md) |
-| 20 | Account-Level MCP (UI) | planned | [cms/20-account-mcp.md](cms/20-account-mcp.md) |
+| 20 | Account-Level MCP (UI) | completed | [cms/20-account-mcp.md](cms/20-account-mcp.md) |
 | 21 | DOMPurify for All v-html Usage | completed | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
 | 22 | API Key Management UI | completed | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
 | 23 | Widget Client Gateway Mode | completed | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
@@ -57,7 +57,7 @@ AI chat, knowledge base backend, embeddings, public API.
 
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
-| 01 | AI Assistant — Public API + Widget | planned | [ai-api/01-public-api-widget.md](ai-api/01-public-api-widget.md) |
+| 01 | AI Assistant — Public API + Widget | completed | [ai-api/01-public-api-widget.md](ai-api/01-public-api-widget.md) |
 | 02 | AI Response Template with @mentions | completed | [ai-api/02-ai-response-template.md](ai-api/02-ai-response-template.md) |
 | 03 | AI Name & Response Template Overrides | planned | [ai-api/03-ai-name-overrides.md](ai-api/03-ai-name-overrides.md) |
 | 04 | Digital Twin / Second Brain (Personal AI Memory) | planned | [ai-api/04-digital-twin-second-brain.md](ai-api/04-digital-twin-second-brain.md) |
@@ -77,7 +77,7 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | 03 | Redis Error Logging | completed | [formula-api/03-redis-error-logging.md](formula-api/03-redis-error-logging.md) |
 | 04 | MCP Error Code Mapping | completed | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
 | 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
-| 06 | Account-Level MCP | planned | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
+| 06 | Account-Level MCP | completed | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
 | 07 | Direct Database Migration | planned | [formula-api/07-direct-db-migration.md](formula-api/07-direct-db-migration.md) |
 
 ### Formula Engine — bl-excel (Rust)
@@ -116,8 +116,8 @@ Auth, rate limiting, routing, CORS.
 | 02 | API Key Management Endpoints | completed | [gateway/02-api-key-management.md](gateway/02-api-key-management.md) |
 | 03 | Widget Routes + Response Cache | completed | [gateway/03-widget-routes-cache.md](gateway/03-widget-routes-cache.md) |
 | 04 | Internal Service Proxy Routes | completed | [gateway/04-internal-service-proxy.md](gateway/04-internal-service-proxy.md) |
-| 05 | Request Logging & Audit Trail | planned | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
-| 06 | Account MCP Route | planned | [gateway/06-account-mcp-route.md](gateway/06-account-mcp-route.md) |
+| 05 | Request Logging & Audit Trail | completed | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
+| 06 | Account MCP Route | completed | [gateway/06-account-mcp-route.md](gateway/06-account-mcp-route.md) |
 
 ---
 
@@ -217,11 +217,11 @@ Build & test locally first. Infrastructure/launch comes after all building block
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 17 | 0 | 12 | 29 |
-| AI API | 5 | 0 | 1 | 6 |
-| Formula API | 2 | 0 | 5 | 7 |
+| CMS | 16 | 0 | 13 | 29 |
+| AI API | 4 | 0 | 2 | 6 |
+| Formula API | 1 | 0 | 6 | 7 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 0 | 0 | 1 | 1 |
-| Gateway | 2 | 0 | 4 | 6 |
+| Gateway | 0 | 0 | 6 | 6 |
 | Cross-Cutting | 1 | 1 | 3 | 5 |
-| **Total** | **35** | **1** | **27** | **63** |
+| **Total** | **30** | **1** | **32** | **63** |

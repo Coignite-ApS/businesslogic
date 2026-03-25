@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node --env-file=.env src/server.js",
     "dev": "node --env-file=.env --watch src/server.js",
-    "test": "node --test test/xlsx-formula.test.js test/telemetry.test.js test/security-headers.test.js test/integration-utils.test.js test/account-mcp.test.js",
+    "test": "node --test --test-force-exit test/xlsx-formula.test.js test/telemetry.test.js test/security-headers.test.js test/integration-utils.test.js test/account-mcp.test.js",
     "test:formulas": "node --test test/formulas.test.js",
     "test:e2e": "node --test test/e2e.test.js",
     "test:workers": "node --test test/workers.test.js",
