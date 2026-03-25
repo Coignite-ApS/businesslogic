@@ -30,7 +30,7 @@ describe('SDK integration against live stack', () => {
     assert.ok(body.data.allowed.length > 0, 'Should have at least one allowed model');
   });
 
-  it('chat sync returns AI response', async () => {
+  it('chat sync returns AI response (stateless)', async () => {
     const res = await fetch(`${AI_API_URL}/v1/ai/chat/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...adminHeaders },
@@ -44,10 +44,7 @@ describe('SDK integration against live stack', () => {
     assert.ok(body.data.usage.input_tokens > 0, 'Should have input tokens');
     assert.ok(body.data.usage.output_tokens > 0, 'Should have output tokens');
     assert.ok(body.data.usage.cost_usd >= 0, 'Should have cost_usd');
-    // NOTE: Container is running OLD code — stateless mode not implemented yet.
-    // conversation_id WILL be present in current build. This test documents current behavior.
-    // Expected future behavior: conversation_id should be undefined in stateless mode.
-    console.log('  chat/sync conversation_id:', body.data.conversation_id ?? '(none — stateless)');
+    assert.strictEqual(body.data.conversation_id, undefined, 'Stateless should not return conversation_id');
   });
 
   it('chat sync stateless mode — no conversation created', async () => {
@@ -88,10 +85,8 @@ describe('SDK integration against live stack', () => {
     // Stateless mode (no conversation_id) → no conversation_created event
     assert.ok(text.includes('event: text_delta'), 'Should emit text_delta events');
 
-    const hasDone = text.includes('event: done');
-    const hasError = text.includes('event: error');
-    console.log(`  SSE stream (stateless): done=${hasDone}, error=${hasError}`);
-    console.log(`  conversation_created: ${text.includes('event: conversation_created')}`);
+    assert.ok(text.includes('event: done'), 'Should emit done event (not error)');
+    assert.ok(!text.includes('event: error'), 'Should not emit error event');
   });
 
   it('conversations list works', async () => {
@@ -121,6 +116,44 @@ describe('SDK integration against live stack', () => {
     const body = await res.json();
     assert.strictEqual(body.status, 'healthy', 'Gateway should be healthy');
     assert.ok(body.backends['ai-api'].healthy, 'ai-api backend should be healthy');
+  });
+
+  it('KB search returns results', async () => {
+    const res = await fetch(`${AI_API_URL}/v1/ai/kb/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
+      body: JSON.stringify({ query: 'business', limit: 3 }),
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body.data), 'Should return array of results');
+    assert.ok(body.data.length > 0, 'Should find at least one result');
+    assert.ok(body.data[0].content, 'Result should have content');
+    assert.strictEqual(typeof body.data[0].similarity, 'number', 'Result should have similarity score');
+  });
+
+  it('KB ask returns answer with sources', async () => {
+    const res = await fetch(`${AI_API_URL}/v1/ai/kb/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders },
+      body: JSON.stringify({ question: 'What is the monetization model?', limit: 3 }),
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.data.answer, 'Should have answer text');
+    assert.ok(['high', 'medium', 'not_found'].includes(body.data.confidence), 'Should have confidence level');
+    assert.ok(Array.isArray(body.data.sources), 'Should have sources array');
+  });
+
+  it('KB list returns knowledge bases', async () => {
+    const res = await fetch(`${AI_API_URL}/v1/ai/kb/list`, {
+      headers: adminHeaders,
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body.data), 'Should return array');
+    assert.ok(body.data.length > 0, 'Should have at least one KB');
+    assert.ok(body.data[0].name, 'KB should have name');
   });
 
   it('gateway rejects unauthenticated AI requests', async () => {

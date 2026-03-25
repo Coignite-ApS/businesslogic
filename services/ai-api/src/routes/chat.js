@@ -324,10 +324,7 @@ export async function registerRoutes(app) {
           await recordCost(accountId, conversationId, costUsd);
         }
 
-        reply.raw.setHeader('X-AI-Cost', String(costUsd));
-        reply.raw.setHeader('X-AI-Tokens-Input', String(totalInputTokens));
-        reply.raw.setHeader('X-AI-Tokens-Output', String(totalOutputTokens));
-
+        // Note: cannot setHeader after writeHead() — usage data is in the done event payload
         const donePayload = {
           usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
         };

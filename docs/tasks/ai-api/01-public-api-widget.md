@@ -282,7 +282,7 @@ Consistent error format across all endpoints:
 - [x] Verify SDK's `ChatClient.send()` works against `/v1/ai/chat/sync`
 - [x] Verify SDK's `ChatClient.stream()` works against `/v1/ai/chat`
 - [x] Verify SDK's `ConversationClient` CRUD works against `/v1/ai/conversations`
-- [ ] Verify SDK's `KBClient.search()` and `KBClient.ask()` work (needs KB data)
+- [x] Verify SDK's `KBClient.search()` and `KBClient.ask()` work
 - [x] Add integration test using SDK against local dev stack
 - [x] Document any SDK changes needed — no breaking changes, SDK works as-is
 
@@ -290,7 +290,8 @@ Consistent error format across all endpoints:
 - [x] Fix gateway path rewrite: `/v1/ai/*` was stripped to `/*`, ai-api expects `/v1/ai/*` prefix
 - [x] Fix ai-api `normalizePermissions()`: gateway sends nested `{services:{ai:{enabled:true}}}`, ai-api expected flat `{ai:true}`
 - [x] Apply migration 003 (api_key_id, external_id, source columns on ai_conversations)
-- [ ] Fix SSE streaming bug: `event: error` instead of `event: done` (header-after-sent issue, pre-existing)
+- [x] Fix SSE streaming bug: remove `setHeader()` after `writeHead()` — now emits `event: done` correctly
+- [x] Fix KB queries: `account_id` → `account` column name mismatch in knowledge_bases, kb_documents, kb_curated_answers
 
 ### Phase 2: Widget (deferred)
 
