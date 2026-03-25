@@ -40,7 +40,7 @@ Evolve the pricing model from calculator-only tiers to a full-platform billing s
 | Everything else | Doesn't exist yet |
 
 ### Known Issues
-- "proffesional" misspelled in Stripe product name (propagates to UI)
+- "professional" misspelled in Stripe product name (propagates to UI)
 - `calls_per_month` not enforced — users can exceed without consequence
 - No soft-limit warnings (80%, 100% email notifications)
 - Currency is USD — consider EUR for EU-sovereign positioning
@@ -291,7 +291,7 @@ Fetch addon quantities from Stripe subscription items (cached in Redis, 5-min TT
    - At 100%: "You've reached your limit. Calls will be blocked after 10% grace."
    - Per resource type (calculators, calls, KB storage, AI queries)
 
-3. **Fix "proffesional" typo** — rename in Stripe Dashboard, sync propagates to UI
+3. **Fix "professional" typo** — rename in Stripe Dashboard, sync propagates to UI
 
 4. **Track seat count** — count users per account, enforce against `seat_limit`
 
@@ -341,7 +341,7 @@ Fetch addon quantities from Stripe subscription items (cached in Redis, 5-min TT
 - [ ] Trial still gives full Business-tier access for 14 days
 - [ ] Post-trial accounts downgrade to read-only (not deleted)
 - [ ] Usage dashboard shows all resource meters with progress bars
-- [ ] Typo fixed ("proffesional" → "Professional")
+- [ ] Typo fixed ("professional" → "Professional")
 - [ ] Stripe Tax enabled — correct VAT calculated per EU country
 - [ ] B2B reverse charge applied when customer provides VAT ID
 - [ ] Sequential invoice numbering with BL- prefix

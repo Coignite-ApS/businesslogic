@@ -13,6 +13,7 @@ import (
 )
 
 const testInternalSecret = "test-internal-secret-12345"
+const testFormulaAdminToken = "test-formula-admin-token"
 
 func setupInternalProxyRouter(t *testing.T, backendHandler http.HandlerFunc) (*routes.Router, *httptest.Server) {
 	t.Helper()
@@ -38,7 +39,8 @@ func setupInternalProxyRouter(t *testing.T, backendHandler http.HandlerFunc) (*r
 			"ai-api":       aiBackend,
 			"flow-trigger": flowBackend,
 		},
-		InternalSecret: testInternalSecret,
+		InternalSecret:       testInternalSecret,
+		FormulaAPIAdminToken: testFormulaAdminToken,
 	})
 	return router, backend
 }
@@ -188,5 +190,49 @@ func TestInternalProxy_ForwardsUserContext(t *testing.T) {
 	}
 	if receivedHeaders.Get("X-Account-Role") != "admin" {
 		t.Error("X-Account-Role should be forwarded")
+	}
+}
+
+func TestInternalProxy_InjectsAdminTokenForCalc(t *testing.T) {
+	var receivedHeaders http.Header
+
+	router, _ := setupInternalProxyRouter(t, func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// /internal/calc/ should get X-Admin-Token injected
+	req := httptest.NewRequest(http.MethodGet, "/internal/calc/health", nil)
+	req.Header.Set("X-Internal-Secret", testInternalSecret)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if receivedHeaders.Get("X-Admin-Token") != testFormulaAdminToken {
+		t.Errorf("expected X-Admin-Token %q, got %q", testFormulaAdminToken, receivedHeaders.Get("X-Admin-Token"))
+	}
+}
+
+func TestInternalProxy_NoAdminTokenForNonCalc(t *testing.T) {
+	var receivedHeaders http.Header
+
+	router, _ := setupInternalProxyRouter(t, func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// /internal/ai/ should NOT get X-Admin-Token
+	req := httptest.NewRequest(http.MethodGet, "/internal/ai/chat/send", nil)
+	req.Header.Set("X-Internal-Secret", testInternalSecret)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if receivedHeaders.Get("X-Admin-Token") != "" {
+		t.Error("X-Admin-Token should NOT be injected for non-calc routes")
 	}
 }

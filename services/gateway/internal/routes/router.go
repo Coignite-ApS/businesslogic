@@ -12,37 +12,40 @@ import (
 )
 
 type Router struct {
-	backends        map[string]*proxy.Backend
-	mux             *http.ServeMux
-	apiKeyHandler   *handler.APIKeyHandler
-	responseCache   *cache.ResponseCache
-	internalSecret  string
-	configCacheTTL  time.Duration
-	catalogCacheTTL time.Duration
-	auditFn         middleware.AuditLogFn
+	backends             map[string]*proxy.Backend
+	mux                  *http.ServeMux
+	apiKeyHandler        *handler.APIKeyHandler
+	responseCache        *cache.ResponseCache
+	internalSecret       string
+	formulaAPIAdminToken string
+	configCacheTTL       time.Duration
+	catalogCacheTTL      time.Duration
+	auditFn              middleware.AuditLogFn
 }
 
 type RouterConfig struct {
-	Backends        map[string]*proxy.Backend
-	APIKeyHandler   *handler.APIKeyHandler
-	ResponseCache   *cache.ResponseCache
-	InternalSecret  string
-	ConfigCacheTTL  time.Duration
-	CatalogCacheTTL time.Duration
+	Backends             map[string]*proxy.Backend
+	APIKeyHandler        *handler.APIKeyHandler
+	ResponseCache        *cache.ResponseCache
+	InternalSecret       string
+	FormulaAPIAdminToken string
+	ConfigCacheTTL       time.Duration
+	CatalogCacheTTL      time.Duration
 	// AuditFn is called for every /internal/* request. Nil = default zerolog.
 	AuditFn middleware.AuditLogFn
 }
 
 func New(cfg RouterConfig) *Router {
 	r := &Router{
-		backends:        cfg.Backends,
-		mux:             http.NewServeMux(),
-		apiKeyHandler:   cfg.APIKeyHandler,
-		responseCache:   cfg.ResponseCache,
-		internalSecret:  cfg.InternalSecret,
-		configCacheTTL:  cfg.ConfigCacheTTL,
-		catalogCacheTTL: cfg.CatalogCacheTTL,
-		auditFn:         cfg.AuditFn,
+		backends:             cfg.Backends,
+		mux:                  http.NewServeMux(),
+		apiKeyHandler:        cfg.APIKeyHandler,
+		responseCache:        cfg.ResponseCache,
+		internalSecret:       cfg.InternalSecret,
+		formulaAPIAdminToken: cfg.FormulaAPIAdminToken,
+		configCacheTTL:       cfg.ConfigCacheTTL,
+		catalogCacheTTL:      cfg.CatalogCacheTTL,
+		auditFn:              cfg.AuditFn,
 	}
 	r.setup()
 	return r
@@ -251,9 +254,14 @@ func (r *Router) setupInternalServiceProxy() {
 		}
 		p := prefix
 		b := backend
+		bn := backendName
 		r.mux.Handle(p, internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// Strip internal secret — don't leak to backend
 			req.Header.Del("X-Internal-Secret")
+			// Inject admin token for formula-api (P0-1)
+			if bn == "formula-api" && r.formulaAPIAdminToken != "" {
+				req.Header.Set("X-Admin-Token", r.formulaAPIAdminToken)
+			}
 			// Rewrite path: /internal/calc/foo → /foo
 			req.URL.Path = "/" + strings.TrimPrefix(req.URL.Path, p)
 			b.ServeHTTP(w, req)

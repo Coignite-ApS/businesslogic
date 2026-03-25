@@ -114,12 +114,13 @@ func main() {
 
 	// Router
 	router := routes.New(routes.RouterConfig{
-		Backends:        backends,
-		APIKeyHandler:   apiKeyHandler,
-		ResponseCache:   responseCache,
-		InternalSecret:  cfg.InternalSecret,
-		ConfigCacheTTL:  cfg.WidgetConfigCacheTTL,
-		CatalogCacheTTL: cfg.WidgetCatalogCacheTTL,
+		Backends:             backends,
+		APIKeyHandler:        apiKeyHandler,
+		ResponseCache:        responseCache,
+		InternalSecret:       cfg.InternalSecret,
+		FormulaAPIAdminToken: cfg.FormulaAPIAdminToken,
+		ConfigCacheTTL:       cfg.WidgetConfigCacheTTL,
+		CatalogCacheTTL:      cfg.WidgetCatalogCacheTTL,
 	})
 
 	// Build request log fn — fire-and-forget INSERT to gateway.request_log

@@ -26,6 +26,7 @@ type Config struct {
 	NegativeCacheTTL time.Duration
 
 	InternalSecret        string
+	FormulaAPIAdminToken  string
 	GatewaySharedSecret   string
 	WidgetConfigCacheTTL  time.Duration
 	WidgetCatalogCacheTTL time.Duration
@@ -52,6 +53,7 @@ func Load() *Config {
 		NegativeCacheTTL: envDuration("NEGATIVE_CACHE_TTL", 1*time.Minute),
 
 		InternalSecret:        envStr("GATEWAY_INTERNAL_SECRET", ""),
+		FormulaAPIAdminToken:  envStr("FORMULA_API_ADMIN_TOKEN", ""),
 		GatewaySharedSecret:   envStr("GATEWAY_SHARED_SECRET", ""),
 		WidgetConfigCacheTTL:  envDuration("WIDGET_CONFIG_CACHE_TTL", 1*time.Hour),
 		WidgetCatalogCacheTTL: envDuration("WIDGET_CATALOG_CACHE_TTL", 24*time.Hour),

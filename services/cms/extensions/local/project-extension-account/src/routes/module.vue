@@ -378,6 +378,7 @@ async function handleCreateToken() {
 }
 
 async function handleRevoke(id: string) {
+	if (!confirm('Are you sure you want to revoke this token? This action cannot be undone.')) return;
 	await revokeFormulaToken(id);
 }
 
@@ -429,6 +430,7 @@ async function handleSavePerms() {
 }
 
 async function handleRevokeKey(id: string) {
+	if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) return;
 	await revokeApiKey(id);
 }
 

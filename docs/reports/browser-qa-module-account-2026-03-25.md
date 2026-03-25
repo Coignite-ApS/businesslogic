@@ -78,12 +78,12 @@
 - Page loaded with Monthly/Yearly toggle and three plan cards:
   - **basic** — $9.90/mo, 1 calculator, 10,000 calls/mo, 10 calls/sec
   - **premium** — $49.90/mo, 5 calculators, 100,000 calls/mo, 50 calls/sec
-  - **proffesional** — $149.90/mo, 25 calculators, 1,000,000 calls/mo, 200 calls/sec
+  - **professional** — $149.90/mo, 25 calculators, 1,000,000 calls/mo, 200 calls/sec
 - Each plan has an "Upgrade" button
 - Sidebar shows "No Subscription" — correct for test account
 - Breadcrumb: Account > Subscription
 - Zero console errors
-- **Finding**: Typo in plan name — "proffesional" should be "professional"
+- **Finding**: Typo in plan name — "professional" should be "professional"
 - **Severity**: LOW — cosmetic, but visible to customers
 - Screenshot: `screenshots/browser-qa-2026-03-25-TC07-subscription-page.jpg`
 
@@ -98,10 +98,10 @@ None. All API calls returned 200, 201, 204, or 304.
 | # | Severity | Finding | Location |
 |---|----------|---------|----------|
 | 1 | MEDIUM | No confirmation dialog before API key revocation | TC-04: Revoke button |
-| 2 | LOW | Typo "proffesional" in subscription plan name | TC-07: Subscription page (likely in `subscription_plans` DB data) |
+| 2 | LOW | Typo "professional" in subscription plan name | TC-07: Subscription page (likely in `subscription_plans` DB data) |
 
 ## Recommendations
 
 1. **Add confirmation dialog for key revocation** — Destructive action on a single click is risky. Show "Are you sure? This key will stop working immediately." before DELETE.
-2. **Fix "proffesional" typo** — Update the plan name in `subscription_plans` collection to "professional".
+2. **Fix "professional" typo** — Update the plan name in `subscription_plans` collection to "professional".
 3. **Consider "test" environment badge styling** — Both keys show "live" environment. Verify test environment keys render with distinct badge color for visual differentiation.
