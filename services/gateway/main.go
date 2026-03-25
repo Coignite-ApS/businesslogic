@@ -122,6 +122,22 @@ func main() {
 		CatalogCacheTTL: cfg.WidgetCatalogCacheTTL,
 	})
 
+	// Build request log fn — fire-and-forget INSERT to gateway.request_log
+	var requestLogFn middleware.RequestLogFn
+	if dbPool != nil {
+		requestLogFn = func(accountID, apiKeyID, method, path string, status, latencyMS, reqSize, respSize int) {
+			_, err := dbPool.Exec(context.Background(),
+				`INSERT INTO gateway.request_log
+					(account_id, api_key_id, method, path, status_code, latency_ms, request_size, response_size)
+				 VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8)`,
+				accountID, nilIfEmpty(apiKeyID), method, path, status, latencyMS, reqSize, respSize,
+			)
+			if err != nil {
+				log.Warn().Err(err).Msg("request_log insert failed")
+			}
+		}
+	}
+
 	// Build handler chain
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthChecker.Handler())
@@ -132,6 +148,7 @@ func main() {
 	h = middleware.GatewaySign(cfg.GatewaySharedSecret)(h)
 	h = middleware.CORS(h)
 	h = middleware.RateLimit(keyService)(h)
+	h = middleware.RequestLog(requestLogFn)(h)
 	h = middleware.Auth(keyService)(h)
 	h = middleware.Tracing(h)
 	h = middleware.Logging(h)
@@ -167,4 +184,12 @@ func main() {
 		log.Fatal().Err(err).Msg("server error")
 	}
 	log.Info().Msg("bl-gateway stopped")
+}
+
+// nilIfEmpty returns nil when s is empty, enabling nullable UUID INSERTs.
+func nilIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
 }

@@ -12,13 +12,14 @@ import (
 )
 
 type Router struct {
-	backends       map[string]*proxy.Backend
-	mux            *http.ServeMux
-	apiKeyHandler  *handler.APIKeyHandler
-	responseCache  *cache.ResponseCache
-	internalSecret string
-	configCacheTTL time.Duration
+	backends        map[string]*proxy.Backend
+	mux             *http.ServeMux
+	apiKeyHandler   *handler.APIKeyHandler
+	responseCache   *cache.ResponseCache
+	internalSecret  string
+	configCacheTTL  time.Duration
 	catalogCacheTTL time.Duration
+	auditFn         middleware.AuditLogFn
 }
 
 type RouterConfig struct {
@@ -28,6 +29,8 @@ type RouterConfig struct {
 	InternalSecret  string
 	ConfigCacheTTL  time.Duration
 	CatalogCacheTTL time.Duration
+	// AuditFn is called for every /internal/* request. Nil = default zerolog.
+	AuditFn middleware.AuditLogFn
 }
 
 func New(cfg RouterConfig) *Router {
@@ -39,6 +42,7 @@ func New(cfg RouterConfig) *Router {
 		internalSecret:  cfg.InternalSecret,
 		configCacheTTL:  cfg.ConfigCacheTTL,
 		catalogCacheTTL: cfg.CatalogCacheTTL,
+		auditFn:         cfg.AuditFn,
 	}
 	r.setup()
 	return r
@@ -47,12 +51,12 @@ func New(cfg RouterConfig) *Router {
 func (r *Router) setup() {
 	// Standard API routes
 	apiRoutes := map[string]string{
-		"/v1/ai/":           "ai-api",
-		"/v1/calc/":         "formula-api",
-		"/v1/mcp/calc/":     "formula-api",
-		"/v1/mcp/ai/":       "ai-api",
+		"/v1/ai/":            "ai-api",
+		"/v1/calc/":          "formula-api",
+		"/v1/mcp/calc/":      "formula-api",
+		"/v1/mcp/ai/":        "ai-api",
 		"/v1/flows/webhook/": "flow-trigger",
-		"/admin/":           "cms",
+		"/admin/":            "cms",
 	}
 
 	for prefix, backendName := range apiRoutes {
@@ -71,11 +75,26 @@ func (r *Router) setup() {
 	// Widget routes (GW-03)
 	r.setupWidgetRoutes()
 
+	// Account MCP route (GW-06)
+	r.setupMCPAccountRoute()
+
 	// Internal service proxy routes (GW-04)
 	r.setupInternalServiceProxy()
 
 	// Internal routes (GW-02 + cache invalidation)
 	r.setupInternalRoutes()
+}
+
+func (r *Router) setupMCPAccountRoute() {
+	formulaBackend, ok := r.backends["formula-api"]
+	if !ok {
+		return
+	}
+
+	mcpHandler := handler.NewMCPHandler(formulaBackend)
+	checkCalc := middleware.CheckServiceAccess("calc")
+
+	r.mux.Handle("/v1/mcp/account/", checkCalc(http.HandlerFunc(mcpHandler.AccountMCP)))
 }
 
 func (r *Router) setupWidgetRoutes() {
@@ -164,9 +183,10 @@ func (r *Router) setupInternalRoutes() {
 	}
 
 	internalAuth := middleware.InternalAuth(r.internalSecret)
+	internalAudit := middleware.InternalAudit(r.auditFn)
 
 	// API Key management
-	r.mux.Handle("/internal/api-keys/", internalAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.mux.Handle("/internal/api-keys/", internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
 		switch req.Method {
@@ -191,10 +211,10 @@ func (r *Router) setupInternalRoutes() {
 		default:
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		}
-	})))
+	}))))
 
 	// Cache invalidation
-	r.mux.Handle("/internal/cache/invalidate", internalAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.mux.Handle("/internal/cache/invalidate", internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			return
@@ -206,7 +226,7 @@ func (r *Router) setupInternalRoutes() {
 		// Invalidate all widget cache entries
 		r.responseCache.Invalidate(req.Context(), "gw:rc:*")
 		w.WriteHeader(http.StatusNoContent)
-	})))
+	}))))
 }
 
 func (r *Router) setupInternalServiceProxy() {
@@ -215,6 +235,7 @@ func (r *Router) setupInternalServiceProxy() {
 	}
 
 	internalAuth := middleware.InternalAuth(r.internalSecret)
+	internalAudit := middleware.InternalAudit(r.auditFn)
 
 	// /internal/calc/* → formula-api, /internal/ai/* → ai-api, /internal/flow/* → flow-trigger
 	internalRoutes := map[string]string{
@@ -230,13 +251,13 @@ func (r *Router) setupInternalServiceProxy() {
 		}
 		p := prefix
 		b := backend
-		r.mux.Handle(p, internalAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		r.mux.Handle(p, internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// Strip internal secret — don't leak to backend
 			req.Header.Del("X-Internal-Secret")
 			// Rewrite path: /internal/calc/foo → /foo
 			req.URL.Path = "/" + strings.TrimPrefix(req.URL.Path, p)
 			b.ServeHTTP(w, req)
-		})))
+		}))))
 	}
 }
 
