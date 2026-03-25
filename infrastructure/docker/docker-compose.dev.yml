@@ -281,6 +281,7 @@ services:
       - LOG_LEVEL=debug
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
       - GATEWAY_SHARED_SECRET=${GATEWAY_SHARED_SECRET:-dev-shared-secret}
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
       - OTEL_ENABLED=true
     depends_on:
