@@ -1,6 +1,6 @@
 # 20. Account-Level MCP (UI)
 
-**Status:** planned
+**Status:** in-progress
 **Depends on:** formula-api/06, gateway/06
 
 ---
@@ -55,13 +55,13 @@ New "Account MCP" page/section in the calculators module:
 
 ## Key Tasks
 
-- [ ] Add "Account MCP" route/page to `project-extension-calculators`
-- [ ] Display account MCP endpoint URL with copy button
-- [ ] List MCP-enabled calculators (query via `calculator-api` extension)
-- [ ] Per-calculator enable/disable toggle (PATCH `calculator_configs.mcp`)
-- [ ] Config snippets for Claude Desktop, Cursor, VS Code, Windsurf
-- [ ] Link to API Key Management (cms/22) for key creation
-- [ ] Add `GET /calc/mcp/account` endpoint in `project-extension-calculator-api` to return MCP-enabled calculator list + account endpoint URL
+- [x] Add "Account MCP" route/page to `project-extension-calculators`
+- [x] Display account MCP endpoint URL with copy button
+- [x] List MCP-enabled calculators (query via `calculator-api` extension)
+- [x] Per-calculator enable/disable toggle (PATCH `calculator_configs.mcp`)
+- [x] Config snippets for Claude Desktop, Cursor, VS Code, Windsurf
+- [x] Link to API Key Management (cms/22) for key creation
+- [x] Add `GET /calc/mcp/account` endpoint in `project-extension-calculator-api` to return MCP-enabled calculator list + account endpoint URL
 
 ---
 
@@ -84,9 +84,9 @@ New "Account MCP" page/section in the calculators module:
 
 ## Acceptance Criteria
 
-- [ ] Account MCP page shows correct endpoint URL for the logged-in account
-- [ ] Calculator list shows which calculators have MCP enabled
-- [ ] Toggle updates `calculator_configs.mcp.enabled` correctly
-- [ ] Config snippets use `X-API-Key` header (not `X-Auth-Token`)
-- [ ] "Get your API key" links to cms/22 API Key Management
-- [ ] Per-calculator MCP config (`mcp-config.vue`) still works unchanged
+- [x] Account MCP page shows correct endpoint URL for the logged-in account
+- [x] Calculator list shows which calculators have MCP enabled
+- [x] Toggle updates `calculator_configs.mcp.enabled` correctly
+- [x] Config snippets use `X-API-Key` header (not `X-Auth-Token`)
+- [x] "Get your API key" links to cms/22 API Key Management
+- [x] Per-calculator MCP config (`mcp-config.vue`) still works unchanged

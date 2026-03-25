@@ -3,6 +3,7 @@ import ModuleComponent from './routes/module.vue';
 import ConfigurePage from './routes/configure.vue';
 import TestPage from './routes/test.vue';
 import IntegrationPage from './routes/integration.vue';
+import AccountMcpPage from './routes/account-mcp.vue';
 
 export default defineModule({
 	id: 'calculators',
@@ -12,6 +13,10 @@ export default defineModule({
 		{
 			path: '',
 			component: ModuleComponent,
+		},
+		{
+			path: 'account-mcp',
+			component: AccountMcpPage,
 		},
 		{
 			path: ':id',

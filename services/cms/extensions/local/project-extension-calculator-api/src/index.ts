@@ -885,6 +885,42 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 			}
 		});
 
+		// GET /calc/mcp/account — return account-level MCP endpoint URL + list of MCP-enabled calculators
+		app.get('/calc/mcp/account', requireAuth, async (req: any, res: any) => {
+			const userId = req.accountability?.user;
+			try {
+				const user = await db('directus_users').where('id', userId).select('active_account').first();
+				if (!user?.active_account) {
+					return res.status(400).json({ errors: [{ message: 'No active account' }] });
+				}
+				const accountId = user.active_account;
+
+				// Fetch all calculator configs for this account that are not test environments
+				const configs = await db('calculator_configs as cc')
+					.join('calculators as c', 'c.id', 'cc.calculator')
+					.where('c.account', accountId)
+					.where('cc.test_environment', false)
+					.select('c.id as calculator_id', 'c.name as calculator_name', 'cc.mcp');
+
+				const calculators = configs.map((row: any) => {
+					const mcp = row.mcp && typeof row.mcp === 'object' ? row.mcp : null;
+					return {
+						id: row.calculator_id,
+						name: row.calculator_name,
+						mcp_enabled: mcp?.enabled === true,
+					};
+				});
+
+				const publicGwUrl = (env['GATEWAY_PUBLIC_URL'] as string) || gwUrl;
+				const endpointUrl = `${publicGwUrl}/v1/mcp/account/${accountId}`;
+
+				return res.json({ accountId, endpointUrl, calculators });
+			} catch (err: any) {
+				logger.error(`Account MCP info failed: ${err}`);
+				return res.status(500).json({ errors: [{ message: 'Failed to fetch account MCP info' }] });
+			}
+		});
+
 		// GET /calc/mcp/:calcId — return MCP config + snippets for a calculator
 		app.get('/calc/mcp/:calcId', requireAuth, requireCalculatorAccess(db), async (req: any, res: any) => {
 			const { calcId } = req.params;

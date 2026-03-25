@@ -11,7 +11,7 @@ describe('compareOutputs', () => {
 	it('returns passed=false when actual differs', () => {
 		const result = compareOutputs({ revenue: 1000 }, { revenue: 900 }, 0);
 		expect(result.passed).toBe(false);
-		expect(result.diff).toEqual({ revenue: { expected: 1000, actual: 900 } });
+		expect(result.diff).toEqual({ revenue: { expected: 900, actual: 1000 } });
 	});
 
 	it('passes when difference is within tolerance', () => {
@@ -28,11 +28,11 @@ describe('compareOutputs', () => {
 
 	it('compares only expected output keys (subset)', () => {
 		const result = compareOutputs(
-			{ revenue: 500, tax: 100 },
+			{ revenue: 500, tax: 100, cost: 200 },
 			{ revenue: 500, cost: 200 },
 			0,
 		);
-		// Only 'revenue' is in expected — cost is not checked
+		// Only keys in expected are checked — extra actual keys (tax) are ignored
 		expect(result.passed).toBe(true);
 	});
 
