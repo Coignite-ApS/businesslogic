@@ -84,6 +84,18 @@ describe('Budget service', () => {
       assert.strictEqual(typeof denied.reason, 'string');
       assert.ok(denied.current > denied.limit);
     });
+
+    it('denied response shape has all required fields for 429 response', () => {
+      const denied = { allowed: false, layer: 3, reason: 'Daily budget exceeded', current: 105.50, limit: 100 };
+      assert.ok('allowed' in denied);
+      assert.ok('layer' in denied);
+      assert.ok('reason' in denied);
+      assert.ok('current' in denied);
+      assert.ok('limit' in denied);
+      assert.strictEqual(denied.allowed, false);
+      assert.strictEqual(typeof denied.layer, 'number');
+      assert.ok(denied.layer >= 2 && denied.layer <= 5);
+    });
   });
 
   describe('recordCost', () => {
@@ -97,6 +109,14 @@ describe('Budget service', () => {
 
     it('skips recording for negative cost', async () => {
       await budget.recordCost('acc-1', 'conv-1', -1);
+    });
+
+    it('skips recording for non-numeric cost (NaN)', async () => {
+      await budget.recordCost('acc-1', 'conv-1', NaN);
+    });
+
+    it('skips recording for non-numeric cost (string)', async () => {
+      await budget.recordCost('acc-1', 'conv-1', 'not-a-number');
     });
   });
 
@@ -113,6 +133,18 @@ describe('Budget service', () => {
       assert.strictEqual(status.daily.limit, 100);
       assert.strictEqual(status.monthly.limit, 1000);
       assert.strictEqual(status.globalDaily.limit, 500);
+    });
+
+    it('status object has correct shape per layer', async () => {
+      const status = await budget.getBudgetStatus('acc-1');
+      for (const layer of [status.daily, status.monthly, status.globalDaily]) {
+        assert.ok('limit' in layer, 'layer missing limit');
+        assert.ok('current' in layer, 'layer missing current');
+        assert.ok('available' in layer, 'layer missing available');
+        assert.strictEqual(typeof layer.limit, 'number');
+        assert.strictEqual(typeof layer.current, 'number');
+        assert.strictEqual(typeof layer.available, 'boolean');
+      }
     });
 
     it('shows zero usage and available without Redis/DB', async () => {

@@ -270,7 +270,7 @@ func rewritePath(path, prefix, backendName string) string {
 	case strings.HasPrefix(prefix, "/v1/mcp/ai/"):
 		return "/mcp" + remainder
 	case strings.HasPrefix(prefix, "/v1/ai/"):
-		return "/" + strings.TrimPrefix(remainder, "/")
+		return "/v1/ai/" + strings.TrimPrefix(remainder, "/")
 	case strings.HasPrefix(prefix, "/v1/calc/"):
 		return "/" + strings.TrimPrefix(remainder, "/")
 	case strings.HasPrefix(prefix, "/v1/flows/webhook/"):

@@ -38,6 +38,26 @@ export function validateGatewaySignature(req) {
 }
 
 /**
+ * Normalize gateway permissions from nested format to flat format.
+ * Input:  {"services":{"ai":{"enabled":true,...},"calc":{"enabled":true,...}}}
+ * Output: {"ai":true,"calc":true}
+ * Also accepts flat format as-is: {"ai":true} → {"ai":true}
+ */
+export function normalizePermissions(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  // Nested gateway v2 format
+  if (raw.services && typeof raw.services === 'object') {
+    const flat = {};
+    for (const [svc, perm] of Object.entries(raw.services)) {
+      flat[svc] = perm?.enabled === true;
+    }
+    return flat;
+  }
+  // Already flat format
+  return raw;
+}
+
+/**
  * Verify authentication — supports:
  * 1. X-Admin-Token (internal service-to-service)
  * 2. X-Gateway-Auth + HMAC signature (gateway-forwarded public API)
@@ -69,10 +89,15 @@ export async function verifyAuth(req, reply) {
     req.userId = req.headers['x-user-id'] || null;
     req.isAdmin = req.headers['x-is-admin'] === 'true';
 
-    // Parse API key permissions (e.g. {"ai":true,"calc":true,"flow":false})
+    // Parse API key permissions
+    // Gateway sends nested format: {"services":{"ai":{"enabled":true,...},"calc":{"enabled":true,...}}}
+    // ai-api uses flat format: {"ai":true,"calc":true,"flow":false}
     const permHeader = req.headers['x-api-permissions'];
     if (permHeader) {
-      try { req.permissions = JSON.parse(permHeader); } catch { req.permissions = {}; }
+      try {
+        const raw = JSON.parse(permHeader);
+        req.permissions = normalizePermissions(raw);
+      } catch { req.permissions = {}; }
     } else {
       req.permissions = {};
     }

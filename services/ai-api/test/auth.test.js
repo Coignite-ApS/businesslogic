@@ -187,3 +187,46 @@ describe('HMAC validateGatewaySignature unit tests', () => {
     assert.strictEqual(result, false);
   });
 });
+
+describe('normalizePermissions', () => {
+  it('converts nested gateway v2 format to flat', async () => {
+    const { normalizePermissions } = await import('../src/utils/auth.js');
+    const nested = {
+      services: {
+        ai: { enabled: true, resources: ['*'], actions: ['chat'] },
+        calc: { enabled: true, resources: ['calc-1'], actions: ['execute'] },
+        flow: { enabled: false },
+      },
+    };
+    const flat = normalizePermissions(nested);
+    assert.strictEqual(flat.ai, true);
+    assert.strictEqual(flat.calc, true);
+    assert.strictEqual(flat.flow, false);
+  });
+
+  it('passes flat format through unchanged', async () => {
+    const { normalizePermissions } = await import('../src/utils/auth.js');
+    const flat = { ai: true, calc: false };
+    const result = normalizePermissions(flat);
+    assert.strictEqual(result.ai, true);
+    assert.strictEqual(result.calc, false);
+  });
+
+  it('returns empty object for null/undefined', async () => {
+    const { normalizePermissions } = await import('../src/utils/auth.js');
+    assert.deepStrictEqual(normalizePermissions(null), {});
+    assert.deepStrictEqual(normalizePermissions(undefined), {});
+  });
+
+  it('returns empty object for non-object', async () => {
+    const { normalizePermissions } = await import('../src/utils/auth.js');
+    assert.deepStrictEqual(normalizePermissions('string'), {});
+    assert.deepStrictEqual(normalizePermissions(42), {});
+  });
+
+  it('handles empty services map', async () => {
+    const { normalizePermissions } = await import('../src/utils/auth.js');
+    const result = normalizePermissions({ services: {} });
+    assert.deepStrictEqual(result, {});
+  });
+});
