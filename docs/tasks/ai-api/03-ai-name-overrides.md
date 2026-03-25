@@ -1,6 +1,6 @@
 # #03 — AI Name & Response Template Overrides
 
-**Status:** planned
+**Status:** completed
 **Phase:** 1 — Security & Widget Foundation
 **Priority:** TBD
 
@@ -40,20 +40,30 @@ Allow users to set a general AI-facing name and response template, with per-inte
 
 ## Key Tasks
 
-- [ ] Add `ai_name` general field to calculator model
-- [ ] Add per-integration override fields: `mcp_name`, `skill_name`, `cowork_name`
-- [ ] Add per-integration response template overrides: `mcp_response_template`, `skill_response_template`, `cowork_response_template`
-- [ ] Build override section UI: label left + toggle right, expand/collapse on toggle
-- [ ] Fallback logic: if override disabled, use general `ai_name` / `response_template`
-- [ ] Save button per override section
+- [x] Add `ai_name` general field to calculator model
+- [x] Add per-integration override fields: `skillName`, `coworkName` (MCP already has `toolName`)
+- [x] Add per-integration response template overrides (skill/plugin already had `skillResponseOverride`, `pluginResponseOverride`)
+- [x] Build override section UI: label left + toggle right, expand/collapse on toggle
+- [x] Fallback logic: if override disabled, use general `ai_name` / `responseTemplate`
+- [x] Save button per override section
 
 ## Acceptance Criteria
 
-- [ ] General AI name and response template set on calculator
-- [ ] Each integration has a toggle override row
-- [ ] Toggle OFF: only label visible, uses general defaults
-- [ ] Toggle ON: name + response template fields + save button appear
-- [ ] Runtime uses override if enabled, else falls back to general
+- [x] General AI name (`ai_name`) field on calculator — shown in AI tab with save button
+- [x] Each integration has a toggle override row (Skill, Plugin — MCP already had toolName)
+- [x] Toggle OFF: only label visible, uses general defaults
+- [x] Toggle ON: name + response template fields appear
+- [x] Fallback logic tested: 27 unit tests in `ai-name-overrides.test.ts`
+
+## Implementation Notes
+
+- `ai_name` stored on `calculators` table — added to Directus snapshot
+- `skillName`, `coworkName` stored in `integration` JSON field on `calculator_configs`
+- MCP uses existing `toolName` field — falls back to `ai_name` when blank
+- Skill tab: toggle expands to show `skillName` + `skillResponseOverride` fields
+- Plugin tab: toggle expands to show `coworkName` + `pluginResponseOverride` fields
+- `saveAiName()` in integration.vue patches `calculators` table directly via `update()`
+- All 100 tests pass
 
 ## Notes
 
