@@ -1,6 +1,6 @@
 # 06. Account-Level MCP
 
-**Status:** planned
+**Status:** completed
 **Depends on:** formula-api/07 (Direct DB Migration), gateway/06 (Account MCP Route)
 
 ---
@@ -112,18 +112,28 @@ MCP calls recorded via direct INSERT to `formula.calculator_calls` with `event_t
 
 ## Key Tasks
 
-- [ ] Add `POST /mcp/account/:accountId` JSON-RPC handler in `src/routes/mcp.js`
-- [ ] Account calculator scan helper (direct DB query, replaces Admin API scan)
-- [ ] Redis + LRU cache for account calculator list (`fa:mcp:account:{accountId}`)
-- [ ] `tools/list` aggregation — reuse `cleanInputSchemaForTools()`
-- [ ] `tools/call` routing by tool name → `getOrRebuild()` → `executeCalculatorCore()`
-- [ ] HMAC verification via existing `validateGatewayAuth()`
-- [ ] Rate limiting via existing `rateLimiter.check(accountId)`
-- [ ] `event_type = 'mcp_call'` stats INSERT
-- [ ] Tests for account MCP endpoint
+- [x] Add `POST /mcp/account/:accountId` JSON-RPC handler in `src/routes/mcp.js`
+- [x] Account calculator scan helper (direct DB query, replaces Admin API scan)
+- [x] Redis + LRU cache for account calculator list (`fa:mcp:account:{accountId}`)
+- [x] `tools/list` aggregation — reuse `cleanInputSchemaForTools()`
+- [x] `tools/call` routing by tool name → `getOrRebuild()` → `executeCalculatorCore()`
+- [x] HMAC verification via existing `validateGatewayAuth()`
+- [x] Rate limiting via existing `rateLimiter.check(accountId)`
+- [x] `event_type = 'mcp_call'` stats INSERT
+- [x] Tests for account MCP endpoint
 - [ ] Update `docs/openapi.yaml`
 
 ---
+
+## Implementation Notes
+
+- `POST /mcp/account/:accountId` added to `src/routes/mcp.js` alongside existing per-calculator handler
+- `_buildAccountTools()` and `_getAccountMcpCacheKey()` exported for testability
+- Account tools cached in `LRUCache` (500 entries, 5-min TTL) + Redis `fa:mcp:account:{accountId}` with 300s TTL
+- `listAccountMcpCalculators()` in `src/services/calculator-db.js` queries `calculators` + `calculator_configs` (live only); `mcp.enabled` filtering done in `_buildAccountTools()`
+- `tools/call` uses `type: 'mcp_call'` for stats, fires `rateLimiter.record()` after success
+- `_calculatorId` attached to tools in-memory for routing but stripped before sending to client
+- Tests: `test/account-mcp.test.js` — 11 unit tests covering helpers, HMAC, cache key, stats
 
 ## Key Files
 
@@ -137,12 +147,12 @@ MCP calls recorded via direct INSERT to `formula.calculator_calls` with `event_t
 
 ## Acceptance Criteria
 
-- [ ] `POST /mcp/account/:accountId` responds to all four JSON-RPC methods
-- [ ] `tools/list` returns only MCP-enabled, live-config calculators for the account
-- [ ] `tools/call` executes correct calculator and returns formatted result
-- [ ] HMAC validation rejects requests not forwarded by gateway
-- [ ] Calculator list cached in Redis with 5-min TTL
-- [ ] Rate limiting applied per account
-- [ ] MCP calls appear in `formula.calculator_calls` with `event_type = 'mcp_call'`
-- [ ] No regression on existing per-calculator MCP endpoints
-- [ ] Tests pass
+- [x] `POST /mcp/account/:accountId` responds to all four JSON-RPC methods
+- [x] `tools/list` returns only MCP-enabled, live-config calculators for the account
+- [x] `tools/call` executes correct calculator and returns formatted result
+- [x] HMAC validation rejects requests not forwarded by gateway
+- [x] Calculator list cached in Redis with 5-min TTL
+- [x] Rate limiting applied per account
+- [x] MCP calls appear in `formula.calculator_calls` with `event_type = 'mcp_call'`
+- [x] No regression on existing per-calculator MCP endpoints
+- [x] Tests pass
