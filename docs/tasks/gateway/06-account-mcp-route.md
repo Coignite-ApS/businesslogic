@@ -1,6 +1,6 @@
 # 06. Account MCP Route
 
-**Status:** planned
+**Status:** completed
 **Depends on:** formula-api/06
 
 ---
@@ -30,10 +30,10 @@ Individual calculator access is enforced by formula-api against the `resources` 
 
 ## Key Tasks
 
-- [ ] Add handler in `services/gateway/internal/handler/mcp.go`
-- [ ] Register `POST /v1/mcp/account/:accountId` in `services/gateway/internal/routes/router.go`
-- [ ] Wire auth + signing middleware to the new route
-- [ ] Write test for handler (proxy forwarding, auth rejection)
+- [x] Add handler in `services/gateway/internal/handler/mcp.go`
+- [x] Register `POST /v1/mcp/account/:accountId` in `services/gateway/internal/routes/router.go`
+- [x] Wire auth + signing middleware to the new route
+- [x] Write test for handler (proxy forwarding, auth rejection)
 
 ## Key Files
 
@@ -49,8 +49,8 @@ Individual calculator access is enforced by formula-api against the `resources` 
 
 ## Acceptance Criteria
 
-- [ ] `POST /v1/mcp/account/:accountId` proxies to formula-api with correct headers
-- [ ] Request rejected (401) if `X-API-Key` missing or invalid
-- [ ] Request rejected (403) if `services.calc.enabled != true`
-- [ ] HMAC signature, timestamp, account ID, key ID, permissions forwarded to formula-api
-- [ ] Tests pass (`go test ./...`)
+- [x] `POST /v1/mcp/account/:accountId` proxies to formula-api with correct headers
+- [x] Request rejected (401) if `X-API-Key` missing or invalid
+- [x] Request rejected (403) if `services.calc.enabled != true`
+- [x] HMAC signature, timestamp, account ID, key ID, permissions forwarded to formula-api
+- [x] Tests pass (`go test ./...`)

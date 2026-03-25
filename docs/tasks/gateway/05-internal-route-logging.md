@@ -1,7 +1,7 @@
 # 05. Request Logging & Audit Trail
 
 **Service:** gateway
-**Status:** planned
+**Status:** completed
 **Depends on:** GW-04
 
 ---
@@ -62,20 +62,20 @@ CREATE INDEX idx_request_log_account_month
 
 ## Key Tasks
 
-- [ ] Create migration `migrations/gateway/003_create_request_log.sql`
-- [ ] Add `RequestLogMiddleware` in `services/gateway/internal/middleware/logging.go`
+- [x] Create migration `migrations/gateway/003_create_request_log.sql`
+- [x] Add `RequestLogMiddleware` in `services/gateway/internal/middleware/logging.go`
   - Wraps `http.ResponseWriter` to capture status code and response size
   - Reads `account_id` and `api_key_id` from request context (set by auth middleware, GW-04)
   - Skips unauthenticated routes (health, metrics)
   - After handler returns: fire-and-forget goroutine does `INSERT INTO gateway.request_log`
   - INSERT errors logged at warn level only — never returned to caller
-- [ ] Add `InternalAuditMiddleware` in the same file
+- [x] Add `InternalAuditMiddleware` in the same file
   - Applies only to `/internal/*` router group
   - Logs structured JSON line: timestamp, ip, user_id, account_id, method, path, status, latency_ms
   - Respects `LOG_LEVEL` env var
-- [ ] Apply `RequestLogMiddleware` to all authenticated route groups in `services/gateway/internal/routes/router.go`
-- [ ] Apply `InternalAuditMiddleware` to the `/internal/*` route group
-- [ ] Write unit tests for middleware (mock DB, assert INSERT fields; assert skip on unauthed routes)
+- [x] Apply `RequestLogMiddleware` to all authenticated route groups in `services/gateway/internal/routes/router.go`
+- [x] Apply `InternalAuditMiddleware` to the `/internal/*` route group
+- [x] Write unit tests for middleware (mock DB, assert INSERT fields; assert skip on unauthed routes)
 
 ---
 
@@ -89,11 +89,11 @@ CREATE INDEX idx_request_log_account_month
 
 ## Acceptance Criteria
 
-- [ ] Authenticated request → row inserted in `gateway.request_log` with correct account_id, method, path, status, latency
-- [ ] Unauthenticated request (health, metrics) → no row inserted
-- [ ] DB INSERT failure → response still returns normally (fire-and-forget confirmed in tests)
-- [ ] `/internal/*` request → structured log line written with all required fields
-- [ ] Log level is respected (`LOG_LEVEL=debug` increases verbosity, `warn` suppresses info lines)
-- [ ] No request/response bodies appear in logs or DB
+- [x] Authenticated request → row inserted in `gateway.request_log` with correct account_id, method, path, status, latency
+- [x] Unauthenticated request (health, metrics) → no row inserted
+- [x] DB INSERT failure → response still returns normally (fire-and-forget confirmed in tests)
+- [x] `/internal/*` request → structured log line written with all required fields
+- [x] Log level is respected (`LOG_LEVEL=debug` increases verbosity, `warn` suppresses info lines)
+- [x] No request/response bodies appear in logs or DB
 - [ ] Migration runs cleanly against local dev DB
-- [ ] Unit tests pass: `go test ./services/gateway/...`
+- [x] Unit tests pass: `go test ./services/gateway/...`
