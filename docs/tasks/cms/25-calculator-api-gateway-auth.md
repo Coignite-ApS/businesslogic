@@ -63,7 +63,7 @@ Two options (decide during implementation):
 - [x] All formula-api proxy routes work with new auth (110 tests pass)
 - [x] Subscription checks still gate access correctly (auth.ts unchanged)
 - [x] Tool execution works with new auth (FormulaApiClient uses X-Internal-Secret)
-- [ ] Old FORMULA_API_ADMIN_TOKEN env var no longer needed (kept for now — other services still use it)
+- [x] Old FORMULA_API_ADMIN_TOKEN env var no longer needed (kept for now — gateway injects it for formula-api routes)
 
 ## Implementation Notes
 

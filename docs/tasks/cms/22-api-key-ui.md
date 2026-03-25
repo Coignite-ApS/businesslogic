@@ -32,7 +32,7 @@ Basic CRUD is already implemented in `project-extension-account`:
 - [x] Create flow: name + environment, returns raw key once
 - [x] Show raw key only once on creation (copy-to-clipboard)
 - [x] Rotate flow: new key generated, old revoked
-- [x] Revoke flow: immediate soft delete
+- [x] Revoke flow: immediate soft delete (with confirmation dialog — added 2026-03-25)
 - [x] Deprecation banner on old formula token UI
 - [x] Resource picker component: tree of account's calculators with action checkboxes (execute, describe)
 - [x] KB picker: list of account's knowledge bases with action checkboxes (search, ask)

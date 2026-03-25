@@ -61,3 +61,12 @@ All authenticated via `X-Internal-Secret` (same as existing `/internal/api-keys/
 - Internal routes DO forward user context so backends can scope data to the user's account
 - This is a simple passthrough proxy — no caching, no rate limiting
 - CMS extensions only need to change env vars: replace `*_ADMIN_TOKEN` + `*_URL` with `GATEWAY_URL` + `GATEWAY_INTERNAL_SECRET`
+
+## Post-QA Fix (2026-03-25)
+
+Gateway strips `X-Internal-Secret` before proxying but formula-api still requires `X-Admin-Token` for admin endpoints. Added admin token injection: after validating `X-Internal-Secret`, gateway injects `X-Admin-Token` from `FORMULA_API_ADMIN_TOKEN` env var — only for `/internal/calc/*` routes.
+
+- `router.go`: inject header when `backendName == "formula-api"`
+- `config.go`: added `FormulaAPIAdminToken` field
+- `docker-compose.dev.yml`: added `FORMULA_API_ADMIN_TOKEN` to gateway env
+- Tests: `TestInternalProxy_InjectsAdminTokenForCalc`, `TestInternalProxy_NoAdminTokenForNonCalc`

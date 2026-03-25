@@ -331,7 +331,7 @@ Fetch addon quantities from Stripe subscription items (cached in Redis, 5-min TT
 - [ ] Trial still gives full Business-tier access for 14 days
 - [ ] Post-trial accounts downgrade to read-only (not deleted)
 - [ ] Usage dashboard shows all resource meters with progress bars
-- [ ] Typo fixed ("professional" → "Professional")
+- [x] Typo fixed ("proffesional" → "professional") — fixed in DB + all snapshots 2026-03-25
 - [ ] Stripe Tax enabled — correct VAT calculated per EU country
 - [ ] B2B reverse charge applied when customer provides VAT ID
 - [ ] Sequential invoice numbering with BL- prefix
