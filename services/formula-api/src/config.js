@@ -75,11 +75,9 @@ export const config = {
   // Direct PostgreSQL connection (replaces Admin API for data reads)
   databaseUrl: env.DATABASE_URL || null,
 
-  // Admin API (base URL, no trailing slash — used by stats telemetry + recipe persistence)
+  // Admin API (base URL, no trailing slash — used for token validation in auth.js)
   adminApiUrl: env.ADMIN_API_URL || null,
   adminApiKey: env.ADMIN_API_KEY || null,
-  statsFlushInterval: parseInt(env.STATS_FLUSH_INTERVAL_MS || '10000', 10),
-  statsMaxBatch: parseInt(env.STATS_MAX_BATCH || '1000', 10),
 
   // Gateway shared secret for HMAC-SHA256 signature verification
   gatewaySharedSecret: env.GATEWAY_SHARED_SECRET || null,
