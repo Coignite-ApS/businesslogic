@@ -128,7 +128,7 @@ Infrastructure and multi-service concerns.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | Infrastructure & Deployment (Hetzner + Coolify) | planned | [cross-cutting/01-infrastructure.md](cross-cutting/01-infrastructure.md) |
-| 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | in-progress | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
+| 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | completed | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
 | 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | completed | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
 | 04 | Formula-API Gateway Auth Path | completed | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
 | 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
@@ -223,5 +223,5 @@ Build & test locally first. Infrastructure/launch comes after all building block
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 0 | 0 | 1 | 1 |
 | Gateway | 0 | 0 | 6 | 6 |
-| Cross-Cutting | 1 | 1 | 3 | 5 |
-| **Total** | **30** | **1** | **32** | **63** |
+| Cross-Cutting | 1 | 0 | 4 | 5 |
+| **Total** | **30** | **0** | **33** | **63** |
