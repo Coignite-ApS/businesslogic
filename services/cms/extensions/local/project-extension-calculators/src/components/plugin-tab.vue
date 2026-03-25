@@ -7,7 +7,7 @@
 
 		<div class="field">
 			<div class="field-row">
-				<label class="field-label">Override Response Template</label>
+				<label class="field-label">Override AI Name & Template</label>
 				<v-checkbox
 					:model-value="overrideOn"
 					:disabled="env === 'live'"
@@ -16,19 +16,31 @@
 					@update:model-value="toggleOverride"
 				/>
 			</div>
-			<span class="field-hint">Override the global AI response template for Plugin only.</span>
+			<span class="field-hint">Override the global AI name and response template for Plugin only.</span>
 		</div>
 
-		<div v-if="overrideOn" class="field">
-			<template-editor
-				:model-value="integration.pluginResponseOverride || ''"
-				:input-params="inputParamKeys"
-				:output-params="outputParamKeys"
-				placeholder="Plugin-specific response template..."
-				:disabled="env === 'live'"
-				@update:model-value="emit('update:integration', { ...integration, pluginResponseOverride: $event })"
-			/>
-		</div>
+		<template v-if="overrideOn">
+			<div class="field">
+				<label class="field-label">Plugin Name</label>
+				<v-input
+					:model-value="integration.coworkName || ''"
+					:disabled="env === 'live'"
+					placeholder="e.g. Mortgage Calculator"
+					@update:model-value="emit('update:integration', { ...integration, coworkName: $event })"
+				/>
+				<span class="field-hint">Name shown to the AI when using this Plugin. Defaults to AI Name.</span>
+			</div>
+			<div class="field">
+				<template-editor
+					:model-value="integration.pluginResponseOverride || ''"
+					:input-params="inputParamKeys"
+					:output-params="outputParamKeys"
+					placeholder="Plugin-specific response template..."
+					:disabled="env === 'live'"
+					@update:model-value="emit('update:integration', { ...integration, pluginResponseOverride: $event })"
+				/>
+			</div>
+		</template>
 
 		<h2 class="section-title">plugin.json</h2>
 		<p class="section-desc">Plugin manifest for Cowork-compatible AI agents.</p>
@@ -102,7 +114,9 @@ const emit = defineEmits<{
 
 const copied = ref<string | null>(null);
 
-const overrideOn = computed(() => !!props.integration.pluginResponseOverride);
+const overrideOn = computed(() =>
+	!!(props.integration.pluginResponseOverride || props.integration.coworkName),
+);
 
 const inputParamKeys = computed(() => props.inputParams);
 const outputParamKeys = computed(() => props.outputParams);
@@ -110,7 +124,8 @@ const outputParamKeys = computed(() => props.outputParams);
 function toggleOverride(on: boolean) {
 	emit('update:integration', {
 		...props.integration,
-		pluginResponseOverride: on ? ' ' : '',
+		coworkName: on ? (props.integration.coworkName || '') : '',
+		pluginResponseOverride: on ? (props.integration.pluginResponseOverride || '') : '',
 	});
 }
 

@@ -156,8 +156,12 @@
 					:output-config="activeConfig?.output"
 					:template-dirty="integrationTemplateDirty"
 					:saving="mcpSaving"
+					:ai-name="aiNameLocal"
+					:stored-ai-name="current?.ai_name ?? ''"
 					@update:mcp-enabled="toggleMcpEnabled($event)"
 					@save-template="saveAiConfig"
+					@update:ai-name="aiNameLocal = $event"
+					@save-ai-name="saveAiName"
 				/>
 			</template>
 
@@ -304,7 +308,7 @@ const router = useRouter();
 
 const {
 	calculators, current, loading, saving,
-	fetchAll, fetchOne, create, updateConfig,
+	fetchAll, fetchOne, create, update: updateCalculator, updateConfig,
 	fetchFormulaApiUrl, fetchApiKey,
 } = useCalculators(api);
 
@@ -413,6 +417,24 @@ const snippetParams = computed<SnippetParams>(() => ({
 	apiKey: apiKey.value,
 	sampleBody: sampleBody.value,
 }));
+
+// ─── AI Name state ───
+
+const aiNameLocal = ref<string>('');
+
+function syncAiNameFromCurrent() {
+	aiNameLocal.value = current.value?.ai_name ?? '';
+}
+
+async function saveAiName() {
+	if (!currentId.value) return;
+	mcpSaving.value = true;
+	try {
+		await updateCalculator(currentId.value, { ai_name: aiNameLocal.value });
+	} finally {
+		mcpSaving.value = false;
+	}
+}
 
 // ─── Integration state ───
 
@@ -601,6 +623,11 @@ watch(() => current.value?.activated, (activated, prev) => {
 watch([env, testConfig, prodConfig], () => {
 	syncMcpFromConfig();
 	syncIntegrationFromConfig();
+}, { immediate: true });
+
+// Sync ai_name when current calculator changes
+watch(() => current.value, () => {
+	syncAiNameFromCurrent();
 }, { immediate: true });
 
 fetchActiveAccount().then(() => {

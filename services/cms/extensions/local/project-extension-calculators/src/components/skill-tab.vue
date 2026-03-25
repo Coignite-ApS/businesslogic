@@ -7,7 +7,7 @@
 
 		<div class="field">
 			<div class="field-row">
-				<label class="field-label">Override Response Template</label>
+				<label class="field-label">Override AI Name & Template</label>
 				<v-checkbox
 					:model-value="overrideOn"
 					:disabled="env === 'live'"
@@ -16,19 +16,31 @@
 					@update:model-value="toggleOverride"
 				/>
 			</div>
-			<span class="field-hint">Override the global AI response template for Skill only.</span>
+			<span class="field-hint">Override the global AI name and response template for Skill only.</span>
 		</div>
 
-		<div v-if="overrideOn" class="field">
-			<template-editor
-				:model-value="integration.skillResponseOverride || ''"
-				:input-params="inputParamKeys"
-				:output-params="outputParamKeys"
-				placeholder="Skill-specific response template..."
-				:disabled="env === 'live'"
-				@update:model-value="emit('update:integration', { ...integration, skillResponseOverride: $event })"
-			/>
-		</div>
+		<template v-if="overrideOn">
+			<div class="field">
+				<label class="field-label">Skill Name</label>
+				<v-input
+					:model-value="integration.skillName || ''"
+					:disabled="env === 'live'"
+					placeholder="e.g. Mortgage Calculator"
+					@update:model-value="emit('update:integration', { ...integration, skillName: $event })"
+				/>
+				<span class="field-hint">Name shown to the AI when using this Skill. Defaults to AI Name.</span>
+			</div>
+			<div class="field">
+				<template-editor
+					:model-value="integration.skillResponseOverride || ''"
+					:input-params="inputParamKeys"
+					:output-params="outputParamKeys"
+					placeholder="Skill-specific response template..."
+					:disabled="env === 'live'"
+					@update:model-value="emit('update:integration', { ...integration, skillResponseOverride: $event })"
+				/>
+			</div>
+		</template>
 
 		<h2 class="section-title">SKILL.md</h2>
 		<p class="section-desc">This file tells Claude how to use your calculator as a skill.</p>
@@ -124,7 +136,9 @@ const emit = defineEmits<{
 const copied = ref<string | null>(null);
 const viewMode = ref<'view' | 'code'>('view');
 
-const overrideOn = computed(() => !!props.integration.skillResponseOverride);
+const overrideOn = computed(() =>
+	!!(props.integration.skillResponseOverride || props.integration.skillName),
+);
 
 const inputParamKeys = computed(() => props.inputParams);
 const outputParamKeys = computed(() => props.outputParams);
@@ -132,7 +146,8 @@ const outputParamKeys = computed(() => props.outputParams);
 function toggleOverride(on: boolean) {
 	emit('update:integration', {
 		...props.integration,
-		skillResponseOverride: on ? ' ' : '',
+		skillName: on ? (props.integration.skillName || '') : '',
+		skillResponseOverride: on ? (props.integration.skillResponseOverride || '') : '',
 	});
 }
 

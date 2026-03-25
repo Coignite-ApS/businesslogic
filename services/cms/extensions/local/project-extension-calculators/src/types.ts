@@ -2,6 +2,7 @@ export interface Calculator {
 	id: string;
 	name: string | null;
 	description: string | null;
+	ai_name?: string | null;
 	status?: string | null;
 	sort: number | null;
 	account: string | null;
@@ -138,6 +139,9 @@ export interface IntegrationConfig {
 	mcpResponseOverride?: string;
 	skillResponseOverride?: string;
 	pluginResponseOverride?: string;
+	// per-integration name overrides (fallback: ai_name on Calculator)
+	skillName?: string;
+	coworkName?: string;
 }
 
 export interface CalculatorConfig {
