@@ -1,6 +1,6 @@
 # 01. AI Assistant — Public API + Widget
 
-**Status:** in-progress
+**Status:** completed (Phase 1 — Phase 2 Widget deferred)
 **Depends on:** None (gateway already routes `/v1/ai/*` to ai-api)
 
 ---
@@ -326,16 +326,16 @@ The `<bl-assistant>` web component, similar to `<bl-calculator>` widget.
 
 ## Acceptance Criteria
 
-- [ ] Public API key request to `/v1/ai/chat/sync` returns AI response with tool results
-- [ ] Public API key request to `/v1/ai/chat` streams SSE events correctly
-- [ ] HMAC signature verification rejects forged/expired requests
-- [ ] Public requests only see 7 safe tools (no create/update/configure/deploy)
-- [ ] API key permissions further restrict tools (e.g., `calc: false` removes calculator tools)
-- [ ] Budget layers 2-5 enforced — exceeded budget returns 429 with clear message
-- [ ] Stateless mode (no conversation_id) works without creating DB conversation rows
-- [ ] API key A cannot read API key B's conversations
-- [ ] `external_id` correlates conversations across requests
-- [ ] `@coignite/sdk` works against the public API without changes
-- [ ] All existing CMS-authenticated chat continues working (no regression)
-- [ ] Token usage tracked for billing regardless of stateless/stateful mode
-- [ ] Error responses use consistent format with machine-readable codes
+- [ ] Public API key request to `/v1/ai/chat/sync` returns AI response with tool results (needs live AI keys)
+- [ ] Public API key request to `/v1/ai/chat` streams SSE events correctly (needs live AI keys)
+- [x] HMAC signature verification rejects forged/expired requests
+- [x] Public requests only see 7 safe tools (no create/update/configure/deploy)
+- [x] API key permissions further restrict tools (e.g., `calc: false` removes calculator tools)
+- [x] Budget layers 2-5 enforced — exceeded budget returns 429 with clear message
+- [x] Stateless mode (no conversation_id) works without creating DB conversation rows
+- [x] API key A cannot read API key B's conversations
+- [x] `external_id` correlates conversations across requests
+- [ ] `@coignite/sdk` works against the public API without changes (needs live stack)
+- [x] All existing CMS-authenticated chat continues working (no regression)
+- [x] Token usage tracked for billing regardless of stateless/stateful mode
+- [x] Error responses use consistent format with machine-readable codes

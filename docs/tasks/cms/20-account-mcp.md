@@ -1,6 +1,6 @@
 # 20. Account-Level MCP (UI)
 
-**Status:** in-progress
+**Status:** completed
 **Depends on:** formula-api/06, gateway/06
 
 ---
