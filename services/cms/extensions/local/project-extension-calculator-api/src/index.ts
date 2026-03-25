@@ -113,8 +113,8 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const now = new Date();
 				const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-				const { count } = await db('calculator_calls')
-					.where('account', accountId)
+				const { count } = await db('formula.calculator_calls')
+					.where('account_id', accountId)
 					.where('timestamp', '>=', firstOfMonth)
 					.count('* as count')
 					.first() as any;

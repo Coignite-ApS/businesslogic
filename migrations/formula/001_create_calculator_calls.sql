@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS formula;
 
 CREATE TABLE IF NOT EXISTS formula.calculator_calls (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    calculator_id   VARCHAR NOT NULL,
+    calculator_id   VARCHAR,
     account_id      UUID,
     timestamp       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     cached          BOOLEAN NOT NULL DEFAULT FALSE,
