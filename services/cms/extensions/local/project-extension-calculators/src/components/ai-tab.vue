@@ -9,10 +9,11 @@
 			:model-value="aiName"
 			:disabled="disabled"
 			placeholder="e.g. Mortgage Calculator"
+			maxlength="255"
 			@update:model-value="$emit('update:aiName', $event)"
 		/>
 		<div v-if="aiNameDirty && !disabled" class="template-save">
-			<v-button :loading="saving" @click="$emit('save-ai-name')">
+			<v-button :loading="aiNameSaving" @click="$emit('save-ai-name')">
 				<v-icon name="check" left />
 				Save Name
 			</v-button>
@@ -98,6 +99,7 @@ const props = defineProps<{
 	outputConfig?: unknown;
 	templateDirty?: boolean;
 	saving?: boolean;
+	aiNameSaving?: boolean;
 	aiName?: string | null;
 	storedAiName?: string | null;
 }>();

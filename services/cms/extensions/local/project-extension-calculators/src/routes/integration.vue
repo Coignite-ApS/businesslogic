@@ -156,6 +156,7 @@
 					:output-config="activeConfig?.output"
 					:template-dirty="integrationTemplateDirty"
 					:saving="mcpSaving"
+					:ai-name-saving="aiNameSaving"
 					:ai-name="aiNameLocal"
 					:stored-ai-name="current?.ai_name ?? ''"
 					@update:mcp-enabled="toggleMcpEnabled($event)"
@@ -210,6 +211,8 @@
 					:is-deployed="isDeployed"
 					:env="env"
 					:integration="integrationLocal"
+					:stored-integration="storedIntegration"
+					:saving="mcpSaving"
 					:input-params="inputParamKeys"
 					:output-params="outputParamKeys"
 					:calculator-name="current.name || effectiveId"
@@ -220,6 +223,7 @@
 					:input-config="extractedInputParams"
 					:output-config="extractedOutputParams"
 					@update:integration="integrationLocal = $event"
+					@save-overrides="saveAiConfig"
 				/>
 			</template>
 
@@ -231,6 +235,8 @@
 					:is-deployed="isDeployed"
 					:env="env"
 					:integration="integrationLocal"
+					:stored-integration="storedIntegration"
+					:saving="mcpSaving"
 					:input-params="inputParamKeys"
 					:output-params="outputParamKeys"
 					:calculator-name="current.name || effectiveId"
@@ -241,6 +247,7 @@
 					:input-config="extractedInputParams"
 					:output-config="extractedOutputParams"
 					@update:integration="integrationLocal = $event"
+					@save-overrides="saveAiConfig"
 				/>
 			</template>
 		</div>
@@ -318,6 +325,7 @@ const formulaApiUrl = ref<string | null>(null);
 const env = ref<'test' | 'live'>('test');
 const integrationTab = ref<'widget' | 'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('widget');
 const mcpSaving = ref(false);
+const aiNameSaving = ref(false);
 const currentId = computed(() => (route.params.id as string) || null);
 
 const testConfig = computed(
@@ -428,11 +436,11 @@ function syncAiNameFromCurrent() {
 
 async function saveAiName() {
 	if (!currentId.value) return;
-	mcpSaving.value = true;
+	aiNameSaving.value = true;
 	try {
 		await updateCalculator(currentId.value, { ai_name: aiNameLocal.value });
 	} finally {
-		mcpSaving.value = false;
+		aiNameSaving.value = false;
 	}
 }
 
@@ -450,6 +458,11 @@ function syncIntegrationFromConfig() {
 		? { ...defaultIntegration(), ...cfg.integration }
 		: defaultIntegration();
 }
+
+const storedIntegration = computed<IntegrationConfig>(() => {
+	const stored = activeConfig.value?.integration;
+	return stored ? { ...defaultIntegration(), ...stored } : defaultIntegration();
+});
 
 const integrationDirty = computed(() => {
 	const stored = activeConfig.value?.integration;

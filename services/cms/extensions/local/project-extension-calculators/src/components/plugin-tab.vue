@@ -40,6 +40,12 @@
 					@update:model-value="emit('update:integration', { ...integration, pluginResponseOverride: $event })"
 				/>
 			</div>
+			<div v-if="overrideDirty && env === 'test'" class="override-save">
+				<v-button :loading="saving" @click="emit('save-overrides')">
+					<v-icon name="check" left />
+					Save Overrides
+				</v-button>
+			</div>
 		</template>
 
 		<h2 class="section-title">plugin.json</h2>
@@ -84,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import CodeBlock from './code-block.vue';
 import TemplateEditor from './template-editor.vue';
 import { downloadZip } from '../utils/download-zip';
@@ -97,6 +103,7 @@ const props = defineProps<{
 	isDeployed: boolean;
 	env: 'test' | 'live';
 	integration: IntegrationConfig;
+	storedIntegration: IntegrationConfig;
 	inputParams: string[];
 	outputParams: string[];
 	calculatorName: string;
@@ -106,27 +113,43 @@ const props = defineProps<{
 	toolName: string;
 	inputConfig: Record<string, InputParameter>;
 	outputConfig: Record<string, OutputParameter>;
+	saving?: boolean;
 }>();
 
 const emit = defineEmits<{
 	(e: 'update:integration', val: IntegrationConfig): void;
+	(e: 'save-overrides'): void;
 }>();
 
 const copied = ref<string | null>(null);
 
-const overrideOn = computed(() =>
+const overrideOn = ref(
 	!!(props.integration.pluginResponseOverride || props.integration.coworkName),
 );
+
+// Sync from parent when stored integration changes (e.g. env switch)
+watch(() => props.storedIntegration, () => {
+	overrideOn.value = !!(props.integration.pluginResponseOverride || props.integration.coworkName);
+});
 
 const inputParamKeys = computed(() => props.inputParams);
 const outputParamKeys = computed(() => props.outputParams);
 
+const overrideDirty = computed(() => {
+	const stored = props.storedIntegration;
+	return (props.integration.coworkName ?? '') !== (stored.coworkName ?? '')
+		|| (props.integration.pluginResponseOverride ?? '') !== (stored.pluginResponseOverride ?? '');
+});
+
 function toggleOverride(on: boolean) {
-	emit('update:integration', {
-		...props.integration,
-		coworkName: on ? (props.integration.coworkName || '') : '',
-		pluginResponseOverride: on ? (props.integration.pluginResponseOverride || '') : '',
-	});
+	overrideOn.value = on;
+	if (!on) {
+		emit('update:integration', {
+			...props.integration,
+			coworkName: '',
+			pluginResponseOverride: '',
+		});
+	}
 }
 
 const fileParams = computed(() => ({
@@ -209,6 +232,11 @@ async function handleDownload() {
 	font-size: 13px;
 	color: var(--theme--foreground-subdued);
 	margin: 0;
+}
+
+.override-save {
+	display: flex;
+	gap: 8px;
 }
 
 .action-row {

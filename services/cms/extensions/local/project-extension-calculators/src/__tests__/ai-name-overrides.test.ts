@@ -169,6 +169,66 @@ describe('effective Plugin config — resolveEffectivePluginConfig', () => {
 	});
 });
 
+describe('override dirty detection', () => {
+	function isSkillOverrideDirty(current: IntegrationConfig, stored: IntegrationConfig): boolean {
+		return (current.skillName ?? '') !== (stored.skillName ?? '')
+			|| (current.skillResponseOverride ?? '') !== (stored.skillResponseOverride ?? '');
+	}
+
+	function isPluginOverrideDirty(current: IntegrationConfig, stored: IntegrationConfig): boolean {
+		return (current.coworkName ?? '') !== (stored.coworkName ?? '')
+			|| (current.pluginResponseOverride ?? '') !== (stored.pluginResponseOverride ?? '');
+	}
+
+	it('detects skill name change as dirty', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false, skillName: '' };
+		const current: IntegrationConfig = { ...stored, skillName: 'New Name' };
+		expect(isSkillOverrideDirty(current, stored)).toBe(true);
+	});
+
+	it('detects skill template change as dirty', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false, skillResponseOverride: '' };
+		const current: IntegrationConfig = { ...stored, skillResponseOverride: 'New template' };
+		expect(isSkillOverrideDirty(current, stored)).toBe(true);
+	});
+
+	it('reports clean when skill overrides unchanged', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false, skillName: 'Same', skillResponseOverride: 'Same' };
+		const current: IntegrationConfig = { ...stored };
+		expect(isSkillOverrideDirty(current, stored)).toBe(false);
+	});
+
+	it('reports clean when both undefined', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false };
+		const current: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false };
+		expect(isSkillOverrideDirty(current, stored)).toBe(false);
+	});
+
+	it('treats undefined and empty string as equal', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false, skillName: undefined };
+		const current: IntegrationConfig = { responseTemplate: '', skill: true, plugin: false, skillName: '' };
+		expect(isSkillOverrideDirty(current, stored)).toBe(false);
+	});
+
+	it('detects plugin name change as dirty', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: false, plugin: true, coworkName: '' };
+		const current: IntegrationConfig = { ...stored, coworkName: 'New Plugin' };
+		expect(isPluginOverrideDirty(current, stored)).toBe(true);
+	});
+
+	it('detects plugin template change as dirty', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: false, plugin: true, pluginResponseOverride: '' };
+		const current: IntegrationConfig = { ...stored, pluginResponseOverride: 'New template' };
+		expect(isPluginOverrideDirty(current, stored)).toBe(true);
+	});
+
+	it('reports clean when plugin overrides unchanged', () => {
+		const stored: IntegrationConfig = { responseTemplate: '', skill: false, plugin: true, coworkName: 'Same', pluginResponseOverride: 'Same' };
+		const current: IntegrationConfig = { ...stored };
+		expect(isPluginOverrideDirty(current, stored)).toBe(false);
+	});
+});
+
 describe('IntegrationConfig shape — new fields', () => {
 	it('IntegrationConfig accepts skillName and coworkName', () => {
 		const cfg: IntegrationConfig = {

@@ -40,6 +40,12 @@
 					@update:model-value="emit('update:integration', { ...integration, skillResponseOverride: $event })"
 				/>
 			</div>
+			<div v-if="overrideDirty && env === 'test'" class="override-save">
+				<v-button :loading="saving" @click="emit('save-overrides')">
+					<v-icon name="check" left />
+					Save Overrides
+				</v-button>
+			</div>
 		</template>
 
 		<h2 class="section-title">SKILL.md</h2>
@@ -94,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import CodeBlock from './code-block.vue';
@@ -118,6 +124,7 @@ const props = defineProps<{
 	isDeployed: boolean;
 	env: 'test' | 'live';
 	integration: IntegrationConfig;
+	storedIntegration: IntegrationConfig;
 	inputParams: string[];
 	outputParams: string[];
 	calculatorName: string;
@@ -127,28 +134,44 @@ const props = defineProps<{
 	toolName: string;
 	inputConfig: Record<string, InputParameter>;
 	outputConfig: Record<string, OutputParameter>;
+	saving?: boolean;
 }>();
 
 const emit = defineEmits<{
 	(e: 'update:integration', val: IntegrationConfig): void;
+	(e: 'save-overrides'): void;
 }>();
 
 const copied = ref<string | null>(null);
 const viewMode = ref<'view' | 'code'>('view');
 
-const overrideOn = computed(() =>
+const overrideOn = ref(
 	!!(props.integration.skillResponseOverride || props.integration.skillName),
 );
+
+// Sync from parent when stored integration changes (e.g. env switch)
+watch(() => props.storedIntegration, () => {
+	overrideOn.value = !!(props.integration.skillResponseOverride || props.integration.skillName);
+});
 
 const inputParamKeys = computed(() => props.inputParams);
 const outputParamKeys = computed(() => props.outputParams);
 
+const overrideDirty = computed(() => {
+	const stored = props.storedIntegration;
+	return (props.integration.skillName ?? '') !== (stored.skillName ?? '')
+		|| (props.integration.skillResponseOverride ?? '') !== (stored.skillResponseOverride ?? '');
+});
+
 function toggleOverride(on: boolean) {
-	emit('update:integration', {
-		...props.integration,
-		skillName: on ? (props.integration.skillName || '') : '',
-		skillResponseOverride: on ? (props.integration.skillResponseOverride || '') : '',
-	});
+	overrideOn.value = on;
+	if (!on) {
+		emit('update:integration', {
+			...props.integration,
+			skillName: '',
+			skillResponseOverride: '',
+		});
+	}
 }
 
 const skillMd = computed(() =>
@@ -311,6 +334,11 @@ async function handleDownload() {
 	padding: 0;
 }
 .rendered-md :deep(ul), .rendered-md :deep(ol) { padding-left: 20px; margin: 6px 0; }
+
+.override-save {
+	display: flex;
+	gap: 8px;
+}
 
 .action-row {
 	display: flex;
