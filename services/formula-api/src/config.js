@@ -72,6 +72,9 @@ export const config = {
   // Admin token (protects management endpoints: calculators CRUD, list, parse)
   adminToken: env.ADMIN_TOKEN || null,
 
+  // Direct PostgreSQL connection (replaces Admin API for data reads)
+  databaseUrl: env.DATABASE_URL || null,
+
   // Admin API (base URL, no trailing slash — used by stats telemetry + recipe persistence)
   adminApiUrl: env.ADMIN_API_URL || null,
   adminApiKey: env.ADMIN_API_KEY || null,

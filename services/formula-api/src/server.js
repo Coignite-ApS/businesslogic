@@ -35,6 +35,7 @@ import { registerRoutes as registerDocsRoutes } from './routes/docs.js';
 import * as stats from './services/stats.js';
 import * as healthPush from './services/health-push.js';
 import * as hashRing from './services/hash-ring.js';
+import { initDb, closeDb } from './db.js';
 
 const app = Fastify({
   logger: { level: config.logLevel },
@@ -132,6 +133,7 @@ const shutdown = async (signal) => {
     try { await healthPush.stop(); } catch { /* best-effort */ }
     try { await stats.shutdown(); } catch { /* best-effort */ }
     try { pool.destroy(); } catch { /* best-effort */ }
+    try { await closeDb(); } catch { /* best-effort */ }
     try { await cache.close(); } catch { /* best-effort */ }
     try { await shutdownTelemetry(); } catch { /* best-effort */ }
     process.exit(0);
@@ -155,6 +157,10 @@ process.on('uncaughtException', (err) => {
 const start = async () => {
   try {
     await cache.initCache();
+    if (config.databaseUrl) {
+      await initDb(config.databaseUrl);
+      app.log.info('Database pool connected');
+    }
     stats.start();
     healthPush.start();
     hashRing.start();

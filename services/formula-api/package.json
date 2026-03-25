@@ -44,7 +44,8 @@
     "fastify": "^5.2.1",
     "hyperformula": "^3.2.0",
     "ioredis": "^5.4.1",
-    "lru-cache": "^11.0.2"
+    "lru-cache": "^11.0.2",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "autocannon": "^8.0.0",
