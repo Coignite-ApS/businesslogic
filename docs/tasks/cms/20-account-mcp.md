@@ -1,148 +1,92 @@
-# 20. Account-Level MCP
+# 20. Account-Level MCP (UI)
 
 **Status:** planned
-**Phase:** 2 — Platform Infrastructure
-**Replaces:** old #10 (Account-Level MCP Configuration)
+**Depends on:** formula-api/06, gateway/06
 
 ---
 
 ## Goal
 
-Provide a single MCP endpoint per account that exposes all enabled calculators as tools, so users configure one MCP connection instead of one per calculator.
+Add a CMS UI page showing the account-level MCP endpoint and letting users toggle which calculators are exposed — so they can configure one MCP connection instead of one per calculator.
 
 ---
 
-## Current State
+## Scope
 
-- Per-calculator MCP config exists: `GET /calc/mcp/:calcId` generates snippets for Claude Desktop, Cursor, VS Code, Windsurf
-- MCP URL points to Formula API: `/mcp/calculator/{calcId}`
-- Formula API implements MCP Streamable HTTP (JSON-RPC 2.0) per calculator
-- `mcp-config.vue` UI lets users configure tool name, description, parameter descriptions, response template
-- `buildMcpInputSchema()` converts calculator input JSON Schema to MCP tool schema
-- Each calculator requires separate MCP client configuration — poor UX for accounts with 5+ calculators
+CMS UI/extension work only. No new database collections, no new backend endpoints, no gateway changes.
+
+- API keys: already in `gateway.api_keys` (gateway/02 backend + cms/22 UI — both completed)
+- MCP backend: formula-api/06
+- Gateway route: gateway/06
 
 ---
 
-## Architecture
+## UI Design
 
-A new Formula API endpoint that aggregates all calculators for an account into a single MCP server.
+New "Account MCP" page/section in the calculators module:
 
-```
-Current:  1 calculator = 1 MCP endpoint = 1 client config
-Proposed: 1 account    = 1 MCP endpoint = 1 client config (N tools)
+1. **Endpoint URL** — display and copy button
+   ```
+   https://api.businesslogic.online/v1/mcp/account/{accountId}
+   ```
 
-POST /mcp/account/{accountId}
-  ├── initialize → {serverInfo: {name: "Account Calculator Tools"}, capabilities: {tools: {}}}
-  ├── tools/list → [{name: "calc_tax", ...}, {name: "calc_loan", ...}, ...]
-  └── tools/call → route to correct calculator by tool name
-```
+2. **Calculator list** — table of calculators with MCP toggle
+   - Read from `calculator_configs` where `mcp->>'enabled' = true`
+   - Toggle updates `calculator_configs.mcp` JSON (enabled true/false)
 
-### Authentication
-- **Account-level API keys** (new collection: `account_api_keys`)
-  - Multiple keys per account (e.g., "production", "staging", "partner-x")
-  - Each key configures which resources are accessible (calculators now, RAG workspaces later)
-  - Key → resource mapping stored as JSON or junction table
-- `X-Auth-Token` header with account key → scopes to that account's allowed resources
-- Each tool call internally uses the per-calculator token for execution
-- Keys can be created/revoked/rotated from the account UI
+3. **Config snippets** — copy-paste blocks for Claude Desktop, Cursor, VS Code, Windsurf
+   ```json
+   {
+     "mcpServers": {
+       "businesslogic": {
+         "url": "https://api.businesslogic.online/v1/mcp/account/{accountId}",
+         "headers": {
+           "X-API-Key": "bl_your_api_key_here"
+         }
+       }
+     }
+   }
+   ```
+   Note: `X-API-Key` header (gateway auth), not `X-Auth-Token`.
 
-### How resources are exposed
-- Each API key has a configured set of accessible resources (calculators, future: RAG)
-- Only resources explicitly assigned to the key appear in `tools/list`
-- Tool name = calculator's MCP tool name (already configurable)
-- Tool schema = calculator's MCP input schema (already built by `buildMcpInputSchema()`)
-- Tool description = calculator's MCP description (already configurable)
-- Knowledge Base tools (from #13): `search_knowledge(query)` and `ask_knowledge(question)` exposed alongside calculator tools
-
-### Discovery flow
-```
-1. Directus UI: Account MCP page shows single endpoint URL + config snippet
-2. User pastes into Claude Desktop / Cursor / etc.
-3. LLM calls tools/list → gets all account calculators as tools
-4. LLM calls tools/call with {name: "calc_tax", arguments: {salary: 50000}}
-5. Formula API routes to correct calculator, validates token, executes
-6. Result returned to LLM
-```
+4. **API key link** — "Get your API key →" linking to the API Key Management page (cms/22)
 
 ---
 
 ## Key Tasks
 
-### Formula API Changes
-- New endpoint: `POST /mcp/account/{accountId}` implementing MCP Streamable HTTP
-- Account lookup: query Directus API to get account's calculators with MCP enabled
-- Dynamic `tools/list`: build tool list from all MCP-enabled calculators
-- `tools/call` routing: match tool name → calculator ID → execute
-- Cache account's calculator list (5-min TTL) to avoid per-request DB queries
-- Auth: validate `X-Auth-Token` against account-level key
+- [ ] Add "Account MCP" route/page to `project-extension-calculators`
+- [ ] Display account MCP endpoint URL with copy button
+- [ ] List MCP-enabled calculators (query via `calculator-api` extension)
+- [ ] Per-calculator enable/disable toggle (PATCH `calculator_configs.mcp`)
+- [ ] Config snippets for Claude Desktop, Cursor, VS Code, Windsurf
+- [ ] Link to API Key Management (cms/22) for key creation
+- [ ] Add `GET /calc/mcp/account` endpoint in `project-extension-calculator-api` to return MCP-enabled calculator list + account endpoint URL
 
-### Directus Changes (calculator-api extension)
-- New endpoint: `GET /calc/mcp/account` — returns account-level MCP config snippets
-- Account-level API key generation (or reuse existing mechanism)
-- UI: new "Account MCP" section in the account module or calculators module
-  - Shows single MCP endpoint URL
-  - Lists which calculators are MCP-enabled
-  - Toggle to enable/disable per calculator
-  - Config snippets for Claude Desktop, Cursor, VS Code, Windsurf (like existing per-calculator snippets)
+---
 
-### Data Model
-```
-account_api_keys (new collection)
-  ├── id (uuid)
-  ├── account (M2O → account)
-  ├── name (string — e.g., "Production", "Partner API")
-  ├── key (string — generated, hashed for storage)
-  ├── grant_all_mcp (boolean, default true — expose all MCP-enabled calculators)
-  ├── resources (JSON — [{type: "calculator", id: "calc-1"}, ...], only used when grant_all_mcp=false)
-  ├── date_created (timestamp)
-  ├── last_used (timestamp)
-  └── status (active / revoked)
-```
+## Key Files
 
-### Config Snippet Format
-```json
-{
-  "mcpServers": {
-    "my-company-calculators": {
-      "url": "https://api.example.com/mcp/account/acc_123",
-      "headers": {
-        "X-Auth-Token": "ak_abc123..."
-      }
-    }
-  }
-}
-```
+- `services/cms/extensions/local/project-extension-calculators/src/` — add Account MCP page
+- `services/cms/extensions/local/project-extension-calculators/src/components/mcp-config.vue` — existing per-calculator MCP config (keep as-is)
+- `services/cms/extensions/local/project-extension-calculator-api/src/index.ts` — add endpoint to list MCP-enabled calculators
+
+---
+
+## What This Task Does NOT Include
+
+- No new `account_api_keys` collection — keys are in `gateway.api_keys`
+- No formula-api endpoint changes — that's formula-api/06
+- No gateway route changes — that's gateway/06
+- No per-calculator MCP config changes — `mcp-config.vue` stays as-is
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Single MCP endpoint per account exposes all MCP-enabled calculators as tools
-- [ ] `tools/list` returns correct tool definitions for all enabled calculators
-- [ ] `tools/call` routes to the correct calculator and returns results
-- [ ] Account-level auth prevents cross-account access
-- [ ] UI shows account MCP config with copy-paste snippets
-- [ ] Adding/removing a calculator from MCP updates the tools/list response (within cache TTL)
-- [ ] Per-calculator MCP endpoints continue to work (backward compatible)
-
----
-
-## Dependencies
-
-- Formula API MCP implementation (already exists for per-calculator)
-- Existing MCP config UI and schema builder
-- New `account_api_keys` collection (schema migration)
-- Directus permissions scoped to `$CURRENT_USER.active_account`
-
-## Technical Notes
-
-- The per-calculator MCP endpoint stays as-is — account-level is additive
-- MCP spec supports dynamic tool lists — `tools/list` can return different tools over time
-- Rate limiting at account level: aggregate all tool calls against the account's subscription limits
-- Consider `tools/list` caching: LLM clients call this frequently, cache the response
-
-## Estimated Scope
-
-- Formula API: ~200-300 lines (new MCP endpoint, account lookup, routing)
-- Directus extension: ~200 lines (account MCP config endpoint, snippet generation)
-- UI: ~200 lines (account MCP section)
+- [ ] Account MCP page shows correct endpoint URL for the logged-in account
+- [ ] Calculator list shows which calculators have MCP enabled
+- [ ] Toggle updates `calculator_configs.mcp.enabled` correctly
+- [ ] Config snippets use `X-API-Key` header (not `X-Auth-Token`)
+- [ ] "Get your API key" links to cms/22 API Key Management
+- [ ] Per-calculator MCP config (`mcp-config.vue`) still works unchanged

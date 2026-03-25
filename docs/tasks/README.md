@@ -38,7 +38,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 18 | Admin Financials — Revenue, Spending & P/L Dashboard | planned | [cms/18-admin-financials.md](cms/18-admin-financials.md) |
 | 19 | directus-extension-businesslogic (public npm) | planned | [cms/19-directus-extension-businesslogic.md](cms/19-directus-extension-businesslogic.md) |
 | 20 | Account-Level MCP (UI) | planned | [cms/20-account-mcp.md](cms/20-account-mcp.md) |
-| 21 | DOMPurify for All v-html Usage | planned | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
+| 21 | DOMPurify for All v-html Usage | completed | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
 | 22 | API Key Management UI | completed | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
 | 23 | Widget Client Gateway Mode | completed | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
 | 24 | Widget Layout Builder | planned | [cms/24-widget-layout-builder.md](cms/24-widget-layout-builder.md) |
@@ -77,7 +77,8 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | 03 | Redis Error Logging | completed | [formula-api/03-redis-error-logging.md](formula-api/03-redis-error-logging.md) |
 | 04 | MCP Error Code Mapping | completed | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
 | 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
-| 06 | Account-Level MCP, Skill & Plugin | planned | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
+| 06 | Account-Level MCP | planned | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
+| 07 | Direct Database Migration | planned | [formula-api/07-direct-db-migration.md](formula-api/07-direct-db-migration.md) |
 
 ### Formula Engine — bl-excel (Rust)
 
@@ -101,7 +102,7 @@ DAG workflow execution, triggers, workers.
 
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
-| 01 | Replace Production unwrap() with Error Handling | planned | [flow/01-unwrap-error-handling.md](flow/01-unwrap-error-handling.md) |
+| 01 | Replace Production unwrap() with Error Handling | completed | [flow/01-unwrap-error-handling.md](flow/01-unwrap-error-handling.md) |
 
 ---
 
@@ -115,7 +116,8 @@ Auth, rate limiting, routing, CORS.
 | 02 | API Key Management Endpoints | completed | [gateway/02-api-key-management.md](gateway/02-api-key-management.md) |
 | 03 | Widget Routes + Response Cache | completed | [gateway/03-widget-routes-cache.md](gateway/03-widget-routes-cache.md) |
 | 04 | Internal Service Proxy Routes | completed | [gateway/04-internal-service-proxy.md](gateway/04-internal-service-proxy.md) |
-| 05 | Internal Route Audit Logging | planned | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
+| 05 | Request Logging & Audit Trail | planned | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
+| 06 | Account MCP Route | planned | [gateway/06-account-mcp-route.md](gateway/06-account-mcp-route.md) |
 
 ---
 
@@ -126,8 +128,8 @@ Infrastructure and multi-service concerns.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | Infrastructure & Deployment (Hetzner + Coolify) | planned | [cross-cutting/01-infrastructure.md](cross-cutting/01-infrastructure.md) |
-| 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | planned | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
-| 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | planned | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
+| 02 | Security Hardening (SSH, Headers, DB SSL, Redis Auth, CORS) | in-progress | [cross-cutting/02-security-hardening.md](cross-cutting/02-security-hardening.md) |
+| 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | completed | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
 | 04 | Formula-API Gateway Auth Path | completed | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
 | 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
 
@@ -135,35 +137,79 @@ Infrastructure and multi-service concerns.
 
 ## Recommended Build Order
 
-| Priority | Service | # | Improvement | Why |
-|----------|---------|---|-------------|-----|
-| 1 | cross-cutting | 01 | Infrastructure & Deployment | Hetzner + Coolify, 3-server setup |
-| 2 | cms | 08 | Pricing — Tax & Compliance | Stripe Tax, EUR+USD, VAT — legal foundation |
-| 3 | formula-api | 01 | Execute Auth | Per-formula tokens, encrypt at rest |
-| 4 | cms | 08 | Pricing — Enforcement | calls_per_month not enforced |
-| 5 | cms | 04 | Core Widget | THE missing product piece (completed) |
-| 6 | gateway | 01 | Resource Permissions | Foundation for API key auth |
-| 7 | gateway | 02 | API Key Management | CRUD for API keys |
-| 8 | gateway | 03 | Widget Routes + Cache | Gateway-routed widget traffic |
-| 9 | cross-cutting | 04 | Formula-API Gateway Auth | HMAC auth between gateway + formula |
-| 10 | cms | 22 | API Key Management UI | User-facing key management |
-| 11 | cms | 23 | Widget Gateway Mode | Widget uses API keys via gateway |
-| 12 | cms | 24 | Widget Layout Builder | Visual drag-drop layout design |
-| 12a | gateway | 04 | Internal Service Proxy Routes | CMS→services via gateway internal routes |
-| 12c | cms | 25 | Calculator-API Gateway Auth | CMS→formula-api uses gateway auth |
-| 12d | cms | 26 | Calculators Code Snippets | X-Auth-Token → X-API-Key in all snippets |
-| 12e | cms | 27 | AI-API Gateway Auth | CMS→ai-api uses gateway auth |
-| 12f | cms | 28 | Flow-Hooks Gateway Auth | CMS→flow uses gateway auth |
-| 12g | cms | 29 | Widget-API Auth Cleanup | Remove token passthrough |
-| 12h | cms | 30 | Formulas Integration Update | Formulas snippets → gateway |
-| 13 | cms | 06 | Lead Capture | Makes widget a marketing tool |
-| 14 | cms | 07 | Template Gallery | Marketing + onboarding + SEO |
-| 15 | cms | 01 | Calculator Testing | Quality foundation |
-| 16 | cms | 02 | Cell Mapping UX | Quick authoring UX win |
-| 17 | cms | 20 | Account-Level MCP (UI) | Unified MCP endpoint |
-| 18 | formula-api | 06 | Account-Level MCP (Backend) | Backend for unified MCP |
-| 19 | ai-api | 01 | Public API + Widget | Public AI chat API |
-| 20 | formula-api/engine | 09 | Missing Functions | ~150 remaining Excel functions |
+Build & test locally first. Infrastructure/launch comes after all building blocks are in place.
+
+### Phase 1A — Foundation (must complete before Account MCP sprint)
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 1 | formula-api/07 | Direct Database Migration | Removes CMS dependency, consistent DB pattern across all services |
+
+### Phase 1B — Core Platform Sprint (parallel after foundation)
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 2 | formula-api/06 | Account-Level MCP (backend) | THE differentiator — "talk to your business brain" |
+| 3 | gateway/06 | Account MCP Route | Gateway proxy for MCP traffic |
+| 4 | cms/20 | Account-Level MCP (UI) | Config page, snippets, toggle MCP per calculator |
+| 5 | ai-api/01 | Public AI API (Phase 1) | Opens AI pillar externally + fixes HMAC security gap |
+| 6 | ai-api/03 | AI Name & Template Overrides | Branded AI responses per account |
+| 7 | gateway/05 | Request Logging & Audit Trail | Billing + security audit trail |
+
+### Phase 1C — Monetization
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 8 | cms/08 | Pricing & Billing | Tiers, tax, enforcement — can't monetize without it |
+| 9 | cms/24 | Widget Layout Builder | Drag-drop layout design — makes widgets sellable |
+
+### Phase 2 — Growth & Distribution
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 7 | cms/06 | Lead Capture & CRM | Turns widgets into marketing tools |
+| 8 | cms/07 | Template Gallery | SEO + onboarding + showcase |
+| 9 | cms/02 | Cell Mapping UX | Authoring UX improvement |
+| 10 | cms/03 | Calculator Onboarding Wizard | Guided first-time creation flow |
+| 11 | cms/09 | Event-Driven Communication | Platform events, email automation, webhooks |
+
+### Phase 3 — Launch & Infrastructure
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 12 | cross-cutting/02 | Security Hardening (finish) | 2 items need prod verification — complete on deploy |
+| 13 | cross-cutting/01 | Infrastructure & Deployment | Hetzner + Coolify 3-server setup — deploy when ready |
+
+### Phase 4 — Vision & Differentiation
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 14 | ai-api/04 | Digital Twin / Second Brain | Personal AI memory — the "second brain" pillar |
+| 15 | ai-api/05 | Contextual Memory Intelligence | Knowledge graph for intelligent memory retrieval |
+| 16 | ai-api/06 | AI Partner Configuration | AI as persistent partner, not stateless tool |
+| 17 | cross-cutting/05 | Cedar Guardrails (Phase 1) | Enterprise policy enforcement — start foundation only |
+
+### Phase 5 — Polish & Engine
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 18 | formula-api/engine/01 | Spill Array Support | Dynamic array spill |
+| 19 | formula-api/engine/06 | Missing Array Functions | FILTER, SORT, UNIQUE |
+| 20 | formula-api/engine/02 | OFFSET/INDIRECT in Aggregates | Dynamic ranges |
+| 21 | formula-api/engine/07 | Numeric Precision | IEEE 754 improvements |
+| 22 | formula-api/engine/08 | TEXT Format Engine | Full TEXT function |
+| 23 | cms/10 | Real-time Stats via WebSockets | Live usage metrics |
+| 24 | cms/17 | Formula Dashboard | Formula analytics |
+| 25 | cms/18 | Admin Financials | P/L dashboard |
+| 26 | cms/11 | Integration Tabs | Claude Skill + Cowork tabs |
+| 27 | cms/13 | OpenAPI in Integration Tab | Embedded API docs |
+| 28 | cms/15 | Claude Skill Tab Improvements | UX refinements |
+| 29 | cms/16 | Cloud File Sync | Drive, OneDrive, Dropbox, Box |
+| 30 | cms/14 | Cowork Plugin Research | Integration research |
+| 31 | cms/19 | directus-extension-businesslogic | Public npm extension |
+| 32 | formula-api/engine/03 | Volatile Function Tracking | NOW, RAND recalculation |
+| 33 | formula-api/engine/04 | Benchmark CI | Perf regression detection |
+| 34 | formula-api/engine/05 | WASM Target | Browser-side formula eval |
 
 ---
 
@@ -171,11 +217,11 @@ Infrastructure and multi-service concerns.
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 18 | 0 | 11 | 29 |
+| CMS | 17 | 0 | 12 | 29 |
 | AI API | 5 | 0 | 1 | 6 |
-| Formula API | 1 | 0 | 5 | 6 |
+| Formula API | 2 | 0 | 5 | 7 |
 | Formula Engine | 8 | 0 | 1 | 9 |
-| Flow | 1 | 0 | 0 | 1 |
-| Gateway | 1 | 0 | 4 | 5 |
-| Cross-Cutting | 3 | 0 | 1 | 4 |
-| **Total** | **37** | **0** | **23** | **60** |
+| Flow | 0 | 0 | 1 | 1 |
+| Gateway | 2 | 0 | 4 | 6 |
+| Cross-Cutting | 1 | 1 | 3 | 5 |
+| **Total** | **35** | **1** | **27** | **63** |
