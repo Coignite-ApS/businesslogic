@@ -85,6 +85,7 @@ export const config = {
 
   // Auth
   adminToken: env.AI_API_ADMIN_TOKEN || env.ADMIN_TOKEN || '',
+  gatewaySharedSecret: env.GATEWAY_SHARED_SECRET || '',
 
   // External services
   formulaApiUrl: (env.FORMULA_API_URL || '').replace(/\/+$/, ''),

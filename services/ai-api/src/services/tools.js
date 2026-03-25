@@ -167,15 +167,37 @@ export const AI_TOOLS = [
 ];
 
 /**
- * Filter AI_TOOLS based on API key permissions.
+ * Safe subset of tools for public API access.
+ * Only read/execute operations — no admin, create, update, configure, or deploy.
+ */
+export const PUBLIC_TOOLS = new Set([
+  'list_calculators',
+  'describe_calculator',
+  'execute_calculator',
+  'search_knowledge',
+  'ask_knowledge',
+  'list_knowledge_bases',
+  'get_knowledge_base',
+]);
+
+/**
+ * Filter AI_TOOLS based on API key permissions and public mode.
  * permissions: { ai: true, calc: true, flow: false, kb: true }
  * - calc: false → remove calculator tools
  * - kb: false → remove knowledge base tools
  * - flow: false → remove flow tools
+ * - isPublicRequest: true → restrict to PUBLIC_TOOLS
  * If permissions is empty/null, return all tools (admin/internal calls).
  */
-export function filterToolsByPermissions(tools, permissions) {
-  if (!permissions || Object.keys(permissions).length === 0) return tools;
+export function filterToolsByPermissions(tools, permissions, isPublicRequest = false) {
+  let filtered = tools;
+
+  // Public requests only get the safe subset
+  if (isPublicRequest) {
+    filtered = filtered.filter(tool => PUBLIC_TOOLS.has(tool.name));
+  }
+
+  if (!permissions || Object.keys(permissions).length === 0) return filtered;
 
   const calcTools = new Set([
     'list_calculators', 'describe_calculator', 'execute_calculator',
@@ -188,7 +210,7 @@ export function filterToolsByPermissions(tools, permissions) {
   ]);
   const flowTools = new Set(['execute_flow']);
 
-  return tools.filter(tool => {
+  return filtered.filter(tool => {
     if (calcTools.has(tool.name) && permissions.calc === false) return false;
     if (kbTools.has(tool.name) && permissions.kb === false) return false;
     if (flowTools.has(tool.name) && permissions.flow === false) return false;

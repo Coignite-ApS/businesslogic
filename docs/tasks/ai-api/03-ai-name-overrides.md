@@ -60,3 +60,11 @@ Allow users to set a general AI-facing name and response template, with per-inte
 - Relates to #21 (Cowork), #22 (Skill tab), #23 (Response Template)
 - Use case: calculator named "Mortgage Affordability Calculator v2.1" but MCP tool should be `mortgage_check`, skill should be "Mortgage Calculator"
 - Override response templates allow integration-specific formatting instructions
+
+## ai-api Analysis
+
+**Conclusion: this task is entirely CMS-side.** No ai-api changes needed.
+
+The ai-api's `executeTool()` calls the formula-api and returns results as-is. Name and response template overrides are applied at the CMS layer (Directus model fields + UI). The ai-api's `describe_calculator` reads `name` and `description` from the `calculators` table — once CMS adds `ai_name`, `mcp_name`, etc., those fields can be included, but that requires no structural change to the tool execution path.
+
+When CMS adds the fields and a consuming integration (MCP server, Skill) is built, it will read the relevant override field directly from the `calculators` table. No ai-api route changes required.

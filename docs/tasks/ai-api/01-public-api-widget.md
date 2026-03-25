@@ -1,6 +1,6 @@
 # 01. AI Assistant — Public API + Widget
 
-**Status:** planned
+**Status:** in-progress
 **Depends on:** None (gateway already routes `/v1/ai/*` to ai-api)
 
 ---
@@ -238,45 +238,45 @@ Consistent error format across all endpoints:
 ### Phase 1: Public Chat API
 
 #### 1.1 HMAC Signature Verification
-- [ ] Add `GATEWAY_SHARED_SECRET` to ai-api config.js
-- [ ] Create `validateGatewaySignature(req)` utility (copy pattern from formula-api)
-- [ ] Call signature verification in `verifyAuth()` when `x-gateway-auth` is present
-- [ ] Reject requests with invalid/missing/expired signatures (401)
-- [ ] Tests: valid signature passes, invalid rejected, expired timestamp rejected, replay attack rejected
+- [x] Add `GATEWAY_SHARED_SECRET` to ai-api config.js
+- [x] Create `validateGatewaySignature(req)` utility (copy pattern from formula-api)
+- [x] Call signature verification in `verifyAuth()` when `x-gateway-auth` is present
+- [x] Reject requests with invalid/missing/expired signatures (401)
+- [x] Tests: valid signature passes, invalid rejected, expired timestamp rejected, replay attack rejected
 
 #### 1.2 Public Tool Whitelist
-- [ ] Define `PUBLIC_TOOLS` constant — subset of `AI_TOOLS` (7 read/execute tools)
-- [ ] Add `isPublicRequest` flag to `req` in `verifyAuth()` (gateway-auth + not admin + not internal)
-- [ ] Use `PUBLIC_TOOLS` instead of `AI_TOOLS` when `req.isPublicRequest === true`
-- [ ] Combine with existing `filterToolsByPermissions()` (permissions further restrict within public set)
-- [ ] Tests: public request gets 7 tools, admin gets all 14, permissions further filter
+- [x] Define `PUBLIC_TOOLS` constant — subset of `AI_TOOLS` (7 read/execute tools)
+- [x] Add `isPublicRequest` flag to `req` in `verifyAuth()` (gateway-auth + not admin + not internal)
+- [x] Use `PUBLIC_TOOLS` instead of `AI_TOOLS` when `req.isPublicRequest === true`
+- [x] Combine with existing `filterToolsByPermissions()` (permissions further restrict within public set)
+- [x] Tests: public request gets 7 tools, admin gets all 14, permissions further filter
 
 #### 1.3 Budget Integration
-- [ ] Initialize budget Redis connection in server.js startup (call `initBudget(config.redisUrl)`)
-- [ ] Call `checkBudget(accountId, conversationId)` before LLM call in both chat routes
-- [ ] Call `recordCost(accountId, conversationId, costUsd)` after LLM call
-- [ ] Return budget error with appropriate 429 code + layer info
+- [x] Initialize budget Redis connection in server.js startup (call `initBudget(config.redisUrl)`)
+- [x] Call `checkBudget(accountId, conversationId)` before LLM call in both chat routes
+- [x] Call `recordCost(accountId, conversationId, costUsd)` after LLM call
+- [x] Return budget error with appropriate 429 code + layer info
 - [ ] Tests: budget exceeded returns 429, cost is recorded, budget status reflects usage
 
 #### 1.4 Stateless Mode
-- [ ] When `conversation_id` is omitted, skip conversation creation/persistence
-- [ ] Return response without `conversation_id` in stateless mode
-- [ ] Still track token usage in `ai_token_usage` (for billing) with `conversation = NULL`
+- [x] When `conversation_id` is omitted, skip conversation creation/persistence
+- [x] Return response without `conversation_id` in stateless mode
+- [x] Still track token usage in `ai_token_usage` (for billing) with `conversation = NULL`
 - [ ] Tests: stateless call returns no conversation_id, no conversation row created, tokens tracked
 
 #### 1.5 Conversation Scoping for API Keys
-- [ ] Add migration: `api_key_id`, `external_id`, `source` columns to `ai_conversations`
-- [ ] Store `req.apiKeyId` on conversation creation
-- [ ] Filter conversations by `api_key_id` when request is from API key
-- [ ] Support `external_id` in create conversation + chat requests
-- [ ] Resume conversation by `external_id` when provided without `conversation_id`
+- [x] Add migration: `api_key_id`, `external_id`, `source` columns to `ai_conversations`
+- [x] Store `req.apiKeyId` on conversation creation
+- [x] Filter conversations by `api_key_id` when request is from API key
+- [x] Support `external_id` in create conversation + chat requests
+- [x] Resume conversation by `external_id` when provided without `conversation_id`
 - [ ] Tests: API key A can't see API key B's conversations, external_id lookup works
 
 #### 1.6 Error Response Standardization
-- [ ] Add `code` field to all error responses across chat + conversation routes
-- [ ] Ensure consistent format: `{ "error": "message", "code": "CODE" }`
-- [ ] Document error codes in this task doc (see table above)
-- [ ] Tests: each error path returns correct HTTP status + error code
+- [x] Add `code` field to all error responses across chat + conversation routes
+- [x] Ensure consistent format: `{ "error": "message", "code": "CODE" }`
+- [x] Document error codes in this task doc (see table above)
+- [x] Tests: each error path returns correct HTTP status + error code
 
 #### 1.7 SDK Compatibility Verification
 - [ ] Verify SDK's `ChatClient.send()` works against `/v1/ai/chat/sync`

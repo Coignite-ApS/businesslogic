@@ -9,6 +9,7 @@ import { sanitizeMessage } from '../utils/sanitize.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { calculateCost } from '../utils/cost.js';
 import { checkAiQuota, getActiveAccount } from '../utils/auth.js';
+import { checkBudget, recordCost } from '../services/budget.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -20,6 +21,7 @@ export async function registerRoutes(app) {
         properties: {
           message: { type: 'string' },
           conversation_id: { type: 'string' },
+          external_id: { type: 'string' },
           prompt_id: { type: 'string' },
         },
         required: ['message'],
@@ -28,23 +30,23 @@ export async function registerRoutes(app) {
   }, async (req, reply) => {
     // Check AI permission for API key requests
     if (req.permissions && req.permissions.ai === false) {
-      return reply.code(403).send({ error: 'API key does not have AI permission' });
+      return reply.code(403).send({ error: 'API key does not have AI permission', code: 'FORBIDDEN' });
     }
 
     if (!config.anthropicApiKey) {
-      return reply.code(503).send({ error: 'AI Assistant not configured' });
+      return reply.code(503).send({ error: 'AI Assistant not configured', code: 'SERVICE_UNAVAILABLE' });
     }
 
-    const { message: rawMessage, conversation_id, prompt_id } = req.body;
+    const { message: rawMessage, conversation_id, external_id, prompt_id } = req.body;
     const message = sanitizeMessage(rawMessage, config.maxMessageLength);
     if (!message?.trim()) {
-      return reply.code(400).send({ error: 'Message is required' });
+      return reply.code(400).send({ error: 'Message is required', code: 'INVALID_REQUEST' });
     }
 
     // Resolve account
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) {
-      return reply.code(403).send({ error: 'No active account' });
+      return reply.code(403).send({ error: 'No active account', code: 'FORBIDDEN' });
     }
 
     // Rate limit (skip for admins)
@@ -53,6 +55,7 @@ export async function registerRoutes(app) {
       if (!rl.allowed) {
         return reply.code(429).header('Retry-After', String(rl.retryAfter)).send({
           error: `Rate limit exceeded. Try again in ${rl.retryAfter}s.`,
+          code: 'RATE_LIMITED',
         });
       }
     }
@@ -62,7 +65,7 @@ export async function registerRoutes(app) {
     if (!req.isAdmin) {
       quota = await checkAiQuota(accountId);
       if (!quota.allowed) {
-        return reply.code(429).send({ error: quota.reason });
+        return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
       }
     }
 
@@ -77,28 +80,74 @@ export async function registerRoutes(app) {
     });
 
     try {
-      // Load or create conversation
-      let conversationId = conversation_id;
+      // Stateless mode: no conversation_id and no external_id → skip DB conversation
+      const isStateless = !conversation_id && !external_id;
+
+      let conversationId = null;
       let messages = [];
 
-      if (conversationId) {
+      if (conversation_id) {
+        // Scope by api_key_id when public request
+        const scopeClause = req.isPublicRequest && req.apiKeyId
+          ? 'AND api_key_id = $3'
+          : '';
+        const params = [conversation_id, accountId];
+        if (req.isPublicRequest && req.apiKeyId) params.push(req.apiKeyId);
+
         const conv = await queryOne(
-          'SELECT messages FROM ai_conversations WHERE id = $1 AND account = $2',
-          [conversationId, accountId],
+          `SELECT messages FROM ai_conversations WHERE id = $1 AND account = $2 ${scopeClause}`,
+          params,
         );
         if (!conv) {
-          sendSSE(reply, 'error', { message: 'Conversation not found' });
+          sendSSE(reply, 'error', { message: 'Conversation not found', code: 'NOT_FOUND' });
           return reply.raw.end();
         }
+        conversationId = conversation_id;
         messages = conv.messages || [];
-      } else {
+      } else if (external_id) {
+        // Find or create conversation by external_id
+        const scopeClause = req.isPublicRequest && req.apiKeyId
+          ? 'AND api_key_id = $3'
+          : '';
+        const params = [external_id, accountId];
+        if (req.isPublicRequest && req.apiKeyId) params.push(req.apiKeyId);
+
+        const conv = await queryOne(
+          `SELECT id, messages FROM ai_conversations WHERE external_id = $1 AND account = $2 ${scopeClause}`,
+          params,
+        );
+        if (conv) {
+          conversationId = conv.id;
+          messages = conv.messages || [];
+        } else {
+          conversationId = randomUUID();
+          await query(
+            `INSERT INTO ai_conversations (id, account, user_created, title, messages, status, total_input_tokens, total_output_tokens, api_key_id, external_id, source, date_created, date_updated)
+             VALUES ($1, $2, $3, $4, $5, 'active', 0, 0, $6, $7, $8, NOW(), NOW())`,
+            [conversationId, accountId, req.userId, message.slice(0, 100), JSON.stringify([]),
+              req.apiKeyId || null, external_id, req.isPublicRequest ? 'api' : 'cms'],
+          );
+          sendSSE(reply, 'conversation_created', { id: conversationId });
+        }
+      } else if (!isStateless) {
+        // Stateful without external_id — create new conversation
         conversationId = randomUUID();
         await query(
-          `INSERT INTO ai_conversations (id, account, user_created, title, messages, status, total_input_tokens, total_output_tokens, date_created, date_updated)
-           VALUES ($1, $2, $3, $4, $5, 'active', 0, 0, NOW(), NOW())`,
-          [conversationId, accountId, req.userId, message.slice(0, 100), JSON.stringify([])],
+          `INSERT INTO ai_conversations (id, account, user_created, title, messages, status, total_input_tokens, total_output_tokens, api_key_id, external_id, source, date_created, date_updated)
+           VALUES ($1, $2, $3, $4, $5, 'active', 0, 0, $6, $7, $8, NOW(), NOW())`,
+          [conversationId, accountId, req.userId, message.slice(0, 100), JSON.stringify([]),
+            req.apiKeyId || null, null, req.isPublicRequest ? 'api' : 'cms'],
         );
         sendSSE(reply, 'conversation_created', { id: conversationId });
+      }
+
+      // Budget check before LLM call (skip for admins)
+      if (!req.isAdmin) {
+        const budget = await checkBudget(accountId, conversationId);
+        if (!budget.allowed) {
+          sendSSE(reply, 'error', { message: budget.reason, code: 'BUDGET_EXCEEDED' });
+          return reply.raw.end();
+        }
       }
 
       // Load system prompt
@@ -143,8 +192,8 @@ export async function registerRoutes(app) {
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
 
-      // Filter tools based on API key permissions
-      const tools = filterToolsByPermissions(AI_TOOLS, req.permissions);
+      // Filter tools based on API key permissions and public mode
+      const tools = filterToolsByPermissions(AI_TOOLS, req.permissions, req.isPublicRequest);
 
       // Tool loop
       for (let round = 0; round < config.maxToolRounds; round++) {
@@ -232,49 +281,59 @@ export async function registerRoutes(app) {
         messages.push({ role: 'user', content: toolResults });
       }
 
-      // Save conversation
+      // Save conversation (skip in stateless mode)
       if (!clientDisconnected) {
-        try {
-          const current = await queryOne(
-            'SELECT total_input_tokens, total_output_tokens FROM ai_conversations WHERE id = $1',
-            [conversationId],
-          );
-          await query(
-            `UPDATE ai_conversations SET messages = $1, model = $2,
-             total_input_tokens = $3, total_output_tokens = $4, date_updated = NOW()
-             WHERE id = $5`,
-            [
-              JSON.stringify(messages),
-              model,
-              (current?.total_input_tokens || 0) + totalInputTokens,
-              (current?.total_output_tokens || 0) + totalOutputTokens,
-              conversationId,
-            ],
-          );
-        } catch (err) {
-          req.log.error(`Failed to save conversation: ${err.message}`);
+        const costUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+
+        if (!isStateless && conversationId) {
+          try {
+            const current = await queryOne(
+              'SELECT total_input_tokens, total_output_tokens FROM ai_conversations WHERE id = $1',
+              [conversationId],
+            );
+            await query(
+              `UPDATE ai_conversations SET messages = $1, model = $2,
+               total_input_tokens = $3, total_output_tokens = $4, date_updated = NOW()
+               WHERE id = $5`,
+              [
+                JSON.stringify(messages),
+                model,
+                (current?.total_input_tokens || 0) + totalInputTokens,
+                (current?.total_output_tokens || 0) + totalOutputTokens,
+                conversationId,
+              ],
+            );
+          } catch (err) {
+            req.log.error(`Failed to save conversation: ${err.message}`);
+          }
         }
 
-        // Record token usage
+        // Record token usage (always, even stateless — for billing)
         try {
           await query(
             `INSERT INTO ai_token_usage (id, account, conversation, model, task_category, input_tokens, output_tokens, cost_usd, date_created)
              VALUES ($1, $2, $3, $4, 'execute', $5, $6, $7, NOW())`,
-            [randomUUID(), accountId, conversationId, model, totalInputTokens, totalOutputTokens, calculateCost(model, totalInputTokens, totalOutputTokens)],
+            [randomUUID(), accountId, conversationId || null, model, totalInputTokens, totalOutputTokens, costUsd],
           );
         } catch (err) {
           req.log.error(`Failed to record token usage: ${err.message}`);
         }
 
-        const costUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+        // Record cost to Redis budget counters
+        if (!req.isAdmin) {
+          await recordCost(accountId, conversationId, costUsd);
+        }
+
         reply.raw.setHeader('X-AI-Cost', String(costUsd));
         reply.raw.setHeader('X-AI-Tokens-Input', String(totalInputTokens));
         reply.raw.setHeader('X-AI-Tokens-Output', String(totalOutputTokens));
 
-        sendSSE(reply, 'done', {
-          conversation_id: conversationId,
+        const donePayload = {
           usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
-        });
+        };
+        if (conversationId) donePayload.conversation_id = conversationId;
+
+        sendSSE(reply, 'done', donePayload);
       }
     } catch (err) {
       req.log.error(`POST /v1/ai/chat: ${err.message}`);
@@ -297,6 +356,7 @@ export async function registerRoutes(app) {
         properties: {
           message: { type: 'string' },
           conversation_id: { type: 'string' },
+          external_id: { type: 'string' },
           prompt_id: { type: 'string' },
           model: { type: 'string' },
         },
@@ -305,22 +365,22 @@ export async function registerRoutes(app) {
     },
   }, async (req, reply) => {
     if (req.permissions && req.permissions.ai === false) {
-      return reply.code(403).send({ error: 'API key does not have AI permission' });
+      return reply.code(403).send({ error: 'API key does not have AI permission', code: 'FORBIDDEN' });
     }
 
     if (!config.anthropicApiKey) {
-      return reply.code(503).send({ error: 'AI Assistant not configured' });
+      return reply.code(503).send({ error: 'AI Assistant not configured', code: 'SERVICE_UNAVAILABLE' });
     }
 
-    const { message: rawMessage, conversation_id, prompt_id } = req.body;
+    const { message: rawMessage, conversation_id, external_id, prompt_id } = req.body;
     const message = sanitizeMessage(rawMessage, config.maxMessageLength);
     if (!message?.trim()) {
-      return reply.code(400).send({ error: 'Message is required' });
+      return reply.code(400).send({ error: 'Message is required', code: 'INVALID_REQUEST' });
     }
 
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) {
-      return reply.code(403).send({ error: 'No active account' });
+      return reply.code(403).send({ error: 'No active account', code: 'FORBIDDEN' });
     }
 
     if (!req.isAdmin) {
@@ -328,6 +388,7 @@ export async function registerRoutes(app) {
       if (!rl.allowed) {
         return reply.code(429).header('Retry-After', String(rl.retryAfter)).send({
           error: `Rate limit exceeded. Try again in ${rl.retryAfter}s.`,
+          code: 'RATE_LIMITED',
         });
       }
     }
@@ -336,30 +397,74 @@ export async function registerRoutes(app) {
     if (!req.isAdmin) {
       quota = await checkAiQuota(accountId);
       if (!quota.allowed) {
-        return reply.code(429).send({ error: quota.reason });
+        return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
       }
     }
 
     try {
-      let conversationId = conversation_id;
+      // Stateless mode: no conversation_id and no external_id
+      const isStateless = !conversation_id && !external_id;
+
+      let conversationId = null;
       let messages = [];
 
-      if (conversationId) {
+      if (conversation_id) {
+        // Scope by api_key_id when public request
+        const scopeClause = req.isPublicRequest && req.apiKeyId
+          ? 'AND api_key_id = $3'
+          : '';
+        const params = [conversation_id, accountId];
+        if (req.isPublicRequest && req.apiKeyId) params.push(req.apiKeyId);
+
         const conv = await queryOne(
-          'SELECT messages FROM ai_conversations WHERE id = $1 AND account = $2',
-          [conversationId, accountId],
+          `SELECT messages FROM ai_conversations WHERE id = $1 AND account = $2 ${scopeClause}`,
+          params,
         );
         if (!conv) {
-          return reply.code(404).send({ error: 'Conversation not found' });
+          return reply.code(404).send({ error: 'Conversation not found', code: 'NOT_FOUND' });
         }
+        conversationId = conversation_id;
         messages = conv.messages || [];
-      } else {
+      } else if (external_id) {
+        // Find or create conversation by external_id
+        const scopeClause = req.isPublicRequest && req.apiKeyId
+          ? 'AND api_key_id = $3'
+          : '';
+        const params = [external_id, accountId];
+        if (req.isPublicRequest && req.apiKeyId) params.push(req.apiKeyId);
+
+        const conv = await queryOne(
+          `SELECT id, messages FROM ai_conversations WHERE external_id = $1 AND account = $2 ${scopeClause}`,
+          params,
+        );
+        if (conv) {
+          conversationId = conv.id;
+          messages = conv.messages || [];
+        } else {
+          conversationId = randomUUID();
+          await query(
+            `INSERT INTO ai_conversations (id, account, user_created, title, messages, status, total_input_tokens, total_output_tokens, api_key_id, external_id, source, date_created, date_updated)
+             VALUES ($1, $2, $3, $4, $5, 'active', 0, 0, $6, $7, $8, NOW(), NOW())`,
+            [conversationId, accountId, req.userId, message.slice(0, 100), JSON.stringify([]),
+              req.apiKeyId || null, external_id, req.isPublicRequest ? 'api' : 'cms'],
+          );
+        }
+      } else if (!isStateless) {
         conversationId = randomUUID();
         await query(
-          `INSERT INTO ai_conversations (id, account, user_created, title, messages, status, total_input_tokens, total_output_tokens, date_created, date_updated)
-           VALUES ($1, $2, $3, $4, $5, 'active', 0, 0, NOW(), NOW())`,
-          [conversationId, accountId, req.userId, message.slice(0, 100), JSON.stringify([])],
+          `INSERT INTO ai_conversations (id, account, user_created, title, messages, status, total_input_tokens, total_output_tokens, api_key_id, external_id, source, date_created, date_updated)
+           VALUES ($1, $2, $3, $4, $5, 'active', 0, 0, $6, $7, $8, NOW(), NOW())`,
+          [conversationId, accountId, req.userId, message.slice(0, 100), JSON.stringify([]),
+            req.apiKeyId || null, null, req.isPublicRequest ? 'api' : 'cms'],
         );
+      }
+
+      // Budget check before LLM call (skip for admins)
+      if (!req.isAdmin) {
+        const budget = await checkBudget(accountId, conversationId);
+        if (!budget.allowed) {
+          return reply.code(429).send({ error: budget.reason, code: 'BUDGET_EXCEEDED' });
+        }
       }
 
       let systemPrompt = DEFAULT_SYSTEM_PROMPT;
@@ -397,7 +502,7 @@ export async function registerRoutes(app) {
       const client = new AiClient(config.anthropicApiKey);
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
-      const tools = filterToolsByPermissions(AI_TOOLS, req.permissions);
+      const tools = filterToolsByPermissions(AI_TOOLS, req.permissions, req.isPublicRequest);
       const toolCalls = [];
       let responseText = '';
 
@@ -467,55 +572,63 @@ export async function registerRoutes(app) {
         messages.push({ role: 'user', content: toolResults });
       }
 
-      // Save conversation
-      try {
-        const current = await queryOne(
-          'SELECT total_input_tokens, total_output_tokens FROM ai_conversations WHERE id = $1',
-          [conversationId],
-        );
-        await query(
-          `UPDATE ai_conversations SET messages = $1, model = $2,
-           total_input_tokens = $3, total_output_tokens = $4, date_updated = NOW()
-           WHERE id = $5`,
-          [
-            JSON.stringify(messages),
-            model,
-            (current?.total_input_tokens || 0) + totalInputTokens,
-            (current?.total_output_tokens || 0) + totalOutputTokens,
-            conversationId,
-          ],
-        );
-      } catch (err) {
-        req.log.error(`Failed to save conversation: ${err.message}`);
+      const costUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+
+      // Save conversation (skip in stateless mode)
+      if (!isStateless && conversationId) {
+        try {
+          const current = await queryOne(
+            'SELECT total_input_tokens, total_output_tokens FROM ai_conversations WHERE id = $1',
+            [conversationId],
+          );
+          await query(
+            `UPDATE ai_conversations SET messages = $1, model = $2,
+             total_input_tokens = $3, total_output_tokens = $4, date_updated = NOW()
+             WHERE id = $5`,
+            [
+              JSON.stringify(messages),
+              model,
+              (current?.total_input_tokens || 0) + totalInputTokens,
+              (current?.total_output_tokens || 0) + totalOutputTokens,
+              conversationId,
+            ],
+          );
+        } catch (err) {
+          req.log.error(`Failed to save conversation: ${err.message}`);
+        }
       }
 
-      // Record token usage
-      const costUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+      // Record token usage (always, even stateless — for billing)
       try {
         await query(
           `INSERT INTO ai_token_usage (id, account, conversation, model, task_category, input_tokens, output_tokens, cost_usd, date_created)
            VALUES ($1, $2, $3, $4, 'execute', $5, $6, $7, NOW())`,
-          [randomUUID(), accountId, conversationId, model, totalInputTokens, totalOutputTokens, costUsd],
+          [randomUUID(), accountId, conversationId || null, model, totalInputTokens, totalOutputTokens, costUsd],
         );
       } catch (err) {
         req.log.error(`Failed to record token usage: ${err.message}`);
+      }
+
+      // Record cost to Redis budget counters
+      if (!req.isAdmin) {
+        await recordCost(accountId, conversationId, costUsd);
       }
 
       reply.header('X-AI-Cost', String(costUsd));
       reply.header('X-AI-Tokens-Input', String(totalInputTokens));
       reply.header('X-AI-Tokens-Output', String(totalOutputTokens));
 
-      return {
-        data: {
-          conversation_id: conversationId,
-          response: responseText,
-          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-          usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
-        },
+      const responseData = {
+        response: responseText,
+        tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+        usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
       };
+      if (conversationId) responseData.conversation_id = conversationId;
+
+      return { data: responseData };
     } catch (err) {
       req.log.error(`POST /v1/ai/chat/sync: ${err.message}`);
-      return reply.code(500).send({ error: 'An unexpected error occurred' });
+      return reply.code(500).send({ error: 'An unexpected error occurred', code: 'INTERNAL_ERROR' });
     }
   });
 }

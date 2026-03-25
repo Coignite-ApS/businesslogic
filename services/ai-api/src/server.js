@@ -8,6 +8,7 @@ import multipart from '@fastify/multipart';
 import { config } from './config.js';
 import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
+import { initBudget, closeBudget } from './services/budget.js';
 import { startCleanup, stopCleanup } from './utils/rate-limit.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
 import { registerRoutes as registerChatRoutes } from './routes/chat.js';
@@ -95,6 +96,7 @@ const shutdown = async (signal) => {
     await app.close();
   } finally {
     stopCleanup();
+    await closeBudget();
     await closeDb();
     await shutdownTelemetry();
     process.exit(0);
@@ -120,6 +122,10 @@ export async function start() {
     if (config.databaseUrl) {
       await initDb(config.databaseUrl);
       app.log.info('Database connected');
+    }
+    if (config.redisUrl) {
+      await initBudget(config.redisUrl);
+      app.log.info('Budget Redis connected');
     }
     startCleanup();
     await app.listen({ port: config.port, host: config.host });

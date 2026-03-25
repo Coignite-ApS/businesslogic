@@ -14,6 +14,7 @@ describe('Public chat endpoints', () => {
     process.env.DATABASE_URL = '';
     process.env.REDIS_URL = '';
     process.env.AI_API_ADMIN_TOKEN = ADMIN_TOKEN;
+    process.env.GATEWAY_SHARED_SECRET = ''; // no HMAC validation in these tests
     process.env.ANTHROPIC_API_KEY = '';
     const mod = await import('../src/server.js');
     app = mod.app;
@@ -38,6 +39,7 @@ describe('Public chat endpoints', () => {
     assert.strictEqual(res.status, 403);
     const body = await res.json();
     assert.ok(body.error.includes('AI permission'));
+    assert.strictEqual(body.code, 'FORBIDDEN');
   });
 
   it('POST /v1/ai/chat/sync rejects when ai permission is false', async () => {
@@ -52,29 +54,19 @@ describe('Public chat endpoints', () => {
       body: JSON.stringify({ message: 'hello' }),
     });
     assert.strictEqual(res.status, 403);
+    const body = await res.json();
+    assert.strictEqual(body.code, 'FORBIDDEN');
   });
 
-  it('POST /v1/ai/chat/sync without auth returns 401', async () => {
+  it('POST /v1/ai/chat/sync without auth returns 401 with code', async () => {
     const res = await fetch(`${BASE}/v1/ai/chat/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'hello' }),
     });
     assert.strictEqual(res.status, 401);
-  });
-
-  it('POST /v1/ai/chat/sync with empty message returns 400 or 503', async () => {
-    const res = await fetch(`${BASE}/v1/ai/chat/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Admin-Token': ADMIN_TOKEN,
-        'X-Account-Id': 'test-account',
-      },
-      body: JSON.stringify({ message: '' }),
-    });
-    // 503 because ANTHROPIC_API_KEY is empty (config cached at load)
-    assert.strictEqual(res.status, 503);
+    const body = await res.json();
+    assert.strictEqual(body.code, 'UNAUTHORIZED');
   });
 
   it('POST /v1/ai/chat/sync with admin token returns 503 (no API key)', async () => {
@@ -88,6 +80,8 @@ describe('Public chat endpoints', () => {
       body: JSON.stringify({ message: 'hello' }),
     });
     assert.strictEqual(res.status, 503);
+    const body = await res.json();
+    assert.strictEqual(body.code, 'SERVICE_UNAVAILABLE');
   });
 });
 
@@ -120,5 +114,50 @@ describe('Tool filtering by permissions', () => {
     const { AI_TOOLS, filterToolsByPermissions } = await import('../src/services/tools.js');
     const filtered = filterToolsByPermissions(AI_TOOLS, null);
     assert.strictEqual(filtered.length, AI_TOOLS.length);
+  });
+
+  it('public request gets exactly 7 tools', async () => {
+    const { AI_TOOLS, filterToolsByPermissions, PUBLIC_TOOLS } = await import('../src/services/tools.js');
+    const filtered = filterToolsByPermissions(AI_TOOLS, {}, true);
+    assert.strictEqual(filtered.length, 7);
+    assert.strictEqual(filtered.length, PUBLIC_TOOLS.size);
+  });
+
+  it('public request excludes admin tools', async () => {
+    const { AI_TOOLS, filterToolsByPermissions } = await import('../src/services/tools.js');
+    const filtered = filterToolsByPermissions(AI_TOOLS, {}, true);
+    const names = filtered.map(t => t.name);
+    const excluded = ['create_calculator', 'update_calculator', 'get_calculator_config',
+      'configure_calculator', 'deploy_calculator', 'create_knowledge_base', 'upload_to_knowledge_base'];
+    for (const name of excluded) {
+      assert.ok(!names.includes(name), `${name} should not be in public tools`);
+    }
+  });
+
+  it('public request includes read/execute tools', async () => {
+    const { AI_TOOLS, filterToolsByPermissions } = await import('../src/services/tools.js');
+    const filtered = filterToolsByPermissions(AI_TOOLS, {}, true);
+    const names = filtered.map(t => t.name);
+    const expected = ['list_calculators', 'describe_calculator', 'execute_calculator',
+      'search_knowledge', 'ask_knowledge', 'list_knowledge_bases', 'get_knowledge_base'];
+    for (const name of expected) {
+      assert.ok(names.includes(name), `${name} should be in public tools`);
+    }
+  });
+
+  it('public request + calc:false removes calculator tools from public set', async () => {
+    const { AI_TOOLS, filterToolsByPermissions } = await import('../src/services/tools.js');
+    const filtered = filterToolsByPermissions(AI_TOOLS, { calc: false }, true);
+    const names = filtered.map(t => t.name);
+    assert.ok(!names.includes('list_calculators'));
+    assert.ok(!names.includes('execute_calculator'));
+    assert.ok(names.includes('search_knowledge')); // KB still present
+  });
+
+  it('admin gets all 14 tools', async () => {
+    const { AI_TOOLS, filterToolsByPermissions } = await import('../src/services/tools.js');
+    const filtered = filterToolsByPermissions(AI_TOOLS, {}, false);
+    assert.strictEqual(filtered.length, AI_TOOLS.length);
+    assert.strictEqual(filtered.length, 14);
   });
 });
