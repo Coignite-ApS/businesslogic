@@ -1,6 +1,8 @@
 import { config } from '../config.js';
 import { getRedisClient, isRedisReady } from './cache.js';
 import * as rateLimiter from './rate-limiter.js';
+import { loadAccountLimitsFromDb } from './calculator-db.js';
+import { getPool } from '../db.js';
 
 const ACCOUNT_LIMITS_PREFIX = 'accl:';
 
@@ -23,7 +25,7 @@ export async function loadAccountLimits(accountId, force = false) {
   if (!accountId) return true;
   if (!force && rateLimiter.has(accountId)) return true;
 
-  // Try Redis first (unless forcing refresh from Admin API)
+  // Try Redis first (unless forcing refresh from DB)
   if (!force) {
     const cached = await loadFromRedis(accountId);
     if (cached) {
@@ -32,15 +34,10 @@ export async function loadAccountLimits(accountId, force = false) {
     }
   }
 
-  // Fetch from Admin API (if not configured, allow — graceful degradation)
-  if (!config.adminApiUrl || !config.adminApiKey) return true;
+  // Fetch from direct DB if pool is available (graceful degradation if not)
+  if (!getPool()) return true;
   try {
-    const res = await fetch(`${config.adminApiUrl}/accounts/${accountId}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
+    const data = await loadAccountLimitsFromDb(accountId);
     rateLimiter.configure(accountId, data);
     saveToRedis(accountId, data);
     return true;

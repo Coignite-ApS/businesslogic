@@ -15,6 +15,8 @@ import { compileIpAllowlist, validateOrigins, checkAllowlist, getClientIp, setCo
 import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
 import { loadAccountLimits } from '../services/account-limits.js';
+import { loadRecipeFromDb, loadMcpConfigFromDb } from '../services/calculator-db.js';
+import { getPool } from '../db.js';
 
 
 function cleanSchemaForDescribe(schema) {
@@ -137,31 +139,27 @@ async function getCachedResultWithRedis(calcId, generation, values) {
   return undefined;
 }
 
-// --- External API helper (read-only fallback) ---
+// --- Database helper (replaces Admin API reads) ---
 
-async function loadFromApi(id) {
-  if (!config.adminApiUrl || !config.adminApiKey) return null;
+async function loadFromDb(id) {
+  if (!getPool()) return null;
   try {
-    const res = await fetch(`${config.adminApiUrl}/management/calc/recipes/${id}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch { return null; }
+    return await loadRecipeFromDb(id);
+  } catch (err) {
+    // Log but don't throw — cache miss is handled upstream
+    console.error('[calculators] loadFromDb failed:', err.message);
+    return null;
+  }
 }
 
 async function fetchMcpConfig(id) {
-  if (!config.adminApiUrl || !config.adminApiKey) return null;
+  if (!getPool()) return null;
   try {
-    const res = await fetch(`${config.adminApiUrl}/management/calc/mcp-config/${id}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.mcp ?? null;
-  } catch { return null; }
+    return await loadMcpConfigFromDb(id);
+  } catch (err) {
+    console.error('[calculators] fetchMcpConfig failed:', err.message);
+    return null;
+  }
 }
 
 // Enrich a live calculator entry + Redis recipe with admin MCP config (fire-and-forget safe)
@@ -295,7 +293,7 @@ async function getOrRebuild(id) {
   const p = (async () => {
     let recipe = await loadFromRedis(id);
     if (!recipe) {
-      recipe = await loadFromApi(id);
+      recipe = await loadFromDb(id);
       if (recipe) saveToRedis(id, recipe);
     }
     if (!recipe) return null;
@@ -333,7 +331,7 @@ async function getMetadata(id) {
 
   let recipe = await loadFromRedis(id);
   if (!recipe) {
-    recipe = await loadFromApi(id);
+    recipe = await loadFromDb(id);
     if (recipe) saveToRedis(id, recipe); // backfill Redis
   }
   if (!recipe) return null;
