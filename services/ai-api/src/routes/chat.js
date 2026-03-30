@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { query, queryOne } from '../db.js';
 import { AiClient } from '../services/ai-client.js';
 import { AI_TOOLS, executeTool, filterToolsByPermissions } from '../services/tools.js';
+import { detectCategories, getToolManifest, getToolsForCategories } from '../services/tool-categories.js';
 import { DEFAULT_SYSTEM_PROMPT } from '../services/system-prompt.js';
 import { sendSSE, setSSEHeaders } from '../utils/streaming.js';
 import { sanitizeMessage } from '../utils/sanitize.js';
@@ -205,8 +206,21 @@ export async function registerRoutes(app) {
         model = quota.allowedModels[0];
       }
 
-      // Filter tools based on API key permissions and public mode
-      const tools = filterToolsByPermissions(AI_TOOLS, req.permissions, req.isPublicRequest);
+      // Progressive tool loading: detect needed categories from user message + history
+      const loadedCategories = detectCategories(message, messages.slice(0, -1));
+      let tools;
+      if (loadedCategories.size === 0) {
+        // Level 0: no tool schemas — append manifest to system prompt instead
+        tools = [];
+        systemPrompt += getToolManifest(req.permissions, req.isPublicRequest);
+      } else {
+        // Level 1: load only needed category schemas, then apply permissions
+        tools = filterToolsByPermissions(
+          getToolsForCategories(AI_TOOLS, loadedCategories),
+          req.permissions,
+          req.isPublicRequest,
+        );
+      }
 
       // Tool loop
       for (let round = 0; round < config.maxToolRounds; round++) {
@@ -533,7 +547,19 @@ export async function registerRoutes(app) {
       if (quota?.allowedModels?.length > 0 && !quota.allowedModels.includes(model)) {
         model = quota.allowedModels[0];
       }
-      const tools = filterToolsByPermissions(AI_TOOLS, req.permissions, req.isPublicRequest);
+      // Progressive tool loading: detect needed categories from user message + history
+      const loadedCategories = detectCategories(message, messages.slice(0, -1));
+      let tools;
+      if (loadedCategories.size === 0) {
+        tools = [];
+        systemPrompt += getToolManifest(req.permissions, req.isPublicRequest);
+      } else {
+        tools = filterToolsByPermissions(
+          getToolsForCategories(AI_TOOLS, loadedCategories),
+          req.permissions,
+          req.isPublicRequest,
+        );
+      }
       const toolCalls = [];
       let responseText = '';
 
