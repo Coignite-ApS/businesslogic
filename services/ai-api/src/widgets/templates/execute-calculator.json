@@ -42,7 +42,7 @@
             "component": "Button",
             "props": {
               "label": "Explain",
-              "style": "ghost",
+              "variant": "ghost",
               "size": "sm",
               "onClickAction": { "type": "assistant.message", "payload": { "text": "Explain this calculation result in detail" } }
             }

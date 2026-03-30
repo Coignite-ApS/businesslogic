@@ -54,7 +54,7 @@
         "component": "Button",
         "props": {
           "label": "Run this calculator",
-          "style": "filled",
+          "variant": "filled",
           "size": "sm",
           "onClickAction": { "type": "assistant.message", "payload": { "text": "Execute this calculator with default values" } }
         }

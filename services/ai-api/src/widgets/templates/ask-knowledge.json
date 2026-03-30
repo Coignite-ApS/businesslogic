@@ -40,7 +40,7 @@
             "component": "Button",
             "props": {
               "label": "Ask follow-up",
-              "style": "ghost",
+              "variant": "ghost",
               "size": "sm",
               "onClickAction": { "type": "assistant.message", "payload": { "text": "Tell me more about this" } }
             }
