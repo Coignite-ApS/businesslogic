@@ -42,10 +42,10 @@ export function registerObservatoryRoutes(app: any, db: DB, env: any, logger: an
 					AVG(total_cost) as avg,
 					COUNT(*) as sample_size
 				FROM (
-					SELECT conversation_id, SUM(cost_usd) as total_cost
+					SELECT conversation, SUM(cost_usd) as total_cost
 					FROM ai_token_usage
-					WHERE date_created >= ? AND conversation_id IS NOT NULL
-					GROUP BY conversation_id
+					WHERE date_created >= ? AND conversation IS NOT NULL
+					GROUP BY conversation
 				) conv_costs
 			`, [sinceDate + 'T00:00:00.000Z']);
 
