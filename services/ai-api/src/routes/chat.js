@@ -82,11 +82,12 @@ export async function registerRoutes(app) {
       abortController.abort();
     });
 
+    // Declared outside try so finally block can access them
+    const isStateless = !conversation_id && !external_id;
+    let conversationId = null;
+
     try {
       // Stateless mode: no conversation_id and no external_id → skip DB conversation
-      const isStateless = !conversation_id && !external_id;
-
-      let conversationId = null;
       let messages = [];
 
       if (conversation_id) {
@@ -148,6 +149,14 @@ export async function registerRoutes(app) {
       if (!req.isAdmin) {
         const budget = await checkBudget(accountId, conversationId);
         if (!budget.allowed) {
+          if (conversationId && !isStateless) {
+            try {
+              await query(
+                `UPDATE ai_conversations SET outcome = 'budget_exhausted', date_updated = NOW() WHERE id = $1`,
+                [conversationId],
+              );
+            } catch { /* non-fatal */ }
+          }
           sendSSE(reply, 'error', { message: budget.reason, code: 'BUDGET_EXCEEDED' });
           return reply.raw.end();
         }
@@ -388,6 +397,14 @@ export async function registerRoutes(app) {
         sendSSE(reply, 'error', { message: 'An unexpected error occurred' });
       }
     } finally {
+      if (clientDisconnected && conversationId && !isStateless) {
+        try {
+          await query(
+            `UPDATE ai_conversations SET outcome = 'abandoned', date_updated = NOW() WHERE id = $1`,
+            [conversationId],
+          );
+        } catch { /* non-fatal */ }
+      }
       if (!clientDisconnected) {
         reply.raw.end();
       }
@@ -450,11 +467,11 @@ export async function registerRoutes(app) {
 
     const startTime = Date.now();
 
-    try {
-      // Stateless mode: no conversation_id and no external_id
-      const isStateless = !conversation_id && !external_id;
+    // Declared outside try so catch block can access them
+    const isStateless = !conversation_id && !external_id;
+    let conversationId = null;
 
-      let conversationId = null;
+    try {
       let messages = [];
 
       if (conversation_id) {
@@ -512,6 +529,14 @@ export async function registerRoutes(app) {
       if (!req.isAdmin) {
         const budget = await checkBudget(accountId, conversationId);
         if (!budget.allowed) {
+          if (conversationId && !isStateless) {
+            try {
+              await query(
+                `UPDATE ai_conversations SET outcome = 'budget_exhausted', date_updated = NOW() WHERE id = $1`,
+                [conversationId],
+              );
+            } catch { /* non-fatal */ }
+          }
           return reply.code(429).send({ error: budget.reason, code: 'BUDGET_EXCEEDED' });
         }
       }
@@ -722,6 +747,14 @@ export async function registerRoutes(app) {
       return { data: responseData };
     } catch (err) {
       req.log.error(`POST /v1/ai/chat/sync: ${err.message}`);
+      if (conversationId && !isStateless) {
+        try {
+          await query(
+            `UPDATE ai_conversations SET outcome = 'error', date_updated = NOW() WHERE id = $1`,
+            [conversationId],
+          );
+        } catch { /* non-fatal */ }
+      }
       return reply.code(500).send({ error: 'An unexpected error occurred', code: 'INTERNAL_ERROR' });
     }
   });
