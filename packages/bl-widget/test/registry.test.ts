@@ -28,12 +28,12 @@ describe('registry', () => {
     expect(getComponent('unknown')).toBeNull();
   });
 
-  it('listComponents() returns 37 unique entries', () => {
+  it('listComponents() returns 38 unique entries', () => {
     const all = listComponents();
-    expect(all).toHaveLength(37);
+    expect(all).toHaveLength(38);
     const tags = all.map(e => e.tag);
     const unique = new Set(tags);
-    expect(unique.size).toBe(37);
+    expect(unique.size).toBe(38);
   });
 
   it('getComponentsByCategory("layout") returns 12 entries', () => {
@@ -44,7 +44,19 @@ describe('registry', () => {
     expect(getComponentsByCategory('input')).toHaveLength(9);
   });
 
-  it('getComponentsByCategory("output") returns 8 entries', () => {
-    expect(getComponentsByCategory('output')).toHaveLength(8);
+  it('getComponentsByCategory("output") returns 9 entries', () => {
+    expect(getComponentsByCategory('output')).toHaveLength(9);
+  });
+
+  it('getComponent("chart") returns bl-chart', () => {
+    const entry = getComponent('chart');
+    expect(entry).not.toBeNull();
+    expect(entry!.tag).toBe('bl-chart');
+  });
+
+  it('getComponent("Chart") returns bl-chart', () => {
+    const entry = getComponent('Chart');
+    expect(entry).not.toBeNull();
+    expect(entry!.tag).toBe('bl-chart');
   });
 });

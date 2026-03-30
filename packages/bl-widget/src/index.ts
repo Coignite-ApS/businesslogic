@@ -1,5 +1,6 @@
-// Main entry — registers <bl-calculator> custom element
+// Main entry — registers <bl-calculator> and <bl-chatkit> custom elements
 export { BlCalculator } from './bl-calculator.js';
+export { BlChatKit } from './bl-chatkit.js';
 
 // Programmatic API
 export { Calculator } from './calculator.js';
@@ -26,6 +27,7 @@ export { BlBarChart } from './components/outputs/bl-bar-chart.js';
 export { BlLineChart } from './components/outputs/bl-line-chart.js';
 export { BlPieChart } from './components/outputs/bl-pie-chart.js';
 export { BlDonutChart } from './components/outputs/bl-donut-chart.js';
+export { BlChart } from './components/outputs/bl-chart.js';
 
 // Layout components
 export { BlRoot } from './components/layout/bl-root.js';
@@ -54,6 +56,7 @@ export { BlLabel } from './components/content/bl-label.js';
 
 // Utilities
 export { ApiClient } from './api-client.js';
+export { renderChatKitTree } from './chatkit-renderer.js';
 export { generateLayout, mapInputComponent, mapOutputComponent } from './auto-layout.js';
 export { renderNode } from './layout-renderer.js';
 export { defaultThemeVars, buildThemeStyle } from './theme.js';

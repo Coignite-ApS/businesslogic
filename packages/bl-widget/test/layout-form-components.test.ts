@@ -40,11 +40,11 @@ describe('layout/form — custom element registration', () => {
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 describe('registry — updated counts', () => {
-  it('listComponents() returns 37 unique entries', () => {
+  it('listComponents() returns 38 unique entries', () => {
     const all = listComponents();
-    expect(all).toHaveLength(37);
+    expect(all).toHaveLength(38);
     const tags = all.map(e => e.tag);
-    expect(new Set(tags).size).toBe(37);
+    expect(new Set(tags).size).toBe(38);
   });
 
   it('getComponentsByCategory("layout") returns 12 entries', () => {

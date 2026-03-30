@@ -290,6 +290,14 @@ registerComponent(['donut-chart', 'DonutChart'], {
   canHaveChildren: false,
 });
 
+registerComponent(['chart', 'Chart'], {
+  tag: 'bl-chart',
+  category: 'output',
+  label: 'Chart',
+  description: 'Unified chart component',
+  canHaveChildren: false,
+});
+
 // ── Content ───────────────────────────────────────────────────────────────────
 
 registerComponent(['title', 'Title'], {
