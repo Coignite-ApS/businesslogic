@@ -27,7 +27,7 @@ export function logRetrievalQuality(data) {
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
     [
       accountId, knowledgeBaseId || null, conversationId || null,
-      queryText, queryType,
+      typeof queryText === 'string' ? queryText.slice(0, 500) : queryText, queryType,
       resultCount ?? 0, topSimilarity ?? null, avgSimilarity ?? null,
       minSimilarityThreshold ?? null,
       chunksInjected ?? null, chunksUtilized ?? null, utilizationRate ?? null,
