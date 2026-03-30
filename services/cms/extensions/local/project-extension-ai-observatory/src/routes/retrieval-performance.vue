@@ -280,6 +280,7 @@ const totalConfidence = computed(() =>
 const ltMax = computed(() => data.value?.search_latency.p99 || 1);
 
 function barPct(val: number, max: number): number {
+	if (!val) return 0;
 	return Math.max(1, (val / max) * 100);
 }
 
