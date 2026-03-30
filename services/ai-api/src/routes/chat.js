@@ -74,6 +74,7 @@ export async function registerRoutes(app) {
     // Set SSE headers
     setSSEHeaders(reply);
 
+    const startTime = Date.now();
     const abortController = new AbortController();
     let clientDisconnected = false;
     req.raw.on('close', () => {
@@ -222,6 +223,9 @@ export async function registerRoutes(app) {
         );
       }
 
+      const toolCallsLog = [];
+      let outcome = 'completed';
+
       // Tool loop
       for (let round = 0; round < config.maxToolRounds; round++) {
         if (clientDisconnected) break;
@@ -289,10 +293,14 @@ export async function registerRoutes(app) {
         for (const tu of toolUses) {
           sendSSE(reply, 'tool_executing', { name: tu.name, id: tu.id });
 
+          const toolStart = Date.now();
           const { result, isError } = await executeTool(tu.name, tu.input, {
             accountId,
             logger: req.log,
           });
+          const toolDuration = Date.now() - toolStart;
+
+          toolCallsLog.push({ name: tu.name, duration_ms: toolDuration, is_error: isError });
 
           const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
           toolResults.push({
@@ -318,6 +326,7 @@ export async function registerRoutes(app) {
       // Save conversation (skip in stateless mode)
       if (!clientDisconnected) {
         const costUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+        const responseTimeMs = Date.now() - startTime;
 
         if (!isStateless && conversationId) {
           try {
@@ -327,13 +336,14 @@ export async function registerRoutes(app) {
             );
             await query(
               `UPDATE ai_conversations SET messages = $1, model = $2,
-               total_input_tokens = $3, total_output_tokens = $4, date_updated = NOW()
-               WHERE id = $5`,
+               total_input_tokens = $3, total_output_tokens = $4, outcome = $5, date_updated = NOW()
+               WHERE id = $6`,
               [
                 JSON.stringify(messages),
                 model,
                 (current?.total_input_tokens || 0) + totalInputTokens,
                 (current?.total_output_tokens || 0) + totalOutputTokens,
+                outcome,
                 conversationId,
               ],
             );
@@ -345,9 +355,14 @@ export async function registerRoutes(app) {
         // Record token usage (always, even stateless — for billing)
         try {
           await query(
-            `INSERT INTO ai_token_usage (id, account, conversation, model, task_category, input_tokens, output_tokens, cost_usd, date_created)
-             VALUES ($1, $2, $3, $4, 'execute', $5, $6, $7, NOW())`,
-            [randomUUID(), accountId, conversationId || null, model, totalInputTokens, totalOutputTokens, costUsd],
+            `INSERT INTO ai_token_usage (id, account, conversation, model, task_category, input_tokens, output_tokens, cost_usd, response_time_ms, tool_calls, date_created)
+             VALUES ($1, $2, $3, $4, 'execute', $5, $6, $7, $8, $9, NOW())`,
+            [
+              randomUUID(), accountId, conversationId || null, model,
+              totalInputTokens, totalOutputTokens, costUsd,
+              responseTimeMs,
+              toolCallsLog.length > 0 ? JSON.stringify(toolCallsLog) : null,
+            ],
           );
         } catch (err) {
           req.log.error(`Failed to record token usage: ${err.message}`);
@@ -368,6 +383,7 @@ export async function registerRoutes(app) {
       }
     } catch (err) {
       req.log.error(`POST /v1/ai/chat: ${err.message}`);
+      outcome = 'error';
       if (!clientDisconnected) {
         sendSSE(reply, 'error', { message: 'An unexpected error occurred' });
       }
@@ -431,6 +447,8 @@ export async function registerRoutes(app) {
         return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
       }
     }
+
+    const startTime = Date.now();
 
     try {
       // Stateless mode: no conversation_id and no external_id
@@ -561,6 +579,7 @@ export async function registerRoutes(app) {
         );
       }
       const toolCalls = [];
+      const toolCallsLog = [];
       let responseText = '';
 
       for (let round = 0; round < config.maxToolRounds; round++) {
@@ -611,10 +630,14 @@ export async function registerRoutes(app) {
 
         const toolResults = [];
         for (const tu of toolUses) {
+          const toolStart = Date.now();
           const { result, isError } = await executeTool(tu.name, tu.input, {
             accountId,
             logger: req.log,
           });
+          const toolDuration = Date.now() - toolStart;
+
+          toolCallsLog.push({ name: tu.name, duration_ms: toolDuration, is_error: isError });
 
           const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
           toolResults.push({
@@ -637,6 +660,7 @@ export async function registerRoutes(app) {
       }
 
       const costUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+      const responseTimeMs = Date.now() - startTime;
 
       // Save conversation (skip in stateless mode)
       if (!isStateless && conversationId) {
@@ -647,13 +671,14 @@ export async function registerRoutes(app) {
           );
           await query(
             `UPDATE ai_conversations SET messages = $1, model = $2,
-             total_input_tokens = $3, total_output_tokens = $4, date_updated = NOW()
-             WHERE id = $5`,
+             total_input_tokens = $3, total_output_tokens = $4, outcome = $5, date_updated = NOW()
+             WHERE id = $6`,
             [
               JSON.stringify(messages),
               model,
               (current?.total_input_tokens || 0) + totalInputTokens,
               (current?.total_output_tokens || 0) + totalOutputTokens,
+              'completed',
               conversationId,
             ],
           );
@@ -665,9 +690,14 @@ export async function registerRoutes(app) {
       // Record token usage (always, even stateless — for billing)
       try {
         await query(
-          `INSERT INTO ai_token_usage (id, account, conversation, model, task_category, input_tokens, output_tokens, cost_usd, date_created)
-           VALUES ($1, $2, $3, $4, 'execute', $5, $6, $7, NOW())`,
-          [randomUUID(), accountId, conversationId || null, model, totalInputTokens, totalOutputTokens, costUsd],
+          `INSERT INTO ai_token_usage (id, account, conversation, model, task_category, input_tokens, output_tokens, cost_usd, response_time_ms, tool_calls, date_created)
+           VALUES ($1, $2, $3, $4, 'execute', $5, $6, $7, $8, $9, NOW())`,
+          [
+            randomUUID(), accountId, conversationId || null, model,
+            totalInputTokens, totalOutputTokens, costUsd,
+            responseTimeMs,
+            toolCallsLog.length > 0 ? JSON.stringify(toolCallsLog) : null,
+          ],
         );
       } catch (err) {
         req.log.error(`Failed to record token usage: ${err.message}`);

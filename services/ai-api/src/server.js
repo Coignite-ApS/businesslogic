@@ -10,6 +10,7 @@ import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
 import { initBudget, closeBudget } from './services/budget.js';
 import { startCleanup, stopCleanup } from './utils/rate-limit.js';
+import { scheduleAggregation, stopAggregation } from './services/metrics-aggregator.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
 import { registerRoutes as registerChatRoutes } from './routes/chat.js';
 import { registerRoutes as registerConversationRoutes } from './routes/conversations.js';
@@ -96,6 +97,7 @@ const shutdown = async (signal) => {
     await app.close();
   } finally {
     stopCleanup();
+    stopAggregation();
     await closeBudget();
     await closeDb();
     await shutdownTelemetry();
@@ -128,6 +130,7 @@ export async function start() {
       app.log.info('Budget Redis connected');
     }
     startCleanup();
+    if (config.databaseUrl) scheduleAggregation();
     await app.listen({ port: config.port, host: config.host });
     app.log.info({ host: config.host, port: config.port }, 'bl-ai-api ready');
   } catch (err) {
