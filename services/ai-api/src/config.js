@@ -78,6 +78,8 @@ export const config = {
   monthlyBudgetUsd: parseFloat(env.MONTHLY_BUDGET_USD || '1000'),
   globalDailyBudgetUsd: parseFloat(env.GLOBAL_DAILY_BUDGET_USD || '500'),
   conversationBudgetUsd: parseFloat(env.CONVERSATION_BUDGET_USD || '1'),
+  budgetWarnPct: parseFloat(env.AI_BUDGET_WARN_PCT || '20') / 100,
+  budgetCriticalPct: parseFloat(env.AI_BUDGET_CRITICAL_PCT || '10') / 100,
 
   // Cache
   cacheMaxItems: parseInt(env.CACHE_MAX_ITEMS || '10000', 10),

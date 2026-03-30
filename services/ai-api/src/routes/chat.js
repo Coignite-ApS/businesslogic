@@ -9,7 +9,7 @@ import { sanitizeMessage } from '../utils/sanitize.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { calculateCost } from '../utils/cost.js';
 import { checkAiQuota, getActiveAccount } from '../utils/auth.js';
-import { checkBudget, recordCost } from '../services/budget.js';
+import { checkBudget, recordCost, getConversationBudgetWarning } from '../services/budget.js';
 import { compressIfNeeded } from '../services/summarize.js';
 
 export async function registerRoutes(app) {
@@ -289,6 +289,21 @@ export async function registerRoutes(app) {
           });
 
           sendSSE(reply, 'tool_result', { name: tu.name, id: tu.id, result, is_error: isError });
+        }
+
+        // Inject budget warning into last tool result (preserves prompt cache)
+        if (toolResults.length > 0 && conversationId) {
+          const currentCostUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+          const budgetWarning = await getConversationBudgetWarning(conversationId, currentCostUsd);
+          if (budgetWarning) {
+            const last = toolResults[toolResults.length - 1];
+            try {
+              const parsed = JSON.parse(last.content);
+              last.content = JSON.stringify({ ...parsed, _budget_warning: budgetWarning });
+            } catch {
+              last.content = JSON.stringify({ result: last.content, _budget_warning: budgetWarning });
+            }
+          }
         }
 
         messages.push({ role: 'user', content: toolResults });
@@ -591,6 +606,21 @@ export async function registerRoutes(app) {
             is_error: isError,
           });
           toolCalls.push({ name: tu.name, input: tu.input, result, is_error: isError });
+        }
+
+        // Inject budget warning into last tool result (preserves prompt cache)
+        if (toolResults.length > 0 && conversationId) {
+          const currentCostUsd = calculateCost(model, totalInputTokens, totalOutputTokens);
+          const budgetWarning = await getConversationBudgetWarning(conversationId, currentCostUsd);
+          if (budgetWarning) {
+            const last = toolResults[toolResults.length - 1];
+            try {
+              const parsed = JSON.parse(last.content);
+              last.content = JSON.stringify({ ...parsed, _budget_warning: budgetWarning });
+            } catch {
+              last.content = JSON.stringify({ result: last.content, _budget_warning: budgetWarning });
+            }
+          }
         }
 
         messages.push({ role: 'user', content: toolResults });
