@@ -2,6 +2,7 @@ import { defineModule } from '@directus/extensions-sdk';
 import CostBudget from './routes/cost-budget.vue';
 import ConversationQuality from './routes/conversation-quality.vue';
 import ToolAnalytics from './routes/tool-analytics.vue';
+import RetrievalPerformance from './routes/retrieval-performance.vue';
 
 export default defineModule({
 	id: 'ai-observatory',
@@ -15,5 +16,6 @@ export default defineModule({
 		{ path: 'cost', component: CostBudget },
 		{ path: 'quality', component: ConversationQuality },
 		{ path: 'tools', component: ToolAnalytics },
+		{ path: 'retrieval', component: RetrievalPerformance },
 	],
 });
