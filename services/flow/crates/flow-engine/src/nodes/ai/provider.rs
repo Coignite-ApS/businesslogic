@@ -23,9 +23,8 @@ struct ModelPricing {
     output_per_m: f64,
 }
 
-/// Calculate cost in USD for a given model and token counts.
-pub fn calculate_cost(model: &str, input_tokens: u64, output_tokens: u64) -> f64 {
-    let pricing = match model {
+fn get_pricing(model: &str) -> ModelPricing {
+    match model {
         m if m.contains("opus") => ModelPricing {
             input_per_m: 15.0,
             output_per_m: 75.0,
@@ -46,11 +45,25 @@ pub fn calculate_cost(model: &str, input_tokens: u64, output_tokens: u64) -> f64
                 output_per_m: 75.0,
             }
         }
-    };
+    }
+}
 
+/// Calculate cost in USD for a given model and token counts.
+/// `cache_creation_tokens`: tokens written to cache (1.25x input rate).
+/// `cache_read_tokens`: tokens read from cache (0.1x input rate).
+pub fn calculate_cost(
+    model: &str,
+    input_tokens: u64,
+    output_tokens: u64,
+    cache_creation_tokens: u64,
+    cache_read_tokens: u64,
+) -> f64 {
+    let pricing = get_pricing(model);
     let input_cost = (input_tokens as f64 / 1_000_000.0) * pricing.input_per_m;
     let output_cost = (output_tokens as f64 / 1_000_000.0) * pricing.output_per_m;
-    input_cost + output_cost
+    let cache_read_cost = (cache_read_tokens as f64 / 1_000_000.0) * pricing.input_per_m * 0.1;
+    let cache_write_cost = (cache_creation_tokens as f64 / 1_000_000.0) * pricing.input_per_m * 1.25;
+    input_cost + output_cost + cache_read_cost + cache_write_cost
 }
 
 /// Extract API key from execution context `$env`. Never log the key value.
@@ -82,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_calculate_cost_sonnet() {
-        let cost = calculate_cost("claude-sonnet-4-6", 1_000, 500);
+        let cost = calculate_cost("claude-sonnet-4-6", 1_000, 500, 0, 0);
         // input: 1000/1M * 3.0 = 0.003, output: 500/1M * 15.0 = 0.0075
         let expected = 0.003 + 0.0075;
         assert!((cost - expected).abs() < 1e-10);
@@ -90,14 +103,14 @@ mod tests {
 
     #[test]
     fn test_calculate_cost_opus() {
-        let cost = calculate_cost("claude-opus-4-6", 1_000_000, 1_000_000);
+        let cost = calculate_cost("claude-opus-4-6", 1_000_000, 1_000_000, 0, 0);
         // input: 15.0, output: 75.0
         assert!((cost - 90.0).abs() < 1e-10);
     }
 
     #[test]
     fn test_calculate_cost_haiku() {
-        let cost = calculate_cost("claude-haiku-4-5", 10_000, 5_000);
+        let cost = calculate_cost("claude-haiku-4-5", 10_000, 5_000, 0, 0);
         // input: 10000/1M * 0.8 = 0.008, output: 5000/1M * 4.0 = 0.02
         let expected = 0.008 + 0.02;
         assert!((cost - expected).abs() < 1e-10);
@@ -105,14 +118,25 @@ mod tests {
 
     #[test]
     fn test_calculate_cost_zero_tokens() {
-        assert_eq!(calculate_cost("claude-sonnet-4-6", 0, 0), 0.0);
+        assert_eq!(calculate_cost("claude-sonnet-4-6", 0, 0, 0, 0), 0.0);
     }
 
     #[test]
     fn test_calculate_cost_unknown_model() {
         // Unknown model falls back to opus pricing (conservative safe default)
-        let cost = calculate_cost("gpt-4", 1_000_000, 0);
+        let cost = calculate_cost("gpt-4", 1_000_000, 0, 0, 0);
         assert!((cost - 15.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_calculate_cost_cache_pricing() {
+        // Sonnet: input_per_m = 3.0
+        // cache_creation: 1_000_000 tokens * 3.0 * 1.25 / 1M = 3.75
+        // cache_read:     1_000_000 tokens * 3.0 * 0.1  / 1M = 0.30
+        // input:          0, output: 0
+        let cost = calculate_cost("claude-sonnet-4-6", 0, 0, 1_000_000, 1_000_000);
+        let expected = 3.75 + 0.30;
+        assert!((cost - expected).abs() < 1e-10);
     }
 
     #[test]

@@ -206,11 +206,13 @@ pub fn handler(
                 }
             };
 
-            // Calculate cost
+            // Calculate cost (including prompt cache pricing)
             let cost_usd = provider::calculate_cost(
                 &used_model,
                 response.input_tokens,
                 response.output_tokens,
+                response.cache_creation_input_tokens,
+                response.cache_read_input_tokens,
             );
 
             // Record cost

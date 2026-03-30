@@ -12,8 +12,17 @@ use flow_common::flow::{ExecutionMode, FlowDef};
 use flow_common::node::NodeInput;
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
+
+/// Circuit breaker multiplier: cumulative cost must exceed `budget * multiplier` to abort.
+/// Configurable via `FLOW_CIRCUIT_BREAKER_MULTIPLIER` env var (default: 2.0).
+static CIRCUIT_BREAKER_MULTIPLIER: LazyLock<f64> = LazyLock::new(|| {
+    std::env::var("FLOW_CIRCUIT_BREAKER_MULTIPLIER")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2.0)
+});
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -377,10 +386,7 @@ async fn execute_dag(
 
                 // Hard circuit breaker: abort if cumulative cost > Nx budget limit
                 if let Some(limit) = flow.settings.budget_limit_usd {
-                    let multiplier: f64 = std::env::var("FLOW_CIRCUIT_BREAKER_MULTIPLIER")
-                        .ok()
-                        .and_then(|v| v.parse().ok())
-                        .unwrap_or(2.0);
+                    let multiplier = *CIRCUIT_BREAKER_MULTIPLIER;
                     let hard_limit = limit * multiplier;
                     if ctx.meta.cumulative_cost_usd > hard_limit {
                         tracing::warn!(
@@ -1709,6 +1715,7 @@ mod tests {
             }),
         );
 
+        // budget=$0.02, hard_limit=2*0.02=$0.04; node costs $0.06 > $0.04 -> trips
         let flow = FlowDef {
             id: Uuid::new_v4(),
             name: "circuit_breaker_test".to_string(),
@@ -1721,21 +1728,10 @@ mod tests {
             },
             trigger_config: flow_common::trigger::TriggerConfig::Manual,
             settings: FlowSettings {
-                budget_limit_usd: Some(0.05), // hard limit = 2x = $0.10, but $0.06 > $0.10? No…
-                // Actually: limit=$0.05, hard_limit=2*0.05=$0.10, spent=$0.06 < $0.10.
-                // Use a tighter limit: budget=$0.02, hard_limit=$0.04, spent=$0.06 > $0.04 -> trips
+                budget_limit_usd: Some(0.02),
                 ..Default::default()
             },
             version: 1,
-        };
-
-        // Rebuild with correct budget so circuit breaker trips
-        let flow = FlowDef {
-            settings: FlowSettings {
-                budget_limit_usd: Some(0.02), // hard limit = $0.04; $0.06 cost > $0.04 -> trips
-                ..Default::default()
-            },
-            ..flow
         };
 
         let result = execute_flow(
