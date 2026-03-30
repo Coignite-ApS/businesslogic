@@ -75,7 +75,7 @@ export class BlButton extends LitElement {
   @property({ attribute: 'on-click-action', type: Object }) onClickAction: ActionConfig | null = null;
   @property() iconStart = '';
   @property() iconEnd = '';
-  @property() style: 'filled' | 'outline' | 'ghost' = 'filled';
+  @property() variant: 'filled' | 'outline' | 'ghost' = 'filled';
   @property() color: 'primary' | 'secondary' | 'danger' = 'primary';
   @property() size: 'sm' | 'md' | 'lg' = 'md';
   @property({ type: Boolean }) submit = false;
@@ -90,7 +90,7 @@ export class BlButton extends LitElement {
   }
 
   render() {
-    const btnClass = `${this.size} ${this.style}-${this.color}${this.block ? ' block' : ''}`;
+    const btnClass = `${this.size} ${this.variant}-${this.color}${this.block ? ' block' : ''}`;
     return html`
       <button
         class=${btnClass}

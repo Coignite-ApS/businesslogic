@@ -1,7 +1,7 @@
 # 24. Widget Layout Builder
 
 **Service:** cms
-**Status:** in-progress
+**Status:** completed
 **Depends on:** CMS-23 (Widget Gateway Mode), **cross-cutting/08 (Unified Widget Foundation)**
 **Supersedes:** old CMS #05
 **Shared foundation:** This task depends on the unified bl-widget extension (cross-cutting/08) which adds ChatKit-compatible components, a component registry with metadata (categories, propSchema), and an upgraded renderer. The layout builder consumes the registry for its component palette and prop editor.

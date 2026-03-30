@@ -146,7 +146,10 @@ function hydrateValue(value, data) {
 }
 
 function getNestedValue(obj, path) {
-  return path.split('.').reduce((o, k) => o?.[k], obj);
+  return path.split('.').reduce((o, k) => {
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') return undefined;
+    return o?.[k];
+  }, obj);
 }
 
 /**

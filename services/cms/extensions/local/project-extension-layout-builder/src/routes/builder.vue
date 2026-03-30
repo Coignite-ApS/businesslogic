@@ -202,6 +202,8 @@ function toExportTree(node: BuilderNode): ExportNode {
   return result;
 }
 
+const CONTAINER_COMPONENTS = new Set(['Card', 'Col', 'Row', 'Box', 'Section', 'Root', 'Basic', 'ListView', 'ListViewItem', 'Transition', 'Form']);
+
 function fromImportTree(exported: ExportNode): BuilderNode {
   const tag = exported.props?.tag as string | undefined ?? `bl-${exported.component.toLowerCase()}`;
   return {
@@ -210,7 +212,7 @@ function fromImportTree(exported: ExportNode): BuilderNode {
     tag,
     props: { ...exported.props },
     children: (exported.children ?? []).map(c => fromImportTree(c)),
-    canHaveChildren: (exported.children?.length ?? 0) > 0,
+    canHaveChildren: CONTAINER_COMPONENTS.has(exported.component) || (exported.children?.length ?? 0) > 0,
   };
 }
 

@@ -106,6 +106,12 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function sanitizeHref(href: string): string {
+  const trimmed = href.trim();
+  if (/^https?:\/\//i.test(trimmed) || /^mailto:/i.test(trimmed)) return trimmed;
+  return '';
+}
+
 function inlineFormat(s: string): string {
   return s
     // Inline code (before bold/italic to avoid double-processing)
@@ -117,7 +123,11 @@ function inlineFormat(s: string): string {
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     .replace(/_([^_]+)_/g, '<em>$1</em>')
     // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
+      const safe = sanitizeHref(href);
+      if (!safe) return escapeHtml(text);
+      return `<a href="${safe}" target="_blank" rel="noopener">${escapeHtml(text)}</a>`;
+    });
 }
 
 @customElement('bl-markdown')

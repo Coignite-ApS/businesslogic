@@ -77,6 +77,7 @@ function resolvePath(path, source) {
     }
 
     // Simple key
+    if (part === '__proto__' || part === 'constructor' || part === 'prototype') return null;
     current = current[part];
   }
 

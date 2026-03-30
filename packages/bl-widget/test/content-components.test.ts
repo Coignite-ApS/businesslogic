@@ -171,8 +171,8 @@ describe('BlButton', () => {
     expect(new BlButton()).toBeInstanceOf(BlButton);
   });
 
-  it('default style is filled', () => {
-    expect(new BlButton().style).toBe('filled');
+  it('default variant is filled', () => {
+    expect(new BlButton().variant).toBe('filled');
   });
 
   it('default color is primary', () => {

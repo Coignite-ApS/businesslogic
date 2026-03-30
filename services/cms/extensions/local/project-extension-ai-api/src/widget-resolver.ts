@@ -40,6 +40,8 @@ async function findTemplate(db: Knex, toolName: string, resourceId?: string | nu
 	}
 }
 
+const PROTO_DENYLIST = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** JSONPath resolver — $.path.to.field */
 function resolvePath(path: string, source: any): any {
 	if (!path?.startsWith('$')) return path;
@@ -49,8 +51,10 @@ function resolvePath(path: string, source: any): any {
 		if (current == null) return null;
 		const bracketMatch = part.match(/^(.+?)\[(\d+)\]$/);
 		if (bracketMatch) {
+			if (PROTO_DENYLIST.has(bracketMatch[1])) return null;
 			current = current[bracketMatch[1]]?.[Number(bracketMatch[2])];
 		} else {
+			if (PROTO_DENYLIST.has(part)) return null;
 			current = current[part];
 		}
 	}
@@ -159,9 +163,9 @@ function hydrateTemplate(tree: any, data: any): ChatKitNode | null {
 function hydrateValue(value: any, data: any): any {
 	if (typeof value === 'string') {
 		const full = value.match(/^\{\{(\w+(?:\.\w+)*)\}\}$/);
-		if (full) return full[1].split('.').reduce((o: any, k: string) => o?.[k], data);
+		if (full) return full[1].split('.').reduce((o: any, k: string) => PROTO_DENYLIST.has(k) ? undefined : o?.[k], data);
 		return value.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_, key: string) => {
-			const val = key.split('.').reduce((o: any, k: string) => o?.[k], data);
+			const val = key.split('.').reduce((o: any, k: string) => PROTO_DENYLIST.has(k) ? undefined : o?.[k], data);
 			return val == null ? '' : String(val);
 		});
 	}
