@@ -28,20 +28,20 @@ describe('registry', () => {
     expect(getComponent('unknown')).toBeNull();
   });
 
-  it('listComponents() returns 28 unique entries', () => {
+  it('listComponents() returns 37 unique entries', () => {
     const all = listComponents();
-    expect(all).toHaveLength(28);
+    expect(all).toHaveLength(37);
     const tags = all.map(e => e.tag);
     const unique = new Set(tags);
-    expect(unique.size).toBe(28);
+    expect(unique.size).toBe(37);
   });
 
-  it('getComponentsByCategory("layout") returns 5 entries', () => {
-    expect(getComponentsByCategory('layout')).toHaveLength(5);
+  it('getComponentsByCategory("layout") returns 12 entries', () => {
+    expect(getComponentsByCategory('layout')).toHaveLength(12);
   });
 
-  it('getComponentsByCategory("input") returns 7 entries', () => {
-    expect(getComponentsByCategory('input')).toHaveLength(7);
+  it('getComponentsByCategory("input") returns 9 entries', () => {
+    expect(getComponentsByCategory('input')).toHaveLength(9);
   });
 
   it('getComponentsByCategory("output") returns 8 entries', () => {

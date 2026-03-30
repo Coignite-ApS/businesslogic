@@ -7,6 +7,9 @@ export type { CalculatorOptions } from './calculator.js';
 
 // Input components
 export { BlTextInput } from './components/inputs/bl-text-input.js';
+// Form/Input components (new)
+export { BlForm } from './components/inputs/bl-form.js';
+export { BlTextarea } from './components/inputs/bl-textarea.js';
 export { BlDropdown } from './components/inputs/bl-dropdown.js';
 export { BlCheckbox } from './components/inputs/bl-checkbox.js';
 export { BlNumberStepper } from './components/inputs/bl-number-stepper.js';
@@ -30,6 +33,14 @@ export { BlSection } from './components/layout/bl-section.js';
 export { BlRow } from './components/layout/bl-row.js';
 export { BlCol } from './components/layout/bl-col.js';
 export { BlCard } from './components/layout/bl-card.js';
+// Layout components (new)
+export { BlBox } from './components/layout/bl-box.js';
+export { BlSpacer } from './components/layout/bl-spacer.js';
+export { BlDivider } from './components/layout/bl-divider.js';
+export { BlListView } from './components/layout/bl-list-view.js';
+export { BlListViewItem } from './components/layout/bl-list-view-item.js';
+export { BlBasic } from './components/layout/bl-basic.js';
+export { BlTransition } from './components/layout/bl-transition.js';
 
 // Content components
 export { BlTitle } from './components/content/bl-title.js';

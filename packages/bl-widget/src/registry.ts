@@ -89,6 +89,65 @@ registerComponent(['card', 'Card'], {
   canHaveChildren: true,
 });
 
+// ── Layout (new) ──────────────────────────────────────────────────────────────
+
+registerComponent(['box', 'Box'], {
+  tag: 'bl-box',
+  category: 'layout',
+  label: 'Box',
+  description: 'Generic flex container',
+  canHaveChildren: true,
+});
+
+registerComponent(['spacer', 'Spacer'], {
+  tag: 'bl-spacer',
+  category: 'layout',
+  label: 'Spacer',
+  description: 'Flexible space filler',
+  canHaveChildren: false,
+});
+
+registerComponent(['divider', 'Divider'], {
+  tag: 'bl-divider',
+  category: 'layout',
+  label: 'Divider',
+  description: 'Horizontal separator',
+  canHaveChildren: false,
+});
+
+registerComponent(['list-view', 'ListView'], {
+  tag: 'bl-list-view',
+  category: 'layout',
+  label: 'List View',
+  description: 'Scrollable list with show-more',
+  canHaveChildren: true,
+  validChildren: ['list-view-item', 'ListViewItem'],
+});
+
+registerComponent(['list-view-item', 'ListViewItem'], {
+  tag: 'bl-list-view-item',
+  category: 'layout',
+  label: 'List View Item',
+  description: 'Row in a list view',
+  canHaveChildren: true,
+});
+
+registerComponent(['basic', 'Basic'], {
+  tag: 'bl-basic',
+  category: 'layout',
+  label: 'Basic',
+  description: 'Minimal container',
+  canHaveChildren: true,
+});
+
+registerComponent(['transition', 'Transition'], {
+  tag: 'bl-transition',
+  category: 'layout',
+  label: 'Transition',
+  description: 'Animated container',
+  canHaveChildren: true,
+});
+
 // ── Inputs ────────────────────────────────────────────────────────────────────
 
 registerComponent(['text-input', 'Input'], {
@@ -144,6 +203,24 @@ registerComponent(['date-picker', 'DatePicker'], {
   category: 'input',
   label: 'Date Picker',
   description: 'Date selection input',
+  canHaveChildren: false,
+});
+
+// ── Inputs (new) ──────────────────────────────────────────────────────────────
+
+registerComponent(['form', 'Form'], {
+  tag: 'bl-form',
+  category: 'input',
+  label: 'Form',
+  description: 'Form with state capture and submit action',
+  canHaveChildren: true,
+});
+
+registerComponent(['textarea', 'Textarea'], {
+  tag: 'bl-textarea',
+  category: 'input',
+  label: 'Textarea',
+  description: 'Multi-line text input',
   canHaveChildren: false,
 });
 

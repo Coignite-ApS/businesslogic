@@ -39,11 +39,11 @@ describe('content components — custom element registration', () => {
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 describe('registry with content components', () => {
-  it('listComponents() returns 28 unique entries', () => {
+  it('listComponents() returns 37 unique entries', () => {
     const all = listComponents();
-    expect(all).toHaveLength(28);
+    expect(all).toHaveLength(37);
     const tags = all.map(e => e.tag);
-    expect(new Set(tags).size).toBe(28);
+    expect(new Set(tags).size).toBe(37);
   });
 
   it('getComponentsByCategory("content") returns 8 entries', () => {
