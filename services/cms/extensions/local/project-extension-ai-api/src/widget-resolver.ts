@@ -49,6 +49,16 @@ function resolvePath(path: string, source: any): any {
 	let current = source;
 	for (const part of parts) {
 		if (current == null) return null;
+		// Array wildcard: field[*] — returns the array; used with { source, map } pattern
+		if (part.endsWith('[*]')) {
+			const key = part.slice(0, -3);
+			if (key) {
+				if (PROTO_DENYLIST.has(key)) return null;
+				current = current[key];
+			}
+			if (!Array.isArray(current)) return null;
+			continue;
+		}
 		const bracketMatch = part.match(/^(.+?)\[(\d+)\]$/);
 		if (bracketMatch) {
 			if (PROTO_DENYLIST.has(bracketMatch[1])) return null;

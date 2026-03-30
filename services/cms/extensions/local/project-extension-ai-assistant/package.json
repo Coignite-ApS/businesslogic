@@ -18,6 +18,7 @@
     "vue": "^3.5.30"
   },
   "dependencies": {
+    "@businesslogic/widget": "file:../../../../../packages/bl-widget",
     "dompurify": "^3.2.6",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.4"

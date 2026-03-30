@@ -3,6 +3,7 @@
 </template>
 
 <script setup lang="ts">
+import '@businesslogic/widget'; // registers <bl-chatkit> custom element
 import { ref, watch, onMounted } from 'vue';
 
 const props = defineProps<{
