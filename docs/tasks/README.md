@@ -63,6 +63,11 @@ AI chat, knowledge base backend, embeddings, public API.
 | 04 | Digital Twin / Second Brain (Personal AI Memory) | planned | [ai-api/04-digital-twin-second-brain.md](ai-api/04-digital-twin-second-brain.md) |
 | 05 | Contextual Memory Intelligence (Digital Twin Brain) | planned | [ai-api/05-contextual-memory-intelligence.md](ai-api/05-contextual-memory-intelligence.md) |
 | 06 | AI Partner Configuration (Behavioral Settings) | planned | [ai-api/06-ai-partner-configuration.md](ai-api/06-ai-partner-configuration.md) |
+| 07 | Calculator Skill Memory (Closed Learning Loop) | planned | [ai-api/07-calculator-skill-memory.md](ai-api/07-calculator-skill-memory.md) |
+| 08 | Budget Warning Injection for Tool Use | completed | [ai-api/08-budget-warning-injection.md](ai-api/08-budget-warning-injection.md) |
+| 09 | Progressive Tool Loading | completed | [ai-api/09-progressive-tool-loading.md](ai-api/09-progressive-tool-loading.md) |
+| 10 | AI Observability & Self-Improvement Dashboard | in-progress | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
+| 11 | Contextual Widgets for AI Assistant | planned | [ai-api/11-contextual-widgets.md](ai-api/11-contextual-widgets.md) |
 
 ---
 
@@ -103,6 +108,8 @@ DAG workflow execution, triggers, workers.
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
 | 01 | Replace Production unwrap() with Error Handling | completed | [flow/01-unwrap-error-handling.md](flow/01-unwrap-error-handling.md) |
+| 02 | Agent Node — ReAct Loop | planned | [flow/02-agent-node.md](flow/02-agent-node.md) |
+| 03 | MCP Client Node — External Tool Integration | planned | [flow/03-mcp-client-node.md](flow/03-mcp-client-node.md) |
 
 ---
 
@@ -132,6 +139,8 @@ Infrastructure and multi-service concerns.
 | 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | completed | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
 | 04 | Formula-API Gateway Auth Path | completed | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
 | 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
+| 06 | MCP Server — Expose BusinessLogic as AI Tool | planned | [cross-cutting/06-mcp-server.md](cross-cutting/06-mcp-server.md) |
+| 07 | AI Safety Quick Fixes (4 items) | completed | [cross-cutting/07-ai-safety-quick-fixes.md](cross-cutting/07-ai-safety-quick-fixes.md) |
 
 ---
 
@@ -156,6 +165,15 @@ Build & test locally first. Infrastructure/launch comes after all building block
 | 6 | ai-api/03 | AI Name & Template Overrides | Branded AI responses per account |
 | 7 | gateway/05 | Request Logging & Audit Trail | Billing + security audit trail |
 
+### Phase 1B+ — Cost Optimization (parallel, quick wins)
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 7b | cross-cutting/07 | AI Safety Quick Fixes (4 items) | Prompt caching, summarization, pricing safety, circuit breaker — 2-3 days |
+| 7c | ai-api/08 | Budget Warning Injection | Graceful budget handling, cost savings, 2-3 days effort |
+| 7d | ai-api/09 | Progressive Tool Loading | 30-50% token reduction on simple queries, 1 week effort |
+| 7e | ai-api/10 | AI Observability Dashboard (Panels 1-3) | Cost, quality, tool usage — see what AI is doing. 1 week |
+
 ### Phase 1C — Monetization
 
 | # | Service | Task | Why |
@@ -173,6 +191,12 @@ Build & test locally first. Infrastructure/launch comes after all building block
 | 10 | cms/03 | Calculator Onboarding Wizard | Guided first-time creation flow |
 | 11 | cms/09 | Event-Driven Communication | Platform events, email automation, webhooks |
 
+### Phase 2B — Ecosystem & Distribution
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 11b | cross-cutting/06 | MCP Server — BusinessLogic as AI Tool | Embed in agent ecosystem (Claude, Cursor, Hermes) |
+
 ### Phase 3 — Launch & Infrastructure
 
 | # | Service | Task | Why |
@@ -184,10 +208,13 @@ Build & test locally first. Infrastructure/launch comes after all building block
 
 | # | Service | Task | Why |
 |---|---------|------|-----|
-| 14 | ai-api/04 | Digital Twin / Second Brain | Personal AI memory — the "second brain" pillar |
-| 15 | ai-api/05 | Contextual Memory Intelligence | Knowledge graph for intelligent memory retrieval |
-| 16 | ai-api/06 | AI Partner Configuration | AI as persistent partner, not stateless tool |
-| 17 | cross-cutting/05 | Cedar Guardrails (Phase 1) | Enterprise policy enforcement — start foundation only |
+| 14 | ai-api/07 | Calculator Skill Memory (Learning Loop) | Platform gets smarter over time — foundation for Digital Twin |
+| 15 | flow/02 | Agent Node — ReAct Loop | Adaptive AI workflows — LLM decides which tools to use |
+| 16 | flow/03 | MCP Client Node | Extensibility — any MCP server becomes a flow tool |
+| 17 | ai-api/04 | Digital Twin / Second Brain | Personal AI memory — the "second brain" pillar |
+| 18 | ai-api/05 | Contextual Memory Intelligence | Knowledge graph for intelligent memory retrieval |
+| 19 | ai-api/06 | AI Partner Configuration | AI as persistent partner, not stateless tool |
+| 20 | cross-cutting/05 | Cedar Guardrails (Phase 1) | Enterprise policy enforcement — start foundation only |
 
 ### Phase 5 — Polish & Engine
 
@@ -218,10 +245,10 @@ Build & test locally first. Infrastructure/launch comes after all building block
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
 | CMS | 16 | 0 | 13 | 29 |
-| AI API | 4 | 0 | 2 | 6 |
+| AI API | 5 | 1 | 4 | 10 |
 | Formula API | 1 | 0 | 6 | 7 |
 | Formula Engine | 8 | 0 | 1 | 9 |
-| Flow | 0 | 0 | 1 | 1 |
+| Flow | 2 | 0 | 1 | 3 |
 | Gateway | 0 | 0 | 6 | 6 |
-| Cross-Cutting | 1 | 0 | 4 | 5 |
-| **Total** | **30** | **0** | **33** | **63** |
+| Cross-Cutting | 2 | 0 | 5 | 7 |
+| **Total** | **34** | **1** | **36** | **71** |
