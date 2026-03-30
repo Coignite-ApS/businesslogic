@@ -228,6 +228,8 @@ pub fn handler(
                     "model": used_model,
                     "input_tokens": response.input_tokens,
                     "output_tokens": response.output_tokens,
+                    "cache_creation_input_tokens": response.cache_creation_input_tokens,
+                    "cache_read_input_tokens": response.cache_read_input_tokens,
                     "cost_usd": cost_usd,
                     "stop_reason": response.stop_reason,
                 }),
@@ -241,6 +243,8 @@ struct AnthropicResponse {
     text: String,
     input_tokens: u64,
     output_tokens: u64,
+    cache_creation_input_tokens: u64,
+    cache_read_input_tokens: u64,
     stop_reason: String,
 }
 
@@ -325,8 +329,18 @@ async fn call_anthropic(
         .unwrap_or("")
         .to_string();
 
-    let input_tokens = json["usage"]["input_tokens"].as_u64().unwrap_or(0);
-    let output_tokens = json["usage"]["output_tokens"].as_u64().unwrap_or(0);
+    let usage = &json["usage"];
+    let input_tokens = usage["input_tokens"].as_u64().unwrap_or(0);
+    let output_tokens = usage["output_tokens"].as_u64().unwrap_or(0);
+    let cache_creation = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+    let cache_read = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+
+    if cache_read > 0 {
+        tracing::info!(cache_read_tokens = cache_read, "Prompt cache hit");
+    } else if cache_creation > 0 {
+        tracing::info!(cache_creation_tokens = cache_creation, "Prompt cache miss — created new cache entry");
+    }
+
     let stop_reason = json["stop_reason"]
         .as_str()
         .unwrap_or("unknown")
@@ -336,6 +350,8 @@ async fn call_anthropic(
         text,
         input_tokens,
         output_tokens,
+        cache_creation_input_tokens: cache_creation,
+        cache_read_input_tokens: cache_read,
         stop_reason,
     })
 }

@@ -375,18 +375,23 @@ async fn execute_dag(
                     ctx.add_cost(node_result.cost_usd);
                 }
 
-                // Hard circuit breaker: abort if cumulative cost > 2x budget limit
+                // Hard circuit breaker: abort if cumulative cost > Nx budget limit
                 if let Some(limit) = flow.settings.budget_limit_usd {
-                    let hard_limit = limit * 2.0;
+                    let multiplier: f64 = std::env::var("FLOW_CIRCUIT_BREAKER_MULTIPLIER")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(2.0);
+                    let hard_limit = limit * multiplier;
                     if ctx.meta.cumulative_cost_usd > hard_limit {
                         tracing::warn!(
                             spent = ctx.meta.cumulative_cost_usd,
                             limit = hard_limit,
-                            "Hard circuit breaker: execution cost exceeded 2x budget limit"
+                            multiplier = multiplier,
+                            "Hard circuit breaker: execution cost exceeded {}x budget limit", multiplier
                         );
                         return Err(FlowError::BudgetExceeded(format!(
-                            "Hard circuit breaker: execution cost ${:.4} exceeded 2x budget limit ${:.4}",
-                            ctx.meta.cumulative_cost_usd, limit
+                            "Hard circuit breaker: execution cost ${:.4} exceeded {:.1}x budget limit ${:.4}",
+                            ctx.meta.cumulative_cost_usd, multiplier, limit
                         )));
                     }
                 }
