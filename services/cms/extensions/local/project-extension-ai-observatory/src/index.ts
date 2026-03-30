@@ -3,6 +3,7 @@ import CostBudget from './routes/cost-budget.vue';
 import ConversationQuality from './routes/conversation-quality.vue';
 import ToolAnalytics from './routes/tool-analytics.vue';
 import RetrievalPerformance from './routes/retrieval-performance.vue';
+import ModelPerformance from './routes/model-performance.vue';
 
 export default defineModule({
 	id: 'ai-observatory',
@@ -17,5 +18,6 @@ export default defineModule({
 		{ path: 'quality', component: ConversationQuality },
 		{ path: 'tools', component: ToolAnalytics },
 		{ path: 'retrieval', component: RetrievalPerformance },
+		{ path: 'models', component: ModelPerformance },
 	],
 });

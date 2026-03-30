@@ -275,6 +275,138 @@ export function registerObservatoryRoutes(app: any, db: DB, env: any, logger: an
 		}
 	});
 
+	app.get('/assistant/admin/model-performance', requireAuth, requireAdmin, async (_req: any, res: any) => {
+		const proxied = await proxyToAiApi(_req, res, env, logger);
+		if (proxied) return;
+		try {
+			const days = Math.min(Math.max(parseInt(_req.query?.days || '30', 10), 1), 365);
+			const sinceDate = new Date(Date.now() - days * 86400000).toISOString();
+
+			// Per-model aggregate stats
+			const modelStats = await db('ai_token_usage')
+				.where('date_created', '>=', sinceDate)
+				.groupBy('model')
+				.select(
+					'model',
+					db.raw('COUNT(*) as calls'),
+					db.raw('COALESCE(SUM(input_tokens), 0) as input_tokens'),
+					db.raw('COALESCE(SUM(output_tokens), 0) as output_tokens'),
+					db.raw('COALESCE(SUM(cost_usd), 0) as cost_usd'),
+					db.raw('COALESCE(AVG(response_time_ms), 0) as avg_response_ms'),
+				)
+				.orderBy('calls', 'desc');
+
+			// Per-model latency percentiles
+			const modelLatency = await db.raw(`
+				SELECT
+					model,
+					PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time_ms) as p50,
+					PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_time_ms) as p95,
+					PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY response_time_ms) as p99
+				FROM ai_token_usage
+				WHERE response_time_ms IS NOT NULL AND date_created >= ?
+				GROUP BY model
+			`, [sinceDate]);
+
+			const latencyByModel: Record<string, { p50: number; p95: number; p99: number }> = {};
+			for (const r of (modelLatency.rows || [])) {
+				latencyByModel[r.model] = {
+					p50: parseFloat(r.p50) || 0,
+					p95: parseFloat(r.p95) || 0,
+					p99: parseFloat(r.p99) || 0,
+				};
+			}
+
+			// Per-model task-type breakdown (derive from tool_calls)
+			const toolRows = await db('ai_token_usage')
+				.where('date_created', '>=', sinceDate)
+				.select('model', 'tool_calls', 'cost_usd');
+
+			const taskMap: Record<string, Record<string, { calls: number; cost: number }>> = {};
+			const KB_TOOLS = new Set(['search_knowledge_base', 'ask_knowledge_base', 'kb_search', 'kb_ask']);
+			const CALC_TOOLS = new Set(['execute_formula', 'execute_calculator', 'evaluate_formula', 'run_calculator']);
+
+			for (const row of toolRows) {
+				const model = row.model || 'unknown';
+				if (!taskMap[model]) taskMap[model] = {};
+
+				let taskType = 'general_chat';
+				if (row.tool_calls) {
+					const calls = typeof row.tool_calls === 'string' ? JSON.parse(row.tool_calls) : row.tool_calls;
+					if (Array.isArray(calls) && calls.length > 0) {
+						const toolNames = calls.map((c: any) => c.name || '');
+						if (toolNames.some((n: string) => KB_TOOLS.has(n))) {
+							taskType = 'knowledge';
+						} else if (toolNames.some((n: string) => CALC_TOOLS.has(n))) {
+							taskType = 'calculator';
+						} else {
+							taskType = 'tool_use';
+						}
+					}
+				}
+
+				if (!taskMap[model][taskType]) taskMap[model][taskType] = { calls: 0, cost: 0 };
+				taskMap[model][taskType].calls++;
+				taskMap[model][taskType].cost += parseFloat(row.cost_usd) || 0;
+			}
+
+			const taskBreakdown: Array<{ model: string; task_type: string; calls: number; cost_usd: number }> = [];
+			for (const [model, types] of Object.entries(taskMap)) {
+				for (const [task_type, stats] of Object.entries(types)) {
+					taskBreakdown.push({ model, task_type, calls: stats.calls, cost_usd: +stats.cost.toFixed(6) });
+				}
+			}
+
+			// Build models array with cost efficiency
+			const models = modelStats.map((r: any) => {
+				const calls = parseInt(r.calls, 10) || 0;
+				const inputTokens = parseInt(r.input_tokens, 10) || 0;
+				const outputTokens = parseInt(r.output_tokens, 10) || 0;
+				const totalTokens = inputTokens + outputTokens;
+				const costUsd = parseFloat(r.cost_usd) || 0;
+				const lt = latencyByModel[r.model] || { p50: 0, p95: 0, p99: 0 };
+				return {
+					model: r.model || 'unknown',
+					calls,
+					input_tokens: inputTokens,
+					output_tokens: outputTokens,
+					total_tokens: totalTokens,
+					cost_usd: +costUsd.toFixed(6),
+					cost_per_1k_tokens: totalTokens > 0 ? +(costUsd / totalTokens * 1000).toFixed(6) : 0,
+					avg_response_ms: Math.round(parseFloat(r.avg_response_ms) || 0),
+					p50_ms: Math.round(lt.p50),
+					p95_ms: Math.round(lt.p95),
+					p99_ms: Math.round(lt.p99),
+				};
+			});
+
+			// Summary
+			const totalCalls = models.reduce((s: number, m: any) => s + m.calls, 0);
+			const withCost = models.filter((m: any) => m.cost_per_1k_tokens > 0);
+			const bestCostEfficiency = withCost.length
+				? withCost.reduce((best: any, m: any) => m.cost_per_1k_tokens < best.cost_per_1k_tokens ? m : best).model
+				: (models[0]?.model || 'none');
+			const withLatency = models.filter((m: any) => m.p50_ms > 0);
+			const fastestP50 = withLatency.length
+				? withLatency.reduce((best: any, m: any) => m.p50_ms < best.p50_ms ? m : best).model
+				: (models[0]?.model || 'none');
+
+			res.json({
+				models,
+				task_breakdown: taskBreakdown,
+				summary: {
+					total_calls: totalCalls,
+					models_used: models.length,
+					best_cost_efficiency: bestCostEfficiency,
+					fastest_model_p50: fastestP50,
+				},
+			});
+		} catch (err: any) {
+			logger.error(`GET /assistant/admin/model-performance: ${err.message}`);
+			res.status(500).json({ errors: [{ message: 'Failed to fetch model performance' }] });
+		}
+	});
+
 	app.get('/assistant/admin/retrieval-metrics', requireAuth, requireAdmin, async (_req: any, res: any) => {
 		const proxied = await proxyToAiApi(_req, res, env, logger);
 		if (proxied) return;

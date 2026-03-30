@@ -39,6 +39,34 @@ export interface ToolAnalyticsData {
   unused_tools: string[];
 }
 
+export interface ModelPerformanceData {
+  models: Array<{
+    model: string;
+    calls: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    cost_usd: number;
+    cost_per_1k_tokens: number;
+    avg_response_ms: number;
+    p50_ms: number;
+    p95_ms: number;
+    p99_ms: number;
+  }>;
+  task_breakdown: Array<{
+    model: string;
+    task_type: string;
+    calls: number;
+    cost_usd: number;
+  }>;
+  summary: {
+    total_calls: number;
+    models_used: number;
+    best_cost_efficiency: string;
+    fastest_model_p50: string;
+  };
+}
+
 export interface RetrievalMetrics {
   total_searches: number;
   total_asks: number;
