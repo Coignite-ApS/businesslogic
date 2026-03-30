@@ -68,6 +68,7 @@ AI chat, knowledge base backend, embeddings, public API.
 | 09 | Progressive Tool Loading | completed | [ai-api/09-progressive-tool-loading.md](ai-api/09-progressive-tool-loading.md) |
 | 10 | AI Observability & Self-Improvement Dashboard | in-progress | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
 | 11 | Contextual Widgets for AI Assistant | planned | [ai-api/11-contextual-widgets.md](ai-api/11-contextual-widgets.md) |
+| 12 | Observatory Improvements & Controls | planned | [ai-api/12-observatory-improvements.md](ai-api/12-observatory-improvements.md) |
 
 ---
 

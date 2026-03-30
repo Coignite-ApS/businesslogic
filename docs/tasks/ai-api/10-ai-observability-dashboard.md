@@ -1,6 +1,6 @@
 # 10. AI Observability & Self-Improvement Dashboard (Directus)
 
-**Status:** in-progress (Phase 1B+ panels completed)
+**Status:** in-progress (Phase 1B+ analytics complete, Phase 2 next)
 **Phase:** 4 — Vision & Differentiation (but foundation panels in Phase 1B+)
 **Depends on:** ai-api/08 (budget warnings), ai-api/09 (progressive loading), ai-api/07 (skill memory), ai-api/05 Phase 6 (self-improvement loop)
 **Principle:** Nothing blackboxed. Every AI decision, experiment, and metric visible and controllable in Directus.
@@ -236,34 +236,34 @@ ai.ai_retrieval_quality
 ### Phase 1B+ — Foundation Panels (build now)
 
 #### Data Collection
-- [ ] Create `ai.ai_metrics_daily` table + nightly aggregation cron
-- [ ] Extend `ai_token_usage` to include tool_calls breakdown per turn
-- [ ] Add `outcome` field to `ai_conversations` (completed/abandoned/error/budget_exhausted)
-- [ ] Add response_time_ms tracking to chat endpoint
-- [ ] Build nightly aggregation job (summarize conversations → daily metrics)
+- [x] Create `ai.ai_metrics_daily` table + nightly aggregation cron
+- [x] Extend `ai_token_usage` to include tool_calls breakdown per turn
+- [x] Add `outcome` field to `ai_conversations` (completed/abandoned/error/budget_exhausted)
+- [x] Add response_time_ms tracking to chat endpoint
+- [x] Build nightly aggregation job (summarize conversations → daily metrics)
 
 #### Panel 1: Cost & Budget
-- [ ] Directus Insights dashboard: daily/weekly/monthly cost by model
-- [ ] Cost per conversation chart (P50/P95/max)
-- [ ] Budget utilization per account (progress bars)
-- [ ] Top 10 spender accounts list
-- [ ] Per-account budget override (editable field in account collection)
-- [ ] Admin alert: configurable threshold notification
+- [x] Directus Insights dashboard: daily/weekly/monthly cost by model
+- [x] Cost per conversation chart (P50/P95/max)
+- [x] Budget utilization per account (progress bars)
+- [x] Top 10 spender accounts list
+- [ ] Per-account budget override (editable field in account collection) — deferred to monetization
+- [ ] Admin alert: configurable threshold notification — deferred to monetization
 
 #### Panel 2: Conversation Quality
-- [ ] Conversations per day trend chart
-- [ ] Completion rate metric (% completed vs abandoned)
-- [ ] Tool call success rate metric
-- [ ] Response time percentiles chart
-- [ ] Extend feedback mechanism to all conversations (not just KB)
-- [ ] Drill-down: click metric → see conversations
+- [x] Conversations per day trend chart
+- [x] Completion rate metric (% completed vs abandoned)
+- [x] Tool call success rate metric
+- [x] Response time percentiles chart
+- [ ] Extend feedback mechanism to all conversations (not just KB) — deferred
+- [ ] Drill-down: click metric → see conversations — deferred
 
 #### Panel 3: Tool Usage
-- [ ] Tool frequency bar chart
-- [ ] Tool latency distribution
-- [ ] Tool error rate tracking
-- [ ] Unused tool report (loaded but never called)
-- [ ] Tool chain analysis (common sequences)
+- [x] Tool frequency bar chart
+- [x] Tool latency distribution
+- [x] Tool error rate tracking
+- [x] Unused tool report (loaded but never called)
+- [x] Tool chain analysis (common sequences)
 
 ### Phase 2 — Retrieval Panel
 
