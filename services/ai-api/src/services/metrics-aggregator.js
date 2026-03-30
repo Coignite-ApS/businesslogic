@@ -111,7 +111,7 @@ export async function aggregateDailyMetrics(targetDate) {
         usage?.total_input_tokens || 0,
         usage?.total_output_tokens || 0,
         usage?.total_cost_usd || 0,
-        convStats?.avg_tokens_per_conv || 0,
+        (convStats?.total_conversations > 0) ? (msgCount?.total || 0) / convStats.total_conversations : 0,
         usage?.avg_response_time_ms || 0,
         JSON.stringify(modelBreakdown),
         JSON.stringify(toolBreakdown),

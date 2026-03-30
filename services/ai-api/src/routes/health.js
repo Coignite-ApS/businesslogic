@@ -25,7 +25,13 @@ export async function registerRoutes(app) {
     },
   }, async (req, reply) => {
     if (!req.isAdmin) return reply.code(403).send({ error: 'Admin only' });
-    const targetDate = req.body?.date ? new Date(req.body.date) : undefined;
+    let targetDate;
+    if (req.body?.date) {
+      targetDate = new Date(req.body.date);
+      if (isNaN(targetDate.getTime())) {
+        return reply.code(400).send({ error: 'Invalid date format', code: 'INVALID_REQUEST' });
+      }
+    }
     try {
       const count = await aggregateDailyMetrics(targetDate);
       return { data: { accounts_processed: count, date: req.body?.date || 'yesterday' } };
