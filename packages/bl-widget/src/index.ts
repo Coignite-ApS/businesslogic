@@ -37,6 +37,20 @@ export { generateLayout, mapInputComponent, mapOutputComponent } from './auto-la
 export { renderNode } from './layout-renderer.js';
 export { defaultThemeVars, buildThemeStyle } from './theme.js';
 
+// Registry
+export {
+  getComponent,
+  registerComponent,
+  listComponents,
+  getComponentsByCategory,
+  getRegisteredNames,
+} from './registry.js';
+export type { ComponentEntry } from './registry.js';
+
+// Actions
+export { BlActionEvent } from './actions.js';
+export type { ActionConfig } from './actions.js';
+
 // Types
 export type {
   LayoutConfig,
@@ -46,4 +60,7 @@ export type {
   JsonSchema,
   SchemaProperty,
   FieldMeta,
+  ChatKitNode,
+  RenderableNode,
+  PropDef,
 } from './types.js';
