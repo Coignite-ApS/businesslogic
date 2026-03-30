@@ -148,7 +148,7 @@ export async function registerRoutes(app) {
 
           const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
           const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const results = await hybridSearch(embedClient, args.query.trim(), accountId, kbId, args.limit || 10, searchConfig);
+          const { results } = await hybridSearch(embedClient, args.query.trim(), accountId, kbId, args.limit || 10, searchConfig);
 
           const content = [{ type: 'text', text: JSON.stringify(results) }];
           return reply.send(jsonRpcResult(id, { content }));
@@ -165,7 +165,7 @@ export async function registerRoutes(app) {
 
           const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
           const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const chunks = await hybridSearch(embedClient, args.question.trim(), accountId, kbId, 10, searchConfig);
+          const { results: chunks } = await hybridSearch(embedClient, args.question.trim(), accountId, kbId, 10, searchConfig);
 
           // Check for curated answers
           let curatedContext = [];
@@ -328,7 +328,7 @@ export async function registerRoutes(app) {
 
           const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
           const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const results = await hybridSearch(embedClient, args.query.trim(), accountId, kb.id, args.limit || 10, searchConfig);
+          const { results } = await hybridSearch(embedClient, args.query.trim(), accountId, kb.id, args.limit || 10, searchConfig);
 
           return reply.send(jsonRpcResult(id, { content: [{ type: 'text', text: JSON.stringify(results) }] }));
         }
@@ -353,7 +353,7 @@ export async function registerRoutes(app) {
 
           const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
           const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const chunks = await hybridSearch(embedClient, args.question.trim(), accountId, kb.id, 10, searchConfig);
+          const { results: chunks } = await hybridSearch(embedClient, args.question.trim(), accountId, kb.id, 10, searchConfig);
           const model = config.defaultModel;
           const result = await generateAnswer(config.anthropicApiKey, args.question.trim(), chunks, model, []);
 
