@@ -14,10 +14,13 @@ Be concise — this summary replaces the original messages for context.`;
  * Summarize older messages to compress conversation context.
  * @param {Array} messages - Messages to summarize
  * @param {string} apiKey - Anthropic API key
+ * @param {string} [baseURL] - Optional base URL override (for testing)
  * @returns {{ summary: string, inputTokens: number, outputTokens: number }}
  */
-export async function summarizeMessages(messages, apiKey) {
-  const client = new Anthropic({ apiKey });
+export async function summarizeMessages(messages, apiKey, baseURL) {
+  const clientOpts = { apiKey };
+  if (baseURL) clientOpts.baseURL = baseURL;
+  const client = new Anthropic(clientOpts);
 
   const formatted = messages.map(m => {
     const role = m.role;
@@ -63,9 +66,10 @@ export async function summarizeMessages(messages, apiKey) {
  * @param {number} maxMessages - Config max (e.g. 50)
  * @param {string} apiKey - Anthropic API key
  * @param {Function} [logger] - Optional warn logger
+ * @param {string} [baseURL] - Optional base URL override (for testing)
  * @returns {{ messages: Array, inputTokens: number, outputTokens: number }}
  */
-export async function compressIfNeeded(messages, maxMessages, apiKey, logger) {
+export async function compressIfNeeded(messages, maxMessages, apiKey, logger, baseURL) {
   const threshold = Math.floor(maxMessages * 0.7);
   const keepRecent = 15;
 
@@ -77,7 +81,7 @@ export async function compressIfNeeded(messages, maxMessages, apiKey, logger) {
     const olderMessages = messages.slice(0, messages.length - keepRecent);
     let recentMessages = messages.slice(-keepRecent);
 
-    const { summary, inputTokens, outputTokens } = await summarizeMessages(olderMessages, apiKey);
+    const { summary, inputTokens, outputTokens } = await summarizeMessages(olderMessages, apiKey, baseURL);
 
     if (!summary) {
       throw new Error('empty summary returned');
