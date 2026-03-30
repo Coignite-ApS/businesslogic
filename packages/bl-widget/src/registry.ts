@@ -212,3 +212,69 @@ registerComponent(['donut-chart', 'DonutChart'], {
   description: 'Donut chart',
   canHaveChildren: false,
 });
+
+// ── Content ───────────────────────────────────────────────────────────────────
+
+registerComponent(['title', 'Title'], {
+  tag: 'bl-title',
+  category: 'content',
+  label: 'Title',
+  description: 'Heading text',
+  canHaveChildren: false,
+});
+
+registerComponent(['caption', 'Caption'], {
+  tag: 'bl-caption',
+  category: 'content',
+  label: 'Caption',
+  description: 'Helper text',
+  canHaveChildren: false,
+});
+
+registerComponent(['badge', 'Badge'], {
+  tag: 'bl-badge',
+  category: 'content',
+  label: 'Badge',
+  description: 'Status badge',
+  canHaveChildren: false,
+});
+
+registerComponent(['button', 'Button'], {
+  tag: 'bl-button',
+  category: 'content',
+  label: 'Button',
+  description: 'Clickable button with action',
+  canHaveChildren: false,
+});
+
+registerComponent(['icon', 'Icon'], {
+  tag: 'bl-icon',
+  category: 'content',
+  label: 'Icon',
+  description: 'SVG icon',
+  canHaveChildren: false,
+});
+
+registerComponent(['image', 'Image'], {
+  tag: 'bl-image',
+  category: 'content',
+  label: 'Image',
+  description: 'Image display',
+  canHaveChildren: false,
+});
+
+registerComponent(['markdown', 'Markdown'], {
+  tag: 'bl-markdown',
+  category: 'content',
+  label: 'Markdown',
+  description: 'Markdown text renderer',
+  canHaveChildren: false,
+});
+
+registerComponent(['label', 'Label'], {
+  tag: 'bl-label',
+  category: 'content',
+  label: 'Label',
+  description: 'Form field label',
+  canHaveChildren: false,
+});

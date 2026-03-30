@@ -28,12 +28,12 @@ describe('registry', () => {
     expect(getComponent('unknown')).toBeNull();
   });
 
-  it('listComponents() returns 20 unique entries', () => {
+  it('listComponents() returns 28 unique entries', () => {
     const all = listComponents();
-    expect(all).toHaveLength(20);
+    expect(all).toHaveLength(28);
     const tags = all.map(e => e.tag);
     const unique = new Set(tags);
-    expect(unique.size).toBe(20);
+    expect(unique.size).toBe(28);
   });
 
   it('getComponentsByCategory("layout") returns 5 entries', () => {

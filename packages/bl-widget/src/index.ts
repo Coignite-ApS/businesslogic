@@ -31,6 +31,16 @@ export { BlRow } from './components/layout/bl-row.js';
 export { BlCol } from './components/layout/bl-col.js';
 export { BlCard } from './components/layout/bl-card.js';
 
+// Content components
+export { BlTitle } from './components/content/bl-title.js';
+export { BlCaption } from './components/content/bl-caption.js';
+export { BlBadge } from './components/content/bl-badge.js';
+export { BlButton } from './components/content/bl-button.js';
+export { BlIcon } from './components/content/bl-icon.js';
+export { BlImage } from './components/content/bl-image.js';
+export { BlMarkdown } from './components/content/bl-markdown.js';
+export { BlLabel } from './components/content/bl-label.js';
+
 // Utilities
 export { ApiClient } from './api-client.js';
 export { generateLayout, mapInputComponent, mapOutputComponent } from './auto-layout.js';
