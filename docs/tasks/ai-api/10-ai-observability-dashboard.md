@@ -1,6 +1,6 @@
 # 10. AI Observability & Self-Improvement Dashboard (Directus)
 
-**Status:** in-progress (Phase 1B+ analytics complete, Phase 2 next)
+**Status:** in-progress (Phase 1B+ + Phase 2 complete, Phase 4 pending)
 **Phase:** 4 — Vision & Differentiation (but foundation panels in Phase 1B+)
 **Depends on:** ai-api/08 (budget warnings), ai-api/09 (progressive loading), ai-api/07 (skill memory), ai-api/05 Phase 6 (self-improvement loop)
 **Principle:** Nothing blackboxed. Every AI decision, experiment, and metric visible and controllable in Directus.
@@ -268,12 +268,16 @@ ai.ai_retrieval_quality
 ### Phase 2 — Retrieval Panel
 
 #### Panel 4: KB & Retrieval Performance
-- [ ] Create `ai.ai_retrieval_quality` table
-- [ ] Log retrieval path scores on every search
-- [ ] Context utilization tracking (injected vs used)
-- [ ] KB-level performance aggregation
-- [ ] Curated answer hit rate metric
-- [ ] Per-KB similarity threshold control (editable in Directus)
+- [x] Create `ai.ai_retrieval_quality` table (migration 005)
+- [x] Log retrieval quality on every search/ask (fire-and-forget logger)
+- [x] Context utilization tracking (chunks_injected vs chunks_utilized)
+- [x] KB-level performance aggregation (per-KB stats endpoint)
+- [x] Curated answer hit rate metric
+- [ ] Per-KB similarity threshold control (editable in Directus) — deferred to ai-api/12
+- [x] Similarity distribution chart (width_bucket histogram)
+- [x] Search latency percentiles (P50/P95/P99)
+- [x] Confidence breakdown chart
+- [x] Observatory panel with KPIs, charts, tables
 
 ### Phase 4 — Self-Improvement Panels
 
