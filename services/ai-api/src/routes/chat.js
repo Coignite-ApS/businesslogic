@@ -10,6 +10,7 @@ import { checkRateLimit } from '../utils/rate-limit.js';
 import { calculateCost } from '../utils/cost.js';
 import { checkAiQuota, getActiveAccount } from '../utils/auth.js';
 import { checkBudget, recordCost } from '../services/budget.js';
+import { compressIfNeeded } from '../services/summarize.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -165,7 +166,23 @@ export async function registerRoutes(app) {
       // Add user message
       messages.push({ role: 'user', content: message });
 
-      // Trim to max
+      // Summarize older messages if approaching limit (instead of dropping)
+      const client = new AiClient(config.anthropicApiKey);
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      {
+        const compressed = await compressIfNeeded(
+          messages,
+          config.maxConversationMessages,
+          config.anthropicApiKey,
+          msg => req.log.warn(msg),
+        );
+        messages = compressed.messages;
+        totalInputTokens += compressed.inputTokens;
+        totalOutputTokens += compressed.outputTokens;
+      }
+
+      // Hard limit safety net
       if (messages.length > config.maxConversationMessages) {
         messages = messages.slice(-config.maxConversationMessages);
       }
@@ -187,10 +204,6 @@ export async function registerRoutes(app) {
       if (quota?.allowedModels?.length > 0 && !quota.allowedModels.includes(model)) {
         model = quota.allowedModels[0];
       }
-
-      const client = new AiClient(config.anthropicApiKey);
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
 
       // Filter tools based on API key permissions and public mode
       const tools = filterToolsByPermissions(AI_TOOLS, req.permissions, req.isPublicRequest);
@@ -476,6 +489,24 @@ export async function registerRoutes(app) {
       }
 
       messages.push({ role: 'user', content: message });
+
+      // Summarize older messages if approaching limit (instead of dropping)
+      const client = new AiClient(config.anthropicApiKey);
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      {
+        const compressed = await compressIfNeeded(
+          messages,
+          config.maxConversationMessages,
+          config.anthropicApiKey,
+          msg => req.log.warn(msg),
+        );
+        messages = compressed.messages;
+        totalInputTokens += compressed.inputTokens;
+        totalOutputTokens += compressed.outputTokens;
+      }
+
+      // Hard limit safety net
       if (messages.length > config.maxConversationMessages) {
         messages = messages.slice(-config.maxConversationMessages);
       }
@@ -495,10 +526,6 @@ export async function registerRoutes(app) {
       if (quota?.allowedModels?.length > 0 && !quota.allowedModels.includes(model)) {
         model = quota.allowedModels[0];
       }
-
-      const client = new AiClient(config.anthropicApiKey);
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
       const tools = filterToolsByPermissions(AI_TOOLS, req.permissions, req.isPublicRequest);
       const toolCalls = [];
       let responseText = '';
