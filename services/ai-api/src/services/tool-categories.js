@@ -20,16 +20,22 @@ export const TOOL_CATEGORIES = {
 };
 
 // Keywords that trigger each category
+// Note: 'kb' uses a regex word-boundary check in detectCategories (see below)
 const CATEGORY_KEYWORDS = {
   calculators: [
-    'calculator', 'calculate', 'calc', 'compute', 'formula', 'build',
-    'deploy', 'configure', 'execute', 'run', 'test', 'excel', 'spreadsheet',
-    'input', 'output', 'create calc', 'update calc',
+    'calculator', 'calculate', 'calc', 'compute', 'formula',
+    'deploy', 'configure', 'execute', 'excel', 'spreadsheet',
+    'input', 'output',
   ],
   knowledge: [
-    'knowledge', ' kb ', 'knowledge base', 'search', 'document', 'upload',
-    'index', 'find', 'ask', 'answer', 'source', 'cite', 'reference',
+    'knowledge', 'knowledge base', 'search', 'document', 'upload',
+    'answer', 'source', 'cite', 'reference',
   ],
+};
+
+// Regex-based keywords (word-boundary matching to avoid false positives)
+const CATEGORY_KEYWORD_PATTERNS = {
+  knowledge: [/\bkb\b/i],
 };
 
 /**
@@ -48,6 +54,11 @@ export function detectCategories(userMessage, conversationMessages = []) {
 
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     if (keywords.some(kw => lower.includes(kw))) {
+      needed.add(category);
+      continue;
+    }
+    const patterns = CATEGORY_KEYWORD_PATTERNS[category];
+    if (patterns && patterns.some(re => re.test(lower))) {
       needed.add(category);
     }
   }
