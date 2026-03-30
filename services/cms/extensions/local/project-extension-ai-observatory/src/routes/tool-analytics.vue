@@ -11,6 +11,17 @@
 		</template>
 
 		<div class="obs-content">
+			<!-- Date range selector -->
+			<div class="date-range-bar">
+				<button
+					v-for="opt in dateOptions"
+					:key="opt.value"
+					class="range-btn"
+					:class="{ active: selectedDays === opt.value }"
+					@click="selectDays(opt.value)"
+				>{{ opt.label }}</button>
+			</div>
+
 			<div v-if="loading && !data" class="loading-state">
 				<v-progress-circular indeterminate />
 			</div>
@@ -46,7 +57,7 @@
 						<div class="kpi-body">
 							<div class="kpi-label">Unused Tools</div>
 							<div class="kpi-value">{{ data.unused_tools.length }}</div>
-							<div class="kpi-subtitle">never called in 30d</div>
+							<div class="kpi-subtitle">never called in {{ selectedDays }}d</div>
 						</div>
 					</div>
 				</div>
@@ -83,7 +94,7 @@
 								</tr>
 							</tbody>
 						</table>
-						<div v-else class="empty-state">No tool calls recorded in the last 30 days</div>
+						<div v-else class="empty-state">No tool calls recorded in the last {{ selectedDays }} days</div>
 					</div>
 				</div>
 
@@ -91,13 +102,13 @@
 				<div class="two-col">
 					<!-- Top Tool Chains -->
 					<div class="section no-margin">
-						<div class="section-title">Top Tool Co-occurrences</div>
+						<div class="section-title">Top Tool Sequences</div>
 						<div class="table-wrap">
 							<table v-if="data.top_chains.length" class="data-table">
 								<thead>
 									<tr>
-										<th>Chain</th>
-										<th class="num">Occurrences</th>
+										<th>Sequence</th>
+										<th class="num">Count</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -113,7 +124,7 @@
 
 					<!-- Unused Tools -->
 					<div class="section no-margin">
-						<div class="section-title">Unused Tools (30d)</div>
+						<div class="section-title">Unused Tools ({{ selectedDays }}d)</div>
 						<div class="table-wrap">
 							<div v-if="data.unused_tools.length" class="unused-list">
 								<div v-for="t in data.unused_tools" :key="t" class="unused-item">
@@ -133,7 +144,7 @@
 		<template #sidebar>
 			<sidebar-detail icon="info" title="Tool Analytics" close>
 				<div class="sidebar-info">
-					<p>Per-tool call frequency, error rates, latency, co-occurrence patterns, and unused tool detection over the last 30 days.</p>
+					<p>Per-tool call frequency, error rates, latency, sequential call patterns, and unused tool detection over the selected period.</p>
 				</div>
 			</sidebar-detail>
 		</template>
@@ -150,6 +161,18 @@ import ObservatoryNavigation from '../components/observatory-navigation.vue';
 const api = useApi();
 const { loading, error, fetchToolAnalytics } = useObservatoryApi(api);
 const data = ref<ToolAnalyticsData | null>(null);
+
+const dateOptions = [
+	{ label: '7d', value: 7 },
+	{ label: '30d', value: 30 },
+	{ label: '90d', value: 90 },
+];
+const selectedDays = ref(30);
+
+async function selectDays(days: number) {
+	selectedDays.value = days;
+	data.value = await fetchToolAnalytics(days);
+}
 
 const totalCalls = computed(() =>
 	(data.value?.tools ?? []).reduce((s, t) => s + t.calls, 0)
@@ -180,7 +203,7 @@ function errorRateClass(rate: string): string {
 }
 
 onMounted(async () => {
-	data.value = await fetchToolAnalytics(30);
+	data.value = await fetchToolAnalytics(selectedDays.value);
 });
 </script>
 
@@ -200,6 +223,36 @@ onMounted(async () => {
 	align-items: center;
 	justify-content: center;
 	height: 300px;
+}
+
+/* Date range bar */
+.date-range-bar {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 24px;
+}
+
+.range-btn {
+	padding: 6px 16px;
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	background: var(--theme--background);
+	color: var(--theme--foreground-subdued);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.range-btn:hover {
+	border-color: var(--theme--primary);
+	color: var(--theme--primary);
+}
+
+.range-btn.active {
+	background: var(--theme--primary);
+	border-color: var(--theme--primary);
+	color: #fff;
 }
 
 .kpi-grid {

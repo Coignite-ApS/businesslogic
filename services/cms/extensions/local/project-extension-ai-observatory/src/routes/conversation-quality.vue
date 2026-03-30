@@ -11,6 +11,17 @@
 		</template>
 
 		<div class="obs-content">
+			<!-- Date range selector -->
+			<div class="date-range-bar">
+				<button
+					v-for="opt in dateOptions"
+					:key="opt.value"
+					class="range-btn"
+					:class="{ active: selectedDays === opt.value }"
+					@click="selectDays(opt.value)"
+				>{{ opt.label }}</button>
+			</div>
+
 			<div v-if="loading && !data" class="loading-state">
 				<v-progress-circular indeterminate />
 			</div>
@@ -21,7 +32,7 @@
 					<div class="kpi-card">
 						<div class="kpi-icon"><v-icon name="forum" /></div>
 						<div class="kpi-body">
-							<div class="kpi-label">Total Conversations (30d)</div>
+							<div class="kpi-label">Total Conversations ({{ selectedDays }}d)</div>
 							<div class="kpi-value">{{ totalConversations }}</div>
 						</div>
 					</div>
@@ -49,11 +60,19 @@
 							<div class="kpi-subtitle">P50 · {{ data.response_time.sample_size }} samples</div>
 						</div>
 					</div>
+					<div class="kpi-card">
+						<div class="kpi-icon"><v-icon name="message" /></div>
+						<div class="kpi-body">
+							<div class="kpi-label">Avg Conv. Length</div>
+							<div class="kpi-value">{{ data.avg_conversation_length }}</div>
+							<div class="kpi-subtitle">messages per conversation</div>
+						</div>
+					</div>
 				</div>
 
 				<!-- Daily Volume Chart -->
 				<div class="chart-card">
-					<div class="chart-title">Daily Conversations — Last 30 Days</div>
+					<div class="chart-title">Daily Conversations — Last {{ selectedDays }} Days</div>
 					<div v-if="data.daily_conversations.length" class="bar-chart">
 						<div class="bar-chart-inner">
 							<div
@@ -134,7 +153,7 @@
 		<template #sidebar>
 			<sidebar-detail icon="info" title="Conversation Quality" close>
 				<div class="sidebar-info">
-					<p>Conversation outcomes, response time percentiles, and tool success rates over the last 30 days.</p>
+					<p>Conversation outcomes, response time percentiles, and tool success rates over the selected period.</p>
 				</div>
 			</sidebar-detail>
 		</template>
@@ -151,6 +170,18 @@ import ObservatoryNavigation from '../components/observatory-navigation.vue';
 const api = useApi();
 const { loading, error, fetchQualityMetrics } = useObservatoryApi(api);
 const data = ref<QualityMetrics | null>(null);
+
+const dateOptions = [
+	{ label: '7d', value: 7 },
+	{ label: '30d', value: 30 },
+	{ label: '90d', value: 90 },
+];
+const selectedDays = ref(30);
+
+async function selectDays(days: number) {
+	selectedDays.value = days;
+	data.value = await fetchQualityMetrics(days);
+}
 
 const totalConversations = computed(() =>
 	Object.values(data.value?.outcomes ?? {}).reduce((s, v) => s + v, 0)
@@ -203,7 +234,7 @@ function outcomeLabel(outcome: string): string {
 }
 
 onMounted(async () => {
-	data.value = await fetchQualityMetrics(30);
+	data.value = await fetchQualityMetrics(selectedDays.value);
 });
 </script>
 
@@ -225,9 +256,39 @@ onMounted(async () => {
 	height: 300px;
 }
 
+/* Date range bar */
+.date-range-bar {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 24px;
+}
+
+.range-btn {
+	padding: 6px 16px;
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	background: var(--theme--background);
+	color: var(--theme--foreground-subdued);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.range-btn:hover {
+	border-color: var(--theme--primary);
+	color: var(--theme--primary);
+}
+
+.range-btn.active {
+	background: var(--theme--primary);
+	border-color: var(--theme--primary);
+	color: #fff;
+}
+
 .kpi-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 	gap: 16px;
 	margin-bottom: 32px;
 }
