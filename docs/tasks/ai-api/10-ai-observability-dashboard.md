@@ -1,6 +1,6 @@
 # 10. AI Observability & Self-Improvement Dashboard (Directus)
 
-**Status:** in-progress (Phase 1B+ + Phase 2 complete, Phase 4 pending)
+**Status:** completed (Phase 1B+, 2, 4-Panel 7 done; Panels 5/6 blocked by ai-api/07 and ai-api/05)
 **Phase:** 4 — Vision & Differentiation (but foundation panels in Phase 1B+)
 **Depends on:** ai-api/08 (budget warnings), ai-api/09 (progressive loading), ai-api/07 (skill memory), ai-api/05 Phase 6 (self-improvement loop)
 **Principle:** Nothing blackboxed. Every AI decision, experiment, and metric visible and controllable in Directus.
@@ -299,10 +299,10 @@ ai.ai_retrieval_quality
 - [ ] Optional approve-before-commit mode
 
 #### Panel 7: Model Performance
-- [ ] Quality-by-model comparison charts
-- [ ] Cost efficiency scatter plot
-- [ ] Task-type breakdown per model
-- [ ] Model routing rules editor (editable in Directus)
+- [x] Quality-by-model comparison charts
+- [x] Cost efficiency scatter plot
+- [x] Task-type breakdown per model
+- [ ] Model routing rules editor (editable in Directus) — deferred to ai-api/12
 
 ---
 
