@@ -159,7 +159,7 @@ export async function getConversationBudgetWarning(conversationId, currentCostUs
   const limit = config.conversationBudgetUsd;
   if (limit <= 0) return null;
 
-  const remaining = limit - spent;
+  const remaining = Math.max(0, limit - spent);
   const pct = remaining / limit;
 
   if (pct <= config.budgetCriticalPct) {
@@ -170,6 +170,23 @@ export async function getConversationBudgetWarning(conversationId, currentCostUs
   }
 
   return null;
+}
+
+/**
+ * Inject a budget warning into the last tool result's content.
+ * Mutates toolResults in place. No-op if no warning or empty array.
+ * @param {Array} toolResults
+ * @param {string|null} warning
+ */
+export function injectBudgetWarning(toolResults, warning) {
+  if (!warning || !toolResults.length) return;
+  const last = toolResults[toolResults.length - 1];
+  try {
+    const parsed = JSON.parse(last.content);
+    last.content = JSON.stringify({ ...parsed, _budget_warning: warning });
+  } catch {
+    last.content = JSON.stringify({ result: last.content, _budget_warning: warning });
+  }
 }
 
 /**
