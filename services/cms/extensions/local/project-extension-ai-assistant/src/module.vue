@@ -31,6 +31,7 @@
 						:message="msg"
 						:conversation-id="currentConversationId"
 						@feedback="handleKbFeedback"
+						@send-message="handleSendFromWidget"
 					/>
 				</div>
 			</template>
@@ -299,6 +300,12 @@ async function handleKbFeedback(data: any) {
 	} catch {
 		// Silent fail — feedback is non-critical
 	}
+}
+
+async function handleSendFromWidget(text: string) {
+	if (!text || streaming.value) return;
+	inputMessage.value = text;
+	await handleSend();
 }
 
 // Upgrade dialog

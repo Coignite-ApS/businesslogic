@@ -6,11 +6,14 @@
 			</template>
 			<template v-else>
 				<markdown-renderer v-if="message.content" :content="message.content" />
-				<tool-result
-					v-for="tr in message.toolResults"
-					:key="tr.id"
-					:tool-result="tr"
-				/>
+				<template v-for="tr in message.toolResults" :key="tr.id">
+					<chatkit-wrapper
+						v-if="message.widgetTrees?.[tr.id]"
+						:tree="message.widgetTrees[tr.id]"
+						@action="handleWidgetAction"
+					/>
+					<tool-result v-else :tool-result="tr" />
+				</template>
 				<div v-if="message.toolExecuting" class="tool-executing">
 					<v-progress-circular indeterminate x-small />
 					<span>Running {{ toolExecutingLabel }}…</span>
@@ -50,6 +53,7 @@ import { computed, ref } from 'vue';
 import type { ChatMessage } from '../composables/use-chat';
 import MarkdownRenderer from './markdown-renderer.vue';
 import ToolResult from './tool-result.vue';
+import ChatkitWrapper from './chatkit-wrapper.vue';
 
 const props = defineProps<{
 	message: ChatMessage;
@@ -66,6 +70,7 @@ const emit = defineEmits<{
 		conversation_id?: string;
 		chunks_used?: string[];
 	}];
+	sendMessage: [text: string];
 }>();
 
 const toolLabels: Record<string, string> = {
@@ -113,6 +118,23 @@ function submitFeedback() {
 		chunks_used: result?.sources?.map((s: any) => s.chunk_id) || [],
 	});
 	feedbackDone.value = true;
+}
+
+function handleWidgetAction(action: { type: string; payload?: Record<string, unknown> }) {
+	switch (action.type) {
+		case 'assistant.message':
+			if (action.payload?.text) {
+				emit('sendMessage', String(action.payload.text));
+			}
+			break;
+		case 'navigate':
+			if (action.payload?.url) {
+				window.open(String(action.payload.url), '_blank');
+			}
+			break;
+		default:
+			console.log('[widget] unhandled action:', action.type);
+	}
 }
 </script>
 

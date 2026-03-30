@@ -9,6 +9,7 @@ import { createRateLimitMiddleware } from './rate-limit.js';
 import { createSanitizeMiddleware } from './sanitize.js';
 import { proxyToAiApi } from './proxy.js';
 import { registerObservatoryRoutes } from './observatory.js';
+import { resolveWidget } from './widget-resolver.js';
 import type { ChatRequest, ConversationMessage, ContentBlock, DB } from './types.js';
 
 function calculateCost(model: string, input: number, output: number): number {
@@ -482,6 +483,21 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 							result,
 							is_error: isError,
 						});
+
+						// Widget resolution (fire-and-forget, non-blocking)
+						try {
+							const widgetTree = await resolveWidget(
+								db,
+								tu.name,
+								result,
+								tu.input?.calculator_id || tu.input?.knowledge_base_id || null,
+							);
+							if (widgetTree) {
+								sendSSE('widget', { tool_id: tu.id, tree: widgetTree });
+							}
+						} catch {
+							// Widget resolution optional — silently skip on failure
+						}
 					}
 
 					messages.push({ role: 'user', content: toolResults });

@@ -1,0 +1,54 @@
+{
+  "name": "Calculator Result",
+  "description": "Shows calculator output as key-value pairs with title",
+  "tool_binding": "execute_calculator",
+  "resource_binding": null,
+  "status": "published",
+  "sort": 1,
+  "data_mapping": {
+    "title": "$.calculator_name",
+    "fields": "$.result | entries"
+  },
+  "template": {
+    "component": "Card",
+    "props": { "size": "sm" },
+    "children": [
+      {
+        "component": "Col",
+        "props": { "gap": "4px" },
+        "children": [
+          { "component": "Caption", "props": { "value": "Calculator Result", "color": "secondary" } },
+          { "component": "Title", "props": { "value": "{{title}}", "size": "md" } }
+        ]
+      },
+      { "component": "Divider", "props": { "flush": true } },
+      {
+        "component": "__each",
+        "props": { "source": "fields" },
+        "children": [{
+          "component": "Row",
+          "children": [
+            { "component": "Text", "props": { "value": "{{key}}", "color": "secondary" } },
+            { "component": "Spacer" },
+            { "component": "Text", "props": { "value": "{{value}}", "weight": "semibold" } }
+          ]
+        }]
+      },
+      {
+        "component": "Row",
+        "props": { "gap": "8px" },
+        "children": [
+          {
+            "component": "Button",
+            "props": {
+              "label": "Explain",
+              "style": "ghost",
+              "size": "sm",
+              "onClickAction": { "type": "assistant.message", "payload": { "text": "Explain this calculation result in detail" } }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
