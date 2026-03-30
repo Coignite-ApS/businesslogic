@@ -38,11 +38,14 @@ pub fn calculate_cost(model: &str, input_tokens: u64, output_tokens: u64) -> f64
             input_per_m: 0.8,
             output_per_m: 4.0,
         },
-        // Unknown model — use sonnet pricing as safe default
-        _ => ModelPricing {
-            input_per_m: 3.0,
-            output_per_m: 15.0,
-        },
+        // Unknown model — use opus pricing as safe (conservative) default
+        _ => {
+            tracing::warn!(model = model, "Unknown model for cost calculation — using Opus pricing as safe default");
+            ModelPricing {
+                input_per_m: 15.0,
+                output_per_m: 75.0,
+            }
+        }
     };
 
     let input_cost = (input_tokens as f64 / 1_000_000.0) * pricing.input_per_m;
@@ -107,9 +110,9 @@ mod tests {
 
     #[test]
     fn test_calculate_cost_unknown_model() {
-        // Unknown model falls back to sonnet pricing
+        // Unknown model falls back to opus pricing (conservative safe default)
         let cost = calculate_cost("gpt-4", 1_000_000, 0);
-        assert!((cost - 3.0).abs() < 1e-10);
+        assert!((cost - 15.0).abs() < 1e-10);
     }
 
     #[test]
