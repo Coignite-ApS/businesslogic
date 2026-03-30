@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { CostDetails, QualityMetrics, ToolAnalyticsData } from '../types';
+import type { CostDetails, QualityMetrics, ToolAnalyticsData, RetrievalMetrics } from '../types';
 
 export function useObservatoryApi(api: any) {
 	const loading = ref(false);
@@ -28,5 +28,7 @@ export function useObservatoryApi(api: any) {
 			request<QualityMetrics>(() => api.get('/assistant/admin/quality-metrics', { params: { days } })),
 		fetchToolAnalytics: (days = 30) =>
 			request<ToolAnalyticsData>(() => api.get('/assistant/admin/tool-analytics', { params: { days } })),
+		fetchRetrievalMetrics: (days = 30) =>
+			request<RetrievalMetrics>(() => api.get('/assistant/admin/retrieval-metrics', { params: { days } })),
 	};
 }

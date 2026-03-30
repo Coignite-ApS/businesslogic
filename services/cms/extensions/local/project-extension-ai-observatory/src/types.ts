@@ -38,3 +38,31 @@ export interface ToolAnalyticsData {
   top_chains: Array<{ chain: string; count: number }>;
   unused_tools: string[];
 }
+
+export interface RetrievalMetrics {
+  total_searches: number;
+  total_asks: number;
+  avg_similarity: number;
+  avg_context_utilization: number;
+  curated_hit_rate: number;
+  daily_volume: Array<{ date: string; searches: number; asks: number }>;
+  similarity_distribution: Array<{ bucket: string; count: number }>;
+  confidence_breakdown: Record<string, number>;
+  kb_performance: Array<{
+    kb_id: string;
+    kb_name: string;
+    search_count: number;
+    ask_count: number;
+    avg_similarity: number;
+    avg_utilization: number;
+    curated_hit_rate: number;
+    avg_search_latency_ms: number;
+  }>;
+  curated_stats: {
+    total_curated: number;
+    total_hits: number;
+    override_count: number;
+    boost_count: number;
+  };
+  search_latency: { p50: number; p95: number; p99: number; sample_size: number };
+}
