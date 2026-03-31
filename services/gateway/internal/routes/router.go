@@ -222,6 +222,8 @@ func (r *Router) setupInternalRoutes() {
 		case http.MethodGet:
 			if path == "/internal/api-keys/" || path == "/internal/api-keys" {
 				r.apiKeyHandler.List(w, req)
+			} else if path == "/internal/api-keys/check-live" {
+				r.apiKeyHandler.CheckLiveKey(w, req)
 			} else {
 				r.apiKeyHandler.Get(w, req)
 			}

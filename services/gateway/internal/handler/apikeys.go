@@ -384,12 +384,12 @@ type autoProvisionRequest struct {
 }
 
 type autoProvisionResponse struct {
-	Provisioned bool          `json:"provisioned"`
-	Message     string        `json:"message,omitempty"`
-	Keys        []keyResponse `json:"keys,omitempty"`
+	Provisioned bool         `json:"provisioned"`
+	Message     string       `json:"message,omitempty"`
+	Key         *keyResponse `json:"key,omitempty"`
 }
 
-// AutoProvision creates test + live keys for an account that has none. Idempotent.
+// AutoProvision creates a test key for an account that has none. Idempotent.
 func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
 	var req autoProvisionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -419,66 +419,85 @@ func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate both keys inside a transaction
-	tx, err := h.db.Begin(r.Context())
+	rawBytes := make([]byte, 48)
+	if _, err := rand.Read(rawBytes); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
+		return
+	}
+	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
+	hash := sha256.Sum256([]byte(rawKey))
+	keyHash := hex.EncodeToString(hash[:])
+	keyPrefix := rawKey[:11]
+
+	var resp keyResponse
+	var permJSON []byte
+	err = h.db.QueryRow(r.Context(), `
+		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
+			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
+		VALUES ($1, $2, $3, 'test', 'Test', NULL, '{}', '{}', NULL, NULL, NULL)
+		RETURNING id, key_prefix, account_id, name, environment, permissions,
+			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
+			expires_at, last_used_at, created_at
+	`, keyHash, keyPrefix, req.AccountID,
+	).Scan(
+		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
+		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
+		&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
+	)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "transaction failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
 		return
 	}
-	defer tx.Rollback(r.Context())
-
-	var createdKeys []keyResponse
-
-	for _, env := range []string{"test", "live"} {
-		rawBytes := make([]byte, 48)
-		if _, err := rand.Read(rawBytes); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
-			return
-		}
-		rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
-		hash := sha256.Sum256([]byte(rawKey))
-		keyHash := hex.EncodeToString(hash[:])
-		keyPrefix := rawKey[:11]
-
-		name := "Test"
-		if env == "live" {
-			name = "Live"
-		}
-
-		var resp keyResponse
-		var permJSON []byte
-		err = tx.QueryRow(r.Context(), `
-			INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
-				permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
-			VALUES ($1, $2, $3, $4, $5, NULL, '{}', '{}', NULL, NULL, NULL)
-			RETURNING id, key_prefix, account_id, name, environment, permissions,
-				allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-				expires_at, last_used_at, created_at
-		`, keyHash, keyPrefix, req.AccountID, env, name,
-		).Scan(
-			&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
-			&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
-			&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
-		)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
-			return
-		}
-		resp.Permissions = nil // full access
-		resp.RawKey = rawKey
-		createdKeys = append(createdKeys, resp)
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "commit failed"})
-		return
-	}
+	resp.Permissions = nil // full access
+	resp.RawKey = rawKey
 
 	h.invalidateAccountCache(r, req.AccountID)
 
 	writeJSON(w, http.StatusCreated, autoProvisionResponse{
 		Provisioned: true,
-		Keys:        createdKeys,
+		Key:         &resp,
+	})
+}
+
+type checkLiveKeyResponse struct {
+	HasLiveKey bool `json:"has_live_key"`
+	KeyCount   int  `json:"key_count"`
+}
+
+// CheckLiveKey returns whether an account has any live-environment non-revoked keys.
+func (h *APIKeyHandler) CheckLiveKey(w http.ResponseWriter, r *http.Request) {
+	accountID := r.URL.Query().Get("account_id")
+	if accountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "account_id query param required"})
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT environment FROM api_keys
+		WHERE account_id = $1 AND revoked_at IS NULL
+	`, accountID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "query failed"})
+		return
+	}
+	defer rows.Close()
+
+	var total int
+	var hasLive bool
+	for rows.Next() {
+		var env string
+		if err := rows.Scan(&env); err != nil {
+			continue
+		}
+		total++
+		if env == "live" {
+			hasLive = true
+		}
+	}
+
+	writeJSON(w, http.StatusOK, checkLiveKeyResponse{
+		HasLiveKey: hasLive,
+		KeyCount:   total,
 	})
 }
 

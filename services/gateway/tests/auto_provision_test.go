@@ -24,7 +24,7 @@ func setupAutoProvisionRouter(t *testing.T, mock pgxmock.PgxPoolIface) *routes.R
 	})
 }
 
-func TestAutoProvision_FirstCall_CreatesBothKeys(t *testing.T) {
+func TestAutoProvision_FirstCall_CreatesTestKey(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -38,12 +38,9 @@ func TestAutoProvision_FirstCall_CreatesBothKeys(t *testing.T) {
 		WithArgs(testAutoProvisionAccountID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
-	// Expect transaction begin
-	mock.ExpectBegin()
-
-	// Expect INSERT for test key (5 args: keyHash, keyPrefix, accountID, env, name)
+	// Expect INSERT for test key (3 args: keyHash, keyPrefix, accountID)
 	mock.ExpectQuery(`INSERT INTO api_keys`).
-		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), testAutoProvisionAccountID, "test", "Test").
+		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), testAutoProvisionAccountID).
 		WillReturnRows(pgxmock.NewRows([]string{
 			"id", "key_prefix", "account_id", "name", "environment", "permissions",
 			"allowed_ips", "allowed_origins", "rate_limit_rps", "monthly_quota",
@@ -52,21 +49,6 @@ func TestAutoProvision_FirstCall_CreatesBothKeys(t *testing.T) {
 			"id-test-1", "bl_testXXX", testAutoProvisionAccountID, "Test", "test", nil,
 			[]string{}, []string{}, nil, nil, nil, nil, now,
 		))
-
-	// Expect INSERT for live key
-	mock.ExpectQuery(`INSERT INTO api_keys`).
-		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), testAutoProvisionAccountID, "live", "Live").
-		WillReturnRows(pgxmock.NewRows([]string{
-			"id", "key_prefix", "account_id", "name", "environment", "permissions",
-			"allowed_ips", "allowed_origins", "rate_limit_rps", "monthly_quota",
-			"expires_at", "last_used_at", "created_at",
-		}).AddRow(
-			"id-live-1", "bl_liveXXX", testAutoProvisionAccountID, "Live", "live", nil,
-			[]string{}, []string{}, nil, nil, nil, nil, now,
-		))
-
-	// Expect commit
-	mock.ExpectCommit()
 
 	router := setupAutoProvisionRouter(t, mock)
 
@@ -91,27 +73,26 @@ func TestAutoProvision_FirstCall_CreatesBothKeys(t *testing.T) {
 		t.Errorf("expected provisioned=true, got %v", resp["provisioned"])
 	}
 
-	keys, ok := resp["keys"].([]interface{})
-	if !ok || len(keys) != 2 {
-		t.Errorf("expected 2 keys, got %v", resp["keys"])
+	key, ok := resp["key"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected key object in response, got %v", resp["key"])
 	}
 
-	// Verify key environments
-	key0 := keys[0].(map[string]interface{})
-	key1 := keys[1].(map[string]interface{})
-	if key0["environment"] != "test" {
-		t.Errorf("expected first key environment=test, got %v", key0["environment"])
+	if key["environment"] != "test" {
+		t.Errorf("expected key environment=test, got %v", key["environment"])
 	}
-	if key1["environment"] != "live" {
-		t.Errorf("expected second key environment=live, got %v", key1["environment"])
+	if key["name"] != "Test" {
+		t.Errorf("expected key name=Test, got %v", key["name"])
 	}
 
 	// raw_key must be present (only surfaced at creation time)
-	if key0["raw_key"] == "" || key0["raw_key"] == nil {
+	if key["raw_key"] == "" || key["raw_key"] == nil {
 		t.Error("expected raw_key in response for test key")
 	}
-	if key1["raw_key"] == "" || key1["raw_key"] == nil {
-		t.Error("expected raw_key in response for live key")
+
+	// keys array must NOT be present
+	if resp["keys"] != nil {
+		t.Errorf("expected no keys array in response, got %v", resp["keys"])
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -126,10 +107,10 @@ func TestAutoProvision_SecondCall_NoOp(t *testing.T) {
 	}
 	defer mock.Close()
 
-	// Expect count query → 2 (account already has keys)
+	// Expect count query → 1 (account already has a key)
 	mock.ExpectQuery(`SELECT count\(\*\) FROM api_keys WHERE account_id = \$1 AND revoked_at IS NULL`).
 		WithArgs(testAutoProvisionAccountID).
-		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
 
 	// No transaction, no inserts expected
 
@@ -158,8 +139,8 @@ func TestAutoProvision_SecondCall_NoOp(t *testing.T) {
 	if resp["message"] != "account already has keys" {
 		t.Errorf("expected no-op message, got %v", resp["message"])
 	}
-	if resp["keys"] != nil {
-		t.Errorf("expected no keys in response, got %v", resp["keys"])
+	if resp["key"] != nil {
+		t.Errorf("expected no key in response, got %v", resp["key"])
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -202,6 +183,109 @@ func TestAutoProvision_MissingAccountID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/internal/api-keys/auto-provision", strings.NewReader(body))
 	req.Header.Set("X-Internal-Secret", testInternalSecret)
 	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestCheckLiveKey_HasLiveKey(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT environment FROM api_keys`).
+		WithArgs(testAutoProvisionAccountID).
+		WillReturnRows(pgxmock.NewRows([]string{"environment"}).
+			AddRow("test").
+			AddRow("live"))
+
+	router := setupAutoProvisionRouter(t, mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/api-keys/check-live?account_id="+testAutoProvisionAccountID, nil)
+	req.Header.Set("X-Internal-Secret", testInternalSecret)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal("failed to decode response:", err)
+	}
+
+	if resp["has_live_key"] != true {
+		t.Errorf("expected has_live_key=true, got %v", resp["has_live_key"])
+	}
+	if resp["key_count"] != float64(2) {
+		t.Errorf("expected key_count=2, got %v", resp["key_count"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %s", err)
+	}
+}
+
+func TestCheckLiveKey_NoLiveKey(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT environment FROM api_keys`).
+		WithArgs(testAutoProvisionAccountID).
+		WillReturnRows(pgxmock.NewRows([]string{"environment"}).
+			AddRow("test"))
+
+	router := setupAutoProvisionRouter(t, mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/api-keys/check-live?account_id="+testAutoProvisionAccountID, nil)
+	req.Header.Set("X-Internal-Secret", testInternalSecret)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal("failed to decode response:", err)
+	}
+
+	if resp["has_live_key"] != false {
+		t.Errorf("expected has_live_key=false, got %v", resp["has_live_key"])
+	}
+	if resp["key_count"] != float64(1) {
+		t.Errorf("expected key_count=1, got %v", resp["key_count"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %s", err)
+	}
+}
+
+func TestCheckLiveKey_MissingAccountID(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	router := setupAutoProvisionRouter(t, mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/api-keys/check-live", nil)
+	req.Header.Set("X-Internal-Secret", testInternalSecret)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
