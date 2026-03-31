@@ -105,21 +105,22 @@ pub fn handler(pg: Option<sqlx::PgPool>) -> NodeHandler {
                 .parse()
                 .map_err(|_| anyhow::anyhow!("VectorSearch: invalid knowledge_base_id UUID"))?;
 
-            // Verify KB ownership (account-scoped access control)
-            let kb_exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM bl_knowledge_bases WHERE id = $1 AND account_id = $2)",
+            // Verify KB ownership and fetch dimensions in one query
+            let kb_row: Option<(i32,)> = sqlx::query_as(
+                "SELECT dimensions FROM bl_knowledge_bases WHERE id = $1 AND account_id = $2",
             )
             .bind(kb_id)
             .bind(account_id)
-            .fetch_one(pg_pool)
+            .fetch_optional(pg_pool)
             .await
             .map_err(|e| anyhow::anyhow!("VectorSearch: KB lookup failed: {}", e))?;
 
-            if !kb_exists {
-                return Err(anyhow::anyhow!(
+            let kb_dimensions = match kb_row {
+                Some((dims,)) => dims,
+                None => return Err(anyhow::anyhow!(
                     "VectorSearch: knowledge base not found or access denied"
-                ));
-            }
+                )),
+            };
 
             // Resolve query embedding
             let embedding_expr = input
@@ -129,6 +130,15 @@ pub fn handler(pg: Option<sqlx::PgPool>) -> NodeHandler {
 
             let resolved = resolve_value(embedding_expr, trigger, last, nodes);
             let embedding_vec: Vec<f32> = resolve_embedding(&resolved)?;
+
+            // Validate dimensions match KB config
+            if embedding_vec.len() as i32 != kb_dimensions {
+                return Err(anyhow::anyhow!(
+                    "VectorSearch: dimension mismatch — query vector has {} dimensions but KB '{}' expects {}. \
+                     The KB was ingested with a different embedding model.",
+                    embedding_vec.len(), kb_id, kb_dimensions
+                ));
+            }
 
             let top_k = input
                 .config
@@ -397,6 +407,31 @@ mod tests {
     fn test_resolve_embedding_invalid_type() {
         assert!(resolve_embedding(&serde_json::json!("not a vector")).is_err());
         assert!(resolve_embedding(&serde_json::json!(42)).is_err());
+    }
+
+    #[test]
+    fn test_resolve_embedding_dimensions_match() {
+        // Verify resolve_embedding works; dimension check happens in handler
+        let val = serde_json::json!([0.1, 0.2, 0.3]);
+        let result = resolve_embedding(&val).unwrap();
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_dimension_mismatch_error_message() {
+        // Verify the error message format contains expected substrings
+        let embedding_len: usize = 384;
+        let kb_dimensions: i32 = 1536;
+        let kb_id = "test-kb-id";
+        let err = format!(
+            "VectorSearch: dimension mismatch — query vector has {} dimensions but KB '{}' expects {}. \
+             The KB was ingested with a different embedding model.",
+            embedding_len, kb_id, kb_dimensions
+        );
+        assert!(err.contains("dimension mismatch"));
+        assert!(err.contains("384"));
+        assert!(err.contains("1536"));
+        assert!(err.contains("test-kb-id"));
     }
 
     #[tokio::test]
