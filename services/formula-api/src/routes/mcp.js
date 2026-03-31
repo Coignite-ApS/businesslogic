@@ -2,7 +2,6 @@ import { createRequire } from 'node:module';
 import { LRUCache } from 'lru-cache';
 import { getOrRebuild, executeCalculatorCore, loadAccountLimits, refreshRedisTtl } from './calculators.js';
 import { validateGatewayAuth } from '../utils/auth.js';
-import { getClientIp, checkAllowlist, setCorsHeaders } from '../utils/allowlist.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import * as stats from '../services/stats.js';
 import { routeByCalcId } from '../utils/routing.js';
@@ -112,8 +111,6 @@ export async function registerRoutes(app) {
   app.options('/mcp/calculator/:id', async (req, reply) => {
     const calc = await getOrRebuild(req.params.id).catch(() => null);
     if (!calc) return reply.code(204).send();
-    const origin = req.headers['origin'] || null;
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
     return reply.code(204).send();
   });
 
@@ -185,15 +182,6 @@ export async function registerRoutes(app) {
         const start = Date.now();
         const calcTestFlag = calc.test ?? undefined;
         const stat = (opts) => stats.record({ calculatorId: calcId, responseTimeMs: Date.now() - start, test: calcTestFlag, ...opts });
-
-        // Allowlist
-        const clientIp = getClientIp(req);
-        const origin = req.headers['origin'] || null;
-        if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-          stat({ cached: false, error: true, errorMessage: 'Access denied' });
-          return reply.send(jsonRpcError(id, INVALID_REQUEST, 'Access denied', { httpStatus: 403 }));
-        }
-        setCorsHeaders(reply, origin, calc.allowedOrigins);
 
         // Rate limiting
         const accountId = calc.accountId;
