@@ -119,22 +119,78 @@
 					/>
 				</div>
 
-				<!-- Edit Key Permissions Dialog -->
+				<!-- Edit Key Dialog -->
 				<div v-if="editingKey" class="edit-perms-overlay" @click.self="editingKey = null">
 					<div class="edit-perms-dialog">
 						<div class="edit-perms-header">
-							<h3>Edit Permissions — {{ editingKey.name }}</h3>
+							<h3>Edit Key — {{ editingKey.name }}</h3>
 							<v-icon name="close" clickable @click="editingKey = null" />
 						</div>
-						<resource-picker
-							:api="api"
-							:account-id="activeAccountId"
-							:model-value="editKeyPerms"
-							@update:model-value="editKeyPerms = $event"
-						/>
+
+						<!-- MCP Endpoint -->
+						<div class="edit-section">
+							<label class="edit-label">MCP Endpoint</label>
+							<div class="mcp-endpoint-row">
+								<code class="mcp-endpoint-url">{{ GATEWAY_URL }}/v1/mcp/{{ editingKey.key_prefix }}</code>
+								<v-icon
+									name="content_copy"
+									small
+									clickable
+									class="copy-icon"
+									@click="copyToClipboard(`${GATEWAY_URL}/v1/mcp/${editingKey.key_prefix}`)"
+								/>
+							</div>
+						</div>
+
+						<!-- Integration Snippet -->
+						<div class="edit-section">
+							<label class="edit-label">MCP Config Snippet</label>
+							<div class="snippet-block">
+								<pre class="snippet-code">{{ `{\n  "mcpServers": {\n    "businesslogic": {\n      "url": "${GATEWAY_URL}/v1/mcp/${editingKey.key_prefix}"\n    }\n  }\n}` }}</pre>
+								<v-icon
+									name="content_copy"
+									small
+									clickable
+									class="copy-icon snippet-copy"
+									@click="copyToClipboard(`{\n  \"mcpServers\": {\n    \"businesslogic\": {\n      \"url\": \"${GATEWAY_URL}/v1/mcp/${editingKey.key_prefix}\"\n    }\n  }\n}`)"
+								/>
+							</div>
+						</div>
+
+						<!-- Permissions -->
+						<div class="edit-section">
+							<label class="edit-label">Permissions</label>
+							<resource-picker
+								:api="api"
+								:account-id="activeAccountId"
+								:model-value="editKeyPerms"
+								@update:model-value="editKeyPerms = $event"
+							/>
+						</div>
+
+						<!-- Origin / IP Restrictions -->
+						<div class="edit-section">
+							<label class="edit-label">Allowed Origins (one per line)</label>
+							<textarea
+								v-model="editOrigins"
+								class="restriction-textarea"
+								placeholder="https://example.com&#10;https://app.example.com"
+								rows="3"
+							/>
+						</div>
+						<div class="edit-section">
+							<label class="edit-label">Allowed IPs (one per line)</label>
+							<textarea
+								v-model="editIPs"
+								class="restriction-textarea"
+								placeholder="192.168.1.0/24&#10;10.0.0.1"
+								rows="3"
+							/>
+						</div>
+
 						<div class="edit-perms-actions">
 							<v-button secondary @click="editingKey = null">Cancel</v-button>
-							<v-button :loading="savingPerms" @click="handleSavePerms">Save Permissions</v-button>
+							<v-button :loading="savingPerms" @click="handleSavePerms">Save</v-button>
 						</div>
 					</div>
 				</div>
@@ -152,40 +208,6 @@
 						/>
 					</div>
 				</v-notice>
-			</div>
-
-			<!-- Legacy Formula Tokens -->
-			<div class="section" v-if="formulaTokens.length > 0">
-				<h2 class="section-title">
-					Formula Tokens
-					<v-chip small class="legacy-chip">Legacy</v-chip>
-				</h2>
-				<p class="section-desc">Per-calculator tokens. Migrate to API Keys above for resource-level permissions.</p>
-
-				<div class="tokens-table">
-					<div class="tokens-header">
-						<span>Label</span>
-						<span>Created</span>
-						<span>Last Used</span>
-						<span>Status</span>
-						<span></span>
-					</div>
-					<div v-for="tok in formulaTokens" :key="tok.id" class="tokens-row">
-						<span class="token-label">{{ tok.label }}</span>
-						<span class="token-date">{{ formatDate(tok.date_created) }}</span>
-						<span class="token-date">{{ tok.last_used_at ? formatDate(tok.last_used_at) : '—' }}</span>
-						<span>
-							<v-chip small :class="tok.revoked ? 'revoked-chip' : 'active-chip'">
-								{{ tok.revoked ? 'Revoked' : 'Active' }}
-							</v-chip>
-						</span>
-						<span class="token-actions">
-							<v-button v-if="!tok.revoked" x-small kind="danger" secondary @click="handleRevoke(tok.id)">
-								Revoke
-							</v-button>
-						</span>
-					</div>
-				</div>
 			</div>
 
 			<!-- Account Settings -->
@@ -269,18 +291,13 @@ const route = useRoute();
 const {
 	accounts, activeAccountId, subscription, loading, error,
 	fetchAccounts, setActiveAccount, fetchSubscription, updateAccount,
-	formulaTokens, fetchFormulaTokens, createFormulaToken, revokeFormulaToken,
-	apiKeys, fetchApiKeys, createApiKey, revokeApiKey, rotateApiKey,
+	apiKeys, fetchApiKeys, createApiKey, updateApiKey, revokeApiKey, rotateApiKey,
 } = useAccount(api);
 
 const accountName = ref('');
 const saving = ref(false);
 const calculatorCount = ref(0);
 const apiCallCount = ref(0);
-const newTokenLabel = ref('');
-const creatingToken = ref(false);
-const newlyCreatedToken = ref<string | null>(null);
-
 const newKeyName = ref('');
 const newKeyEnv = ref('live');
 const creatingKey = ref(false);
@@ -300,6 +317,10 @@ const newKeyPerms = ref<PermissionSelection>(defaultPerms());
 const editingKey = ref<any>(null);
 const editKeyPerms = ref<PermissionSelection>(defaultPerms());
 const savingPerms = ref(false);
+const editOrigins = ref('');
+const editIPs = ref('');
+
+const GATEWAY_URL = 'https://api.businesslogic.online';
 
 const isSubscriptionRoute = computed(() => route.path.includes('/subscription'));
 
@@ -365,29 +386,6 @@ async function handleSaveName() {
 	saving.value = false;
 }
 
-async function handleCreateToken() {
-	if (!newTokenLabel.value.trim()) return;
-	creatingToken.value = true;
-	newlyCreatedToken.value = null;
-	const result = await createFormulaToken(newTokenLabel.value.trim());
-	if (result) {
-		newlyCreatedToken.value = result.token;
-		newTokenLabel.value = '';
-	}
-	creatingToken.value = false;
-}
-
-async function handleRevoke(id: string) {
-	if (!confirm('Are you sure you want to revoke this token? This action cannot be undone.')) return;
-	await revokeFormulaToken(id);
-}
-
-function copyNewToken() {
-	if (newlyCreatedToken.value) {
-		navigator.clipboard.writeText(newlyCreatedToken.value);
-	}
-}
-
 function copyToClipboard(text: string | null) {
 	if (text) navigator.clipboard.writeText(text);
 }
@@ -418,13 +416,17 @@ function getPermsSummary(perms: any): string {
 function openEditKey(key: any) {
 	editingKey.value = key;
 	editKeyPerms.value = parsePermissions(key.permissions);
+	editOrigins.value = (key.allowed_origins || []).join('\n');
+	editIPs.value = (key.allowed_ips || []).join('\n');
 }
 
 async function handleSavePerms() {
 	if (!editingKey.value) return;
 	savingPerms.value = true;
 	const permissions = buildPermissions(editKeyPerms.value);
-	await updateApiKey(editingKey.value.id, { permissions });
+	const allowed_origins = editOrigins.value.split('\n').map((s) => s.trim()).filter(Boolean);
+	const allowed_ips = editIPs.value.split('\n').map((s) => s.trim()).filter(Boolean);
+	await updateApiKey(editingKey.value.id, { permissions, allowed_origins, allowed_ips });
 	editingKey.value = null;
 	savingPerms.value = false;
 }
@@ -453,9 +455,7 @@ watch(currentAccount, (acct) => {
 watch(activeAccountId, () => {
 	fetchSubscription();
 	fetchUsageStats();
-	fetchFormulaTokens();
 	fetchApiKeys();
-	newlyCreatedToken.value = null;
 	newlyCreatedKey.value = null;
 });
 
@@ -463,7 +463,6 @@ onMounted(async () => {
 	await fetchAccounts();
 	await fetchSubscription();
 	await fetchUsageStats();
-	await fetchFormulaTokens();
 	await fetchApiKeys();
 });
 </script>
@@ -646,12 +645,6 @@ onMounted(async () => {
 	--v-chip-color: #fff;
 }
 
-.legacy-chip {
-	--v-chip-background-color: var(--theme--foreground-subdued);
-	--v-chip-color: #fff;
-	margin-left: 8px;
-	vertical-align: middle;
-}
 
 .tokens-empty {
 	border: 1px solid var(--theme--border-color);
@@ -795,5 +788,75 @@ onMounted(async () => {
 .sidebar-info code {
 	font-size: 12px;
 	word-break: break-all;
+}
+
+.edit-section {
+	margin-bottom: 16px;
+}
+
+.edit-label {
+	display: block;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--theme--foreground-subdued);
+	margin-bottom: 6px;
+}
+
+.mcp-endpoint-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background: var(--theme--background-subdued);
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+}
+
+.mcp-endpoint-url {
+	flex: 1;
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
+	font-size: 12px;
+	word-break: break-all;
+}
+
+.snippet-block {
+	position: relative;
+	background: var(--theme--background-subdued);
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	padding: 12px;
+}
+
+.snippet-code {
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
+	font-size: 12px;
+	margin: 0;
+	white-space: pre;
+	overflow-x: auto;
+}
+
+.snippet-copy {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+}
+
+.restriction-textarea {
+	width: 100%;
+	padding: 8px 12px;
+	background: var(--theme--background);
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	color: var(--theme--foreground);
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
+	font-size: 13px;
+	resize: vertical;
+	box-sizing: border-box;
+}
+
+.restriction-textarea:focus {
+	outline: none;
+	border-color: var(--theme--primary);
 }
 </style>

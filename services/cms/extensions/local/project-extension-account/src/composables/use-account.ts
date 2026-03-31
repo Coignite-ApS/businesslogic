@@ -152,41 +152,6 @@ export function useAccount(api: any) {
 		}
 	}
 
-	// ─── Formula token management ───
-
-	const formulaTokens = ref<any[]>([]);
-
-	async function fetchFormulaTokens() {
-		try {
-			const { data } = await api.get('/calc/formula-tokens');
-			formulaTokens.value = data.data || [];
-		} catch {
-			formulaTokens.value = [];
-		}
-	}
-
-	async function createFormulaToken(label: string): Promise<{ id: string; label: string; token: string } | null> {
-		error.value = null;
-		try {
-			const { data } = await api.post('/calc/formula-tokens', { label });
-			await fetchFormulaTokens();
-			return data;
-		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err.message;
-			return null;
-		}
-	}
-
-	async function revokeFormulaToken(id: string) {
-		error.value = null;
-		try {
-			await api.delete(`/calc/formula-tokens/${id}`);
-			await fetchFormulaTokens();
-		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err.message;
-		}
-	}
-
 	// ─── API key management (gateway-backed) ───
 
 	const apiKeys = ref<any[]>([]);
@@ -270,10 +235,6 @@ export function useAccount(api: any) {
 		updateAccount,
 		startCheckout,
 		openPortal,
-		formulaTokens,
-		fetchFormulaTokens,
-		createFormulaToken,
-		revokeFormulaToken,
 		apiKeys,
 		fetchApiKeys,
 		createApiKey,
