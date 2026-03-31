@@ -9,6 +9,8 @@ import { config } from './config.js';
 import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
 import { initBudget, closeBudget } from './services/budget.js';
+import { initWidgetCache, closeWidgetCache } from './widgets/cache.js';
+import { loadBuiltinTemplates } from './widgets/resolver.js';
 import { startCleanup, stopCleanup } from './utils/rate-limit.js';
 import { scheduleAggregation, stopAggregation } from './services/metrics-aggregator.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
@@ -99,6 +101,7 @@ const shutdown = async (signal) => {
     stopCleanup();
     stopAggregation();
     await closeBudget();
+    await closeWidgetCache();
     await closeDb();
     await shutdownTelemetry();
     process.exit(0);
@@ -128,7 +131,12 @@ export async function start() {
     if (config.redisUrl) {
       await initBudget(config.redisUrl);
       app.log.info('Budget Redis connected');
+      initWidgetCache(config.redisUrl);
+    } else {
+      initWidgetCache(null);
     }
+    loadBuiltinTemplates();
+    app.log.info(`Widget cache initialized (${config.redisUrl ? 'L1+L2' : 'L1-only'})`);
     startCleanup();
     if (config.databaseUrl) scheduleAggregation();
     await app.listen({ port: config.port, host: config.host });
