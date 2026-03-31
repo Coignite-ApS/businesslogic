@@ -12,6 +12,7 @@ import { calculateCost } from '../utils/cost.js';
 import { checkAiQuota, getActiveAccount } from '../utils/auth.js';
 import { checkBudget, recordCost, getConversationBudgetWarning, injectBudgetWarning } from '../services/budget.js';
 import { compressIfNeeded } from '../services/summarize.js';
+import { resolveWidget } from '../widgets/resolver.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -320,6 +321,19 @@ export async function registerRoutes(app) {
           });
 
           sendSSE(reply, 'tool_result', { name: tu.name, id: tu.id, result, is_error: isError });
+
+          // Widget resolution (non-blocking, optional)
+          if (!isError) {
+            try {
+              const resourceId = tu.input?.calculator_id || tu.input?.knowledge_base_id || null;
+              const widgetTree = await resolveWidget(tu.name, result, { resourceId });
+              if (widgetTree) {
+                sendSSE(reply, 'widget', { tool_id: tu.id, tree: widgetTree });
+              }
+            } catch {
+              // Widget resolution is optional — skip silently on failure
+            }
+          }
         }
 
         // Inject budget warning into last tool result (preserves prompt cache)
