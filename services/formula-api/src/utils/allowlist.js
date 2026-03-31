@@ -129,7 +129,7 @@ export function setCorsHeaders(reply, origin, allowedOrigins) {
   if (!origin || !allowedOrigins || !allowedOrigins.length) return;
   if (checkOrigin(allowedOrigins, origin)) {
     reply.header('Access-Control-Allow-Origin', origin);
-    reply.header('Access-Control-Allow-Headers', 'Content-Type, X-Auth-Token');
+    reply.header('Access-Control-Allow-Headers', 'Content-Type');
     reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     reply.header('Vary', 'Origin');
   }

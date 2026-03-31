@@ -844,7 +844,7 @@ export async function registerRoutes(app) {
     }
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
-    // Auth: admin token (internal), gateway HMAC, or legacy token
+    // Auth: admin token (internal) or gateway HMAC
     if (!checkAdminToken(req)) {
       // Admin token valid — trusted internal caller, skip further auth
     } else if (isGatewayRequest(req)) {
@@ -854,11 +854,6 @@ export async function registerRoutes(app) {
         return reply.code(403).send({ error: 'Account does not own this calculator' });
       }
     } else {
-      if (calc.token) {
-        const provided = req.headers['x-auth-token'];
-        if (!provided) return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-        if (!safeTokenCompare(provided, calc.token)) return reply.code(403).send({ error: 'Invalid auth token' });
-      }
       const clientIp = getClientIp(req);
       const origin = req.headers['origin'] || null;
       if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
@@ -905,12 +900,10 @@ export async function registerRoutes(app) {
       toolName: calc.mcp.toolName,
       toolDescription: calc.mcp.toolDescription,
       responseTemplate: calc.mcp.responseTemplate ?? null,
-      auth: { type: 'header', name: 'X-Auth-Token' },
       claudeDesktop: {
         mcpServers: {
           [calc.mcp.toolName]: {
             url: `${baseUrl}${endpoint}`,
-            headers: { 'X-Auth-Token': '{token}' },
           },
         },
       },
@@ -1268,19 +1261,6 @@ export async function registerRoutes(app) {
       }
       authAccountId = gw.accountId;
     } else {
-      // Legacy token auth
-      if (calc.token) {
-        const provided = req.headers['x-auth-token'];
-        if (!provided) {
-          stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
-          return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-        }
-        if (!safeTokenCompare(provided, calc.token)) {
-          stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
-          return reply.code(403).send({ error: 'Invalid auth token' });
-        }
-      }
-
       // Allowlist check (only for direct requests, gateway handles this)
       const clientIp = getClientIp(req);
       const origin = req.headers['origin'] || null;

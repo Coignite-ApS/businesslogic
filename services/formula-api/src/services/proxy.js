@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 
 const FORWARD_HEADERS = [
-  'content-type', 'x-auth-token', 'x-admin-token',
+  'content-type', 'x-admin-token',
   'origin', 'cf-connecting-ip', 'x-forwarded-for',
   'x-forwarded-host', 'x-forwarded-proto', 'accept',
 ];

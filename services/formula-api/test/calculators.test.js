@@ -93,13 +93,13 @@ const createSimple = async (overrides = {}) => {
   return { status, data };
 };
 
-const exec = (id, body, token = DEFAULT_TOKEN) =>
-  post(`/execute/calculator/${id}`, body, { 'X-Auth-Token': token });
+const exec = (id, body) =>
+  post(`/execute/calculator/${id}`, body);
 
-const execRaw = async (id, body, token = DEFAULT_TOKEN) => {
+const execRaw = async (id, body) => {
   const res = await fetch(`${BASE}/execute/calculator/${id}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
     body: JSON.stringify(body),
   });
   const text = await res.text();
@@ -1158,34 +1158,6 @@ describe('Calculators', () => {
     });
   });
 
-  // ============================================================
-  // DESCRIBE AUTH (X-Auth-Token)
-  // ============================================================
-  describe('Describe auth (X-Auth-Token)', () => {
-    it('describe without X-Auth-Token returns 401', async () => {
-      const { data: calc } = await createSimple({ token: 'desc-secret' });
-      const res = await fetch(`${BASE}/calculator/${calc.calculatorId}/describe`);
-      assert.strictEqual(res.status, 401);
-      const data = await res.json();
-      assert.ok(data.error.includes('Missing'));
-    });
-
-    it('describe with wrong X-Auth-Token returns 403', async () => {
-      const { data: calc } = await createSimple({ token: 'desc-secret' });
-      const res = await fetch(`${BASE}/calculator/${calc.calculatorId}/describe`, {
-        headers: { 'X-Auth-Token': 'wrong-token' },
-      });
-      assert.strictEqual(res.status, 403);
-    });
-
-    it('describe with correct X-Auth-Token returns 200', async () => {
-      const tk = 'desc-correct';
-      const { data: calc } = await createSimple({ token: tk, name: 'DescAuth' });
-      const { status, data } = await get(`/calculator/${calc.calculatorId}/describe`, { 'X-Auth-Token': tk });
-      assert.strictEqual(status, 200);
-      assert.strictEqual(data.name, 'DescAuth');
-    });
-  });
 
   // ============================================================
   // FULL LIFECYCLE (create → get → list → describe → execute → patch → execute → delete → 410)
@@ -1309,21 +1281,12 @@ describe('Calculators', () => {
       });
       assert.strictEqual(patchToken, 200);
 
-      // Old token should fail
-      const oldR = await postNoAdmin(`/execute/calculator/${id}`, { price: 1, qty: 1 }, { 'X-Auth-Token': TOKEN });
-      assert.strictEqual(oldR.status, 403);
-
-      // New token should work
-      const newR = await postNoAdmin(`/execute/calculator/${id}`, { price: 1, qty: 1 }, { 'X-Auth-Token': 'new-token' });
-      assert.strictEqual(newR.status, 200);
-      assert.strictEqual(newR.data.total, 2);
-
       // 11. DELETE
       const { status: delStatus } = await del(`/calculator/${id}`);
       assert.strictEqual(delStatus, 204);
 
       // 12. GONE — execute after delete
-      const goneR = await postNoAdmin(`/execute/calculator/${id}`, {}, { 'X-Auth-Token': 'new-token' });
+      const goneR = await postNoAdmin(`/execute/calculator/${id}`, {});
       assert.strictEqual(goneR.status, 410);
 
       // GET after delete
@@ -1487,30 +1450,6 @@ describe('Calculators', () => {
       assert.strictEqual(data.result.content.length, 2);
       assert.ok(data.result.content[1].text.includes('Response template'));
       assert.ok(data.result.content[1].text.includes('{{sum1}}'));
-    });
-
-    it('tools/call without auth returns error', async () => {
-      const { data: c } = await createSimple({
-        mcp: { enabled: true, toolName: 'noauth_tool', toolDescription: 'No auth' },
-      });
-      const { data } = await mcpPost(c.calculatorId, {
-        jsonrpc: '2.0', id: 5, method: 'tools/call',
-        params: { name: 'noauth_tool', arguments: {} },
-      });
-      assert.ok(data.error);
-      assert.strictEqual(data.error.data.httpStatus, 401);
-    });
-
-    it('tools/call with wrong auth returns error', async () => {
-      const { data: c } = await createSimple({
-        mcp: { enabled: true, toolName: 'badauth_tool', toolDescription: 'Bad auth' },
-      });
-      const { data } = await mcpPost(c.calculatorId, {
-        jsonrpc: '2.0', id: 6, method: 'tools/call',
-        params: { name: 'badauth_tool', arguments: {} },
-      }, { 'X-Auth-Token': 'wrong-token' });
-      assert.ok(data.error);
-      assert.strictEqual(data.error.data.httpStatus, 403);
     });
 
     it('MCP disabled returns error for all methods', async () => {

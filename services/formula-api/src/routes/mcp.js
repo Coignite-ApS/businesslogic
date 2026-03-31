@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { LRUCache } from 'lru-cache';
 import { getOrRebuild, executeCalculatorCore, loadAccountLimits, refreshRedisTtl } from './calculators.js';
-import { safeTokenCompare, validateGatewayAuth } from '../utils/auth.js';
+import { validateGatewayAuth } from '../utils/auth.js';
 import { getClientIp, checkAllowlist, setCorsHeaders } from '../utils/allowlist.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import * as stats from '../services/stats.js';
@@ -185,19 +185,6 @@ export async function registerRoutes(app) {
         const start = Date.now();
         const calcTestFlag = calc.test ?? undefined;
         const stat = (opts) => stats.record({ calculatorId: calcId, responseTimeMs: Date.now() - start, test: calcTestFlag, ...opts });
-
-        // Token auth
-        if (calc.token) {
-          const provided = req.headers['x-auth-token'];
-          if (!provided) {
-            stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
-            return reply.send(jsonRpcError(id, INVALID_REQUEST, 'Missing X-Auth-Token header', { httpStatus: 401 }));
-          }
-          if (!safeTokenCompare(provided, calc.token)) {
-            stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
-            return reply.send(jsonRpcError(id, INVALID_REQUEST, 'Invalid auth token', { httpStatus: 403 }));
-          }
-        }
 
         // Allowlist
         const clientIp = getClientIp(req);
