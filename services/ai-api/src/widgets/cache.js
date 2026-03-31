@@ -13,6 +13,7 @@ function buildKey(toolName, resourceId) {
   return `${KEY_PREFIX}${toolName}:${resourceId || 'default'}`;
 }
 
+/** Initialize widget template cache. Pass null for L1-only mode. */
 export function initWidgetCache(redisUrl) {
   lru = new LRUCache({ max: L1_MAX, ttl: L1_TTL });
 
@@ -33,6 +34,7 @@ export function initWidgetCache(redisUrl) {
   }
 }
 
+/** Close Redis connection and clear LRU. */
 export async function closeWidgetCache() {
   if (redis) {
     try { await redis.quit(); } catch {}
@@ -41,10 +43,15 @@ export async function closeWidgetCache() {
   if (lru) { lru.clear(); lru = null; }
 }
 
+/**
+ * Get cached template. Returns undefined on miss, null for negative cache.
+ * Uses has() to distinguish stored null from absent key.
+ */
 export async function getCachedTemplate(toolName, resourceId) {
   if (!lru) return undefined;
   const key = buildKey(toolName, resourceId);
 
+  // has() needed: lru.get() returns undefined for both "no key" and "key is undefined"
   if (lru.has(key)) return lru.get(key);
 
   if (redis) {
@@ -61,6 +68,7 @@ export async function getCachedTemplate(toolName, resourceId) {
   return undefined;
 }
 
+/** Store template in L1 + L2. Pass null to negative-cache. */
 export async function setCachedTemplate(toolName, resourceId, value) {
   if (!lru) return;
   const key = buildKey(toolName, resourceId);
@@ -74,6 +82,7 @@ export async function setCachedTemplate(toolName, resourceId, value) {
   }
 }
 
+/** Clear L1 cache. L2 expires via TTL. */
 export function clearWidgetCache() {
   if (lru) lru.clear();
 }
