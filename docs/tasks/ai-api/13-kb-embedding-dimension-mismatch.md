@@ -1,6 +1,6 @@
 # AI API #13 — KB Embedding Dimension Mismatch (Bug)
 
-**Status:** in-progress
+**Status:** done
 **Service:** ai-api, flow
 **Priority:** Critical — silent data corruption risk
 
@@ -65,28 +65,32 @@ Change `embedding vector(384)` to `embedding vector` (untyped) in the schema. Th
 ## Key Tasks
 
 1. [x] Add dimension validation in `search.js` hybridSearch — hard error on mismatch
-2. [ ] Add dimension validation in `vector_search.rs` — hard error on mismatch
+2. [x] Add dimension validation in `vector_search.rs` — hard error on mismatch
 3. [x] Lock embedding model per KB at creation time (query always uses KB's model)
-4. [ ] Add `embedding_model` column to `bl_kb_chunks`, backfill from parent KB
-5. [ ] Migrate `embedding vector(384)` to untyped `embedding vector` (requires HNSW index rebuild)
-6. [ ] Add integration test: ingest with model A, search with model B → must error
-7. [ ] Add integration test: flip USE_LOCAL_EMBEDDINGS → existing KBs still use original model
-8. [ ] Audit all code paths that call embedding clients to ensure model consistency
+4. [x] Add `embedding_model` column to `bl_kb_chunks`, backfill from parent KB
+5. [x] Migrate `embedding vector(384)` to untyped `embedding vector` (requires HNSW index rebuild)
+6. [x] Add integration test: ingest with model A, search with model B → must error
+7. [x] Add integration test: flip USE_LOCAL_EMBEDDINGS → existing KBs still use original model
+8. [x] Audit all code paths that call embedding clients to ensure model consistency
 
 ### Implementation Notes (2026-03-31)
 
-- `src/services/embedding-factory.js` — new file with `createEmbeddingClientForKb(kb)`, `getModelDimensions(model)`, `MODEL_DIMENSIONS` map
-- `src/routes/kb.js` — KB create now stores `embedding_model` (locks at creation); search+ask now look up KB's model and pass `expectedDimensions` to hybridSearch
-- `src/services/search.js` — `hybridSearch()` now accepts optional `expectedDimensions`, throws clear error on mismatch
-- `test/embedding-factory.test.js` — unit tests for factory + dimension lookup + mismatch detection (229 tests passing)
+- `src/services/embedding-factory.js` — new file with `createEmbeddingClientForKb(kb)`, `getModelDimensions(model)`, `MODEL_DIMENSIONS` map, `LOCAL_EMBEDDING_MODEL` constant
+- `src/routes/kb.js` — KB create stores `embedding_model` (locks at creation); search+ask+curated use KB's locked model via factory; pass `expectedDimensions` to hybridSearch
+- `src/services/search.js` — `hybridSearch()` accepts optional `expectedDimensions`, throws clear error on mismatch
+- `src/services/ingest-worker.js` — uses `createEmbeddingClientForKb(kb)` instead of direct `EmbeddingClient`; stores `embedding_model` per chunk
+- `services/flow/crates/flow-engine/src/nodes/ai/vector_search.rs` — combined KB ownership + dimensions check; validates query vector length against KB config
+- `services/flow/migrations/003_kb_embedding_flex.sql` — relaxes `vector(384)` to untyped `vector`, adds `embedding_model` column to `bl_kb_chunks`, backfills from parent KB
+- `test/embedding-factory.test.js` — unit tests for factory + dimension lookup + mismatch detection
+- `test/embedding-safety.test.js` — model locking, toggle bypass, dimension mismatch, code inspection tests (237 tests passing)
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Searching a KB with the wrong embedding model produces a clear error, not wrong results
-- [ ] Changing USE_LOCAL_EMBEDDINGS does not affect existing KBs
-- [ ] New KBs lock their embedding model at creation time
-- [ ] Per-chunk embedding_model column exists and is populated
-- [ ] Vector column supports multiple dimensions (untyped)
-- [ ] All existing tests still pass after migration
+- [x] Searching a KB with the wrong embedding model produces a clear error, not wrong results
+- [x] Changing USE_LOCAL_EMBEDDINGS does not affect existing KBs
+- [x] New KBs lock their embedding model at creation time
+- [x] Per-chunk embedding_model column exists and is populated
+- [x] Vector column supports multiple dimensions (untyped)
+- [x] All existing tests still pass after migration
