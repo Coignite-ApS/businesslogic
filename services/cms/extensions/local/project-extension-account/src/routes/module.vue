@@ -137,7 +137,7 @@
 									small
 									clickable
 									class="copy-icon"
-									@click="copyToClipboard(`${GATEWAY_URL}/v1/mcp/${editingKey.key_prefix}`)"
+									@click="copyToClipboard(GATEWAY_URL + '/v1/mcp/' + editingKey.key_prefix)"
 								/>
 							</div>
 						</div>
@@ -146,13 +146,13 @@
 						<div class="edit-section">
 							<label class="edit-label">MCP Config Snippet</label>
 							<div class="snippet-block">
-								<pre class="snippet-code">{{ `{\n  "mcpServers": {\n    "businesslogic": {\n      "url": "${GATEWAY_URL}/v1/mcp/${editingKey.key_prefix}"\n    }\n  }\n}` }}</pre>
+								<pre class="snippet-code">{{ mcpSnippet(editingKey.key_prefix) }}</pre>
 								<v-icon
 									name="content_copy"
 									small
 									clickable
 									class="copy-icon snippet-copy"
-									@click="copyToClipboard(`{\n  \"mcpServers\": {\n    \"businesslogic\": {\n      \"url\": \"${GATEWAY_URL}/v1/mcp/${editingKey.key_prefix}\"\n    }\n  }\n}`)"
+									@click="copyToClipboard(mcpSnippet(editingKey.key_prefix))"
 								/>
 							</div>
 						</div>
@@ -388,6 +388,16 @@ async function handleSaveName() {
 
 function copyToClipboard(text: string | null) {
 	if (text) navigator.clipboard.writeText(text);
+}
+
+function mcpSnippet(keyPrefix: string): string {
+	return JSON.stringify({
+		mcpServers: {
+			businesslogic: {
+				url: `${GATEWAY_URL}/v1/mcp/${keyPrefix}`,
+			},
+		},
+	}, null, 2);
 }
 
 async function handleCreateKey() {
