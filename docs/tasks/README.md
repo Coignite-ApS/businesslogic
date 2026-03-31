@@ -28,7 +28,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 08 | Pricing & Billing (Tax, Enforcement, Tiers, Lifetime) | planned | [cms/08-pricing-billing.md](cms/08-pricing-billing.md) |
 | 09 | Event-Driven Communication & Client Data | planned | [cms/09-event-communication.md](cms/09-event-communication.md) |
 | 10 | Real-time Stats via WebSockets | planned | [cms/10-realtime-stats.md](cms/10-realtime-stats.md) |
-| 11 | Integration Tabs — Claude Skill & Cowork Plugin | planned | [cms/11-integration-tabs.md](cms/11-integration-tabs.md) |
+| 11 | Integration Tabs — Claude Skill & Cowork Plugin | completed | [cms/11-integration-tabs.md](cms/11-integration-tabs.md) |
 | 12 | Unsaved Changes Navigation Guard | completed | [cms/12-unsaved-changes-guard.md](cms/12-unsaved-changes-guard.md) |
 | 13 | OpenAPI Spec in Integration Tab | planned | [cms/13-openapi-integration-tab.md](cms/13-openapi-integration-tab.md) |
 | 14 | Cowork Plugin Integration Research | planned | [cms/14-cowork-plugin-integration.md](cms/14-cowork-plugin-integration.md) |
@@ -142,6 +142,7 @@ Infrastructure and multi-service concerns.
 | 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
 | 06 | MCP Server — Expose BusinessLogic as AI Tool | planned | [cross-cutting/06-mcp-server.md](cross-cutting/06-mcp-server.md) |
 | 07 | AI Safety Quick Fixes (4 items) | completed | [cross-cutting/07-ai-safety-quick-fixes.md](cross-cutting/07-ai-safety-quick-fixes.md) |
+| 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | planned | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
 
 ---
 
@@ -175,28 +176,37 @@ Build & test locally first. Infrastructure/launch comes after all building block
 | 7d | ai-api/09 | Progressive Tool Loading | 30-50% token reduction on simple queries, 1 week effort |
 | 7e | ai-api/10 | AI Observability Dashboard (Panels 1-3) | Cost, quality, tool usage — see what AI is doing. 1 week |
 
-### Phase 1C — Monetization
+### Phase 1C — Widget Foundation + AI Widgets
+
+| # | Service | Task | Why | Est. |
+|---|---------|------|-----|------|
+| 8 | cross-cutting/08 | Unified Widget Foundation | Shared component library — prerequisite for cms/24 and ai-api/11 | ~9-11 days |
+| 9 | ai-api/11 | Contextual Widgets for AI Assistant | Rich inline widgets in chat — validates foundation before builder | ~5-7 days |
+
+Phase 1C tasks are sequential: 08 first (foundation), then 11 (first consumer). 1A and 1B can run in parallel alongside.
+
+### Phase 1D — Monetization
 
 | # | Service | Task | Why |
 |---|---------|------|-----|
-| 8 | cms/08 | Pricing & Billing | Tiers, tax, enforcement — can't monetize without it |
-| 9 | cms/24 | Widget Layout Builder | Drag-drop layout design — makes widgets sellable |
+| 10 | cms/08 | Pricing & Billing | Tiers, tax, enforcement — can't monetize without it |
+| 11 | cms/24 | Widget Layout Builder | Drag-drop layout design — makes widgets sellable. Depends on cross-cutting/08. |
 
 ### Phase 2 — Growth & Distribution
 
 | # | Service | Task | Why |
 |---|---------|------|-----|
-| 7 | cms/06 | Lead Capture & CRM | Turns widgets into marketing tools |
-| 8 | cms/07 | Template Gallery | SEO + onboarding + showcase |
-| 9 | cms/02 | Cell Mapping UX | Authoring UX improvement |
-| 10 | cms/03 | Calculator Onboarding Wizard | Guided first-time creation flow |
-| 11 | cms/09 | Event-Driven Communication | Platform events, email automation, webhooks |
+| 12 | cms/06 | Lead Capture & CRM | Turns widgets into marketing tools |
+| 13 | cms/07 | Template Gallery | SEO + onboarding + showcase |
+| 14 | cms/02 | Cell Mapping UX | Authoring UX improvement |
+| 15 | cms/03 | Calculator Onboarding Wizard | Guided first-time creation flow |
+| 16 | cms/09 | Event-Driven Communication | Platform events, email automation, webhooks |
 
 ### Phase 2B — Ecosystem & Distribution
 
 | # | Service | Task | Why |
 |---|---------|------|-----|
-| 11b | cross-cutting/06 | MCP Server — BusinessLogic as AI Tool | Embed in agent ecosystem (Claude, Cursor, Hermes) |
+| 17 | cross-cutting/06 | MCP Server — BusinessLogic as AI Tool | Embed in agent ecosystem (Claude, Cursor, Hermes) |
 
 ### Phase 3 — Launch & Infrastructure
 
@@ -251,5 +261,5 @@ Build & test locally first. Infrastructure/launch comes after all building block
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 1 | 3 |
 | Gateway | 0 | 0 | 6 | 6 |
-| Cross-Cutting | 2 | 0 | 5 | 7 |
-| **Total** | **34** | **1** | **36** | **71** |
+| Cross-Cutting | 3 | 0 | 5 | 8 |
+| **Total** | **35** | **1** | **36** | **72** |
