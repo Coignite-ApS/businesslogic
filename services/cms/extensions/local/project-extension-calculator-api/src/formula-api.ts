@@ -123,11 +123,9 @@ export class FormulaApiClient {
 		return { status: res.status, body: data };
 	}
 
-	async describeCalculator(id: string, token?: string): Promise<{ status: number; body: unknown }> {
-		const headers = this.adminHeaders();
-		if (token) headers['X-Auth-Token'] = token;
+	async describeCalculator(id: string): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/calculator/${encodeURIComponent(id)}/describe`, {
-			headers,
+			headers: this.adminHeaders(),
 		});
 
 		if (res.status === 410) {
@@ -174,42 +172,40 @@ export class FormulaApiClient {
 		return { status: res.status, body: data };
 	}
 
-	async executeFormula(body: unknown, token: string): Promise<{ status: number; body: unknown }> {
+	async executeFormula(body: unknown): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute`, {
 			method: 'POST',
-			headers: this.adminHeaders({ 'Content-Type': 'application/json', 'X-Auth-Token': token }),
+			headers: this.adminHeaders({ 'Content-Type': 'application/json' }),
 			body: JSON.stringify(body),
 		});
 		const data = await res.json();
 		return { status: res.status, body: data };
 	}
 
-	async executeFormulaBatch(body: unknown, token: string): Promise<{ status: number; body: unknown }> {
+	async executeFormulaBatch(body: unknown): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute/batch`, {
 			method: 'POST',
-			headers: this.adminHeaders({ 'Content-Type': 'application/json', 'X-Auth-Token': token }),
+			headers: this.adminHeaders({ 'Content-Type': 'application/json' }),
 			body: JSON.stringify(body),
 		});
 		const data = await res.json();
 		return { status: res.status, body: data };
 	}
 
-	async executeFormulaSheet(body: unknown, token: string): Promise<{ status: number; body: unknown }> {
+	async executeFormulaSheet(body: unknown): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute/sheet`, {
 			method: 'POST',
-			headers: this.adminHeaders({ 'Content-Type': 'application/json', 'X-Auth-Token': token }),
+			headers: this.adminHeaders({ 'Content-Type': 'application/json' }),
 			body: JSON.stringify(body),
 		});
 		const data = await res.json();
 		return { status: res.status, body: data };
 	}
 
-	async executeCalculator(id: string, input: unknown, token?: string): Promise<{ status: number; body: unknown }> {
-		const headers = this.adminHeaders({ 'Content-Type': 'application/json' });
-		if (token) headers['X-Auth-Token'] = token;
+	async executeCalculator(id: string, input: unknown): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute/calculator/${encodeURIComponent(id)}`, {
 			method: 'POST',
-			headers,
+			headers: this.adminHeaders({ 'Content-Type': 'application/json' }),
 			body: JSON.stringify(input),
 		});
 

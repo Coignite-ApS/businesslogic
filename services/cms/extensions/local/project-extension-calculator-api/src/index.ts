@@ -632,14 +632,12 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				try {
-					const result = await client.executeCalculator(calcId, req.body, token);
+					const result = await client.executeCalculator(calcId, req.body);
 					return res.status(result.status).json(result.body);
 				} catch (err) {
 					if (err instanceof FormulaApiGoneError) {
-						return await selfHeal(client, db, calcId, (fid) => client.executeCalculator(fid, req.body, token), res);
+						return await selfHeal(client, db, calcId, (fid) => client.executeCalculator(fid, req.body), res);
 					}
 					throw err;
 				}
@@ -662,8 +660,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				// Load all test cases for this calculator
 				const rows = await db('calculator_test_cases')
 					.where('calculator', calculatorId)
@@ -677,7 +673,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 					const expected = tc.expected_outputs || {};
 					const tolerance = tc.tolerance ?? 0;
 					try {
-						const execResult = await client.executeCalculator(calcId, input, token);
+						const execResult = await client.executeCalculator(calcId, input);
 						const actual = (execResult.body as Record<string, unknown>) || {};
 						const { passed, diff } = compareOutputs(actual, expected, tolerance);
 						results.push({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
@@ -717,8 +713,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				const tc = await db('calculator_test_cases')
 					.where('id', testId)
 					.where('calculator', calculatorId)
@@ -734,7 +728,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const tolerance = tc.tolerance ?? 0;
 
 				try {
-					const execResult = await client.executeCalculator(calcId, input, token);
+					const execResult = await client.executeCalculator(calcId, input);
 					const actual = (execResult.body as Record<string, unknown>) || {};
 					const { passed, diff } = compareOutputs(actual, expected, tolerance);
 					return res.json({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
@@ -868,14 +862,12 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				try {
-					const result = await client.describeCalculator(calcId, token);
+					const result = await client.describeCalculator(calcId);
 					return res.status(result.status).json(stripDescribeInternals(result.body));
 				} catch (err) {
 					if (err instanceof FormulaApiGoneError) {
-						return await selfHeal(client, db, calcId, (fid) => client.describeCalculator(fid, token), res, stripDescribeInternals);
+						return await selfHeal(client, db, calcId, (fid) => client.describeCalculator(fid), res, stripDescribeInternals);
 					}
 					throw err;
 				}
@@ -935,7 +927,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				}
 
 				const mcpUrl = `${apiUrl}/mcp/calculator/${calcId}`;
-				const token = decryptToken(config.api_key) || '';
 
 				const inputSchema = buildMcpInputSchema(
 					config.input as Record<string, unknown>,
@@ -945,14 +936,13 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const snippets = buildMcpSnippets({
 					toolName: mcp.toolName,
 					mcpUrl,
-					token,
 				});
 
 				return res.json({
 					enabled: true,
 					url: mcpUrl,
 					transport: 'sse',
-					auth: token ? { type: 'bearer', token } : null,
+					auth: null,
 					tool: {
 						name: mcp.toolName,
 						description: mcp.toolDescription,

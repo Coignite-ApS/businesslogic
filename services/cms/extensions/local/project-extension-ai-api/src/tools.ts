@@ -362,10 +362,8 @@ async function describeCalculator(
 	}
 
 	try {
-		const token = decryptApiKey(config.api_key, encryptionKey);
 		const res = await fetch(`${gatewayCalcUrl}/calculator/${encodeURIComponent(calculatorId)}/describe`, {
 			headers: {
-				...(token ? { 'X-Auth-Token': token } : {}),
 				...(internalSecret ? { 'X-Internal-Secret': internalSecret } : {}),
 			},
 		});
@@ -426,13 +424,10 @@ async function executeCalculator(
 		return { result: `Calculator "${calculatorId}" has no ${test ? 'test' : 'live'} configuration.`, isError: true };
 	}
 
-	const token = decryptApiKey(config.api_key, encryptionKey);
-
 	const res = await fetch(`${gatewayCalcUrl}/execute/calculator/${encodeURIComponent(formulaId)}`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			...(token ? { 'X-Auth-Token': token } : {}),
 			...(internalSecret ? { 'X-Internal-Secret': internalSecret } : {}),
 		},
 		body: JSON.stringify(inputs),

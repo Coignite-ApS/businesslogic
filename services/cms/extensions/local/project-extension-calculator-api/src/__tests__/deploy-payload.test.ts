@@ -260,7 +260,7 @@ describe('deploy payload integration', () => {
 			}
 		});
 
-		it('execute sends input to correct endpoint with token', async () => {
+		it('execute sends input to correct endpoint', async () => {
 			fetchMock.mockResolvedValueOnce({
 				ok: true,
 				status: 200,
@@ -268,14 +268,14 @@ describe('deploy payload integration', () => {
 			});
 
 			const client = new FormulaApiClient('http://formula:3000');
-			const result = await client.executeCalculator('my-calc', { amount: 21 }, 'tok-abc');
+			const result = await client.executeCalculator('my-calc', { amount: 21 });
 
 			expect(result.status).toBe(200);
 			expect(result.body).toEqual({ result: 42 });
 
 			const [url, opts] = fetchMock.mock.calls[0];
 			expect(url).toBe('http://formula:3000/execute/calculator/my-calc');
-			expect(opts.headers['X-Auth-Token']).toBe('tok-abc');
+			expect(opts.headers['X-Auth-Token']).toBeUndefined();
 			expect(JSON.parse(opts.body)).toEqual({ amount: 21 });
 		});
 
@@ -290,13 +290,13 @@ describe('deploy payload integration', () => {
 			});
 
 			const client = new FormulaApiClient('http://formula:3000');
-			const result = await client.describeCalculator('my-calc', 'tok-abc');
+			const result = await client.describeCalculator('my-calc');
 
 			expect(result.status).toBe(200);
 
 			const [url, opts] = fetchMock.mock.calls[0];
 			expect(url).toBe('http://formula:3000/calculator/my-calc/describe');
-			expect(opts.headers['X-Auth-Token']).toBe('tok-abc');
+			expect(opts.headers['X-Auth-Token']).toBeUndefined();
 		});
 
 		it('execute 410 → throws FormulaApiGoneError', async () => {
@@ -307,7 +307,7 @@ describe('deploy payload integration', () => {
 			});
 
 			const client = new FormulaApiClient('http://formula:3000');
-			await expect(client.executeCalculator('my-calc', {}, 'tok')).rejects.toThrow(FormulaApiGoneError);
+			await expect(client.executeCalculator('my-calc', {})).rejects.toThrow(FormulaApiGoneError);
 		});
 	});
 
