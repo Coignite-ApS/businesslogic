@@ -36,14 +36,16 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     deploy:
       placement:
         constraints: [node.labels.role == data]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a $REDIS_PASSWORD ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,8 +68,8 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - REDIS_URL=redis://10.0.0.20:6379
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.20:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
       - AI_API_URL=http://10.0.0.40:3200
       - FORMULA_API_URL=http://10.0.0.30:3000
       - FLOW_TRIGGER_URL=http://10.0.0.40:3100
@@ -104,7 +106,7 @@ services:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - REDIS_ENABLED=true
-      - REDIS=redis://10.0.0.20:6379
+      - REDIS=redis://:${REDIS_PASSWORD}@10.0.0.20:6379
       - CACHE_ENABLED=true
       - CACHE_TTL=5m
       - FORMULA_API_URL=http://10.0.0.30:3000
@@ -133,8 +135,8 @@ services:
       - "3200:3200"
     environment:
       - PORT=3200
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://10.0.0.20:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.20:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - AI_API_ADMIN_TOKEN=${AI_API_ADMIN_TOKEN}
@@ -164,8 +166,8 @@ services:
       - "3100:3100"
     environment:
       - PORT=3100
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://10.0.0.20:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.20:6379
       - RUST_LOG=info
       - ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
@@ -190,7 +192,7 @@ services:
     environment:
       - PORT=3000
       - POOL_SIZE=4
-      - REDIS_URL=redis://10.0.0.20:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.20:6379
       - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN}
       - ENGINE=${ENGINE:-hyperformula}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.0.0.20:4318
@@ -210,8 +212,8 @@ services:
       dockerfile: docker/Dockerfile
       target: worker
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://10.0.0.20:6379
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@10.0.0.20:5432/${POSTGRES_DB}?sslmode=require
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.20:6379
       - RUST_LOG=info
       - WORKER_CONCURRENCY=10
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}

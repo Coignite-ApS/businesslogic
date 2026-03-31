@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FormulaApiClient, FormulaApiError, FormulaApiGoneError } from '../formula-api.js';
 
 const BASE = 'https://api.example.com';
-const ADMIN_TOKEN = 'test-admin-token';
+const INTERNAL_SECRET = 'test-internal-secret';
 
 function mockFetchOk(body: unknown, status = 200) {
 	return vi.fn().mockResolvedValue({
@@ -24,11 +24,11 @@ describe('FormulaApiClient', () => {
 	let client: FormulaApiClient;
 
 	beforeEach(() => {
-		client = new FormulaApiClient(BASE, ADMIN_TOKEN);
+		client = new FormulaApiClient(BASE, INTERNAL_SECRET);
 	});
 
 	describe('parseXlsx', () => {
-		it('sends POST with correct URL, content-type and admin token', async () => {
+		it('sends POST with correct URL, content-type and internal secret', async () => {
 			const body = { sheets: {} };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -38,7 +38,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/parse/xlsx`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'multipart/form-data; boundary=xxx', 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'Content-Type': 'multipart/form-data; boundary=xxx', 'X-Internal-Secret': INTERNAL_SECRET },
 				body: buf,
 			});
 			expect(result).toEqual({ status: 200, body });
@@ -53,7 +53,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('createCalculator', () => {
-		it('sends POST /calculator with JSON body and admin token', async () => {
+		it('sends POST /calculator with JSON body and internal secret', async () => {
 			const created = { calculatorId: 'new-id' };
 			const fetchMock = mockFetchOk(created);
 			vi.stubGlobal('fetch', fetchMock);
@@ -63,7 +63,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET },
 				body: JSON.stringify(payload),
 			});
 			expect(result).toEqual(created);
@@ -77,7 +77,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('updateCalculator', () => {
-		it('sends PATCH /calculator/:id with admin token', async () => {
+		it('sends PATCH /calculator/:id with internal secret', async () => {
 			const body = { ok: true };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -87,7 +87,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1`, {
 				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET },
 				body: JSON.stringify(payload),
 			});
 			expect(result).toEqual({ status: 200, body });
@@ -113,7 +113,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('deleteCalculator', () => {
-		it('sends DELETE /calculator/:id with admin token', async () => {
+		it('sends DELETE /calculator/:id with internal secret', async () => {
 			const fetchMock = vi.fn().mockResolvedValue({
 				status: 204,
 				json: () => Promise.resolve(null),
@@ -124,14 +124,14 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1`, {
 				method: 'DELETE',
-				headers: { 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET },
 			});
 			expect(result.status).toBe(204);
 		});
 	});
 
 	describe('getCalculator', () => {
-		it('sends GET /calculator/:id with admin token', async () => {
+		it('sends GET /calculator/:id with internal secret', async () => {
 			const body = { id: 'calc-1' };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -139,7 +139,7 @@ describe('FormulaApiClient', () => {
 			const result = await client.getCalculator('calc-1');
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1`, {
-				headers: { 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET },
 			});
 			expect(result).toEqual({ status: 200, body });
 		});
@@ -162,7 +162,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('describeCalculator', () => {
-		it('sends GET /calculator/:id/describe', async () => {
+		it('sends GET /calculator/:id/describe with internal secret', async () => {
 			const body = { schema: {} };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -170,7 +170,7 @@ describe('FormulaApiClient', () => {
 			const result = await client.describeCalculator('calc-1');
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1/describe`, {
-				headers: {},
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET },
 			});
 			expect(result).toEqual({ status: 200, body });
 		});
@@ -182,7 +182,7 @@ describe('FormulaApiClient', () => {
 			await client.describeCalculator('calc-1', 'my-token');
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1/describe`, {
-				headers: { 'X-Auth-Token': 'my-token' },
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET, 'X-Auth-Token': 'my-token' },
 			});
 		});
 
@@ -198,7 +198,7 @@ describe('FormulaApiClient', () => {
 	});
 
 	describe('executeCalculator', () => {
-		it('sends POST /execute/calculator/:id with input', async () => {
+		it('sends POST /execute/calculator/:id with input and internal secret', async () => {
 			const body = { result: 42 };
 			const fetchMock = mockFetchOk(body);
 			vi.stubGlobal('fetch', fetchMock);
@@ -208,7 +208,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/execute/calculator/calc-1`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET },
 				body: JSON.stringify(input),
 			});
 			expect(result).toEqual({ status: 200, body });
@@ -222,7 +222,7 @@ describe('FormulaApiClient', () => {
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/execute/calculator/calc-1`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', 'X-Auth-Token': 'my-token' },
+				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET, 'X-Auth-Token': 'my-token' },
 				body: JSON.stringify({ a: 1 }),
 			});
 		});
@@ -252,27 +252,27 @@ describe('FormulaApiClient', () => {
 			await client.getCalculator('calc/with spaces');
 
 			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc%2Fwith%20spaces`, {
-				headers: { 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET },
 			});
 		});
 	});
 
 	describe('trailing slash handling', () => {
 		it('strips trailing slash from base URL', async () => {
-			const c = new FormulaApiClient('https://api.example.com/', ADMIN_TOKEN);
+			const c = new FormulaApiClient('https://api.example.com/', INTERNAL_SECRET);
 			const fetchMock = mockFetchOk({});
 			vi.stubGlobal('fetch', fetchMock);
 
 			await c.getCalculator('x');
 
 			expect(fetchMock).toHaveBeenCalledWith('https://api.example.com/calculator/x', {
-				headers: { 'X-Admin-Token': ADMIN_TOKEN },
+				headers: { 'X-Internal-Secret': INTERNAL_SECRET },
 			});
 		});
 	});
 
-	describe('no admin token', () => {
-		it('omits X-Admin-Token when not configured', async () => {
+	describe('no internal secret', () => {
+		it('omits X-Internal-Secret when not configured', async () => {
 			const noTokenClient = new FormulaApiClient(BASE);
 			const fetchMock = mockFetchOk({});
 			vi.stubGlobal('fetch', fetchMock);

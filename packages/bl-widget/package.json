@@ -1,0 +1,42 @@
+{
+  "name": "@businesslogic/widget",
+  "version": "0.1.0",
+  "description": "Embeddable calculator widget — renders interactive calculators from JSON config",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "main": "dist/bl-calculator.iife.js",
+  "module": "dist/bl-calculator.es.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/bl-calculator.es.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly && node scripts/sri.js",
+    "build:no-sri": "vite build && tsc --emitDeclarationOnly",
+    "dev": "vite build --watch",
+    "test": "vitest run",
+    "test:e2e": "node --test test/e2e.test.js",
+    "test:all": "vitest run && node --test test/e2e.test.js",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "@open-wc/testing": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0",
+    "jsdom": "^25.0.0"
+  }
+}

@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { Calculator, CalculatorConfig, CalculatorTemplate, CalculatorTestCase } from '../types';
+import type { Calculator, CalculatorConfig, CalculatorTemplate, CalculatorTestCase, TestCaseResult } from '../types';
 
 /** Build the Formula API calc ID: "{calculatorId}-test" or "{calculatorId}" */
 function calcId(calculatorId: string, isTest: boolean): string {
@@ -263,14 +263,28 @@ export function useCalculators(api: any) {
 			const { data } = await api.get('/items/calculator_test_cases', {
 				params: {
 					filter: { calculator: { _eq: calculatorId } },
-					sort: ['name'],
-					fields: ['id', 'name', 'input', 'calculator'],
+					sort: ['sort', 'name'],
+					fields: ['id', 'name', 'input', 'expected_outputs', 'tolerance', 'sort', 'calculator'],
 				},
 			});
 			testCases.value = data.data;
 		} catch {
 			testCases.value = [];
 		}
+	}
+
+	/** Run all test cases for a calculator (batch) */
+	async function runAllTests(calculatorId: string, isTest: boolean): Promise<Array<{ id: string; name: string } & TestCaseResult>> {
+		const calcApiId = calcId(calculatorId, isTest);
+		const { data } = await api.post(`/calc/test/${calcApiId}`);
+		return data.results;
+	}
+
+	/** Run a single test case */
+	async function runSingleTest(calculatorId: string, isTest: boolean, testCaseId: string): Promise<{ id: string; name: string } & TestCaseResult> {
+		const calcApiId = calcId(calculatorId, isTest);
+		const { data } = await api.post(`/calc/test/${calcApiId}/${testCaseId}`);
+		return data;
 	}
 
 	async function createTestCase(payload: Partial<CalculatorTestCase>) {
@@ -376,6 +390,8 @@ export function useCalculators(api: any) {
 		createTestCase,
 		updateTestCase,
 		deleteTestCase,
+		runAllTests,
+		runSingleTest,
 		enableTest,
 		disableTest,
 		activateCalc,

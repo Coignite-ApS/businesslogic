@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, requireCalculatorAccess, requireActiveSubscr
 import { handleFormulaApiError, buildPayload, buildRecipe, configIsComplete, toSnakeCase, buildMcpInputSchema, buildMcpSnippets, lookupCalculatorConfig } from './helpers.js';
 import { registerAdminRoutes } from './admin-routes.js';
 import { encrypt, decrypt, isEncrypted } from './crypto.js';
+import { compareOutputs } from './test-runner.js';
 import type { CalculatorConfig, DB } from './types.js';
 
 /** Strip internal fields from describe response (mapping, available_data) */
@@ -112,8 +113,8 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const now = new Date();
 				const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-				const { count } = await db('calculator_calls')
-					.where('account', accountId)
+				const { count } = await db('formula.calculator_calls')
+					.where('account_id', accountId)
 					.where('timestamp', '>=', firstOfMonth)
 					.count('* as count')
 					.first() as any;
@@ -257,20 +258,22 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 
 	// ─── Formula API proxy ───────────────────────────────────
 
-	const apiUrl = env['FORMULA_API_URL'] as string | undefined;
-	if (!apiUrl) {
-		logger.warn('FORMULA_API_URL not set — calculator API proxy disabled');
+	const gwUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
+	const gwSecret = env['GATEWAY_INTERNAL_SECRET'] as string | undefined;
+	if (!gwUrl) {
+		logger.warn('GATEWAY_URL not set — calculator API proxy disabled');
 		return;
 	}
 
-	const adminToken = env['FORMULA_API_ADMIN_TOKEN'] as string | undefined;
-	const client = new FormulaApiClient(apiUrl, adminToken);
+	const apiUrl = `${gwUrl}/internal/calc`;
+	const client = new FormulaApiClient(apiUrl, gwSecret);
 
 	init('routes.custom.before', ({ app }) => {
 
-		// GET /calc/formula-api-url — expose Formula API URL to frontend
+		// GET /calc/formula-api-url — expose public Formula API URL to frontend (for code snippets)
+		const publicApiUrl = (env['FORMULA_API_PUBLIC_URL'] as string) || (env['FORMULA_API_URL'] as string) || apiUrl;
 		app.get('/calc/formula-api-url', requireAuth, (_req: any, res: any) => {
-			return res.json({ url: apiUrl });
+			return res.json({ url: publicApiUrl });
 		});
 
 		// GET /calc/health — proxy Formula API health (admin only)
@@ -646,6 +649,116 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 			}
 		});
 
+		// POST /calc/test/:calcId — run all test cases for a calculator
+		app.post('/calc/test/:calcId', requireAuth, requireCalculatorAccess(db), async (req: any, res: any) => {
+			const { calcId } = req.params;
+			const { calculatorId, isTest } = parseCalcId(calcId);
+			try {
+				// Load config api_key for execute calls
+				const config = await db('calculator_configs')
+					.where('calculator', calculatorId)
+					.where('test_environment', isTest)
+					.select('api_key')
+					.first();
+				if (!config) {
+					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
+				}
+				const token = decryptToken(config.api_key);
+
+				// Load all test cases for this calculator
+				const rows = await db('calculator_test_cases')
+					.where('calculator', calculatorId)
+					.orderBy([{ column: 'sort', order: 'asc' }, { column: 'name', order: 'asc' }])
+					.select('id', 'name', 'input', 'expected_outputs', 'tolerance');
+
+				// Execute each test case in sequence and collect results
+				const results = [];
+				for (const tc of rows) {
+					const input = tc.input || {};
+					const expected = tc.expected_outputs || {};
+					const tolerance = tc.tolerance ?? 0;
+					try {
+						const execResult = await client.executeCalculator(calcId, input, token);
+						const actual = (execResult.body as Record<string, unknown>) || {};
+						const { passed, diff } = compareOutputs(actual, expected, tolerance);
+						results.push({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
+					} catch (err: any) {
+						results.push({
+							id: tc.id,
+							name: tc.name,
+							passed: false,
+							expected,
+							actual: {},
+							diff: {},
+							error: err instanceof FormulaApiError
+								? `Formula API error ${err.status}`
+								: (err.message || 'Execution failed'),
+						});
+					}
+				}
+
+				return res.json({ results });
+			} catch (err: any) {
+				if (err instanceof FormulaApiError) return handleFormulaApiError(err, res);
+				logger.error(`Test run failed for ${calcId}: ${err}`);
+				return res.status(500).json({ errors: [{ message: 'Test run failed' }] });
+			}
+		});
+
+		// POST /calc/test/:calcId/:testId — run a single test case
+		app.post('/calc/test/:calcId/:testId', requireAuth, requireCalculatorAccess(db), async (req: any, res: any) => {
+			const { calcId, testId } = req.params;
+			const { calculatorId, isTest } = parseCalcId(calcId);
+			try {
+				const config = await db('calculator_configs')
+					.where('calculator', calculatorId)
+					.where('test_environment', isTest)
+					.select('api_key')
+					.first();
+				if (!config) {
+					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
+				}
+				const token = decryptToken(config.api_key);
+
+				const tc = await db('calculator_test_cases')
+					.where('id', testId)
+					.where('calculator', calculatorId)
+					.select('id', 'name', 'input', 'expected_outputs', 'tolerance')
+					.first();
+
+				if (!tc) {
+					return res.status(404).json({ errors: [{ message: 'Test case not found' }] });
+				}
+
+				const input = tc.input || {};
+				const expected = tc.expected_outputs || {};
+				const tolerance = tc.tolerance ?? 0;
+
+				try {
+					const execResult = await client.executeCalculator(calcId, input, token);
+					const actual = (execResult.body as Record<string, unknown>) || {};
+					const { passed, diff } = compareOutputs(actual, expected, tolerance);
+					return res.json({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
+				} catch (err: any) {
+					return res.json({
+						id: tc.id,
+						name: tc.name,
+						passed: false,
+						expected,
+						actual: {},
+						diff: {},
+						error: err instanceof FormulaApiError
+							? `Formula API error ${err.status}`
+							: (err.message || 'Execution failed'),
+					});
+				}
+			} catch (err: any) {
+				if (err instanceof FormulaApiError) return handleFormulaApiError(err, res);
+				logger.error(`Single test run failed for ${calcId}/${testId}: ${err}`);
+				return res.status(500).json({ errors: [{ message: 'Test run failed' }] });
+			}
+		});
+
 		// POST /calc/generate-xlsx — generate annotated Excel from config
 		app.post('/calc/generate-xlsx', requireAuth, async (req: any, res: any) => {
 			const { config_id } = req.body || {};
@@ -769,6 +882,42 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				}
 			} catch (err) {
 				return handleFormulaApiError(err, res);
+			}
+		});
+
+		// GET /calc/mcp/account — return account-level MCP endpoint URL + list of MCP-enabled calculators
+		app.get('/calc/mcp/account', requireAuth, async (req: any, res: any) => {
+			const userId = req.accountability?.user;
+			try {
+				const user = await db('directus_users').where('id', userId).select('active_account').first();
+				if (!user?.active_account) {
+					return res.status(400).json({ errors: [{ message: 'No active account' }] });
+				}
+				const accountId = user.active_account;
+
+				// Fetch all calculator configs for this account that are not test environments
+				const configs = await db('calculator_configs as cc')
+					.join('calculators as c', 'c.id', 'cc.calculator')
+					.where('c.account', accountId)
+					.where('cc.test_environment', false)
+					.select('c.id as calculator_id', 'c.name as calculator_name', 'cc.mcp');
+
+				const calculators = configs.map((row: any) => {
+					const mcp = row.mcp && typeof row.mcp === 'object' ? row.mcp : null;
+					return {
+						id: row.calculator_id,
+						name: row.calculator_name,
+						mcp_enabled: mcp?.enabled === true,
+					};
+				});
+
+				const publicGwUrl = (env['GATEWAY_PUBLIC_URL'] as string) || gwUrl;
+				const endpointUrl = `${publicGwUrl}/v1/mcp/account/${accountId}`;
+
+				return res.json({ accountId, endpointUrl, calculators });
+			} catch (err: any) {
+				logger.error(`Account MCP info failed: ${err}`);
+				return res.status(500).json({ errors: [{ message: 'Failed to fetch account MCP info' }] });
 			}
 		});
 
@@ -1053,6 +1202,102 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 			}
 		});
 
+		// ─── A14: API Key management (proxy to gateway) ───────
+
+		const gatewayUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
+		const gatewayInternalSecret = (env['GATEWAY_INTERNAL_SECRET'] as string) || '';
+
+		if (gatewayUrl && gatewayInternalSecret) {
+			const gwFetch = async (path: string, method: string, body?: unknown) => {
+				const opts: RequestInit = {
+					method,
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Internal-Secret': gatewayInternalSecret,
+					},
+				};
+				if (body) opts.body = JSON.stringify(body);
+				const res = await fetch(`${gatewayUrl}${path}`, opts);
+				const text = await res.text();
+				return { status: res.status, data: text ? JSON.parse(text) : null };
+			};
+
+			// List API keys for active account
+			app.get('/calc/api-keys', requireAuth, async (req: any, res: any) => {
+				const userId = req.accountability?.user;
+				try {
+					const user = await db('directus_users').where('id', userId).select('active_account').first();
+					if (!user?.active_account) return res.status(400).json({ errors: [{ message: 'No active account' }] });
+					const gw = await gwFetch(`/internal/api-keys/?account_id=${user.active_account}`, 'GET');
+					return res.status(gw.status).json({ data: gw.data });
+				} catch (err: any) {
+					logger.error(`List API keys failed: ${err}`);
+					return res.status(500).json({ errors: [{ message: 'Failed to list keys' }] });
+				}
+			});
+
+			// Create API key
+			app.post('/calc/api-keys', requireAuth, async (req: any, res: any) => {
+				const userId = req.accountability?.user;
+				try {
+					const user = await db('directus_users').where('id', userId).select('active_account').first();
+					if (!user?.active_account) return res.status(400).json({ errors: [{ message: 'No active account' }] });
+					const gw = await gwFetch('/internal/api-keys/', 'POST', {
+						account_id: user.active_account,
+						...req.body,
+					});
+					return res.status(gw.status).json(gw.data);
+				} catch (err: any) {
+					logger.error(`Create API key failed: ${err}`);
+					return res.status(500).json({ errors: [{ message: 'Failed to create key' }] });
+				}
+			});
+
+			// Get single API key
+			app.get('/calc/api-keys/:id', requireAuth, async (req: any, res: any) => {
+				try {
+					const gw = await gwFetch(`/internal/api-keys/${req.params.id}`, 'GET');
+					return res.status(gw.status).json(gw.data);
+				} catch (err: any) {
+					logger.error(`Get API key failed: ${err}`);
+					return res.status(500).json({ errors: [{ message: 'Failed to get key' }] });
+				}
+			});
+
+			// Update API key
+			app.patch('/calc/api-keys/:id', requireAuth, async (req: any, res: any) => {
+				try {
+					const gw = await gwFetch(`/internal/api-keys/${req.params.id}`, 'PATCH', req.body);
+					return res.status(gw.status).json(gw.data);
+				} catch (err: any) {
+					logger.error(`Update API key failed: ${err}`);
+					return res.status(500).json({ errors: [{ message: 'Failed to update key' }] });
+				}
+			});
+
+			// Revoke API key
+			app.delete('/calc/api-keys/:id', requireAuth, async (req: any, res: any) => {
+				try {
+					const gw = await gwFetch(`/internal/api-keys/${req.params.id}`, 'DELETE');
+					return res.status(gw.status).json(gw.data);
+				} catch (err: any) {
+					logger.error(`Revoke API key failed: ${err}`);
+					return res.status(500).json({ errors: [{ message: 'Failed to revoke key' }] });
+				}
+			});
+
+			// Rotate API key
+			app.post('/calc/api-keys/:id/rotate', requireAuth, async (req: any, res: any) => {
+				try {
+					const gw = await gwFetch(`/internal/api-keys/${req.params.id}/rotate`, 'POST');
+					return res.status(gw.status).json(gw.data);
+				} catch (err: any) {
+					logger.error(`Rotate API key failed: ${err}`);
+					return res.status(500).json({ errors: [{ message: 'Failed to rotate key' }] });
+				}
+			});
+		}
+
 		logger.info('Calculator API proxy routes registered');
 	});
 
@@ -1211,6 +1456,31 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 			if (count > 0) logger.info(`Backfilled type on ${count} calculator_call(s)`);
 		} catch (err) {
 			logger.error(`Backfill calculator_calls.type failed: ${err}`);
+		}
+
+		// Startup bulk sync: deploy all active calculator configs to Formula API
+		try {
+			const configs = await db('calculator_configs')
+				.whereNotNull('sheets')
+				.whereNotNull('formulas')
+				.select('id');
+
+			if (configs.length > 0) {
+				logger.info(`Syncing ${configs.length} calculator config(s) to Formula API...`);
+				let synced = 0;
+				let failed = 0;
+				for (const row of configs) {
+					try {
+						await syncConfig(row.id);
+						synced++;
+					} catch {
+						failed++;
+					}
+				}
+				logger.info(`Calculator sync complete: ${synced} synced, ${failed} failed`);
+			}
+		} catch (err) {
+			logger.error(`Startup calculator sync failed: ${err}`);
 		}
 	});
 
@@ -1396,4 +1666,5 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 		}
 		return keys;
 	});
+
 });

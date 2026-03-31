@@ -10,8 +10,8 @@
   "scripts": {
     "start": "node --env-file=.env src/server.js",
     "dev": "node --env-file=.env --watch src/server.js",
-    "test": "node --test test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js",
-    "test:all": "node --test --test-concurrency=1 test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js test/kb.test.js test/flow-ingest.test.js test/flow-tools.test.js test/local-embeddings.test.js test/telemetry.test.js",
+    "test": "node --test --test-concurrency=1 test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js test/budget-warning.test.js test/security-headers.test.js test/db-ssl.test.js test/auth.test.js test/chat-public.test.js test/stateless.test.js test/conversation-scoping.test.js test/summarize.test.js test/metrics-aggregator.test.js",
+    "test:all": "node --test --test-concurrency=1 test/health.test.js test/pool.test.js test/ingest.test.js test/budget.test.js test/budget-warning.test.js test/security-headers.test.js test/db-ssl.test.js test/kb.test.js test/flow-ingest.test.js test/flow-tools.test.js test/local-embeddings.test.js test/telemetry.test.js",
     "test:chat": "node --test test/chat.test.js",
     "test:kb": "node --test test/kb.test.js",
     "test:contracts": "node --test test/contracts/producer.test.js"
@@ -19,21 +19,22 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@fastify/cors": "^10.0.2",
+    "@fastify/helmet": "^13.0.2",
     "@fastify/multipart": "^9.4.0",
     "@fastify/under-pressure": "^9.0.3",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.57.2",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.2",
+    "@opentelemetry/instrumentation-http": "^0.57.2",
+    "@opentelemetry/resources": "^1.30.1",
+    "@opentelemetry/sdk-metrics": "^1.30.1",
+    "@opentelemetry/sdk-node": "^0.57.2",
+    "@opentelemetry/semantic-conventions": "^1.30.0",
     "bullmq": "^5.34.8",
     "fastify": "^5.2.1",
     "franc": "^6.2.0",
     "ioredis": "^5.4.1",
     "lru-cache": "^11.0.2",
     "openai": "^4.86.2",
-    "pg": "^8.13.1",
-    "@opentelemetry/sdk-node": "^0.57.2",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.57.2",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.57.2",
-    "@opentelemetry/sdk-metrics": "^1.30.1",
-    "@opentelemetry/instrumentation-http": "^0.57.2",
-    "@opentelemetry/resources": "^1.30.1",
-    "@opentelemetry/semantic-conventions": "^1.30.0"
+    "pg": "^8.13.1"
   }
 }

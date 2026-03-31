@@ -113,6 +113,7 @@
 				<input-parameters
 					:model-value="localInput"
 					:sheets="testConfig?.sheets || null"
+					:output-mappings="outputMappingMap"
 					@update:model-value="localInput = $event"
 				/>
 			</div>
@@ -121,6 +122,7 @@
 				<output-parameters
 					:model-value="localOutput"
 					:sheets="testConfig?.sheets || null"
+					:input-mappings="inputMappingMap"
 					@update:model-value="localOutput = $event"
 				/>
 			</div>
@@ -228,6 +230,16 @@
 				</div>
 			</sidebar-detail>
 		</template>
+		<v-dialog v-model="showUnsavedDialog" @esc="cancelLeave">
+			<v-card>
+				<v-card-title>Unsaved Changes</v-card-title>
+				<v-card-text>You have unsaved changes. Are you sure you want to leave?</v-card-text>
+				<v-card-actions>
+					<v-button secondary @click="cancelLeave">Stay</v-button>
+					<v-button kind="danger" @click="confirmLeave">Leave</v-button>
+				</v-card-actions>
+			</v-card>
+		</v-dialog>
 	</private-view>
 </template>
 
@@ -236,6 +248,7 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
+import { useUnsavedGuard } from '../composables/use-unsaved-guard';
 import CalculatorNavigation from '../components/navigation.vue';
 import InputParameters from '../components/input-parameters.vue';
 import OutputParameters from '../components/output-parameters.vue';
@@ -309,6 +322,23 @@ const originalOutput = computed(() =>
 	extractParams<OutputParameter>(testConfig.value?.output as Record<string, unknown> | null),
 );
 
+// Cross-parameter mapping maps for cell highlighting
+const inputMappingMap = computed(() => {
+	const map: Record<string, string> = {};
+	for (const [key, param] of Object.entries(localInput.value)) {
+		if (param.mapping) map[param.title || key] = param.mapping;
+	}
+	return map;
+});
+
+const outputMappingMap = computed(() => {
+	const map: Record<string, string> = {};
+	for (const [key, param] of Object.entries(localOutput.value)) {
+		if (param.mapping) map[param.title || key] = param.mapping;
+	}
+	return map;
+});
+
 const hasParamChanges = computed(() =>
 	JSON.stringify(localInput.value) !== JSON.stringify(originalInput.value)
 	|| JSON.stringify(localOutput.value) !== JSON.stringify(originalOutput.value),
@@ -324,6 +354,9 @@ const hasAccessChanges = computed(() => {
 });
 
 const hasChanges = computed(() => hasCalcEdits.value || hasParamChanges.value || hasAccessChanges.value);
+
+// Unsaved changes navigation guard
+const { showDialog: showUnsavedDialog, confirmLeave, cancelLeave } = useUnsavedGuard(hasChanges);
 
 // IP validation: IPv4 with optional CIDR, or IPv6 (must contain : and be 3+ chars)
 const IP_V4_RE = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;

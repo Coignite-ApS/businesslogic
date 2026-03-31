@@ -13,17 +13,23 @@ type Config struct {
 	RedisURL    string
 	DatabaseURL string
 
-	AIApiURL      string
-	FormulaAPIURL string
+	AIApiURL       string
+	FormulaAPIURL  string
 	FlowTriggerURL string
-	CMSURL        string
+	CMSURL         string
 
-	HealthCheckInterval time.Duration
+	HealthCheckInterval     time.Duration
 	CircuitBreakerThreshold int
 	CircuitBreakerTimeout   time.Duration
 
-	KeyCacheTTL         time.Duration
-	NegativeCacheTTL    time.Duration
+	KeyCacheTTL      time.Duration
+	NegativeCacheTTL time.Duration
+
+	InternalSecret        string
+	FormulaAPIAdminToken  string
+	GatewaySharedSecret   string
+	WidgetConfigCacheTTL  time.Duration
+	WidgetCatalogCacheTTL time.Duration
 }
 
 func Load() *Config {
@@ -32,7 +38,7 @@ func Load() *Config {
 		LogLevel: envStr("LOG_LEVEL", "info"),
 
 		RedisURL:    envStr("REDIS_URL", "redis://localhost:6379"),
-		DatabaseURL: envStr("DATABASE_URL", "postgresql://directus:directus@localhost:5432/directus"),
+		DatabaseURL: envStr("DATABASE_URL", ""),
 
 		AIApiURL:       envStr("AI_API_URL", "http://localhost:3200"),
 		FormulaAPIURL:  envStr("FORMULA_API_URL", "http://localhost:3000"),
@@ -45,6 +51,12 @@ func Load() *Config {
 
 		KeyCacheTTL:      envDuration("KEY_CACHE_TTL", 10*time.Minute),
 		NegativeCacheTTL: envDuration("NEGATIVE_CACHE_TTL", 1*time.Minute),
+
+		InternalSecret:        envStr("GATEWAY_INTERNAL_SECRET", ""),
+		FormulaAPIAdminToken:  envStr("FORMULA_API_ADMIN_TOKEN", ""),
+		GatewaySharedSecret:   envStr("GATEWAY_SHARED_SECRET", ""),
+		WidgetConfigCacheTTL:  envDuration("WIDGET_CONFIG_CACHE_TTL", 1*time.Hour),
+		WidgetCatalogCacheTTL: envDuration("WIDGET_CATALOG_CACHE_TTL", 24*time.Hour),
 	}
 }
 

@@ -58,9 +58,111 @@
 			<!-- API Keys -->
 			<div class="section">
 				<h2 class="section-title">API Keys</h2>
-				<p class="section-desc">Use API keys to authenticate requests to the Formula API.</p>
+				<p class="section-desc">Authenticate widget & API requests through the gateway with resource-level permissions.</p>
 
-				<div v-if="formulaTokens.length > 0" class="tokens-table">
+				<div v-if="apiKeys.length > 0" class="tokens-table">
+					<div class="tokens-header tokens-header-6col">
+						<span>Name</span>
+						<span>Prefix</span>
+						<span>Environment</span>
+						<span>Permissions</span>
+						<span>Created</span>
+						<span></span>
+					</div>
+					<div v-for="key in apiKeys" :key="key.id" class="tokens-row tokens-row-6col">
+						<span class="token-label">{{ key.name }}</span>
+						<span class="token-date"><code>{{ key.key_prefix }}...</code></span>
+						<span>
+							<v-chip small :class="key.environment === 'live' ? 'active-chip' : 'test-chip'">
+								{{ key.environment }}
+							</v-chip>
+						</span>
+						<span class="perms-summary" @click="openEditKey(key)">
+							{{ getPermsSummary(key.permissions) }}
+							<v-icon name="edit" x-small class="edit-perms-icon" />
+						</span>
+						<span class="token-date">{{ formatDate(key.created_at) }}</span>
+						<span class="token-actions">
+							<v-button x-small secondary @click="handleRotateKey(key.id)">Rotate</v-button>
+							<v-button x-small kind="danger" secondary @click="handleRevokeKey(key.id)">Revoke</v-button>
+						</span>
+					</div>
+				</div>
+				<div v-else class="tokens-empty">
+					<span class="muted">No API keys yet. Create one to authenticate widget & API requests.</span>
+				</div>
+
+				<div class="token-create-row">
+					<v-input v-model="newKeyName" placeholder="Key name (e.g. Production)" small />
+					<v-select
+						v-model="newKeyEnv"
+						:items="[{ text: 'Live', value: 'live' }, { text: 'Test', value: 'test' }]"
+						small
+						inline
+					/>
+					<v-button small secondary @click="showCreatePerms = !showCreatePerms">
+						<v-icon name="tune" left />
+						Permissions
+					</v-button>
+					<v-button small :loading="creatingKey" @click="handleCreateKey">
+						<v-icon name="add" left />
+						Create Key
+					</v-button>
+				</div>
+
+				<div v-if="showCreatePerms" class="create-perms-panel">
+					<resource-picker
+						:api="api"
+						:account-id="activeAccountId"
+						:model-value="newKeyPerms"
+						@update:model-value="newKeyPerms = $event"
+					/>
+				</div>
+
+				<!-- Edit Key Permissions Dialog -->
+				<div v-if="editingKey" class="edit-perms-overlay" @click.self="editingKey = null">
+					<div class="edit-perms-dialog">
+						<div class="edit-perms-header">
+							<h3>Edit Permissions — {{ editingKey.name }}</h3>
+							<v-icon name="close" clickable @click="editingKey = null" />
+						</div>
+						<resource-picker
+							:api="api"
+							:account-id="activeAccountId"
+							:model-value="editKeyPerms"
+							@update:model-value="editKeyPerms = $event"
+						/>
+						<div class="edit-perms-actions">
+							<v-button secondary @click="editingKey = null">Cancel</v-button>
+							<v-button :loading="savingPerms" @click="handleSavePerms">Save Permissions</v-button>
+						</div>
+					</div>
+				</div>
+
+				<v-notice v-if="newlyCreatedKey" type="info" class="new-token-notice">
+					<div class="new-token-content">
+						<strong>Copy this key now — it won't be shown again:</strong>
+						<code class="new-token-value">{{ newlyCreatedKey }}</code>
+						<v-icon
+							name="content_copy"
+							small
+							clickable
+							class="copy-icon"
+							@click="copyToClipboard(newlyCreatedKey)"
+						/>
+					</div>
+				</v-notice>
+			</div>
+
+			<!-- Legacy Formula Tokens -->
+			<div class="section" v-if="formulaTokens.length > 0">
+				<h2 class="section-title">
+					Formula Tokens
+					<v-chip small class="legacy-chip">Legacy</v-chip>
+				</h2>
+				<p class="section-desc">Per-calculator tokens. Migrate to API Keys above for resource-level permissions.</p>
+
+				<div class="tokens-table">
 					<div class="tokens-header">
 						<span>Label</span>
 						<span>Created</span>
@@ -84,32 +186,6 @@
 						</span>
 					</div>
 				</div>
-				<div v-else class="tokens-empty">
-					<span class="muted">No API keys yet. Create one to use the Formula API.</span>
-				</div>
-
-				<div class="token-create-row">
-					<v-input v-model="newTokenLabel" placeholder="Key label (e.g. Production)" small />
-					<v-button small :loading="creatingToken" @click="handleCreateToken">
-						<v-icon name="add" left />
-						Create Key
-					</v-button>
-				</div>
-
-				<!-- Show newly created token (once) -->
-				<v-notice v-if="newlyCreatedToken" type="info" class="new-token-notice">
-					<div class="new-token-content">
-						<strong>Copy this key now — it won't be shown again:</strong>
-						<code class="new-token-value">{{ newlyCreatedToken }}</code>
-						<v-icon
-							name="content_copy"
-							small
-							clickable
-							class="copy-icon"
-							@click="copyNewToken"
-						/>
-					</div>
-				</v-notice>
 			</div>
 
 			<!-- Account Settings -->
@@ -183,6 +259,9 @@ import { useApi } from '@directus/extensions-sdk';
 import { useRoute } from 'vue-router';
 import { useAccount } from '../composables/use-account';
 import AccountSelector from '../components/account-selector.vue';
+import ResourcePicker from '../components/resource-picker.vue';
+import { buildPermissions, parsePermissions, summarizePermissions } from '../utils/permissions';
+import type { PermissionSelection } from '../utils/permissions';
 
 const api = useApi();
 const route = useRoute();
@@ -191,6 +270,7 @@ const {
 	accounts, activeAccountId, subscription, loading, error,
 	fetchAccounts, setActiveAccount, fetchSubscription, updateAccount,
 	formulaTokens, fetchFormulaTokens, createFormulaToken, revokeFormulaToken,
+	apiKeys, fetchApiKeys, createApiKey, revokeApiKey, rotateApiKey,
 } = useAccount(api);
 
 const accountName = ref('');
@@ -200,6 +280,26 @@ const apiCallCount = ref(0);
 const newTokenLabel = ref('');
 const creatingToken = ref(false);
 const newlyCreatedToken = ref<string | null>(null);
+
+const newKeyName = ref('');
+const newKeyEnv = ref('live');
+const creatingKey = ref(false);
+const newlyCreatedKey = ref<string | null>(null);
+const showCreatePerms = ref(false);
+
+const defaultPerms = (): PermissionSelection => ({
+	calcResources: [],
+	calcActions: ['execute', 'describe'],
+	calcWildcard: true,
+	kbResources: [],
+	kbActions: ['search', 'ask'],
+	kbWildcard: false,
+});
+
+const newKeyPerms = ref<PermissionSelection>(defaultPerms());
+const editingKey = ref<any>(null);
+const editKeyPerms = ref<PermissionSelection>(defaultPerms());
+const savingPerms = ref(false);
 
 const isSubscriptionRoute = computed(() => route.path.includes('/subscription'));
 
@@ -278,12 +378,67 @@ async function handleCreateToken() {
 }
 
 async function handleRevoke(id: string) {
+	if (!confirm('Are you sure you want to revoke this token? This action cannot be undone.')) return;
 	await revokeFormulaToken(id);
 }
 
 function copyNewToken() {
 	if (newlyCreatedToken.value) {
 		navigator.clipboard.writeText(newlyCreatedToken.value);
+	}
+}
+
+function copyToClipboard(text: string | null) {
+	if (text) navigator.clipboard.writeText(text);
+}
+
+async function handleCreateKey() {
+	if (!newKeyName.value.trim()) return;
+	creatingKey.value = true;
+	newlyCreatedKey.value = null;
+	const permissions = buildPermissions(newKeyPerms.value);
+	const result = await createApiKey({
+		name: newKeyName.value.trim(),
+		environment: newKeyEnv.value,
+		permissions,
+	});
+	if (result?.raw_key) {
+		newlyCreatedKey.value = result.raw_key;
+		newKeyName.value = '';
+		showCreatePerms.value = false;
+		newKeyPerms.value = defaultPerms();
+	}
+	creatingKey.value = false;
+}
+
+function getPermsSummary(perms: any): string {
+	return summarizePermissions(perms);
+}
+
+function openEditKey(key: any) {
+	editingKey.value = key;
+	editKeyPerms.value = parsePermissions(key.permissions);
+}
+
+async function handleSavePerms() {
+	if (!editingKey.value) return;
+	savingPerms.value = true;
+	const permissions = buildPermissions(editKeyPerms.value);
+	await updateApiKey(editingKey.value.id, { permissions });
+	editingKey.value = null;
+	savingPerms.value = false;
+}
+
+async function handleRevokeKey(id: string) {
+	if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) return;
+	await revokeApiKey(id);
+}
+
+async function handleRotateKey(id: string) {
+	newlyCreatedKey.value = null;
+	const result = await rotateApiKey(id);
+	if (result?.raw_key) {
+		newlyCreatedKey.value = result.raw_key;
 	}
 }
 
@@ -299,7 +454,9 @@ watch(activeAccountId, () => {
 	fetchSubscription();
 	fetchUsageStats();
 	fetchFormulaTokens();
+	fetchApiKeys();
 	newlyCreatedToken.value = null;
+	newlyCreatedKey.value = null;
 });
 
 onMounted(async () => {
@@ -307,6 +464,7 @@ onMounted(async () => {
 	await fetchSubscription();
 	await fetchUsageStats();
 	await fetchFormulaTokens();
+	await fetchApiKeys();
 });
 </script>
 
@@ -437,6 +595,10 @@ onMounted(async () => {
 	border-bottom: 1px solid var(--theme--border-color);
 }
 
+.tokens-header-6col {
+	grid-template-columns: 2fr 1fr 1fr 1.5fr 80px 80px;
+}
+
 .tokens-row {
 	display: grid;
 	grid-template-columns: 2fr 1fr 1fr 80px 80px;
@@ -445,6 +607,10 @@ onMounted(async () => {
 	align-items: center;
 	font-size: 14px;
 	border-bottom: 1px solid var(--theme--border-color);
+}
+
+.tokens-row-6col {
+	grid-template-columns: 2fr 1fr 1fr 1.5fr 80px 80px;
 }
 
 .tokens-row:last-child {
@@ -473,6 +639,18 @@ onMounted(async () => {
 .revoked-chip {
 	--v-chip-background-color: var(--theme--foreground-subdued);
 	--v-chip-color: #fff;
+}
+
+.test-chip {
+	--v-chip-background-color: var(--theme--warning);
+	--v-chip-color: #fff;
+}
+
+.legacy-chip {
+	--v-chip-background-color: var(--theme--foreground-subdued);
+	--v-chip-color: #fff;
+	margin-left: 8px;
+	vertical-align: middle;
 }
 
 .tokens-empty {
@@ -520,6 +698,79 @@ onMounted(async () => {
 
 .copy-icon:hover {
 	color: var(--theme--foreground);
+}
+
+.perms-summary {
+	font-size: 12px;
+	color: var(--theme--foreground-subdued);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.perms-summary:hover {
+	color: var(--theme--foreground);
+}
+
+.edit-perms-icon {
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.perms-summary:hover .edit-perms-icon {
+	opacity: 1;
+}
+
+.create-perms-panel {
+	margin-top: 12px;
+	padding: 12px;
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	background: var(--theme--background-subdued);
+}
+
+.edit-perms-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 500;
+}
+
+.edit-perms-dialog {
+	background: var(--theme--background);
+	border-radius: var(--theme--border-radius);
+	padding: 24px;
+	width: 480px;
+	max-height: 80vh;
+	overflow-y: auto;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.edit-perms-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 16px;
+}
+
+.edit-perms-header h3 {
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0;
+}
+
+.edit-perms-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
 }
 
 .error-msg {

@@ -36,4 +36,9 @@ Format:
 - Use markdown for formatting
 - Use tables for structured results
 - Use code blocks for technical data
-- Bold key values in results`;
+- Bold key values in results
+
+Budget:
+- When a tool result contains a "_budget_warning" field, treat it as a high-priority signal
+- On warn: finish current task, avoid starting new tool chains, provide a concise final answer
+- On critical: provide your final answer immediately — do not make any further tool calls`;

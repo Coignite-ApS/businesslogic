@@ -14,20 +14,20 @@ import (
 )
 
 type AccountData struct {
-	AccountID      string   `json:"account_id"`
-	KeyID          string   `json:"key_id"`
-	Environment    string   `json:"environment"`
-	Permissions    map[string]bool `json:"permissions"`
-	AllowedOrigins []string `json:"allowed_origins"`
-	AllowedIPs     []string `json:"allowed_ips"`
-	RateLimitRPS   int      `json:"rate_limit_rps"`
-	MonthlyQuota   int      `json:"monthly_quota"`
+	AccountID      string              `json:"account_id"`
+	KeyID          string              `json:"key_id"`
+	Environment    string              `json:"environment"`
+	Permissions    ResourcePermissions `json:"permissions"`
+	AllowedOrigins []string            `json:"allowed_origins"`
+	AllowedIPs     []string            `json:"allowed_ips"`
+	RateLimitRPS   int                 `json:"rate_limit_rps"`
+	MonthlyQuota   int                 `json:"monthly_quota"`
 }
 
 type KeyService struct {
-	redis           *redis.Client
-	db              *pgxpool.Pool
-	keyCacheTTL     time.Duration
+	redis            *redis.Client
+	db               *pgxpool.Pool
+	keyCacheTTL      time.Duration
 	negativeCacheTTL time.Duration
 }
 
@@ -109,7 +109,7 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 		return nil, fmt.Errorf("key expired")
 	}
 
-	_ = json.Unmarshal(permJSON, &acct.Permissions)
+	acct.Permissions = ParsePermissions(permJSON)
 	acct.AllowedOrigins = allowedOrigins
 	acct.AllowedIPs = allowedIPs
 

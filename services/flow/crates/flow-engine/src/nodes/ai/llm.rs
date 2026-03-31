@@ -206,11 +206,13 @@ pub fn handler(
                 }
             };
 
-            // Calculate cost
+            // Calculate cost (including prompt cache pricing)
             let cost_usd = provider::calculate_cost(
                 &used_model,
                 response.input_tokens,
                 response.output_tokens,
+                response.cache_creation_input_tokens,
+                response.cache_read_input_tokens,
             );
 
             // Record cost
@@ -228,6 +230,8 @@ pub fn handler(
                     "model": used_model,
                     "input_tokens": response.input_tokens,
                     "output_tokens": response.output_tokens,
+                    "cache_creation_input_tokens": response.cache_creation_input_tokens,
+                    "cache_read_input_tokens": response.cache_read_input_tokens,
                     "cost_usd": cost_usd,
                     "stop_reason": response.stop_reason,
                 }),
@@ -241,6 +245,8 @@ struct AnthropicResponse {
     text: String,
     input_tokens: u64,
     output_tokens: u64,
+    cache_creation_input_tokens: u64,
+    cache_read_input_tokens: u64,
     stop_reason: String,
 }
 
@@ -266,13 +272,18 @@ async fn call_anthropic(
     });
 
     if let Some(sys) = system {
-        body["system"] = serde_json::json!(sys);
+        body["system"] = serde_json::json!([{
+            "type": "text",
+            "text": sys,
+            "cache_control": { "type": "ephemeral" }
+        }]);
     }
 
     let req = provider::HTTP_CLIENT
         .post(api_url)
         .header("x-api-key", api_key)
         .header("anthropic-version", "2023-06-01")
+        .header("anthropic-beta", "prompt-caching-2024-07-31")
         .header("content-type", "application/json")
         .timeout(Duration::from_secs(timeout_secs))
         .json(&body);
@@ -320,8 +331,18 @@ async fn call_anthropic(
         .unwrap_or("")
         .to_string();
 
-    let input_tokens = json["usage"]["input_tokens"].as_u64().unwrap_or(0);
-    let output_tokens = json["usage"]["output_tokens"].as_u64().unwrap_or(0);
+    let usage = &json["usage"];
+    let input_tokens = usage["input_tokens"].as_u64().unwrap_or(0);
+    let output_tokens = usage["output_tokens"].as_u64().unwrap_or(0);
+    let cache_creation = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+    let cache_read = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+
+    if cache_read > 0 {
+        tracing::info!(cache_read_tokens = cache_read, "Prompt cache hit");
+    } else if cache_creation > 0 {
+        tracing::info!(cache_creation_tokens = cache_creation, "Prompt cache miss — created new cache entry");
+    }
+
     let stop_reason = json["stop_reason"]
         .as_str()
         .unwrap_or("unknown")
@@ -331,6 +352,8 @@ async fn call_anthropic(
         text,
         input_tokens,
         output_tokens,
+        cache_creation_input_tokens: cache_creation,
+        cache_read_input_tokens: cache_read,
         stop_reason,
     })
 }
@@ -339,7 +362,12 @@ fn truncate(s: &str, max_len: usize) -> &str {
     if s.len() <= max_len {
         s
     } else {
-        &s[..max_len]
+        // Find last valid UTF-8 char boundary at or before max_len
+        let mut end = max_len;
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        &s[..end]
     }
 }
 
@@ -559,5 +587,152 @@ mod tests {
         assert_eq!(result.data["text"], "Fallback response");
         assert_eq!(result.data["model"], "claude-haiku-4-5");
         assert_eq!(call_count.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_llm_system_prompt_cache_control_format() {
+        use axum::extract::Request;
+        use axum::body::to_bytes;
+        use std::sync::Mutex;
+
+        // Capture the request body to verify system prompt format
+        let captured_body: Arc<Mutex<Option<serde_json::Value>>> = Arc::new(Mutex::new(None));
+        let captured_clone = captured_body.clone();
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let api_url = format!("http://127.0.0.1:{}/v1/messages", addr.port());
+
+        tokio::spawn(async move {
+            let captured = captured_clone.clone();
+            let app = axum::Router::new().route(
+                "/v1/messages",
+                axum::routing::post(move |req: Request| {
+                    let captured = captured.clone();
+                    async move {
+                        let body_bytes = to_bytes(req.into_body(), usize::MAX).await.unwrap();
+                        let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+                        *captured.lock().unwrap() = Some(body);
+                        axum::Json(serde_json::json!({
+                            "id": "msg_test",
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "text", "text": "ok"}],
+                            "model": "claude-sonnet-4-6",
+                            "stop_reason": "end_turn",
+                            "usage": {"input_tokens": 5, "output_tokens": 2}
+                        }))
+                    }
+                }),
+            );
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let h = handler(None, None);
+        let input = NodeInput::new(
+            serde_json::json!({
+                "prompt": "Hello",
+                "system_prompt": "You are a helpful assistant.",
+                "api_base_url": api_url,
+                "model": "claude-sonnet-4-6"
+            }),
+            serde_json::json!({}),
+            serde_json::json!({
+                "$trigger": {},
+                "$env": {"ANTHROPIC_API_KEY": "sk-test-key"},
+                "$meta": {
+                    "execution_id": "00000000-0000-0000-0000-000000000000",
+                    "flow_id": "00000000-0000-0000-0000-000000000000",
+                    "account_id": "00000000-0000-0000-0000-000000000000",
+                    "started_at": "2026-01-01T00:00:00Z",
+                    "cumulative_cost_usd": 0.0
+                },
+                "$nodes": {},
+                "$last": null
+            }),
+        );
+
+        h(input).await.unwrap();
+
+        let body = captured_body.lock().unwrap().clone().unwrap();
+        // System prompt must be array with cache_control
+        let system = body["system"].as_array().expect("system must be an array");
+        assert_eq!(system.len(), 1);
+        assert_eq!(system[0]["type"], "text");
+        assert_eq!(system[0]["text"], "You are a helpful assistant.");
+        assert_eq!(system[0]["cache_control"]["type"], "ephemeral");
+    }
+
+    #[tokio::test]
+    async fn test_llm_prompt_caching_beta_header() {
+        use axum::extract::Request;
+        use std::sync::Mutex;
+
+        let captured_header: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let captured_clone = captured_header.clone();
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let api_url = format!("http://127.0.0.1:{}/v1/messages", addr.port());
+
+        tokio::spawn(async move {
+            let captured = captured_clone.clone();
+            let app = axum::Router::new().route(
+                "/v1/messages",
+                axum::routing::post(move |req: Request| {
+                    let captured = captured.clone();
+                    async move {
+                        let beta = req
+                            .headers()
+                            .get("anthropic-beta")
+                            .and_then(|v| v.to_str().ok())
+                            .map(|s| s.to_string());
+                        *captured.lock().unwrap() = beta;
+                        axum::Json(serde_json::json!({
+                            "id": "msg_test",
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "text", "text": "ok"}],
+                            "model": "claude-sonnet-4-6",
+                            "stop_reason": "end_turn",
+                            "usage": {"input_tokens": 5, "output_tokens": 2}
+                        }))
+                    }
+                }),
+            );
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let h = handler(None, None);
+        let input = NodeInput::new(
+            serde_json::json!({
+                "prompt": "Hello",
+                "api_base_url": api_url,
+                "model": "claude-sonnet-4-6"
+            }),
+            serde_json::json!({}),
+            serde_json::json!({
+                "$trigger": {},
+                "$env": {"ANTHROPIC_API_KEY": "sk-test-key"},
+                "$meta": {
+                    "execution_id": "00000000-0000-0000-0000-000000000000",
+                    "flow_id": "00000000-0000-0000-0000-000000000000",
+                    "account_id": "00000000-0000-0000-0000-000000000000",
+                    "started_at": "2026-01-01T00:00:00Z",
+                    "cumulative_cost_usd": 0.0
+                },
+                "$nodes": {},
+                "$last": null
+            }),
+        );
+
+        h(input).await.unwrap();
+
+        let header_val = captured_header.lock().unwrap().clone().unwrap();
+        assert_eq!(header_val, "prompt-caching-2024-07-31");
     }
 }

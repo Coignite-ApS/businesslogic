@@ -3,6 +3,24 @@
  * Extracted from src/routes/mcp.js.
  */
 
+/**
+ * Resolve {{input.key}} and {{output.key}} references in a response template.
+ *
+ * @param {string} template - Raw template string with {{input.x}} / {{output.x}} tokens
+ * @param {Record<string, unknown>} inputs - Actual input values passed to the calculation
+ * @param {Record<string, unknown>} outputs - Actual output values returned by the calculation
+ * @returns {string} Template with all resolvable references replaced by their values
+ */
+export function resolveResponseTemplate(template, inputs, outputs) {
+  if (!template) return '';
+  return template.replace(/\{\{(input|output)\.([^}]+)\}\}/g, (match, kind, key) => {
+    const val = kind === 'input' ? inputs?.[key] : outputs?.[key];
+    if (val === undefined || val === null) return match; // leave unresolved refs as-is
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  });
+}
+
 export function buildTypeHint(prop) {
   // Transform overrides base type hint
   if (prop.transform === 'date') return 'Date YYYY-MM-DD (e.g. 2025-06-15)';

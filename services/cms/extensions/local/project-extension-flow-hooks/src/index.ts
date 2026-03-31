@@ -11,15 +11,15 @@ function requireAuth(req: any, res: any, next: () => void) {
 
 export default defineHook(({ init, filter }, { env, logger, database }) => {
 	const db: DB = database;
-	const triggerUrl = env['FLOW_TRIGGER_URL'] as string | undefined;
+	const gwUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
 
-	if (!triggerUrl) {
-		logger.warn('FLOW_TRIGGER_URL not set — flow hooks disabled');
+	if (!gwUrl) {
+		logger.warn('GATEWAY_URL not set — flow hooks disabled');
 		return;
 	}
 
-	const adminToken = env['FLOW_TRIGGER_ADMIN_TOKEN'] as string | undefined;
-	const client = new FlowTriggerClient(triggerUrl, adminToken);
+	const internalSecret = env['GATEWAY_INTERNAL_SECRET'] as string | undefined;
+	const client = new FlowTriggerClient(`${gwUrl}/internal/flow`, internalSecret);
 
 	// ─── Sync node types on startup ─────────────────────────
 
@@ -57,11 +57,6 @@ export default defineHook(({ init, filter }, { env, logger, database }) => {
 	// ─── Proxy routes ───────────────────────────────────────
 
 	init('routes.custom.before', ({ app }) => {
-
-		// GET /flow/trigger-url — expose trigger URL to frontend
-		app.get('/flow/trigger-url', requireAuth, (_req: any, res: any) => {
-			return res.json({ url: triggerUrl });
-		});
 
 		// GET /flow/health — proxy flow-trigger health
 		app.get('/flow/health', requireAuth, async (_req: any, res: any) => {
@@ -116,7 +111,7 @@ export default defineHook(({ init, filter }, { env, logger, database }) => {
 			try {
 				const streamUrl = client.streamUrl(req.params.id);
 				const upstream = await fetch(streamUrl, {
-					headers: adminToken ? { 'X-Admin-Token': adminToken } : {},
+					headers: internalSecret ? { 'X-Internal-Secret': internalSecret } : {},
 				});
 
 				if (!upstream.ok || !upstream.body) {

@@ -3,7 +3,6 @@
 #
 # Usage:
 #   docker compose -f infrastructure/docker/docker-compose.dev.yml up -d
-#   docker compose -f infrastructure/docker/docker-compose.dev.yml --profile legacy up -d
 #
 # Host ports are offset to avoid collisions with other local projects:
 #   postgres   — PostgreSQL 16 + pgvector (host 15432 → container 5432)
@@ -18,7 +17,6 @@
 #   otel-collector — OpenTelemetry Collector (host 14317/14318 → container 4317/4318)
 #
 # Legacy (for comparison testing):
-#   legacy-cms — Original Directus with embedded AI (host 18056 → container 8055)
 ##############################################################################
 
 services:
@@ -73,9 +71,9 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "/otelcol-contrib", "components"]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   # ════════════════════════════════════════════════════
@@ -116,13 +114,13 @@ services:
       - EXTENSIONS_AUTO_RELOAD=true
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
-      # Service URLs (internal Docker network)
+      # Gateway internal auth (CMS→gateway→services)
+      - GATEWAY_URL=http://bl-gateway:8080
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
+      # Direct service URLs (for public URL exposure + legacy)
       - FORMULA_API_URL=http://bl-formula-api:3000
       - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
-      - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
-      - FLOW_TRIGGER_ADMIN_TOKEN=${FLOW_TRIGGER_ADMIN_TOKEN:-dev-flow-token}
-      # AI proxy (Phase 1: proxy to bl-ai-api when enabled)
-      - AI_SERVICE_URL=http://bl-ai-api:3200
+      # AI proxy (routes through gateway /internal/ai/ when enabled)
       - AI_SERVICE_ENABLED=${AI_SERVICE_ENABLED:-false}
     volumes:
       # Mount local extensions for hot-reload during development
@@ -146,11 +144,14 @@ services:
     build:
       context: ../../services/formula-api
       dockerfile: Dockerfile
+      secrets:
+        - npm_token
     ports:
       - "13000:3000"
     environment:
       - PORT=3000
-      - POOL_SIZE=2
+      - POOL_SIZE=4
+      - REQUEST_TIMEOUT_MS=30000
       - REDIS_URL=redis://redis:6379
       - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
@@ -160,10 +161,14 @@ services:
       - ENGINE=${ENGINE:-hyperformula}
       - MAX_QUEUE_DEPTH=256
       - CACHE_MAX_MEMORY_ITEMS=10000
+      - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
+      - ADMIN_API_URL=${ADMIN_API_URL:-http://bl-cms:8055}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
     depends_on:
+      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -193,7 +198,7 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3100/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -249,7 +254,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3200/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -274,50 +279,18 @@ services:
       - FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
       - CMS_URL=http://bl-cms:8055
       - LOG_LEVEL=debug
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
+      - GATEWAY_SHARED_SECRET=${GATEWAY_SHARED_SECRET:-dev-shared-secret}
+      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
       - OTEL_ENABLED=true
     depends_on:
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
       interval: 5s
       timeout: 3s
       retries: 3
-
-  # ════════════════════════════════════════════════════
-  # Legacy CMS (for comparison testing)
-  # ════════════════════════════════════════════════════
-  # Only starts with: --profile legacy
-
-  legacy-cms:
-    profiles: ["legacy"]
-    build:
-      context: ../../legacy-implementation/businesslogic-cms
-      dockerfile: base/Dockerfile
-      args:
-        DIRECTUS_VERSION: "11.16.1"
-      secrets:
-        - npm_token
-    ports:
-      - "18056:8055"
-    env_file:
-      - .env
-    environment:
-      - CONFIG_PATH=/directus/config.local.yaml
-      - PUBLIC_URL=http://localhost:18056
-      - DB_CLIENT=pg
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=directus
-      - DB_USER=directus
-      - DB_PASSWORD=directus
-      - REDIS_ENABLED=true
-      - REDIS=redis://redis:6379
-      - FORMULA_API_URL=http://bl-formula-api:3000
-      - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
 
 secrets:
   npm_token:

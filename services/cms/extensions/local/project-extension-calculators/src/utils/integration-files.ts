@@ -6,7 +6,7 @@ export interface IntegrationFileParams {
 	effectiveId: string;
 	toolName: string;
 	formulaApiUrl: string;
-	token: string;
+	apiKey: string;
 	inputParams: Record<string, InputParameter>;
 	outputParams: Record<string, OutputParameter>;
 }
@@ -71,7 +71,7 @@ export function generateSkillMd(params: IntegrationFileParams): string {
 		'## API Details',
 		'',
 		`- **Endpoint**: \`POST ${endpoint}\``,
-		`- **Auth Header**: \`X-Auth-Token: ${params.token}\``,
+		`- **Auth Header**: \`X-API-Key: ${params.apiKey}\``,
 		'- **Content-Type**: `application/json`',
 		'',
 		'## Example Request',
@@ -79,7 +79,7 @@ export function generateSkillMd(params: IntegrationFileParams): string {
 		'```bash',
 		`curl -X POST '${endpoint}' \\`,
 		`  -H 'Content-Type: application/json' \\`,
-		`  -H 'X-Auth-Token: ${params.token}' \\`,
+		`  -H 'X-API-Key: ${params.apiKey}' \\`,
 		`  -d '${JSON.stringify(sampleBody)}'`,
 		'```',
 		'',
@@ -107,7 +107,7 @@ export function generatePluginJson(params: IntegrationFileParams): string {
 		auth: {
 			type: 'service_http',
 			authorization_type: 'custom',
-			custom_auth_header: 'X-Auth-Token',
+			custom_auth_header: 'X-API-Key',
 		},
 	};
 	return JSON.stringify(obj, null, 2);
@@ -118,7 +118,7 @@ export function generateMcpJson(params: IntegrationFileParams): string {
 		mcpServers: {
 			[params.toolName]: {
 				url: `${params.formulaApiUrl}/mcp/calculator/${params.effectiveId}`,
-				headers: { 'X-Auth-Token': params.token },
+				headers: { 'X-API-Key': params.apiKey },
 			},
 		},
 	};

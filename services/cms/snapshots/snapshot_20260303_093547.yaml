@@ -3348,8 +3348,8 @@ fields:
         choices:
           - text: Basic
             value: basic
-          - text: Proffesional
-            value: proffesional
+          - text: Professional
+            value: professional
           - text: Premium
             value: premium
       readonly: false

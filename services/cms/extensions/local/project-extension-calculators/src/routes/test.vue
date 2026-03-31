@@ -292,6 +292,118 @@
 				</div>
 			</div>
 
+			<!-- Saved test cases section -->
+			<div v-if="testCases.length > 0 || showAddTestCase" class="saved-tests-section">
+				<div class="saved-tests-header">
+					<span class="saved-tests-title">Saved Tests</span>
+					<div class="saved-tests-actions">
+						<v-button
+							v-if="testCases.length > 0"
+							small
+							secondary
+							:loading="runningAll"
+							:disabled="!isDeployed"
+							@click="handleRunAll"
+						>
+							<v-icon name="play_circle" left small />
+							Run All
+						</v-button>
+						<v-button small secondary @click="showAddTestCase = !showAddTestCase">
+							<v-icon name="add" left small />
+							Add Test
+						</v-button>
+					</div>
+				</div>
+
+				<!-- Add test case form -->
+				<div v-if="showAddTestCase" class="add-tc-form">
+					<div class="add-tc-fields">
+						<v-input v-model="testCaseName" placeholder="Test case name" />
+						<p class="add-tc-hint">Current inputs will be saved. If you ran a calculation, the response will be saved as expected outputs.</p>
+					</div>
+					<div class="add-tc-footer">
+						<v-button secondary small @click="showAddTestCase = false">Cancel</v-button>
+						<v-button small :loading="savingTestCase" :disabled="!testCaseName.trim()" @click="handleSaveNewTestCase">
+							Save Test Case
+						</v-button>
+					</div>
+				</div>
+
+				<!-- Test case list -->
+				<div class="tc-list">
+					<div
+						v-for="tc in testCases"
+						:key="tc.id"
+						class="tc-row"
+						:class="{
+							'tc-row--passed': testResults[tc.id]?.passed === true,
+							'tc-row--failed': testResults[tc.id]?.passed === false,
+						}"
+					>
+						<div class="tc-row-main">
+							<span
+								v-if="tc.id in testResults"
+								class="tc-badge"
+								:class="testResults[tc.id].passed ? 'tc-badge--pass' : 'tc-badge--fail'"
+							>
+								{{ testResults[tc.id].passed ? 'PASS' : 'FAIL' }}
+							</span>
+							<span class="tc-name">{{ tc.name }}</span>
+							<span v-if="tc.expected_outputs && Object.keys(tc.expected_outputs).length > 0" class="tc-expected-count">
+								{{ Object.keys(tc.expected_outputs).length }} expected
+							</span>
+							<div class="tc-row-actions">
+								<v-button
+									x-small
+									secondary
+									:loading="runningSingleId === tc.id"
+									:disabled="!isDeployed"
+									@click="handleRunSingle(tc.id)"
+								>
+									<v-icon name="play_arrow" small />
+								</v-button>
+								<v-button x-small secondary @click="handleLoadTestCase(tc.id)">
+									<v-icon name="edit" small />
+								</v-button>
+								<v-button x-small secondary @click="handleDeleteTestCase(tc.id)">
+									<v-icon name="delete" small />
+								</v-button>
+							</div>
+						</div>
+
+						<!-- Diff display for failed tests -->
+						<div v-if="testResults[tc.id]?.passed === false" class="tc-diff">
+							<div v-if="testResults[tc.id].error" class="tc-diff-error">
+								{{ testResults[tc.id].error }}
+							</div>
+							<table v-else-if="Object.keys(testResults[tc.id].diff).length > 0" class="diff-table">
+								<thead>
+									<tr>
+										<th>Field</th>
+										<th>Expected</th>
+										<th>Actual</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(entry, key) in testResults[tc.id].diff" :key="key">
+										<td class="diff-field">{{ key }}</td>
+										<td class="diff-expected">{{ entry.expected }}</td>
+										<td class="diff-actual">{{ entry.actual }}</td>
+									</tr>
+								</tbody>
+							</table>
+							<div v-else class="tc-diff-error">Execution failed — no diff available.</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div v-else-if="testCases.length === 0 && isDeployed" class="saved-tests-empty">
+				<v-button small secondary @click="showAddTestCase = true">
+					<v-icon name="add" left small />
+					Save current inputs as test case
+				</v-button>
+			</div>
+
 			<!-- Bottom bar -->
 			<div class="bottom-bar">
 				<div class="bar-left">
@@ -398,6 +510,7 @@ const {
 	deployConfig, executeConfig,
 	enableTest,
 	fetchTestCases, createTestCase, updateTestCase, deleteTestCase,
+	runAllTests, runSingleTest,
 	launchConfig, activateCalc, updateConfig,
 } = useCalculators(api);
 
@@ -426,6 +539,13 @@ const savingTestCase = ref(false);
 const tcDropdownOpen = ref(false);
 const showGoLiveDialog = ref(false);
 const publishing = ref(false);
+
+// Test management state
+const expectedOutputValues = ref<Record<string, unknown>>({});
+const runningAll = ref(false);
+const runningSingleId = ref<string | null>(null);
+const testResults = ref<Record<string, { passed: boolean; actual: Record<string, unknown>; diff: Record<string, { expected: unknown; actual: unknown }>; error?: string | null }>>({});
+const showAddTestCase = ref(false);
 
 const currentId = computed(() => (route.params.id as string) || null);
 
@@ -677,11 +797,15 @@ async function handleSaveTestCase() {
 	if (!currentId.value || !testCaseName.value.trim()) return;
 	savingTestCase.value = true;
 	try {
-		const payload = {
+		const payload: Record<string, unknown> = {
 			name: testCaseName.value.trim(),
 			input: { ...inputValues.value },
 			calculator: currentId.value,
 		};
+		// Capture current response as expected outputs if present
+		if (responseData.value && typeof responseData.value === 'object') {
+			payload.expected_outputs = { ...(responseData.value as Record<string, unknown>) };
+		}
 		if (selectedTestCaseId.value) {
 			await updateTestCase(selectedTestCaseId.value, payload);
 		} else {
@@ -699,6 +823,7 @@ function handleLoadTestCase(id: string | null) {
 	selectedTestCaseId.value = id;
 	if (!id) {
 		testCaseName.value = '';
+		expectedOutputValues.value = {};
 		return;
 	}
 	const tc = testCases.value.find((t) => t.id === id);
@@ -706,6 +831,11 @@ function handleLoadTestCase(id: string | null) {
 	testCaseName.value = tc.name;
 	if (tc.input && typeof tc.input === 'object') {
 		inputValues.value = { ...tc.input };
+	}
+	if (tc.expected_outputs && typeof tc.expected_outputs === 'object') {
+		expectedOutputValues.value = { ...tc.expected_outputs };
+	} else {
+		expectedOutputValues.value = {};
 	}
 }
 
@@ -719,6 +849,65 @@ async function handleDeleteTestCase(id: string) {
 		}
 	} catch (err: any) {
 		execError.value = extractErrorMessage(err, 'Delete failed');
+	}
+}
+
+async function handleRunAll() {
+	if (!currentId.value || !isDeployed.value) return;
+	runningAll.value = true;
+	execError.value = null;
+	try {
+		if (!isTestActive.value) await enableTest(currentId.value);
+		const results = await runAllTests(currentId.value, true);
+		const map: typeof testResults.value = {};
+		for (const r of results) {
+			map[r.id] = { passed: r.passed, actual: r.actual, diff: r.diff, error: r.error };
+		}
+		testResults.value = map;
+	} catch (err: any) {
+		execError.value = extractErrorMessage(err, 'Run all failed');
+	} finally {
+		runningAll.value = false;
+	}
+}
+
+async function handleRunSingle(id: string) {
+	if (!currentId.value || !isDeployed.value) return;
+	runningSingleId.value = id;
+	execError.value = null;
+	try {
+		if (!isTestActive.value) await enableTest(currentId.value);
+		const r = await runSingleTest(currentId.value, true, id);
+		testResults.value = {
+			...testResults.value,
+			[id]: { passed: r.passed, actual: r.actual, diff: r.diff, error: r.error },
+		};
+	} catch (err: any) {
+		execError.value = extractErrorMessage(err, 'Run failed');
+	} finally {
+		runningSingleId.value = null;
+	}
+}
+
+async function handleSaveNewTestCase() {
+	if (!currentId.value || !testCaseName.value.trim()) return;
+	savingTestCase.value = true;
+	try {
+		const payload = {
+			name: testCaseName.value.trim(),
+			input: { ...inputValues.value },
+			expected_outputs: Object.keys(expectedOutputValues.value).length > 0 ? { ...expectedOutputValues.value } : null,
+			tolerance: null,
+			calculator: currentId.value,
+		};
+		await createTestCase(payload);
+		testCaseName.value = '';
+		expectedOutputValues.value = {};
+		showAddTestCase.value = false;
+	} catch (err: any) {
+		execError.value = extractErrorMessage(err, 'Save failed');
+	} finally {
+		savingTestCase.value = false;
 	}
 }
 
@@ -770,6 +959,8 @@ watch(currentId, (id) => {
 	execError.value = null;
 	selectedTestCaseId.value = null;
 	testCaseName.value = '';
+	expectedOutputValues.value = {};
+	testResults.value = {};
 	if (id) {
 		fetchOne(id);
 		fetchTestCases(id);
@@ -1280,5 +1471,182 @@ watch(inputParamKeys, () => {
 .sidebar-info p {
 	margin: 0;
 	line-height: 1.6;
+}
+
+/* Saved test cases section */
+.saved-tests-section {
+	margin-top: 28px;
+	border-top: var(--theme--border-width) solid var(--theme--border-color);
+	padding-top: 20px;
+}
+
+.saved-tests-empty {
+	margin-top: 16px;
+	padding: 16px 0;
+}
+
+.saved-tests-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+}
+
+.saved-tests-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.saved-tests-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.add-tc-form {
+	background: var(--theme--background-subdued);
+	border: var(--theme--border-width) solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	padding: 16px;
+	margin-bottom: 16px;
+}
+
+.add-tc-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.add-tc-hint {
+	font-size: 12px;
+	color: var(--theme--foreground-subdued);
+	margin: 0;
+}
+
+.add-tc-footer {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.tc-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.tc-row {
+	border: var(--theme--border-width) solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	overflow: hidden;
+}
+
+.tc-row--passed {
+	border-color: var(--theme--success);
+}
+
+.tc-row--failed {
+	border-color: var(--theme--danger);
+}
+
+.tc-row-main {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	background: var(--theme--background);
+}
+
+.tc-badge {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	padding: 2px 7px;
+	border-radius: 4px;
+	flex-shrink: 0;
+}
+
+.tc-badge--pass {
+	background: var(--theme--success-background, #e8f5e9);
+	color: var(--theme--success, #4caf50);
+}
+
+.tc-badge--fail {
+	background: var(--theme--danger-background, #fce4ec);
+	color: var(--theme--danger, #e35169);
+}
+
+.tc-name {
+	flex: 1;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--theme--foreground);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tc-expected-count {
+	font-size: 12px;
+	color: var(--theme--foreground-subdued);
+	flex-shrink: 0;
+}
+
+.tc-row-actions {
+	display: flex;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.tc-diff {
+	padding: 12px;
+	background: var(--theme--danger-background, #fce4ec);
+	border-top: var(--theme--border-width) solid var(--theme--border-color);
+}
+
+.tc-diff-error {
+	font-size: 13px;
+	color: var(--theme--danger, #e35169);
+	font-weight: 500;
+}
+
+.diff-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.diff-table th,
+.diff-table td {
+	padding: 6px 10px;
+	text-align: left;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.diff-table th {
+	font-weight: 600;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--theme--foreground-subdued);
+}
+
+.diff-field {
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
+	color: var(--theme--foreground);
+}
+
+.diff-expected {
+	color: var(--theme--success, #4caf50);
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
+}
+
+.diff-actual {
+	color: var(--theme--danger, #e35169);
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
 }
 </style>

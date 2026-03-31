@@ -68,7 +68,7 @@ const descLangObj = computed(() => languages.find((l) => l.id === descLang.value
 
 const maskedParams = computed<SnippetParams>(() => ({
 	...props.snippetParams,
-	token: maskToken(props.snippetParams.token),
+	apiKey: maskToken(props.snippetParams.apiKey),
 }));
 
 const execDisplay = computed(() => execLangObj.value.execute(maskedParams.value));

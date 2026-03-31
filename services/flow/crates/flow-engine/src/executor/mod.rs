@@ -12,8 +12,17 @@ use flow_common::flow::{ExecutionMode, FlowDef};
 use flow_common::node::NodeInput;
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
+
+/// Circuit breaker multiplier: cumulative cost must exceed `budget * multiplier` to abort.
+/// Configurable via `FLOW_CIRCUIT_BREAKER_MULTIPLIER` env var (default: 2.0).
+static CIRCUIT_BREAKER_MULTIPLIER: LazyLock<f64> = LazyLock::new(|| {
+    std::env::var("FLOW_CIRCUIT_BREAKER_MULTIPLIER")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2.0)
+});
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -373,6 +382,24 @@ async fn execute_dag(
 
                 if node_result.cost_usd > 0.0 {
                     ctx.add_cost(node_result.cost_usd);
+                }
+
+                // Hard circuit breaker: abort if cumulative cost > Nx budget limit
+                if let Some(limit) = flow.settings.budget_limit_usd {
+                    let multiplier = *CIRCUIT_BREAKER_MULTIPLIER;
+                    let hard_limit = limit * multiplier;
+                    if ctx.meta.cumulative_cost_usd > hard_limit {
+                        tracing::warn!(
+                            spent = ctx.meta.cumulative_cost_usd,
+                            limit = hard_limit,
+                            multiplier = multiplier,
+                            "Hard circuit breaker: execution cost exceeded {}x budget limit", multiplier
+                        );
+                        return Err(FlowError::BudgetExceeded(format!(
+                            "Hard circuit breaker: execution cost ${:.4} exceeded {:.1}x budget limit ${:.4}",
+                            ctx.meta.cumulative_cost_usd, multiplier, limit
+                        )));
+                    }
                 }
 
                 for log in &node_result.logs {
@@ -1658,5 +1685,128 @@ mod tests {
             .as_f64()
             .unwrap() as i64;
         assert_eq!(counter, 1);
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_aborts_when_cost_exceeds_2x_limit() {
+        let mut registry = NodeRegistry::new();
+        // Node that reports $0.06 cost — will exceed 2x of $0.05 limit after first node
+        registry.register(
+            "test:costly",
+            flow_common::node::NodeTypeMeta {
+                id: "test:costly".into(),
+                name: "Costly".into(),
+                description: "Returns a high cost".into(),
+                category: "test".into(),
+                tier: flow_common::node::NodeTier::Core,
+                inputs: vec![],
+                outputs: vec![],
+                config_schema: serde_json::json!({}),
+                estimated_cost_usd: 0.0,
+                required_role: flow_common::node::RequiredRole::default(),
+            },
+            Arc::new(|_input: NodeInput| {
+                Box::pin(async {
+                    Ok(flow_common::node::NodeResult::with_cost(
+                        serde_json::json!({"done": true}),
+                        0.06, // $0.06 > 2x limit of $0.05
+                    ))
+                })
+            }),
+        );
+
+        // budget=$0.02, hard_limit=2*0.02=$0.04; node costs $0.06 > $0.04 -> trips
+        let flow = FlowDef {
+            id: Uuid::new_v4(),
+            name: "circuit_breaker_test".to_string(),
+            description: None,
+            account_id: Uuid::new_v4(),
+            status: FlowStatus::Active,
+            graph: FlowGraph {
+                nodes: vec![make_node("costly_node", "test:costly")],
+                edges: vec![],
+            },
+            trigger_config: flow_common::trigger::TriggerConfig::Manual,
+            settings: FlowSettings {
+                budget_limit_usd: Some(0.02),
+                ..Default::default()
+            },
+            version: 1,
+        };
+
+        let result = execute_flow(
+            &flow,
+            serde_json::json!({}),
+            &registry,
+            HashMap::new(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.status, ExecutionStatus::Failed);
+        let err = result.error.unwrap();
+        assert!(err.contains("circuit breaker") || err.contains("budget"), "error was: {err}");
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_does_not_trigger_within_budget() {
+        let mut registry = NodeRegistry::new();
+        // Node that reports $0.01 cost — well within 2x limit of $0.10
+        registry.register(
+            "test:cheap",
+            flow_common::node::NodeTypeMeta {
+                id: "test:cheap".into(),
+                name: "Cheap".into(),
+                description: "Returns a small cost".into(),
+                category: "test".into(),
+                tier: flow_common::node::NodeTier::Core,
+                inputs: vec![],
+                outputs: vec![],
+                config_schema: serde_json::json!({}),
+                estimated_cost_usd: 0.0,
+                required_role: flow_common::node::RequiredRole::default(),
+            },
+            Arc::new(|_input: NodeInput| {
+                Box::pin(async {
+                    Ok(flow_common::node::NodeResult::with_cost(
+                        serde_json::json!({"done": true}),
+                        0.01,
+                    ))
+                })
+            }),
+        );
+
+        let flow = FlowDef {
+            id: Uuid::new_v4(),
+            name: "budget_ok_test".to_string(),
+            description: None,
+            account_id: Uuid::new_v4(),
+            status: FlowStatus::Active,
+            graph: FlowGraph {
+                nodes: vec![make_node("cheap_node", "test:cheap")],
+                edges: vec![],
+            },
+            trigger_config: flow_common::trigger::TriggerConfig::Manual,
+            settings: FlowSettings {
+                budget_limit_usd: Some(0.05), // hard limit = $0.10; $0.01 << $0.10
+                ..Default::default()
+            },
+            version: 1,
+        };
+
+        let result = execute_flow(
+            &flow,
+            serde_json::json!({}),
+            &registry,
+            HashMap::new(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.status, ExecutionStatus::Completed);
     }
 }

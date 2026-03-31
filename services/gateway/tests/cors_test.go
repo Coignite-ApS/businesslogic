@@ -10,13 +10,38 @@ import (
 	"github.com/coignite-aps/bl-gateway/internal/service"
 )
 
-func TestCORS_AllowsWhenNoRestrictions(t *testing.T) {
+func TestCORS_NoOriginEchoWithoutAccount(t *testing.T) {
+	// F-012: unauthenticated requests must NOT echo arbitrary origins
+	handler := middleware.CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Origin", "https://evil.com")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if v := rec.Header().Get("Access-Control-Allow-Origin"); v != "" {
+		t.Errorf("expected no Access-Control-Allow-Origin without account, got %q", v)
+	}
+}
+
+func TestCORS_EchosOriginWithAuthenticatedAccount(t *testing.T) {
+	// Authenticated requests with no origin restrictions should echo origin
+	acct := &service.AccountData{}
+
 	handler := middleware.CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("Origin", "https://example.com")
+	ctx := context.WithValue(req.Context(), middleware.AccountContextKey, acct)
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -73,7 +98,29 @@ func TestCORS_AllowsMatchingOrigin(t *testing.T) {
 	}
 }
 
-func TestCORS_Preflight(t *testing.T) {
+func TestCORS_PreflightWithAccount(t *testing.T) {
+	acct := &service.AccountData{}
+	handler := middleware.CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+	req.Header.Set("Origin", "https://example.com")
+	ctx := context.WithValue(req.Context(), middleware.AccountContextKey, acct)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204 for preflight, got %d", rec.Code)
+	}
+	if v := rec.Header().Get("Access-Control-Allow-Origin"); v != "https://example.com" {
+		t.Errorf("expected origin echo on preflight, got %q", v)
+	}
+}
+
+func TestCORS_PreflightWithoutAccount(t *testing.T) {
 	handler := middleware.CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -86,6 +133,9 @@ func TestCORS_Preflight(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("expected 204 for preflight, got %d", rec.Code)
+	}
+	if v := rec.Header().Get("Access-Control-Allow-Origin"); v != "" {
+		t.Errorf("expected no CORS header without account, got %q", v)
 	}
 }
 

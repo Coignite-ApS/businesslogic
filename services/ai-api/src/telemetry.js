@@ -16,6 +16,7 @@ import {
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions';
 import { config } from './config.js';
+import { logger } from './logger.js';
 
 const enabled = process.env.OTEL_ENABLED === 'true' || process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
@@ -48,7 +49,7 @@ export function initTelemetry() {
   });
 
   sdk.start();
-  console.log(`[otel] tracing enabled → ${endpoint}`);
+  logger.info('[otel] tracing enabled → %s', endpoint);
 }
 
 export async function shutdownTelemetry() {

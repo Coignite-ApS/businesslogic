@@ -178,7 +178,7 @@ pub fn handler() -> NodeHandler {
 
             // Sort by RRF score and take top_k
             let mut ranked: Vec<MergedResult> = score_map.into_values().collect();
-            ranked.sort_by(|a, b| b.rrf_score.partial_cmp(&a.rrf_score).unwrap());
+            ranked.sort_by(|a, b| b.rrf_score.partial_cmp(&a.rrf_score).unwrap_or(std::cmp::Ordering::Equal));
             ranked.truncate(top_k);
 
             let results: Vec<serde_json::Value> = ranked

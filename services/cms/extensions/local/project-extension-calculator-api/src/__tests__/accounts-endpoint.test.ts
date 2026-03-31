@@ -64,7 +64,7 @@ function createMockDb(opts: {
 		queryChain.first = vi.fn().mockImplementation((..._args: any[]) => {
 			if (currentTable === 'account') return Promise.resolve(opts.account ?? undefined);
 			if (currentTable === 'subscriptions') return Promise.resolve(opts.subscription ?? undefined);
-			if (currentTable === 'calculator_calls') return Promise.resolve({ count: String(opts.callCount ?? 0) });
+			if (currentTable === 'formula.calculator_calls') return Promise.resolve({ count: String(opts.callCount ?? 0) });
 			return Promise.resolve(undefined);
 		});
 

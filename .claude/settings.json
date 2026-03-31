@@ -1,4 +1,129 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(pnpm *)",
+      "Bash(yarn *)",
+      "Bash(cargo *)",
+      "Bash(rustc *)",
+      "Bash(rustup *)",
+      "Bash(go *)",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go run *)",
+      "Bash(go mod *)",
+      "Bash(go get *)",
+      "Bash(make *)",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(docker *)",
+      "Bash(docker compose *)",
+      "Bash(docker-compose *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(psql *)",
+      "Bash(redis-cli *)",
+      "Bash(pg_dump *)",
+      "Bash(pg_restore *)",
+      "Bash(terraform *)",
+      "Bash(coolify *)",
+      "Bash(k6 *)",
+      "Bash(jq *)",
+      "Bash(yq *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(rm *)",
+      "Bash(touch *)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
+      "Bash(ln *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(diff *)",
+      "Bash(sed *)",
+      "Bash(awk *)",
+      "Bash(cut *)",
+      "Bash(tr *)",
+      "Bash(xargs *)",
+      "Bash(echo *)",
+      "Bash(printf *)",
+      "Bash(tee *)",
+      "Bash(env *)",
+      "Bash(export *)",
+      "Bash(source *)",
+      "Bash(bash *)",
+      "Bash(sh *)",
+      "Bash(test *)",
+      "Bash(true)",
+      "Bash(false)",
+      "Bash(which *)",
+      "Bash(whereis *)",
+      "Bash(pwd)",
+      "Bash(cd *)",
+      "Bash(tree *)",
+      "Bash(du *)",
+      "Bash(df *)",
+      "Bash(tar *)",
+      "Bash(zip *)",
+      "Bash(unzip *)",
+      "Bash(gzip *)",
+      "Bash(gunzip *)",
+      "Bash(openssl *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(tsc *)",
+      "Bash(esbuild *)",
+      "Bash(eslint *)",
+      "Bash(prettier *)",
+      "Bash(jest *)",
+      "Bash(vitest *)",
+      "Bash(playwright *)",
+      "Bash(kill *)",
+      "Bash(lsof *)",
+      "Bash(netstat *)",
+      "Bash(ss *)",
+      "Bash(sleep *)",
+      "Bash(napi *)",
+      "Bash(wasm-pack *)",
+      "Bash(sqlx *)",
+      "Bash(diesel *)",
+      "Bash(pandoc *)",
+      "Bash(pdftoppm *)",
+      "Bash(libreoffice *)",
+      "Bash(./scripts/*)",
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__Claude_in_Chrome__*",
+      "mcp__chrome-devtools__*",
+      "mcp__*"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf /)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -13,6 +138,11 @@
             "type": "command",
             "command": ".claude/hooks/pre-commit-tests.sh",
             "timeout": 300
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-commit-docs-check.sh",
+            "timeout": 10
           }
         ]
       }
@@ -25,6 +155,27 @@
             "type": "command",
             "command": ".claude/hooks/post-edit-lint.sh",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-commit-task-eval.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh",
+            "timeout": 15
           }
         ]
       }

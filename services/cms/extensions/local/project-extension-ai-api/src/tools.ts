@@ -265,8 +265,8 @@ export const AI_TOOLS: ToolDefinition[] = [
 export interface ToolExecutorDeps {
 	db: DB;
 	accountId: string;
-	formulaApiUrl: string;
-	formulaApiAdminToken: string;
+	gatewayCalcUrl: string;
+	internalSecret: string;
 	encryptionKey?: string;
 	authToken?: string;
 	logger: any;
@@ -277,16 +277,16 @@ export async function executeTool(
 	toolInput: any,
 	deps: ToolExecutorDeps,
 ): Promise<{ result: unknown; isError?: boolean }> {
-	const { db, accountId, formulaApiUrl, formulaApiAdminToken, encryptionKey, authToken, logger } = deps;
+	const { db, accountId, gatewayCalcUrl, internalSecret, encryptionKey, authToken, logger } = deps;
 
 	try {
 		switch (toolName) {
 			case 'list_calculators':
 				return await listCalculators(db, accountId);
 			case 'describe_calculator':
-				return await describeCalculator(db, accountId, toolInput.calculator_id, formulaApiUrl, formulaApiAdminToken, encryptionKey);
+				return await describeCalculator(db, accountId, toolInput.calculator_id, gatewayCalcUrl, internalSecret, encryptionKey);
 			case 'execute_calculator':
-				return await executeCalculator(db, accountId, toolInput.calculator_id, toolInput.inputs, toolInput.test ?? false, formulaApiUrl, formulaApiAdminToken, encryptionKey);
+				return await executeCalculator(db, accountId, toolInput.calculator_id, toolInput.inputs, toolInput.test ?? false, gatewayCalcUrl, internalSecret, encryptionKey);
 			case 'create_calculator':
 				return await createCalculator(db, accountId, toolInput);
 			case 'update_calculator':
@@ -296,7 +296,7 @@ export async function executeTool(
 			case 'configure_calculator':
 				return await configureCalculator(db, accountId, toolInput);
 			case 'deploy_calculator':
-				return await deployCalculator(db, accountId, toolInput.calculator_id, toolInput.test ?? false, formulaApiUrl, formulaApiAdminToken, encryptionKey, logger);
+				return await deployCalculator(db, accountId, toolInput.calculator_id, toolInput.test ?? false, gatewayCalcUrl, internalSecret, encryptionKey, logger);
 			case 'search_knowledge':
 				return await searchKnowledge(db, accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit, authToken);
 			case 'ask_knowledge':
@@ -339,8 +339,8 @@ async function describeCalculator(
 	db: DB,
 	accountId: string,
 	calculatorId: string,
-	formulaApiUrl: string,
-	formulaApiAdminToken: string,
+	gatewayCalcUrl: string,
+	internalSecret: string,
 	encryptionKey?: string,
 ) {
 	const calc = await db('calculators')
@@ -363,10 +363,10 @@ async function describeCalculator(
 
 	try {
 		const token = decryptApiKey(config.api_key, encryptionKey);
-		const res = await fetch(`${formulaApiUrl}/calculator/${encodeURIComponent(calculatorId)}/describe`, {
+		const res = await fetch(`${gatewayCalcUrl}/calculator/${encodeURIComponent(calculatorId)}/describe`, {
 			headers: {
 				...(token ? { 'X-Auth-Token': token } : {}),
-				...(formulaApiAdminToken ? { 'X-Admin-Token': formulaApiAdminToken } : {}),
+				...(internalSecret ? { 'X-Internal-Secret': internalSecret } : {}),
 			},
 		});
 
@@ -402,8 +402,8 @@ async function executeCalculator(
 	calculatorId: string,
 	inputs: unknown,
 	test: boolean,
-	formulaApiUrl: string,
-	formulaApiAdminToken: string,
+	gatewayCalcUrl: string,
+	internalSecret: string,
 	encryptionKey?: string,
 ) {
 	const calc = await db('calculators')
@@ -428,12 +428,12 @@ async function executeCalculator(
 
 	const token = decryptApiKey(config.api_key, encryptionKey);
 
-	const res = await fetch(`${formulaApiUrl}/execute/calculator/${encodeURIComponent(formulaId)}`, {
+	const res = await fetch(`${gatewayCalcUrl}/execute/calculator/${encodeURIComponent(formulaId)}`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
 			...(token ? { 'X-Auth-Token': token } : {}),
-			...(formulaApiAdminToken ? { 'X-Admin-Token': formulaApiAdminToken } : {}),
+			...(internalSecret ? { 'X-Internal-Secret': internalSecret } : {}),
 		},
 		body: JSON.stringify(inputs),
 	});
@@ -669,8 +669,8 @@ async function deployCalculator(
 	accountId: string,
 	calculatorId: string,
 	test: boolean,
-	formulaApiUrl: string,
-	formulaApiAdminToken: string,
+	gatewayCalcUrl: string,
+	internalSecret: string,
 	encryptionKey: string | undefined,
 	logger: any,
 ) {
@@ -788,12 +788,12 @@ async function deployCalculator(
 	if (config.expressions?.length) payload.expressions = config.expressions;
 
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-	if (formulaApiAdminToken) headers['X-Admin-Token'] = formulaApiAdminToken;
+	if (internalSecret) headers['X-Internal-Secret'] = internalSecret;
 
 	// Try update first, then create on 410/404
 	let deployed = false;
 	try {
-		const res = await fetch(`${formulaApiUrl}/calculator/${encodeURIComponent(formulaId)}`, {
+		const res = await fetch(`${gatewayCalcUrl}/calculator/${encodeURIComponent(formulaId)}`, {
 			method: 'PATCH',
 			headers,
 			body: JSON.stringify(payload),
@@ -816,7 +816,7 @@ async function deployCalculator(
 	}
 
 	if (!deployed) {
-		const res = await fetch(`${formulaApiUrl}/calculator`, {
+		const res = await fetch(`${gatewayCalcUrl}/calculator`, {
 			method: 'POST',
 			headers,
 			body: JSON.stringify(payload),
@@ -834,9 +834,9 @@ async function deployCalculator(
 	}
 
 	// Refresh MCP cache (fire-and-forget)
-	fetch(`${formulaApiUrl}/cache/refresh-mcp/${encodeURIComponent(formulaId)}`, {
+	fetch(`${gatewayCalcUrl}/cache/refresh-mcp/${encodeURIComponent(formulaId)}`, {
 		method: 'POST',
-		headers: formulaApiAdminToken ? { 'X-Admin-Token': formulaApiAdminToken } : {},
+		headers: internalSecret ? { 'X-Internal-Secret': internalSecret } : {},
 	}).catch(() => {});
 
 	return {

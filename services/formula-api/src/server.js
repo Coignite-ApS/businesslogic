@@ -19,6 +19,7 @@ import { initTelemetry, shutdownTelemetry } from './telemetry.js';
 initTelemetry();
 
 import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
 import { config } from './config.js';
@@ -34,6 +35,7 @@ import { registerRoutes as registerDocsRoutes } from './routes/docs.js';
 import * as stats from './services/stats.js';
 import * as healthPush from './services/health-push.js';
 import * as hashRing from './services/hash-ring.js';
+import { initDb, closeDb } from './db.js';
 
 const app = Fastify({
   logger: { level: config.logLevel },
@@ -42,6 +44,9 @@ const app = Fastify({
   bodyLimit: config.maxPayloadSize,
   trustProxy: true,
 });
+
+// Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, etc.)
+await app.register(helmet, { contentSecurityPolicy: false });
 
 await app.register(multipart, {
   limits: { fileSize: config.maxPayloadSize },
@@ -97,7 +102,7 @@ if (config.requestLogging) {
   app.addHook('onResponse', (req, reply, done) => {
     if (req.url === '/ping' || req.url === '/health') return done();
     const ms = reply.elapsedTime?.toFixed(0) ?? '-';
-    console.log(`${req.method} ${req.url} ${reply.statusCode} ${ms}ms`);
+    req.log.info({ method: req.method, url: req.url, statusCode: reply.statusCode, ms }, 'request completed');
     done();
   });
 }
@@ -115,12 +120,20 @@ await registerDocsRoutes(app);
 const shutdown = async (signal) => {
   app.log.info(`${signal} received, shutting down`);
   try {
-    await app.close();
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('shutdown timeout')), config.shutdownTimeoutMs),
+    );
+    await Promise.race([app.close(), timeout]);
+  } catch (err) {
+    if (err.message === 'shutdown timeout') {
+      app.log.warn(`shutdown timed out after ${config.shutdownTimeoutMs}ms, forcing exit`);
+    }
   } finally {
     try { hashRing.stop(); } catch { /* best-effort */ }
     try { await healthPush.stop(); } catch { /* best-effort */ }
     try { await stats.shutdown(); } catch { /* best-effort */ }
     try { pool.destroy(); } catch { /* best-effort */ }
+    try { await closeDb(); } catch { /* best-effort */ }
     try { await cache.close(); } catch { /* best-effort */ }
     try { await shutdownTelemetry(); } catch { /* best-effort */ }
     process.exit(0);
@@ -130,15 +143,29 @@ const shutdown = async (signal) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+process.on('unhandledRejection', (reason) => {
+  app.log.fatal({ err: reason }, 'unhandled rejection');
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  app.log.fatal({ err }, 'uncaught exception');
+  process.exit(1);
+});
+
 // Start
 const start = async () => {
   try {
     await cache.initCache();
+    if (config.databaseUrl) {
+      await initDb(config.databaseUrl);
+      app.log.info('Database pool connected');
+    }
     stats.start();
     healthPush.start();
     hashRing.start();
     await app.listen({ port: config.port, host: config.host });
-    console.log(`API ready on ${config.host}:${config.port} | pool=${config.poolSize} | maxQueue=${pool.maxPending}`);
+    app.log.info({ host: config.host, port: config.port, poolSize: config.poolSize, maxQueue: pool.maxPending }, 'API ready');
   } catch (err) {
     app.log.error(err);
     process.exit(1);

@@ -157,6 +157,16 @@ export async function ensureKbSchema(db: DB, logger: any): Promise<void> {
 		logger.info('KB: added contextual_content, search_vector, language to kb_chunks');
 	}
 
+	// 5.5. Add content_hash column to kb_chunks if missing
+	const contentHashExists = await columnExists(db, 'kb_chunks', 'content_hash');
+	if (!contentHashExists) {
+		await db.raw('ALTER TABLE kb_chunks ADD COLUMN content_hash varchar(64)');
+		await registerFields(db, 'kb_chunks', [
+			{ field: 'content_hash', special: null, interface_type: 'input', sort: 14, hidden: true, width: 'half' },
+		]);
+		logger.info('KB: added content_hash to kb_chunks');
+	}
+
 	// 6. Add language column to kb_documents
 	const docLangExists = await columnExists(db, 'kb_documents', 'language');
 	if (!docLangExists) {

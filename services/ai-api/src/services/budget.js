@@ -138,6 +138,58 @@ export async function recordCost(accountId, conversationId, costUsd) {
 }
 
 /**
+ * Get budget warning for conversation context.
+ * Returns null if no warning needed, or a warning string.
+ * @param {string} conversationId
+ * @param {number} currentCostUsd - cost accumulated so far in current request
+ */
+export async function getConversationBudgetWarning(conversationId, currentCostUsd = 0) {
+  if (!conversationId) return null;
+
+  let spent = 0;
+  try {
+    const row = await queryOne(
+      `SELECT COALESCE(SUM(cost_usd), 0)::float AS total
+       FROM ai_token_usage WHERE conversation = $1`,
+      [conversationId],
+    );
+    spent = (row?.total || 0) + currentCostUsd;
+  } catch { return null; }
+
+  const limit = config.conversationBudgetUsd;
+  if (limit <= 0) return null;
+
+  const remaining = Math.max(0, limit - spent);
+  const pct = remaining / limit;
+
+  if (pct <= config.budgetCriticalPct) {
+    return `⚠️ BUDGET CRITICAL: Only $${remaining.toFixed(4)} remaining (${Math.round(pct * 100)}% of $${limit}). Provide your final answer now — do not make further tool calls.`;
+  }
+  if (pct <= config.budgetWarnPct) {
+    return `⚠️ Budget notice: $${remaining.toFixed(4)} of $${limit} remaining (${Math.round(pct * 100)}%). Summarize findings and wrap up soon.`;
+  }
+
+  return null;
+}
+
+/**
+ * Inject a budget warning into the last tool result's content.
+ * Mutates toolResults in place. No-op if no warning or empty array.
+ * @param {Array} toolResults
+ * @param {string|null} warning
+ */
+export function injectBudgetWarning(toolResults, warning) {
+  if (!warning || !toolResults.length) return;
+  const last = toolResults[toolResults.length - 1];
+  try {
+    const parsed = JSON.parse(last.content);
+    last.content = JSON.stringify({ ...parsed, _budget_warning: warning });
+  } catch {
+    last.content = JSON.stringify({ result: last.content, _budget_warning: warning });
+  }
+}
+
+/**
  * Get current budget status across all layers for an account.
  */
 export async function getBudgetStatus(accountId) {

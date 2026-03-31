@@ -46,7 +46,7 @@
 						<li><code>POST /execute/sheet</code> — spreadsheet mode</li>
 					</ul>
 					<p style="margin-top: 12px;">
-						<strong>Auth:</strong> <code>X-Auth-Token</code> header with your API key.
+						<strong>Auth:</strong> <code>X-API-Key</code> header with your API key.
 					</p>
 				</div>
 			</sidebar-detail>
@@ -67,7 +67,7 @@ const { hasToken, tokenLoading, tokenValue, formulaApiUrl, fetchToken } = useFor
 
 const snippetParams = computed<FormulaSnippetParams>(() => ({
 	baseUrl: formulaApiUrl.value,
-	token: tokenValue.value,
+	apiKey: tokenValue.value,
 }));
 
 onMounted(fetchToken);

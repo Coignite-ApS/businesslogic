@@ -44,11 +44,11 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					.count('* as count'),
 				db('calculators').count('* as count').first(),
 				db('calculators').where('activated', true).count('* as count').first(),
-				db('calculator_calls').where('timestamp', '>=', todayStart).count('* as count').first(),
-				db('calculator_calls').where('timestamp', '>=', weekStart).count('* as count').first(),
-				db('calculator_calls').where('timestamp', '>=', monthStart).count('* as count').first(),
-				db('calculator_calls').where('timestamp', '>=', monthStart).where('error', true).count('* as count').first(),
-				db('calculator_calls')
+				db('formula.calculator_calls').where('timestamp', '>=', todayStart).count('* as count').first(),
+				db('formula.calculator_calls').where('timestamp', '>=', weekStart).count('* as count').first(),
+				db('formula.calculator_calls').where('timestamp', '>=', monthStart).count('* as count').first(),
+				db('formula.calculator_calls').where('timestamp', '>=', monthStart).where('error', true).count('* as count').first(),
+				db('formula.calculator_calls')
 					.where('timestamp', '>=', thirtyDaysAgo)
 					.select(db.raw("DATE(timestamp) as date"))
 					.count('* as total')
@@ -202,8 +202,8 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 						.select('account')
 						.count('* as calculator_count')
 						.sum({ active_count: db.raw("CASE WHEN activated = true THEN 1 ELSE 0 END") }),
-					db('calculator_calls as cc')
-						.join('calculators as c', 'cc.calculator', 'c.id')
+					db('formula.calculator_calls as cc')
+						.join('calculators as c', 'cc.calculator_id', 'c.id')
 						.whereIn('c.account', accountIds)
 						.where('cc.timestamp', '>=', monthStart)
 						.groupBy('c.account')
@@ -255,8 +255,8 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 				db('calculators')
 					.where('account', accountId)
 					.select('id', 'name', 'activated', 'over_limit', 'date_created', 'date_updated'),
-				db('calculator_calls as cc')
-					.join('calculators as c', 'cc.calculator', 'c.id')
+				db('formula.calculator_calls as cc')
+					.join('calculators as c', 'cc.calculator_id', 'c.id')
 					.where('c.account', accountId)
 					.where('cc.timestamp', '>=', thirtyDaysAgo)
 					.select(db.raw("DATE(cc.timestamp) as date"))
@@ -273,11 +273,11 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					db('calculator_configs')
 						.whereIn('calculator', calcIds)
 						.select('calculator', 'test_environment', 'profile'),
-					db('calculator_calls')
-						.whereIn('calculator', calcIds)
+					db('formula.calculator_calls')
+						.whereIn('calculator_id', calcIds)
 						.where('timestamp', '>=', monthStart)
-						.groupBy('calculator')
-						.select('calculator')
+						.groupBy('calculator_id')
+						.select('calculator_id')
 						.count('* as total_calls')
 						.sum({ error_calls: db.raw("CASE WHEN error = true THEN 1 ELSE 0 END") }),
 				]);
@@ -287,7 +287,7 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					if (!configMap[cfg.calculator]) configMap[cfg.calculator] = cfg;
 					else if (!cfg.test_environment) configMap[cfg.calculator] = cfg;
 				}
-				const callsMap = Object.fromEntries(monthlyCalls.map((r: any) => [r.calculator, {
+				const callsMap = Object.fromEntries(monthlyCalls.map((r: any) => [r.calculator_id, {
 					total: parseInt(r.total_calls, 10) || 0,
 					errors: parseInt(r.error_calls, 10) || 0,
 				}]));
@@ -360,11 +360,11 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					db('calculator_configs')
 						.whereIn('calculator', calcIds)
 						.select('calculator', 'test_environment', 'profile', 'config_version', 'file_version', 'unresolved_functions'),
-					db('calculator_calls')
-						.whereIn('calculator', calcIds)
+					db('formula.calculator_calls')
+						.whereIn('calculator_id', calcIds)
 						.where('timestamp', '>=', monthStart)
-						.groupBy('calculator')
-						.select('calculator')
+						.groupBy('calculator_id')
+						.select('calculator_id')
 						.count('* as total_calls')
 						.sum({ error_calls: db.raw("CASE WHEN error = true THEN 1 ELSE 0 END") }),
 				]);
@@ -375,7 +375,7 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					configMap[cfg.calculator].push(cfg);
 				}
 
-				const callsMap = Object.fromEntries(monthlyCalls.map((r: any) => [r.calculator, {
+				const callsMap = Object.fromEntries(monthlyCalls.map((r: any) => [r.calculator_id, {
 					total: parseInt(r.total_calls, 10) || 0,
 					errors: parseInt(r.error_calls, 10) || 0,
 				}]));
@@ -437,8 +437,8 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 			const { limit = '20' } = req.query;
 			const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
 
-			const errors = await db('calculator_calls')
-				.where('calculator', calcId)
+			const errors = await db('formula.calculator_calls')
+				.where('calculator_id', calcId)
 				.where('error', true)
 				.orderBy('timestamp', 'desc')
 				.limit(limitNum)

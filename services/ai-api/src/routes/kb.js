@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
 import { getActiveAccount } from '../utils/auth.js';
 import { EmbeddingClient } from '../services/embeddings.js';
@@ -25,7 +26,7 @@ async function verifyKbOwnership(req, reply) {
   if (!accountId) { reply.code(403).send({ errors: [{ message: 'No active account' }] }); return null; }
 
   const kb = await queryOne(
-    'SELECT * FROM knowledge_bases WHERE id = $1 AND account_id = $2',
+    'SELECT * FROM knowledge_bases WHERE id = $1 AND account = $2',
     [req.params.kbId, accountId],
   );
   if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
@@ -43,7 +44,7 @@ export async function registerRoutes(app) {
 
     const rows = await queryAll(
       `SELECT id, name, description, icon, sort, date_created, date_updated
-       FROM knowledge_bases WHERE account_id = $1 ORDER BY sort, name`,
+       FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
       [accountId],
     );
     return { data: rows };
@@ -60,7 +61,7 @@ export async function registerRoutes(app) {
 
     const id = randomUUID();
     await query(
-      `INSERT INTO knowledge_bases (id, account_id, name, description, icon, sort, date_created, date_updated)
+      `INSERT INTO knowledge_bases (id, account, name, description, icon, sort, date_created, date_updated)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
       [id, accountId, name.trim(), description || null, icon || null, sort ?? 0],
     );
@@ -146,7 +147,7 @@ export async function registerRoutes(app) {
 
     const docId = randomUUID();
     await query(
-      `INSERT INTO kb_documents (id, knowledge_base, account_id, file_id, title, status, chunk_count, token_count, date_created, date_updated)
+      `INSERT INTO kb_documents (id, knowledge_base, account, file_id, title, status, chunk_count, token_count, date_created, date_updated)
        VALUES ($1, $2, $3, $4, $5, 'pending', 0, 0, NOW(), NOW())`,
       [docId, req.params.kbId, ctx.accountId, file_id, title || null],
     );
@@ -271,13 +272,13 @@ export async function registerRoutes(app) {
         const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
         embedding = await embedClient.embedQuery(question);
       } catch (err) {
-        console.error('Failed to embed curated question:', err.message);
+        logger.error({ err: err.message }, 'Failed to embed curated question');
       }
     }
 
     const id = randomUUID();
     await query(
-      `INSERT INTO kb_curated_answers (id, knowledge_base, account_id, question, answer, metadata, question_embedding, date_created, date_updated)
+      `INSERT INTO kb_curated_answers (id, knowledge_base, account, question, answer, metadata, question_embedding, date_created, date_updated)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
       [id, req.params.kbId, ctx.accountId, question.trim(), answer.trim(), metadata ? JSON.stringify(metadata) : null, embedding ? `[${embedding.join(',')}]` : null],
     );
@@ -312,7 +313,7 @@ export async function registerRoutes(app) {
         updates.push(`question_embedding = $${idx++}`);
         params.push(`[${embedding.join(',')}]`);
       } catch (err) {
-        console.error('Failed to re-embed curated question:', err.message);
+        logger.error({ err: err.message }, 'Failed to re-embed curated question');
       }
     }
 
@@ -434,7 +435,7 @@ export async function registerRoutes(app) {
 
     const id = randomUUID();
     await query(
-      `INSERT INTO kb_feedback (id, account_id, knowledge_base, query, answer, rating, metadata, date_created)
+      `INSERT INTO kb_feedback (id, account, knowledge_base, query, answer, rating, metadata, date_created)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
       [id, accountId, kb_id || null, feedbackQuery || null, answer || null, rating, metadata ? JSON.stringify(metadata) : null],
     );

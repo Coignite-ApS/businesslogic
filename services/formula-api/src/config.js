@@ -1,5 +1,6 @@
 // Centralized configuration - validated at startup
 import os from 'node:os';
+import { logger } from './logger.js';
 
 const env = process.env;
 const defaultPoolSize = os.availableParallelism?.() || os.cpus().length || 2;
@@ -21,7 +22,7 @@ const parseBytes = (str) => {
 const engine = env.ENGINE || 'hyperformula';
 const VALID_ENGINES = new Set(['hyperformula', 'bl-excel', 'both']);
 if (!VALID_ENGINES.has(engine)) {
-  console.warn(`[config] Unknown ENGINE="${engine}", falling back to hyperformula`);
+  logger.warn('[config] Unknown ENGINE="%s", falling back to hyperformula', engine);
 }
 
 export const config = {
@@ -65,17 +66,24 @@ export const config = {
   healthPushInterval: parseInt(env.HEALTH_PUSH_INTERVAL_MS || '15000', 10),
   hashRingRefreshInterval: parseInt(env.HASH_RING_REFRESH_MS || '5000', 10),
 
-  // Request logging (always-on console.log per request)
+  // Request logging (opt-in structured per-request logging)
   requestLogging: env.REQUEST_LOGGING === 'true' || env.REQUEST_LOGGING === '1',
 
   // Admin token (protects management endpoints: calculators CRUD, list, parse)
   adminToken: env.ADMIN_TOKEN || null,
 
-  // Admin API (base URL, no trailing slash — used by stats telemetry + recipe persistence)
+  // Direct PostgreSQL connection (replaces Admin API for data reads)
+  databaseUrl: env.DATABASE_URL || null,
+
+  // Admin API (base URL, no trailing slash — used for token validation in auth.js)
   adminApiUrl: env.ADMIN_API_URL || null,
   adminApiKey: env.ADMIN_API_KEY || null,
-  statsFlushInterval: parseInt(env.STATS_FLUSH_INTERVAL_MS || '10000', 10),
-  statsMaxBatch: parseInt(env.STATS_MAX_BATCH || '1000', 10),
+
+  // Gateway shared secret for HMAC-SHA256 signature verification
+  gatewaySharedSecret: env.GATEWAY_SHARED_SECRET || null,
+
+  // Graceful shutdown timeout (ms) — hard exit if app.close() hangs
+  shutdownTimeoutMs: parseInt(env.SHUTDOWN_TIMEOUT_MS || '5000', 10),
 };
 
 // Locale mapping: short code -> engine locale

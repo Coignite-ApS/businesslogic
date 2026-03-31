@@ -1,7 +1,7 @@
 export interface SnippetParams {
 	baseUrl: string;
 	calculatorId: string;
-	token: string;
+	apiKey: string;
 	sampleBody?: Record<string, unknown>;
 }
 
@@ -16,26 +16,26 @@ function jsonBody(body: Record<string, unknown>): string {
 
 // --- curl ---
 
-export function curlExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function curlExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const body = sampleBody ? ` \\\n  -d '${jsonBody(sampleBody)}'` : '';
 	return `curl -X POST "${baseUrl}/execute/calculator/${calculatorId}" \\
-  -H "X-Auth-Token: ${token}" \\
+  -H "X-API-Key: ${apiKey}" \\
   -H "Content-Type: application/json"${body}`;
 }
 
-export function curlDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function curlDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `curl "${baseUrl}/calculator/${calculatorId}/describe" \\
-  -H "X-Auth-Token: ${token}"`;
+  -H "X-API-Key: ${apiKey}"`;
 }
 
 // --- JavaScript (fetch) ---
 
-export function jsExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function jsExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const body = sampleBody ? `\n  body: JSON.stringify(${jsonBody(sampleBody)}),` : '';
 	return `const response = await fetch("${baseUrl}/execute/calculator/${calculatorId}", {
   method: "POST",
   headers: {
-    "X-Auth-Token": "${token}",
+    "X-API-Key": "${apiKey}",
     "Content-Type": "application/json",
   },${body}
 });
@@ -44,10 +44,10 @@ const result = await response.json();
 console.log(result);`;
 }
 
-export function jsDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function jsDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `const response = await fetch("${baseUrl}/calculator/${calculatorId}/describe", {
   headers: {
-    "X-Auth-Token": "${token}",
+    "X-API-Key": "${apiKey}",
   },
 });
 
@@ -57,25 +57,25 @@ console.log(schema);`;
 
 // --- Python (requests) ---
 
-export function pythonExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function pythonExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const body = sampleBody ? `\n\ndata = ${jsonBody(sampleBody)}` : '';
 	const arg = sampleBody ? ', json=data' : '';
 	return `import requests
 ${body}
 response = requests.post(
     "${baseUrl}/execute/calculator/${calculatorId}",
-    headers={"X-Auth-Token": "${token}"}${arg}
+    headers={"X-API-Key": "${apiKey}"}${arg}
 )
 
 print(response.json())`;
 }
 
-export function pythonDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function pythonDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `import requests
 
 response = requests.get(
     "${baseUrl}/calculator/${calculatorId}/describe",
-    headers={"X-Auth-Token": "${token}"}
+    headers={"X-API-Key": "${apiKey}"}
 )
 
 print(response.json())`;
@@ -83,7 +83,7 @@ print(response.json())`;
 
 // --- PHP (cURL) ---
 
-export function phpExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function phpExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const body = sampleBody
 		? `\n$data = json_encode(${jsonBody(sampleBody).replace(/"/g, "'").replace(/'/g, '"')});\n`
 		: '';
@@ -96,7 +96,7 @@ ${body}
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "X-Auth-Token: ${token}",
+    "X-API-Key: ${apiKey}",
     "Content-Type: application/json",
 ]);${opts}
 $response = curl_exec($ch);
@@ -105,13 +105,13 @@ curl_close($ch);
 echo $response;`;
 }
 
-export function phpDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function phpDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `<?php
 $ch = curl_init("${baseUrl}/calculator/${calculatorId}/describe");
 
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "X-Auth-Token: ${token}",
+    "X-API-Key: ${apiKey}",
 ]);
 
 $response = curl_exec($ch);
@@ -122,7 +122,7 @@ echo $response;`;
 
 // --- Go ---
 
-export function goExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function goExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const bodySetup = sampleBody
 		? `body := strings.NewReader(\`${jsonBody(sampleBody)}\`)\n\treq, err := http.NewRequest("POST", url, body)`
 		: `req, err := http.NewRequest("POST", url, nil)`;
@@ -141,7 +141,7 @@ func main() {
 		panic(err)
 	}
 
-	req.Header.Set("X-Auth-Token", "${token}")
+	req.Header.Set("X-API-Key", "${apiKey}")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -155,7 +155,7 @@ func main() {
 }`;
 }
 
-export function goDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function goDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `package main
 
 import (
@@ -171,7 +171,7 @@ func main() {
 		panic(err)
 	}
 
-	req.Header.Set("X-Auth-Token", "${token}")
+	req.Header.Set("X-API-Key", "${apiKey}")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -186,7 +186,7 @@ func main() {
 
 // --- Rust (reqwest) ---
 
-export function rustExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function rustExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const bodyArg = sampleBody ? `.json(&serde_json::json!(${jsonBody(sampleBody)}))` : '';
 	return `use reqwest;
 
@@ -195,7 +195,7 @@ async fn main() -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let res = client
         .post("${baseUrl}/execute/calculator/${calculatorId}")
-        .header("X-Auth-Token", "${token}")
+        .header("X-API-Key", "${apiKey}")
         ${bodyArg}
         .send()
         .await?;
@@ -206,7 +206,7 @@ async fn main() -> Result<(), reqwest::Error> {
 }`;
 }
 
-export function rustDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function rustDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `use reqwest;
 
 #[tokio::main]
@@ -214,7 +214,7 @@ async fn main() -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let res = client
         .get("${baseUrl}/calculator/${calculatorId}/describe")
-        .header("X-Auth-Token", "${token}")
+        .header("X-API-Key", "${apiKey}")
         .send()
         .await?;
 
@@ -226,7 +226,7 @@ async fn main() -> Result<(), reqwest::Error> {
 
 // --- Java (HttpClient) ---
 
-export function javaExecute({ baseUrl, calculatorId, token, sampleBody }: SnippetParams): string {
+export function javaExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const bodyPublisher = sampleBody
 		? `HttpRequest.BodyPublishers.ofString("""\n            ${jsonBody(sampleBody)}""")`
 		: `HttpRequest.BodyPublishers.noBody()`;
@@ -238,7 +238,7 @@ import java.net.http.HttpResponse;
 var client = HttpClient.newHttpClient();
 var request = HttpRequest.newBuilder()
     .uri(URI.create("${baseUrl}/execute/calculator/${calculatorId}"))
-    .header("X-Auth-Token", "${token}")
+    .header("X-API-Key", "${apiKey}")
     .header("Content-Type", "application/json")
     .POST(${bodyPublisher})
     .build();
@@ -247,7 +247,7 @@ var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 System.out.println(response.body());`;
 }
 
-export function javaDescribe({ baseUrl, calculatorId, token }: SnippetParams): string {
+export function javaDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -256,7 +256,7 @@ import java.net.http.HttpResponse;
 var client = HttpClient.newHttpClient();
 var request = HttpRequest.newBuilder()
     .uri(URI.create("${baseUrl}/calculator/${calculatorId}/describe"))
-    .header("X-Auth-Token", "${token}")
+    .header("X-API-Key", "${apiKey}")
     .GET()
     .build();
 

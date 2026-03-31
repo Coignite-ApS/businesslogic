@@ -7,12 +7,16 @@ import { buildInputMappings, buildOutputMappings } from '../utils/mapping.js';
 import { applyTransform, applyOutputTransform } from '../utils/transforms.js';
 import { errorTypeMap } from '../blocked.js';
 import { getRedisClient, isRedisReady } from '../services/cache.js';
-import { safeTokenCompare, checkAdminToken } from '../utils/auth.js';
+import { safeTokenCompare, checkAdminToken, isGatewayRequest, validateGatewayAuth } from '../utils/auth.js';
+import { redisWarn } from '../utils/redis-warn.js';
 import * as stats from '../services/stats.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import { compileIpAllowlist, validateOrigins, checkAllowlist, getClientIp, setCorsHeaders } from '../utils/allowlist.js';
 import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
+import { loadAccountLimits } from '../services/account-limits.js';
+import { loadRecipeFromDb, loadMcpConfigFromDb } from '../services/calculator-db.js';
+import { getPool } from '../db.js';
 
 
 function cleanSchemaForDescribe(schema) {
@@ -41,7 +45,6 @@ function sanitizeDetail(msg) {
 
 const REDIS_PREFIX = 'calc:';
 const RESULT_PREFIX = 'calcr:';
-const ACCOUNT_LIMITS_PREFIX = 'accl:';
 
 // Server-side calculator store
 const store = new LRUCache({
@@ -50,7 +53,7 @@ const store = new LRUCache({
   updateAgeOnGet: true,
   noDisposeOnSet: true,
   dispose: (val, key) => {
-    pool.destroyCalculator(key, val.workerId).catch(() => {});
+    pool.destroyCalculator(key, val.workerId).catch((e) => redisWarn('calculators.dispose', e));
   },
 });
 
@@ -68,19 +71,19 @@ const rebuilding = new Map();
 function saveToRedis(id, recipe) {
   if (!isRedisReady()) return;
   const redis = getRedisClient();
-  redis.setex(REDIS_PREFIX + id, config.calculatorRedisTtl, JSON.stringify(recipe)).catch(() => {});
+  redis.setex(REDIS_PREFIX + id, config.calculatorRedisTtl, JSON.stringify(recipe)).catch((e) => redisWarn('calculators.saveToRedis', e));
 }
 
 function deleteFromRedis(id) {
   if (!isRedisReady()) return Promise.resolve(0);
   const redis = getRedisClient();
-  return redis.del(REDIS_PREFIX + id).catch(() => 0);
+  return redis.del(REDIS_PREFIX + id).catch((e) => { redisWarn('calculators.deleteFromRedis', e); return 0; });
 }
 
 function refreshRedisTtl(id) {
   if (!isRedisReady()) return;
   const redis = getRedisClient();
-  redis.expire(REDIS_PREFIX + id, config.calculatorRedisTtl).catch(() => {});
+  redis.expire(REDIS_PREFIX + id, config.calculatorRedisTtl).catch((e) => redisWarn('calculators.refreshTtl', e));
 }
 
 async function loadFromRedis(id) {
@@ -113,7 +116,7 @@ function setCachedResult(calcId, generation, values, result) {
   // Fire-and-forget Redis
   if (isRedisReady()) {
     const redis = getRedisClient();
-    redis.setex(RESULT_PREFIX + k, config.calculatorResultTtl, JSON.stringify(result)).catch(() => {});
+    redis.setex(RESULT_PREFIX + k, config.calculatorResultTtl, JSON.stringify(result)).catch((e) => redisWarn('calculators.cacheResult', e));
   }
 }
 
@@ -136,31 +139,27 @@ async function getCachedResultWithRedis(calcId, generation, values) {
   return undefined;
 }
 
-// --- External API helper (read-only fallback) ---
+// --- Database helper (replaces Admin API reads) ---
 
-async function loadFromApi(id) {
-  if (!config.adminApiUrl || !config.adminApiKey) return null;
+async function loadFromDb(id) {
+  if (!getPool()) return null;
   try {
-    const res = await fetch(`${config.adminApiUrl}/management/calc/recipes/${id}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch { return null; }
+    return await loadRecipeFromDb(id);
+  } catch (err) {
+    // Log but don't throw — cache miss is handled upstream
+    console.error('[calculators] loadFromDb failed:', err.message);
+    return null;
+  }
 }
 
 async function fetchMcpConfig(id) {
-  if (!config.adminApiUrl || !config.adminApiKey) return null;
+  if (!getPool()) return null;
   try {
-    const res = await fetch(`${config.adminApiUrl}/management/calc/mcp-config/${id}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.mcp ?? null;
-  } catch { return null; }
+    return await loadMcpConfigFromDb(id);
+  } catch (err) {
+    console.error('[calculators] fetchMcpConfig failed:', err.message);
+    return null;
+  }
 }
 
 // Enrich a live calculator entry + Redis recipe with admin MCP config (fire-and-forget safe)
@@ -179,51 +178,6 @@ async function enrichMcpConfig(id, entry, recipe) {
     if (entry.mcpInputSchema) recipe.mcpInputSchema = entry.mcpInputSchema;
     saveToRedis(id, recipe);
   }
-}
-
-// --- Account rate limiting ---
-
-async function loadAccountLimitsFromRedis(accountId) {
-  if (!isRedisReady()) return null;
-  try {
-    const redis = getRedisClient();
-    const raw = await redis.get(ACCOUNT_LIMITS_PREFIX + accountId);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveAccountLimitsToRedis(accountId, data) {
-  if (!isRedisReady()) return;
-  const redis = getRedisClient();
-  redis.setex(ACCOUNT_LIMITS_PREFIX + accountId, config.accountLimitsRedisTtl, JSON.stringify(data)).catch(() => {});
-}
-
-async function loadAccountLimits(accountId, force = false) {
-  if (!accountId) return true;
-  if (!force && rateLimiter.has(accountId)) return true;
-
-  // Try Redis first (unless forcing refresh from Admin API)
-  if (!force) {
-    const cached = await loadAccountLimitsFromRedis(accountId);
-    if (cached) {
-      rateLimiter.configure(accountId, cached);
-      return true;
-    }
-  }
-
-  // Fetch from Admin API (if not configured, allow — graceful degradation)
-  if (!config.adminApiUrl || !config.adminApiKey) return true;
-  try {
-    const res = await fetch(`${config.adminApiUrl}/accounts/${accountId}`, {
-      headers: { 'Authorization': `Bearer ${config.adminApiKey}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    rateLimiter.configure(accountId, data);
-    saveAccountLimitsToRedis(accountId, data);
-    return true;
-  } catch { return false; }
 }
 
 // --- Build + rebuild ---
@@ -339,7 +293,7 @@ async function getOrRebuild(id) {
   const p = (async () => {
     let recipe = await loadFromRedis(id);
     if (!recipe) {
-      recipe = await loadFromApi(id);
+      recipe = await loadFromDb(id);
       if (recipe) saveToRedis(id, recipe);
     }
     if (!recipe) return null;
@@ -377,7 +331,7 @@ async function getMetadata(id) {
 
   let recipe = await loadFromRedis(id);
   if (!recipe) {
-    recipe = await loadFromApi(id);
+    recipe = await loadFromDb(id);
     if (recipe) saveToRedis(id, recipe); // backfill Redis
   }
   if (!recipe) return null;
@@ -890,20 +844,28 @@ export async function registerRoutes(app) {
     }
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
-    // Per-calculator token auth (same as execute)
-    if (calc.token) {
-      const provided = req.headers['x-auth-token'];
-      if (!provided) return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-      if (!safeTokenCompare(provided, calc.token)) return reply.code(403).send({ error: 'Invalid auth token' });
+    // Auth: admin token (internal), gateway HMAC, or legacy token
+    if (!checkAdminToken(req)) {
+      // Admin token valid — trusted internal caller, skip further auth
+    } else if (isGatewayRequest(req)) {
+      const gw = validateGatewayAuth(req);
+      if (!gw) return reply.code(403).send({ error: 'Invalid gateway signature' });
+      if (calc.accountId && gw.accountId !== calc.accountId) {
+        return reply.code(403).send({ error: 'Account does not own this calculator' });
+      }
+    } else {
+      if (calc.token) {
+        const provided = req.headers['x-auth-token'];
+        if (!provided) return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
+        if (!safeTokenCompare(provided, calc.token)) return reply.code(403).send({ error: 'Invalid auth token' });
+      }
+      const clientIp = getClientIp(req);
+      const origin = req.headers['origin'] || null;
+      if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
+        return reply.code(403).send({ error: 'Access denied' });
+      }
+      setCorsHeaders(reply, origin, calc.allowedOrigins);
     }
-
-    // Allowlist check
-    const clientIp = getClientIp(req);
-    const origin = req.headers['origin'] || null;
-    if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-      return reply.code(403).send({ error: 'Access denied' });
-    }
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
 
     const resp = {
       name: calc.name ?? null,
@@ -1291,30 +1253,46 @@ export async function registerRoutes(app) {
 
     calcTestFlag = calc.test ?? undefined;
 
-    // Token auth check
-    if (calc.token) {
-      const provided = req.headers['x-auth-token'];
-      if (!provided) {
-        stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
-        return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
+    // Auth: gateway path or legacy token path
+    let authAccountId;
+    if (isGatewayRequest(req)) {
+      const gw = validateGatewayAuth(req);
+      if (!gw) {
+        stat({ cached: false, error: true, errorMessage: 'Invalid gateway signature' });
+        return reply.code(403).send({ error: 'Invalid gateway signature' });
       }
-      if (!safeTokenCompare(provided, calc.token)) {
-        stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
-        return reply.code(403).send({ error: 'Invalid auth token' });
+      // Verify ownership: gateway account must own this calculator
+      if (calc.accountId && gw.accountId !== calc.accountId) {
+        stat({ cached: false, error: true, errorMessage: 'Account mismatch' });
+        return reply.code(403).send({ error: 'Account does not own this calculator' });
       }
-    }
+      authAccountId = gw.accountId;
+    } else {
+      // Legacy token auth
+      if (calc.token) {
+        const provided = req.headers['x-auth-token'];
+        if (!provided) {
+          stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
+          return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
+        }
+        if (!safeTokenCompare(provided, calc.token)) {
+          stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
+          return reply.code(403).send({ error: 'Invalid auth token' });
+        }
+      }
 
-    // Allowlist check
-    const clientIp = getClientIp(req);
-    const origin = req.headers['origin'] || null;
-    if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-      stat({ cached: false, error: true, errorMessage: 'Access denied' });
-      return reply.code(403).send({ error: 'Access denied' });
+      // Allowlist check (only for direct requests, gateway handles this)
+      const clientIp = getClientIp(req);
+      const origin = req.headers['origin'] || null;
+      if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
+        stat({ cached: false, error: true, errorMessage: 'Access denied' });
+        return reply.code(403).send({ error: 'Access denied' });
+      }
+      setCorsHeaders(reply, origin, calc.allowedOrigins);
     }
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
 
     // Rate limiting
-    const accountId = calc.accountId;
+    const accountId = authAccountId || calc.accountId;
     if (accountId && !rateLimiter.has(accountId)) {
       const loaded = await loadAccountLimits(accountId);
       if (!loaded) {

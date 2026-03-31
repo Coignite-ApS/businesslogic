@@ -83,7 +83,11 @@ func (hc *HealthChecker) checkAll() {
 
 func (hc *HealthChecker) checkOne(b *Backend) BackendStatus {
 	start := time.Now()
-	healthURL := b.URL.String() + "/health"
+	healthPath := "/health"
+	if b.HealthPath != "" {
+		healthPath = b.HealthPath
+	}
+	healthURL := b.URL.String() + healthPath
 
 	resp, err := hc.client.Get(healthURL)
 	latency := time.Since(start)

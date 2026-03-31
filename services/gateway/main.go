@@ -9,7 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coignite-aps/bl-gateway/internal/cache"
 	"github.com/coignite-aps/bl-gateway/internal/config"
+	"github.com/coignite-aps/bl-gateway/internal/handler"
 	"github.com/coignite-aps/bl-gateway/internal/middleware"
 	"github.com/coignite-aps/bl-gateway/internal/proxy"
 	"github.com/coignite-aps/bl-gateway/internal/routes"
@@ -71,6 +73,15 @@ func main() {
 	// Key service
 	keyService := service.NewKeyService(rdb, dbPool, cfg.KeyCacheTTL, cfg.NegativeCacheTTL)
 
+	// Response cache
+	responseCache := cache.New(rdb)
+
+	// API key handler
+	var apiKeyHandler *handler.APIKeyHandler
+	if dbPool != nil {
+		apiKeyHandler = handler.NewAPIKeyHandler(dbPool, rdb)
+	}
+
 	// Create backends
 	backendDefs := map[string]string{
 		"ai-api":       cfg.AIApiURL,
@@ -79,12 +90,19 @@ func main() {
 		"cms":          cfg.CMSURL,
 	}
 
+	healthPaths := map[string]string{
+		"cms": "/server/ping",
+	}
+
 	backends := make(map[string]*proxy.Backend)
 	var backendList []*proxy.Backend
 	for name, rawURL := range backendDefs {
 		b, err := proxy.NewBackend(name, rawURL, cfg.CircuitBreakerThreshold, cfg.CircuitBreakerTimeout)
 		if err != nil {
 			log.Fatal().Err(err).Str("backend", name).Msg("failed to create backend")
+		}
+		if hp, ok := healthPaths[name]; ok {
+			b.HealthPath = hp
 		}
 		backends[name] = b
 		backendList = append(backendList, b)
@@ -95,7 +113,31 @@ func main() {
 	healthChecker.Start(ctx)
 
 	// Router
-	router := routes.New(backends)
+	router := routes.New(routes.RouterConfig{
+		Backends:             backends,
+		APIKeyHandler:        apiKeyHandler,
+		ResponseCache:        responseCache,
+		InternalSecret:       cfg.InternalSecret,
+		FormulaAPIAdminToken: cfg.FormulaAPIAdminToken,
+		ConfigCacheTTL:       cfg.WidgetConfigCacheTTL,
+		CatalogCacheTTL:      cfg.WidgetCatalogCacheTTL,
+	})
+
+	// Build request log fn — fire-and-forget INSERT to gateway.request_log
+	var requestLogFn middleware.RequestLogFn
+	if dbPool != nil {
+		requestLogFn = func(accountID, apiKeyID, method, path string, status, latencyMS, reqSize, respSize int) {
+			_, err := dbPool.Exec(context.Background(),
+				`INSERT INTO gateway.request_log
+					(account_id, api_key_id, method, path, status_code, latency_ms, request_size, response_size)
+				 VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8)`,
+				accountID, nilIfEmpty(apiKeyID), method, path, status, latencyMS, reqSize, respSize,
+			)
+			if err != nil {
+				log.Warn().Err(err).Msg("request_log insert failed")
+			}
+		}
+	}
 
 	// Build handler chain
 	mux := http.NewServeMux()
@@ -103,18 +145,21 @@ func main() {
 	mux.Handle("/", router)
 
 	// Middleware chain (outermost first)
-	var handler http.Handler = mux
-	handler = middleware.CORS(handler)
-	handler = middleware.RateLimit(keyService)(handler)
-	handler = middleware.Auth(keyService)(handler)
-	handler = middleware.Tracing(handler)
-	handler = middleware.Logging(handler)
-	handler = middleware.RequestID(handler)
+	var h http.Handler = mux
+	h = middleware.GatewaySign(cfg.GatewaySharedSecret)(h)
+	h = middleware.CORS(h)
+	h = middleware.RateLimit(keyService)(h)
+	h = middleware.RequestLog(requestLogFn)(h)
+	h = middleware.Auth(keyService)(h)
+	h = middleware.Tracing(h)
+	h = middleware.Logging(h)
+	h = middleware.SecurityHeaders(h)
+	h = middleware.RequestID(h)
 
 	// Server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      handler,
+		Handler:      h,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -140,4 +185,12 @@ func main() {
 		log.Fatal().Err(err).Msg("server error")
 	}
 	log.Info().Msg("bl-gateway stopped")
+}
+
+// nilIfEmpty returns nil when s is empty, enabling nullable UUID INSERTs.
+func nilIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
 }

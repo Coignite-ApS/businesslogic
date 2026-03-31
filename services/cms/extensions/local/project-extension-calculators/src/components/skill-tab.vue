@@ -7,7 +7,7 @@
 
 		<div class="field">
 			<div class="field-row">
-				<label class="field-label">Override Response Template</label>
+				<label class="field-label">Override AI Name & Template</label>
 				<v-checkbox
 					:model-value="overrideOn"
 					:disabled="env === 'live'"
@@ -16,19 +16,37 @@
 					@update:model-value="toggleOverride"
 				/>
 			</div>
-			<span class="field-hint">Override the global AI response template for Skill only.</span>
+			<span class="field-hint">Override the global AI name and response template for Skill only.</span>
 		</div>
 
-		<div v-if="overrideOn" class="field">
-			<template-editor
-				:model-value="integration.skillResponseOverride || ''"
-				:input-params="inputParamKeys"
-				:output-params="outputParamKeys"
-				placeholder="Skill-specific response template..."
-				:disabled="env === 'live'"
-				@update:model-value="emit('update:integration', { ...integration, skillResponseOverride: $event })"
-			/>
-		</div>
+		<template v-if="overrideOn">
+			<div class="field">
+				<label class="field-label">Skill Name</label>
+				<v-input
+					:model-value="integration.skillName || ''"
+					:disabled="env === 'live'"
+					placeholder="e.g. Mortgage Calculator"
+					@update:model-value="emit('update:integration', { ...integration, skillName: $event })"
+				/>
+				<span class="field-hint">Name shown to the AI when using this Skill. Defaults to AI Name.</span>
+			</div>
+			<div class="field">
+				<template-editor
+					:model-value="integration.skillResponseOverride || ''"
+					:input-params="inputParamKeys"
+					:output-params="outputParamKeys"
+					placeholder="Skill-specific response template..."
+					:disabled="env === 'live'"
+					@update:model-value="emit('update:integration', { ...integration, skillResponseOverride: $event })"
+				/>
+			</div>
+			<div v-if="overrideDirty && env === 'test'" class="override-save">
+				<v-button :loading="saving" @click="emit('save-overrides')">
+					<v-icon name="check" left />
+					Save Overrides
+				</v-button>
+			</div>
+		</template>
 
 		<h2 class="section-title">SKILL.md</h2>
 		<p class="section-desc">This file tells Claude how to use your calculator as a skill.</p>
@@ -82,9 +100,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import CodeBlock from './code-block.vue';
+
+const ALLOWED_TAGS = [
+	'p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i',
+	'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+	'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+	'span', 'div', 'hr', 'del', 'sup', 'sub',
+];
+
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'id'];
 import TemplateEditor from './template-editor.vue';
 import { downloadZip } from '../utils/download-zip';
 import { generateSkillMd } from '../utils/integration-files';
@@ -96,34 +124,54 @@ const props = defineProps<{
 	isDeployed: boolean;
 	env: 'test' | 'live';
 	integration: IntegrationConfig;
+	storedIntegration: IntegrationConfig;
 	inputParams: string[];
 	outputParams: string[];
 	calculatorName: string;
 	calculatorDescription: string | null;
 	formulaApiUrl: string;
-	token: string;
+	apiKey: string;
 	toolName: string;
 	inputConfig: Record<string, InputParameter>;
 	outputConfig: Record<string, OutputParameter>;
+	saving?: boolean;
 }>();
 
 const emit = defineEmits<{
 	(e: 'update:integration', val: IntegrationConfig): void;
+	(e: 'save-overrides'): void;
 }>();
 
 const copied = ref<string | null>(null);
 const viewMode = ref<'view' | 'code'>('view');
 
-const overrideOn = computed(() => !!props.integration.skillResponseOverride);
+const overrideOn = ref(
+	!!(props.integration.skillResponseOverride || props.integration.skillName),
+);
+
+// Sync from parent when stored integration changes (e.g. env switch)
+watch(() => props.storedIntegration, () => {
+	overrideOn.value = !!(props.integration.skillResponseOverride || props.integration.skillName);
+});
 
 const inputParamKeys = computed(() => props.inputParams);
 const outputParamKeys = computed(() => props.outputParams);
 
+const overrideDirty = computed(() => {
+	const stored = props.storedIntegration;
+	return (props.integration.skillName ?? '') !== (stored.skillName ?? '')
+		|| (props.integration.skillResponseOverride ?? '') !== (stored.skillResponseOverride ?? '');
+});
+
 function toggleOverride(on: boolean) {
-	emit('update:integration', {
-		...props.integration,
-		skillResponseOverride: on ? ' ' : '',
-	});
+	overrideOn.value = on;
+	if (!on) {
+		emit('update:integration', {
+			...props.integration,
+			skillName: '',
+			skillResponseOverride: '',
+		});
+	}
 }
 
 const skillMd = computed(() =>
@@ -133,7 +181,7 @@ const skillMd = computed(() =>
 		effectiveId: props.effectiveId,
 		toolName: props.toolName,
 		formulaApiUrl: props.formulaApiUrl,
-		token: props.token,
+		apiKey: props.apiKey,
 		inputParams: props.inputConfig,
 		outputParams: props.outputConfig,
 	}),
@@ -141,7 +189,8 @@ const skillMd = computed(() =>
 
 const renderedMd = computed(() => {
 	if (!skillMd.value) return '';
-	return marked(skillMd.value);
+	const raw = marked(skillMd.value) as string;
+	return DOMPurify.sanitize(raw, { ALLOWED_TAGS, ALLOWED_ATTR });
 });
 
 const projectInstall = computed(() =>
@@ -285,6 +334,11 @@ async function handleDownload() {
 	padding: 0;
 }
 .rendered-md :deep(ul), .rendered-md :deep(ol) { padding-left: 20px; margin: 6px 0; }
+
+.override-save {
+	display: flex;
+	gap: 8px;
+}
 
 .action-row {
 	display: flex;

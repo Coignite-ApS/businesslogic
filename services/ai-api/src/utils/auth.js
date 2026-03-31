@@ -1,20 +1,66 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
 import { queryOne } from '../db.js';
 
-/** Timing-safe string comparison */
+/** Timing-safe string comparison via hash */
 function safeCompare(a, b) {
   if (!a || !b) return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+  const ha = createHash('sha256').update(String(a)).digest();
+  const hb = createHash('sha256').update(String(b)).digest();
+  return timingSafeEqual(ha, hb);
+}
+
+const GATEWAY_TIMESTAMP_MAX_AGE = 30_000; // 30 seconds
+
+/**
+ * Validate HMAC signature on gateway-forwarded requests.
+ * Returns true if valid, false otherwise.
+ */
+export function validateGatewaySignature(req) {
+  const secret = config.gatewaySharedSecret;
+  if (!secret) return false;
+
+  const signature = req.headers['x-gateway-signature'];
+  const timestamp = req.headers['x-gateway-timestamp'];
+  const accountId = req.headers['x-account-id'];
+  const keyId = req.headers['x-api-key-id'] || '';
+
+  if (!signature || !timestamp || !accountId) return false;
+
+  // Replay protection
+  const ts = parseInt(timestamp, 10);
+  if (isNaN(ts) || Math.abs(Date.now() - ts) > GATEWAY_TIMESTAMP_MAX_AGE) return false;
+
+  // Verify HMAC
+  const payload = `${accountId}|${keyId}|${timestamp}`;
+  const expected = createHmac('sha256', secret).update(payload).digest('hex');
+  return safeCompare(signature, expected);
+}
+
+/**
+ * Normalize gateway permissions from nested format to flat format.
+ * Input:  {"services":{"ai":{"enabled":true,...},"calc":{"enabled":true,...}}}
+ * Output: {"ai":true,"calc":true}
+ * Also accepts flat format as-is: {"ai":true} → {"ai":true}
+ */
+export function normalizePermissions(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  // Nested gateway v2 format
+  if (raw.services && typeof raw.services === 'object') {
+    const flat = {};
+    for (const [svc, perm] of Object.entries(raw.services)) {
+      flat[svc] = perm?.enabled === true;
+    }
+    return flat;
+  }
+  // Already flat format
+  return raw;
 }
 
 /**
  * Verify authentication — supports:
  * 1. X-Admin-Token (internal service-to-service)
- * 2. X-Gateway-Auth + X-Account-Id + X-User-Id (gateway-forwarded)
+ * 2. X-Gateway-Auth + HMAC signature (gateway-forwarded public API)
  */
 export async function verifyAuth(req, reply) {
   const adminToken = req.headers['x-admin-token'];
@@ -25,27 +71,43 @@ export async function verifyAuth(req, reply) {
     req.accountId = req.headers['x-account-id'] || null;
     req.userId = req.headers['x-user-id'] || null;
     req.isAdmin = true;
+    req.isPublicRequest = false;
     return;
   }
 
   if (gatewayAuth) {
+    // Verify HMAC signature when secret is configured
+    if (config.gatewaySharedSecret) {
+      if (!validateGatewaySignature(req)) {
+        return reply.code(401).send({ error: 'Invalid or expired gateway signature', code: 'UNAUTHORIZED' });
+      }
+    }
+
     req.authType = 'gateway';
     req.accountId = req.headers['x-account-id'] || null;
     req.apiKeyId = req.headers['x-api-key-id'] || null;
     req.userId = req.headers['x-user-id'] || null;
     req.isAdmin = req.headers['x-is-admin'] === 'true';
 
-    // Parse API key permissions (e.g. {"ai":true,"calc":true,"flow":false})
+    // Parse API key permissions
+    // Gateway sends nested format: {"services":{"ai":{"enabled":true,...},"calc":{"enabled":true,...}}}
+    // ai-api uses flat format: {"ai":true,"calc":true,"flow":false}
     const permHeader = req.headers['x-api-permissions'];
     if (permHeader) {
-      try { req.permissions = JSON.parse(permHeader); } catch { req.permissions = {}; }
+      try {
+        const raw = JSON.parse(permHeader);
+        req.permissions = normalizePermissions(raw);
+      } catch { req.permissions = {}; }
     } else {
       req.permissions = {};
     }
+
+    // Public request = gateway-forwarded + not admin
+    req.isPublicRequest = !req.isAdmin;
     return;
   }
 
-  reply.code(401).send({ error: 'Unauthorized', detail: 'Missing or invalid authentication' });
+  reply.code(401).send({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
 }
 
 /** Get active account ID for a user */

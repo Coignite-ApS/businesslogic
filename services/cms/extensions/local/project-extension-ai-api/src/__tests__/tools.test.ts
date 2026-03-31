@@ -30,8 +30,8 @@ function makeDeps(dbOverrides?: Record<string, any>): ToolExecutorDeps {
 	return {
 		db: createMockDb(),
 		accountId: 'acc-123',
-		formulaApiUrl: 'http://formula-api:3000',
-		formulaApiAdminToken: 'admin-token',
+		gatewayCalcUrl: 'http://bl-gateway:8080/internal/calc',
+		internalSecret: 'dev-internal-secret',
 		encryptionKey: undefined,
 		logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 		...dbOverrides,

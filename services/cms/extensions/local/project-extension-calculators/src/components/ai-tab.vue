@@ -1,5 +1,24 @@
 <template>
 	<div class="ai-tab">
+		<h2 class="section-title">AI Name</h2>
+		<p class="section-desc">
+			General name used by all AI integrations unless overridden per-integration.
+			Defaults to the calculator name when blank.
+		</p>
+		<v-input
+			:model-value="aiName"
+			:disabled="disabled"
+			placeholder="e.g. Mortgage Calculator"
+			maxlength="255"
+			@update:model-value="$emit('update:aiName', $event)"
+		/>
+		<div v-if="aiNameDirty && !disabled" class="template-save">
+			<v-button :loading="aiNameSaving" @click="$emit('save-ai-name')">
+				<v-icon name="check" left />
+				Save Name
+			</v-button>
+		</div>
+
 		<h2 class="section-title">Response Template</h2>
 		<p class="section-desc">
 			Global template for AI responses. Type <code>@</code> to insert parameters.
@@ -80,17 +99,24 @@ const props = defineProps<{
 	outputConfig?: unknown;
 	templateDirty?: boolean;
 	saving?: boolean;
+	aiNameSaving?: boolean;
+	aiName?: string | null;
+	storedAiName?: string | null;
 }>();
 
 const emit = defineEmits<{
 	(e: 'update:modelValue', val: IntegrationConfig): void;
 	(e: 'update:mcpEnabled', val: boolean): void;
 	(e: 'save-template'): void;
+	(e: 'update:aiName', val: string): void;
+	(e: 'save-ai-name'): void;
 }>();
 
 function update<K extends keyof IntegrationConfig>(key: K, value: IntegrationConfig[K]) {
 	emit('update:modelValue', { ...props.modelValue, [key]: value });
 }
+
+const aiNameDirty = computed(() => (props.aiName ?? '') !== (props.storedAiName ?? ''));
 
 const defaultPreview = computed(() => {
 	const raw = props.outputConfig as any;

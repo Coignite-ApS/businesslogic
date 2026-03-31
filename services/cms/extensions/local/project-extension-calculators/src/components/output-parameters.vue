@@ -186,6 +186,7 @@
 			:allow-range="pickerAllowRange"
 			:title="pickerTitle"
 			:description="pickerDescription"
+			:mapped-cells="mappedCells"
 			@confirm="handlePickerConfirm"
 		/>
 	</div>
@@ -195,6 +196,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import type { OutputParameter, OutputArrayItem } from '../types';
 import CellPickerDialog from './cell-picker-dialog.vue';
+import type { MappedCell } from './cell-picker-dialog.vue';
 
 const rootEl = ref<HTMLElement | null>(null);
 
@@ -214,6 +216,7 @@ const props = defineProps<{
 	modelValue: Record<string, OutputParameter>;
 	sheets: Record<string, unknown[][]> | null;
 	compact?: boolean;
+	inputMappings?: Record<string, string>;
 }>();
 
 const emit = defineEmits<{
@@ -260,6 +263,21 @@ const paramEntries = computed(() =>
 		.map(([key, param]) => ({ key, param }))
 		.sort((a, b) => (a.param.order ?? 999) - (b.param.order ?? 999)),
 );
+
+const mappedCells = computed<MappedCell[]>(() => {
+	const cells: MappedCell[] = [];
+	for (const [key, param] of Object.entries(props.modelValue)) {
+		if (param.mapping) {
+			cells.push({ ref: param.mapping, type: 'output', label: param.title || key });
+		}
+	}
+	if (props.inputMappings) {
+		for (const [key, mapping] of Object.entries(props.inputMappings)) {
+			if (mapping) cells.push({ ref: mapping, type: 'input', label: key });
+		}
+	}
+	return cells;
+});
 
 // Drag reorder
 const dragIdx = ref<number | null>(null);

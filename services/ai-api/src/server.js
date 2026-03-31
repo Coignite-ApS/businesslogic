@@ -2,12 +2,15 @@ import { initTelemetry, shutdownTelemetry } from './telemetry.js';
 initTelemetry();
 
 import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
 import { config } from './config.js';
 import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
+import { initBudget, closeBudget } from './services/budget.js';
 import { startCleanup, stopCleanup } from './utils/rate-limit.js';
+import { scheduleAggregation, stopAggregation } from './services/metrics-aggregator.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
 import { registerRoutes as registerChatRoutes } from './routes/chat.js';
 import { registerRoutes as registerConversationRoutes } from './routes/conversations.js';
@@ -21,6 +24,9 @@ export const app = Fastify({
   bodyLimit: config.maxPayloadSize,
   trustProxy: true,
 });
+
+// Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, etc.)
+await app.register(helmet, { contentSecurityPolicy: false });
 
 await app.register(multipart, {
   limits: { fileSize: config.maxPayloadSize },
@@ -69,7 +75,7 @@ if (config.requestLogging) {
   app.addHook('onResponse', (req, reply, done) => {
     if (req.url === '/ping' || req.url === '/health') return done();
     const ms = reply.elapsedTime?.toFixed(0) ?? '-';
-    console.log(`${req.method} ${req.url} ${reply.statusCode} ${ms}ms`);
+    req.log.info({ method: req.method, url: req.url, statusCode: reply.statusCode, ms }, 'request completed');
     done();
   });
 }
@@ -91,6 +97,8 @@ const shutdown = async (signal) => {
     await app.close();
   } finally {
     stopCleanup();
+    stopAggregation();
+    await closeBudget();
     await closeDb();
     await shutdownTelemetry();
     process.exit(0);
@@ -100,16 +108,31 @@ const shutdown = async (signal) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+process.on('unhandledRejection', (reason) => {
+  app.log.fatal({ err: reason }, 'unhandled rejection');
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  app.log.fatal({ err }, 'uncaught exception');
+  process.exit(1);
+});
+
 export async function start() {
   try {
     // Init database (optional — runs without DB for health checks)
     if (config.databaseUrl) {
       await initDb(config.databaseUrl);
-      console.log('Database connected');
+      app.log.info('Database connected');
+    }
+    if (config.redisUrl) {
+      await initBudget(config.redisUrl);
+      app.log.info('Budget Redis connected');
     }
     startCleanup();
+    if (config.databaseUrl) scheduleAggregation();
     await app.listen({ port: config.port, host: config.host });
-    console.log(`bl-ai-api ready on ${config.host}:${config.port}`);
+    app.log.info({ host: config.host, port: config.port }, 'bl-ai-api ready');
   } catch (err) {
     app.log.error(err);
     process.exit(1);

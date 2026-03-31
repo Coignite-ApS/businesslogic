@@ -1,5 +1,7 @@
 import { LRUCache } from 'lru-cache';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
+import { redisWarn } from '../utils/redis-warn.js';
 
 let redis = null;
 let redisReady = false;
@@ -32,7 +34,7 @@ export async function initCache() {
 
     await redis.connect();
   } catch (e) {
-    console.warn('Redis unavailable, using LRU only');
+    logger.warn('Redis unavailable, using LRU only');
     redis = null;
   }
 }
@@ -69,7 +71,7 @@ export function set(formula, locale, value) {
   lru.set(k, value);
 
   if (redisReady) {
-    redis.setex(k, config.cacheTtl, JSON.stringify(value)).catch(() => {});
+    redis.setex(k, config.cacheTtl, JSON.stringify(value)).catch((e) => redisWarn('cache.set', e));
   }
 }
 
@@ -123,7 +125,7 @@ export function mset(entries, locale) {
     }
   }
 
-  if (pipeline) pipeline.exec().catch(() => {});
+  if (pipeline) pipeline.exec().catch((e) => redisWarn('cache.mset', e));
 }
 
 export function getRedisClient() { return redis; }

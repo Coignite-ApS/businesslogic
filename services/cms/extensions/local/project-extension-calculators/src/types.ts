@@ -2,6 +2,7 @@ export interface Calculator {
 	id: string;
 	name: string | null;
 	description: string | null;
+	ai_name?: string | null;
 	status?: string | null;
 	sort: number | null;
 	account: string | null;
@@ -107,7 +108,20 @@ export interface CalculatorTestCase {
 	id: string;
 	name: string;
 	input: Record<string, unknown> | null;
+	expected_outputs: Record<string, unknown> | null;
+	tolerance: number | null;
+	sort: number | null;
 	calculator: string | null;
+	// runtime-only (not persisted)
+	_result?: TestCaseResult | null;
+}
+
+export interface TestCaseResult {
+	passed: boolean;
+	expected: Record<string, unknown>;
+	actual: Record<string, unknown>;
+	diff: Record<string, { expected: unknown; actual: unknown }>;
+	error?: string | null;
 }
 
 export interface McpConfig {
@@ -125,6 +139,9 @@ export interface IntegrationConfig {
 	mcpResponseOverride?: string;
 	skillResponseOverride?: string;
 	pluginResponseOverride?: string;
+	// per-integration name overrides (fallback: ai_name on Calculator)
+	skillName?: string;
+	coworkName?: string;
 }
 
 export interface CalculatorConfig {

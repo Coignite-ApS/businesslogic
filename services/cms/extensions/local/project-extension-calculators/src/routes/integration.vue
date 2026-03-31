@@ -64,6 +64,13 @@
 			<div class="type-tabs">
 				<button
 					class="type-tab"
+					:class="{ active: integrationTab === 'widget' }"
+					@click="integrationTab = 'widget'"
+				>
+					Widget
+				</button>
+				<button
+					class="type-tab"
 					:class="{ active: integrationTab === 'api' }"
 					@click="integrationTab = 'api'"
 				>
@@ -102,6 +109,31 @@
 				</button>
 			</div>
 
+			<!-- Widget tab -->
+			<template v-if="integrationTab === 'widget'">
+				<div v-if="!isDeployed" class="deploy-notice">
+					<v-icon name="cloud_off" />
+					<span>Not deployed to Formula API. Deploy from the dashboard first.</span>
+				</div>
+				<template v-else>
+					<div class="code-section">
+						<h2 class="section-title">Embed Widget (Gateway Mode)</h2>
+						<p class="code-section-desc">
+							Add this to your HTML page. The widget authenticates via your API key through the gateway.
+						</p>
+						<code-block :code="widgetEmbedGateway" :copy-code="widgetEmbedGateway" language="html" />
+					</div>
+
+					<div class="code-section">
+						<h2 class="section-title">Embed Widget (Legacy Direct Mode)</h2>
+						<p class="code-section-desc">
+							Uses a per-calculator token to connect directly to the Formula API. Use Gateway Mode above for new integrations.
+						</p>
+						<code-block :code="widgetEmbedDirect" :copy-code="widgetEmbedDirect" language="html" />
+					</div>
+				</template>
+			</template>
+
 			<!-- API tab -->
 			<template v-if="integrationTab === 'api'">
 				<div v-if="!isDeployed" class="deploy-notice">
@@ -124,8 +156,13 @@
 					:output-config="activeConfig?.output"
 					:template-dirty="integrationTemplateDirty"
 					:saving="mcpSaving"
+					:ai-name-saving="aiNameSaving"
+					:ai-name="aiNameLocal"
+					:stored-ai-name="current?.ai_name ?? ''"
 					@update:mcp-enabled="toggleMcpEnabled($event)"
 					@save-template="saveAiConfig"
+					@update:ai-name="aiNameLocal = $event"
+					@save-ai-name="saveAiName"
 				/>
 			</template>
 
@@ -174,16 +211,19 @@
 					:is-deployed="isDeployed"
 					:env="env"
 					:integration="integrationLocal"
+					:stored-integration="storedIntegration"
+					:saving="mcpSaving"
 					:input-params="inputParamKeys"
 					:output-params="outputParamKeys"
 					:calculator-name="current.name || effectiveId"
 					:calculator-description="current.description || null"
 					:formula-api-url="formulaApiUrl || ''"
-					:token="apiKey"
+					:api-key="apiKey"
 					:tool-name="mcpConfigLocal.toolName || currentId!.replace(/-/g, '_')"
 					:input-config="extractedInputParams"
 					:output-config="extractedOutputParams"
 					@update:integration="integrationLocal = $event"
+					@save-overrides="saveAiConfig"
 				/>
 			</template>
 
@@ -195,16 +235,19 @@
 					:is-deployed="isDeployed"
 					:env="env"
 					:integration="integrationLocal"
+					:stored-integration="storedIntegration"
+					:saving="mcpSaving"
 					:input-params="inputParamKeys"
 					:output-params="outputParamKeys"
 					:calculator-name="current.name || effectiveId"
 					:calculator-description="current.description || null"
 					:formula-api-url="formulaApiUrl || ''"
-					:token="apiKey"
+					:api-key="apiKey"
 					:tool-name="mcpConfigLocal.toolName || currentId!.replace(/-/g, '_')"
 					:input-config="extractedInputParams"
 					:output-config="extractedOutputParams"
 					@update:integration="integrationLocal = $event"
+					@save-overrides="saveAiConfig"
 				/>
 			</template>
 		</div>
@@ -259,6 +302,7 @@ import McpSnippets from '../components/mcp-snippets.vue';
 import AiTab from '../components/ai-tab.vue';
 import SkillTab from '../components/skill-tab.vue';
 import PluginTab from '../components/plugin-tab.vue';
+import { maskToken } from '../utils/code-snippets';
 import type { SnippetParams } from '../utils/code-snippets';
 import type { McpSnippetParams } from '../utils/mcp-snippets';
 import { extractParams } from '../utils/param-transforms';
@@ -271,7 +315,7 @@ const router = useRouter();
 
 const {
 	calculators, current, loading, saving,
-	fetchAll, fetchOne, create, updateConfig,
+	fetchAll, fetchOne, create, update: updateCalculator, updateConfig,
 	fetchFormulaApiUrl, fetchApiKey,
 } = useCalculators(api);
 
@@ -279,8 +323,9 @@ const { activeAccountId, fetchActiveAccount } = useActiveAccount(api);
 
 const formulaApiUrl = ref<string | null>(null);
 const env = ref<'test' | 'live'>('test');
-const integrationTab = ref<'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('api');
+const integrationTab = ref<'widget' | 'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('widget');
 const mcpSaving = ref(false);
+const aiNameSaving = ref(false);
 const currentId = computed(() => (route.params.id as string) || null);
 
 const testConfig = computed(
@@ -351,12 +396,53 @@ const sampleBody = computed(() => {
 	return Object.keys(body).length > 0 ? body : undefined;
 });
 
+const widgetEmbedGateway = computed(() => {
+	const maskedKey = apiKey.value ? maskToken(apiKey.value) : 'YOUR_API_KEY';
+	return `<!-- BusinessLogic Calculator Widget -->
+<script src="https://cdn.businesslogic.online/widget/bl-widget.js"><\/script>
+
+<bl-calculator
+  api-key="${maskedKey}"
+  calculator-id="${effectiveId.value}"
+></bl-calculator>`;
+});
+
+const widgetEmbedDirect = computed(() => {
+	const maskedKey = apiKey.value ? maskToken(apiKey.value) : 'YOUR_TOKEN';
+	return `<!-- BusinessLogic Calculator Widget (Legacy) -->
+<script src="https://cdn.businesslogic.online/widget/bl-widget.js"><\/script>
+
+<bl-calculator
+  token="${maskedKey}"
+  calculator-id="${effectiveId.value}"
+  api-url="${formulaApiUrl.value || 'https://api.businesslogic.online'}"
+></bl-calculator>`;
+});
+
 const snippetParams = computed<SnippetParams>(() => ({
 	baseUrl: formulaApiUrl.value || '',
 	calculatorId: effectiveId.value,
-	token: apiKey.value,
+	apiKey: apiKey.value,
 	sampleBody: sampleBody.value,
 }));
+
+// ─── AI Name state ───
+
+const aiNameLocal = ref<string>('');
+
+function syncAiNameFromCurrent() {
+	aiNameLocal.value = current.value?.ai_name ?? '';
+}
+
+async function saveAiName() {
+	if (!currentId.value) return;
+	aiNameSaving.value = true;
+	try {
+		await updateCalculator(currentId.value, { ai_name: aiNameLocal.value });
+	} finally {
+		aiNameSaving.value = false;
+	}
+}
 
 // ─── Integration state ───
 
@@ -372,6 +458,11 @@ function syncIntegrationFromConfig() {
 		? { ...defaultIntegration(), ...cfg.integration }
 		: defaultIntegration();
 }
+
+const storedIntegration = computed<IntegrationConfig>(() => {
+	const stored = activeConfig.value?.integration;
+	return stored ? { ...defaultIntegration(), ...stored } : defaultIntegration();
+});
 
 const integrationDirty = computed(() => {
 	const stored = activeConfig.value?.integration;
@@ -445,7 +536,7 @@ const mcpDirty = computed(() => {
 const mcpSnippetParams = computed<McpSnippetParams>(() => ({
 	toolName: mcpConfigLocal.value.toolName || 'calculator',
 	mcpUrl: `${formulaApiUrl.value || ''}/mcp/calculator/${effectiveId.value}`,
-	token: apiKey.value,
+	apiKey: apiKey.value,
 }));
 
 // Sync MCP config from server data
@@ -532,7 +623,7 @@ watch([() => mcpConfigLocal.value.enabled, () => integrationLocal.value.skill, (
 // Reset env when switching calculators — default to live if activated
 watch(currentId, () => {
 	env.value = current.value?.activated ? 'live' : 'test';
-	integrationTab.value = 'api';
+	integrationTab.value = 'widget';
 });
 
 // Default to live when activated, switch back to test if deactivated
@@ -545,6 +636,11 @@ watch(() => current.value?.activated, (activated, prev) => {
 watch([env, testConfig, prodConfig], () => {
 	syncMcpFromConfig();
 	syncIntegrationFromConfig();
+}, { immediate: true });
+
+// Sync ai_name when current calculator changes
+watch(() => current.value, () => {
+	syncAiNameFromCurrent();
 }, { immediate: true });
 
 fetchActiveAccount().then(() => {

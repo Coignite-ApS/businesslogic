@@ -21,16 +21,16 @@ export class FormulaApiError extends Error {
 
 export class FormulaApiClient {
 	private baseUrl: string;
-	private adminToken: string | undefined;
+	private internalSecret: string | undefined;
 
-	constructor(baseUrl: string, adminToken?: string) {
+	constructor(baseUrl: string, internalSecret?: string) {
 		this.baseUrl = baseUrl.replace(/\/+$/, '');
-		this.adminToken = adminToken;
+		this.internalSecret = internalSecret;
 	}
 
 	private adminHeaders(extra?: Record<string, string>): Record<string, string> {
 		const h: Record<string, string> = { ...extra };
-		if (this.adminToken) h['X-Admin-Token'] = this.adminToken;
+		if (this.internalSecret) h['X-Internal-Secret'] = this.internalSecret;
 		return h;
 	}
 
@@ -124,7 +124,7 @@ export class FormulaApiClient {
 	}
 
 	async describeCalculator(id: string, token?: string): Promise<{ status: number; body: unknown }> {
-		const headers: Record<string, string> = {};
+		const headers = this.adminHeaders();
 		if (token) headers['X-Auth-Token'] = token;
 		const res = await fetch(`${this.baseUrl}/calculator/${encodeURIComponent(id)}/describe`, {
 			headers,
@@ -177,7 +177,7 @@ export class FormulaApiClient {
 	async executeFormula(body: unknown, token: string): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+			headers: this.adminHeaders({ 'Content-Type': 'application/json', 'X-Auth-Token': token }),
 			body: JSON.stringify(body),
 		});
 		const data = await res.json();
@@ -187,7 +187,7 @@ export class FormulaApiClient {
 	async executeFormulaBatch(body: unknown, token: string): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute/batch`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+			headers: this.adminHeaders({ 'Content-Type': 'application/json', 'X-Auth-Token': token }),
 			body: JSON.stringify(body),
 		});
 		const data = await res.json();
@@ -197,7 +197,7 @@ export class FormulaApiClient {
 	async executeFormulaSheet(body: unknown, token: string): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/execute/sheet`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+			headers: this.adminHeaders({ 'Content-Type': 'application/json', 'X-Auth-Token': token }),
 			body: JSON.stringify(body),
 		});
 		const data = await res.json();
@@ -205,7 +205,7 @@ export class FormulaApiClient {
 	}
 
 	async executeCalculator(id: string, input: unknown, token?: string): Promise<{ status: number; body: unknown }> {
-		const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+		const headers = this.adminHeaders({ 'Content-Type': 'application/json' });
 		if (token) headers['X-Auth-Token'] = token;
 		const res = await fetch(`${this.baseUrl}/execute/calculator/${encodeURIComponent(id)}`, {
 			method: 'POST',
