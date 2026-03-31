@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { queryAll, queryOne, query } from '../db.js';
 import { config } from '../config.js';
 import { executeToolViaFlow, isFlowToolEnabled } from './flow-tools.js';
+import { LOCAL_EMBEDDING_MODEL } from './embedding-factory.js';
 
 export const AI_TOOLS = [
   {
@@ -567,11 +568,13 @@ async function listKnowledgeBases(accountId) {
 async function createKnowledgeBase(accountId, input) {
   if (!input.name?.trim()) return { result: 'Name is required', isError: true };
 
+  const embeddingModel = config.useLocalEmbeddings ? LOCAL_EMBEDDING_MODEL : config.embeddingModel;
+
   const id = randomUUID();
   await query(
     `INSERT INTO knowledge_bases (id, account, name, description, icon, document_count, chunk_count, embedding_model, status, date_created)
      VALUES ($1, $2, $3, $4, $5, 0, 0, $6, 'active', NOW())`,
-    [id, accountId, input.name.trim(), input.description?.trim() || null, 'menu_book', config.embeddingModel],
+    [id, accountId, input.name.trim(), input.description?.trim() || null, 'menu_book', embeddingModel],
   );
   const kb = await queryOne('SELECT * FROM knowledge_bases WHERE id = $1', [id]);
   return { result: kb };

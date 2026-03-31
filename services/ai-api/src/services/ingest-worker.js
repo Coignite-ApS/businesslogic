@@ -11,14 +11,14 @@ import { config } from '../config.js';
 import { query, queryOne, queryAll } from '../db.js';
 import { chunkDocument, estimateTokens } from './chunker.js';
 import { computeChunkHash, diffChunks } from './content-hash.js';
-import { EmbeddingClient } from './embeddings.js';
+import { createEmbeddingClientForKb } from './embedding-factory.js';
 import { detectLanguage, pgTsConfig } from './language.js';
 
 let worker = null;
 let connection = null;
 
 /**
- * Initialize the ingest worker. No-op if redisUrl or openaiApiKey missing.
+ * Initialize the ingest worker. No-op if redisUrl missing.
  * @param {object} [logger] - Optional logger (defaults to console)
  * @returns {Worker|null}
  */
@@ -102,14 +102,16 @@ async function processIngestJob(job, logger) {
       logger.info?.(`Document ${documentId}: ${skippedCount} chunks unchanged, skipping re-embed`);
     }
 
-    // Embed only changed chunks
+    // Embed only changed chunks — use the KB's locked model, not the global config
     let embeddings = [];
-    if (diff.toEmbed.length > 0 && config.openaiApiKey) {
-      const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
+    let kbModel = null;
+    if (diff.toEmbed.length > 0) {
+      const kb = await queryOne('SELECT embedding_model FROM knowledge_bases WHERE id = $1', [kbId]);
+      if (!kb) throw new Error(`Knowledge base ${kbId} not found`);
+      kbModel = kb.embedding_model;
+      const embedClient = await createEmbeddingClientForKb(kb);
       const textsToEmbed = diff.toEmbed.map((c) => c.content);
       embeddings = await embedClient.embedBatch(textsToEmbed);
-    } else if (diff.toEmbed.length > 0) {
-      throw new Error('OpenAI API key not configured — cannot embed chunks');
     }
 
     // Delete old chunks that are no longer reused
@@ -138,7 +140,7 @@ async function processIngestJob(job, logger) {
     // Insert new chunks
     for (let i = 0; i < diff.toEmbed.length; i += 50) {
       const batch = diff.toEmbed.slice(i, i + 50);
-      await insertChunkBatch(batch, embeddings.slice(i, i + 50), chunks, documentId, kbId, accountId, docLanguage, tsConfig);
+      await insertChunkBatch(batch, embeddings.slice(i, i + 50), chunks, documentId, kbId, accountId, docLanguage, tsConfig, kbModel);
     }
 
     // Calculate total token count
@@ -196,8 +198,9 @@ async function fetchFileContent(fileId) {
 
 /**
  * Insert a batch of chunks using parameterized pg queries.
+ * @param {string|null} embeddingModel - The model used to generate these embeddings
  */
-async function insertChunkBatch(toEmbed, embeddings, allChunks, documentId, kbId, accountId, language, tsConfig) {
+async function insertChunkBatch(toEmbed, embeddings, allChunks, documentId, kbId, accountId, language, tsConfig, embeddingModel = null) {
   for (let j = 0; j < toEmbed.length; j++) {
     const chunk = toEmbed[j];
     const embedding = embeddings[j];
@@ -208,12 +211,13 @@ async function insertChunkBatch(toEmbed, embeddings, allChunks, documentId, kbId
     const embeddingLiteral = `[${embedding.join(',')}]`;
 
     await query(
-      `INSERT INTO kb_chunks (id, document, knowledge_base, account_id, chunk_index, content, content_hash, embedding, metadata, token_count, language, search_vector)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9::jsonb, $10, $11, to_tsvector($12::regconfig, $13))`,
+      `INSERT INTO kb_chunks (id, document, knowledge_base, account_id, chunk_index, content, content_hash, embedding, embedding_model, metadata, token_count, language, search_vector)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10::jsonb, $11, $12, to_tsvector($13::regconfig, $14))`,
       [
         id, documentId, kbId, accountId,
         chunk.chunk_index, chunk.content, chunk.content_hash,
-        embeddingLiteral, JSON.stringify({ ...metadata, language }),
+        embeddingLiteral, embeddingModel,
+        JSON.stringify({ ...metadata, language }),
         fullChunk?.tokenCount || estimateTokens(chunk.content),
         language, tsConfig, chunk.content,
       ],
