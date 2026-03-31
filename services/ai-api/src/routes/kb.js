@@ -3,8 +3,9 @@ import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
 import { getActiveAccount } from '../utils/auth.js';
-import { EmbeddingClient } from '../services/embeddings.js';
 import { hybridSearch } from '../services/search.js';
+import { createEmbeddingClientForKb, getModelDimensions } from '../services/embedding-factory.js';
+import { createEmbeddingClient } from '../services/local-embeddings.js';
 import { generateAnswer } from '../services/answer.js';
 import { logRetrievalQuality } from '../services/retrieval-logger.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
@@ -60,11 +61,13 @@ export async function registerRoutes(app) {
     const { name, description, icon, sort } = req.body || {};
     if (!name?.trim()) return reply.code(400).send({ errors: [{ message: 'Name is required' }] });
 
+    const embeddingModel = config.useLocalEmbeddings ? 'BAAI/bge-small-en-v1.5' : config.embeddingModel;
+
     const id = randomUUID();
     await query(
-      `INSERT INTO knowledge_bases (id, account, name, description, icon, sort, date_created, date_updated)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
-      [id, accountId, name.trim(), description || null, icon || null, sort ?? 0],
+      `INSERT INTO knowledge_bases (id, account, name, description, icon, sort, embedding_model, date_created, date_updated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+      [id, accountId, name.trim(), description || null, icon || null, sort ?? 0, embeddingModel],
     );
     const item = await queryOne('SELECT * FROM knowledge_bases WHERE id = $1', [id]);
     return { data: item };
@@ -354,14 +357,21 @@ export async function registerRoutes(app) {
     const { query: searchQuery, kb_id, limit } = req.body || {};
     if (!searchQuery?.trim()) return reply.code(400).send({ errors: [{ message: 'Query is required' }] });
 
-    if (!config.openaiApiKey) {
-      return reply.code(503).send({ errors: [{ message: 'Embedding service not configured' }] });
+    // Resolve embedding client — use KB's locked model if kb_id provided
+    let embedClient;
+    let expectedDimensions;
+    if (kb_id) {
+      const kb = await queryOne('SELECT embedding_model FROM knowledge_bases WHERE id = $1 AND account = $2', [kb_id, accountId]);
+      if (!kb) return reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] });
+      embedClient = await createEmbeddingClientForKb(kb);
+      expectedDimensions = getModelDimensions(kb.embedding_model || config.embeddingModel);
+    } else {
+      embedClient = await createEmbeddingClient();
     }
 
-    const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
     const searchStart = Date.now();
-    const { results, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const { results, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
     const searchLatencyMs = Date.now() - searchStart;
 
     // Log retrieval quality (fire-and-forget)
@@ -389,17 +399,25 @@ export async function registerRoutes(app) {
     const { question, kb_id, model, limit } = req.body || {};
     if (!question?.trim()) return reply.code(400).send({ errors: [{ message: 'Question is required' }] });
 
-    if (!config.openaiApiKey) {
-      return reply.code(503).send({ errors: [{ message: 'Embedding service not configured' }] });
-    }
     if (!config.anthropicApiKey) {
       return reply.code(503).send({ errors: [{ message: 'AI service not configured' }] });
     }
 
-    const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
+    // Resolve embedding client — use KB's locked model if kb_id provided
+    let embedClient;
+    let expectedDimensions;
+    if (kb_id) {
+      const kb = await queryOne('SELECT embedding_model FROM knowledge_bases WHERE id = $1 AND account = $2', [kb_id, accountId]);
+      if (!kb) return reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] });
+      embedClient = await createEmbeddingClientForKb(kb);
+      expectedDimensions = getModelDimensions(kb.embedding_model || config.embeddingModel);
+    } else {
+      embedClient = await createEmbeddingClient();
+    }
+
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
     const searchStart = Date.now();
-    const { results: chunks, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const { results: chunks, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
     const searchLatencyMs = Date.now() - searchStart;
 
     // Check for curated answers
