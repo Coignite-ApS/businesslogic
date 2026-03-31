@@ -41,7 +41,7 @@ func withCalcAuth(next http.Handler) http.Handler {
 			KeyID:     "key-mcp-001",
 			Permissions: service.ResourcePermissions{
 				Services: map[string]service.ServicePermission{
-					"calc": {Enabled: true, Resources: []string{"*"}, Actions: []string{"*"}},
+					"calc": {Enabled: true, Resources: &[]string{"*"}, Actions: &[]string{"*"}},
 				},
 			},
 		}
@@ -104,7 +104,7 @@ func TestMCPAccountRoute_RequiresCalcPermission(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Account with NO calc permission
+	// Account with calc explicitly disabled (v3: missing = allow, so must set enabled: false to deny)
 	noCalcAuth := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			acct := &service.AccountData{
@@ -112,7 +112,8 @@ func TestMCPAccountRoute_RequiresCalcPermission(t *testing.T) {
 				KeyID:     "key-nocalc",
 				Permissions: service.ResourcePermissions{
 					Services: map[string]service.ServicePermission{
-						"ai": {Enabled: true, Resources: []string{"*"}, Actions: []string{"*"}}, // ai only, not calc
+						"ai":   {Enabled: true, Resources: &[]string{"*"}, Actions: &[]string{"*"}},
+						"calc": {Enabled: false}, // explicitly disabled
 					},
 				},
 			}

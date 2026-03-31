@@ -26,41 +26,41 @@ func NewAPIKeyHandler(db *pgxpool.Pool, rdb *redis.Client) *APIKeyHandler {
 }
 
 type createKeyRequest struct {
-	AccountID      string                      `json:"account_id"`
-	Name           string                      `json:"name"`
-	Environment    string                      `json:"environment"`
-	Permissions    service.ResourcePermissions  `json:"permissions"`
-	AllowedIPs     []string                    `json:"allowed_ips"`
-	AllowedOrigins []string                    `json:"allowed_origins"`
-	RateLimitRPS   *int                        `json:"rate_limit_rps"`
-	MonthlyQuota   *int                        `json:"monthly_quota"`
-	ExpiresAt      *time.Time                  `json:"expires_at"`
+	AccountID      string                       `json:"account_id"`
+	Name           string                       `json:"name"`
+	Environment    string                       `json:"environment"`
+	Permissions    *service.ResourcePermissions `json:"permissions"`
+	AllowedIPs     []string                     `json:"allowed_ips"`
+	AllowedOrigins []string                     `json:"allowed_origins"`
+	RateLimitRPS   *int                         `json:"rate_limit_rps"`
+	MonthlyQuota   *int                         `json:"monthly_quota"`
+	ExpiresAt      *time.Time                   `json:"expires_at"`
 }
 
 type updateKeyRequest struct {
-	Name           *string                     `json:"name"`
+	Name           *string                      `json:"name"`
 	Permissions    *service.ResourcePermissions `json:"permissions"`
-	AllowedIPs     *[]string                   `json:"allowed_ips"`
-	AllowedOrigins *[]string                   `json:"allowed_origins"`
-	RateLimitRPS   *int                        `json:"rate_limit_rps"`
-	MonthlyQuota   *int                        `json:"monthly_quota"`
+	AllowedIPs     *[]string                    `json:"allowed_ips"`
+	AllowedOrigins *[]string                    `json:"allowed_origins"`
+	RateLimitRPS   *int                         `json:"rate_limit_rps"`
+	MonthlyQuota   *int                         `json:"monthly_quota"`
 }
 
 type keyResponse struct {
-	ID             string                      `json:"id"`
-	KeyPrefix      string                      `json:"key_prefix"`
-	RawKey         string                      `json:"raw_key,omitempty"`
-	AccountID      string                      `json:"account_id"`
-	Name           string                      `json:"name"`
-	Environment    string                      `json:"environment"`
-	Permissions    service.ResourcePermissions  `json:"permissions"`
-	AllowedIPs     []string                    `json:"allowed_ips"`
-	AllowedOrigins []string                    `json:"allowed_origins"`
-	RateLimitRPS   *int                        `json:"rate_limit_rps"`
-	MonthlyQuota   *int                        `json:"monthly_quota"`
-	ExpiresAt      *time.Time                  `json:"expires_at"`
-	LastUsedAt     *time.Time                  `json:"last_used_at"`
-	CreatedAt      time.Time                   `json:"created_at"`
+	ID             string                       `json:"id"`
+	KeyPrefix      string                       `json:"key_prefix"`
+	RawKey         string                       `json:"raw_key,omitempty"`
+	AccountID      string                       `json:"account_id"`
+	Name           string                       `json:"name"`
+	Environment    string                       `json:"environment"`
+	Permissions    *service.ResourcePermissions `json:"permissions"`
+	AllowedIPs     []string                     `json:"allowed_ips"`
+	AllowedOrigins []string                     `json:"allowed_origins"`
+	RateLimitRPS   *int                         `json:"rate_limit_rps"`
+	MonthlyQuota   *int                         `json:"monthly_quota"`
+	ExpiresAt      *time.Time                   `json:"expires_at"`
+	LastUsedAt     *time.Time                   `json:"last_used_at"`
+	CreatedAt      time.Time                    `json:"created_at"`
 }
 
 // Create generates a new API key. Raw key is returned ONLY in this response.
@@ -96,7 +96,11 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	keyHash := hex.EncodeToString(hash[:])
 	keyPrefix := rawKey[:11] // "bl_" + first 8 chars of encoded key
 
-	permJSON, _ := json.Marshal(req.Permissions)
+	// nil permissions → store as SQL NULL (full access, v3 default)
+	var permJSON []byte
+	if req.Permissions != nil {
+		permJSON, _ = json.Marshal(req.Permissions)
+	}
 
 	var resp keyResponse
 	err := h.db.QueryRow(r.Context(), `
@@ -118,7 +122,8 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.Unmarshal(permJSON, &resp.Permissions)
+	parsed := service.ParsePermissions(permJSON)
+	resp.Permissions = &parsed
 	resp.RawKey = rawKey
 
 	// Invalidate account cache
@@ -160,7 +165,8 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			continue
 		}
-		_ = json.Unmarshal(permJSON, &k.Permissions)
+		p := service.ParsePermissions(permJSON)
+		k.Permissions = &p
 		keys = append(keys, k)
 	}
 
@@ -194,7 +200,8 @@ func (h *APIKeyHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
 		return
 	}
-	_ = json.Unmarshal(permJSON, &k.Permissions)
+	p := service.ParsePermissions(permJSON)
+	k.Permissions = &p
 	writeJSON(w, http.StatusOK, k)
 }
 
@@ -311,7 +318,7 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.Unmarshal(permJSON, &old.Permissions)
+	// (permJSON kept as raw bytes to pass to new key insert — no need to parse old.Permissions)
 
 	// Revoke old key
 	_, _ = h.db.Exec(r.Context(), `UPDATE api_keys SET revoked_at = NOW() WHERE id = $1`, id)
@@ -347,7 +354,8 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.Unmarshal(permJSON, &resp.Permissions)
+	rp := service.ParsePermissions(permJSON)
+	resp.Permissions = &rp
 	resp.RawKey = rawKey
 
 	h.invalidateAccountCache(r, old.AccountID)
@@ -387,4 +395,3 @@ func pgParam(col string, idx *int) string {
 	*idx++
 	return s
 }
-
