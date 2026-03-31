@@ -3,7 +3,10 @@
 </template>
 
 <script setup lang="ts">
-import '@businesslogic/widget'; // registers <bl-chatkit> custom element
+import { BlChatKit } from '@businesslogic/widget';
+// Force rollup to keep BlChatKit (and all sub-components via chatkit-renderer)
+// Without this, tree-shaking strips the @customElement('bl-chatkit') registration
+void BlChatKit;
 import { ref, watch, onMounted } from 'vue';
 
 const props = defineProps<{
