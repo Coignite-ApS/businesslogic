@@ -116,6 +116,82 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 	return &acct, nil
 }
 
+// LookupByPrefix resolves an API key by its prefix (first 11 chars, e.g. bl_xxxxxxxx).
+// Used by the MCP-by-prefix endpoint where the key prefix IS the auth token in the URL.
+func (ks *KeyService) LookupByPrefix(ctx context.Context, prefix string) (*AccountData, error) {
+	cacheKey := fmt.Sprintf("gw:prefix:%s", prefix)
+
+	// Try Redis cache first
+	if ks.redis != nil {
+		data, err := ks.redis.Get(ctx, cacheKey).Bytes()
+		if err == nil {
+			if string(data) == "nil" {
+				return nil, fmt.Errorf("invalid key prefix (cached)")
+			}
+			var acct AccountData
+			if err := json.Unmarshal(data, &acct); err == nil {
+				return &acct, nil
+			}
+		}
+	}
+
+	// PostgreSQL fallback
+	acct, err := ks.lookupDBByPrefix(ctx, prefix)
+	if err != nil {
+		if ks.redis != nil {
+			_ = ks.redis.Set(ctx, cacheKey, "nil", ks.negativeCacheTTL).Err()
+		}
+		return nil, err
+	}
+
+	// Cache positive result
+	if ks.redis != nil {
+		if data, err := json.Marshal(acct); err == nil {
+			_ = ks.redis.Set(ctx, cacheKey, data, ks.keyCacheTTL).Err()
+		}
+	}
+
+	return acct, nil
+}
+
+func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*AccountData, error) {
+	if ks.db == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+
+	var acct AccountData
+	var permJSON []byte
+	var allowedOrigins, allowedIPs []string
+	var expiresAt, revokedAt *time.Time
+
+	err := ks.db.QueryRow(ctx, `
+		SELECT id, account_id, environment, permissions,
+			   allowed_origins, allowed_ips, rate_limit_rps, monthly_quota,
+			   expires_at, revoked_at
+		FROM api_keys WHERE key_prefix = $1
+	`, prefix).Scan(
+		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
+		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
+		&expiresAt, &revokedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("key not found")
+	}
+
+	if revokedAt != nil {
+		return nil, fmt.Errorf("key revoked")
+	}
+	if expiresAt != nil && time.Now().After(*expiresAt) {
+		return nil, fmt.Errorf("key expired")
+	}
+
+	acct.Permissions = ParsePermissions(permJSON)
+	acct.AllowedOrigins = allowedOrigins
+	acct.AllowedIPs = allowedIPs
+
+	return &acct, nil
+}
+
 func (ks *KeyService) CheckRateLimit(ctx context.Context, accountID string, rpsLimit int) (allowed bool, remaining int, err error) {
 	if ks.redis == nil {
 		return false, 0, fmt.Errorf("redis not available")

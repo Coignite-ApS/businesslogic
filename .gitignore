@@ -49,6 +49,9 @@ Thumbs.db
 # ── Claude Code (local settings only — .claude/settings.json IS committed) ──
 .claude/settings.local.json
 
+# ── Git Worktrees ───────────────────────────────────────────────────
+.worktrees/
+
 # ── Database Snapshots (large binary, keep local only) ───────────
 infrastructure/db-snapshots/*.sql.gz
 

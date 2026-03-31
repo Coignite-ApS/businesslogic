@@ -4,6 +4,7 @@ export interface ChatMessage {
 	role: 'user' | 'assistant';
 	content: string;
 	toolResults?: ToolResultEvent[];
+	widgetTrees?: Record<string, any>; // tool_id → ChatKit tree
 	streaming?: boolean;
 	toolExecuting?: string | null;
 }
@@ -184,6 +185,10 @@ export function useChat(api: any) {
 					result: data.result,
 					is_error: data.is_error,
 				});
+				break;
+			case 'widget':
+				if (!msg.widgetTrees) msg.widgetTrees = {};
+				msg.widgetTrees[data.tool_id] = data.tree;
 				break;
 		}
 	}

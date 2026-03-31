@@ -25,10 +25,6 @@ All routes are registered at the Directus custom endpoint level (e.g. `POST /par
 | DELETE | `/calculators/:configId` | Account member | Remove from Formula API, clear `formula_api_id` |
 | POST | `/calculators/:configId/execute` | Account member | Execute calculator with input values |
 | GET | `/calculators/:configId/describe` | Account member | Get calculator parameter description |
-| POST | `/calc/formula-tokens` | Authenticated user | Create new formula API key |
-| GET | `/calc/formula-tokens` | Authenticated user | List formula API keys for active account |
-| DELETE | `/calc/formula-tokens/:id` | Authenticated user | Revoke a formula API key |
-| GET | `/management/calc/validate-token` | Formula API callback | Validate `X-Auth-Token`, resolve account |
 | POST | `/calc/formula/execute` | Authenticated user | Proxy to Formula API `/execute` |
 | POST | `/calc/formula/execute-batch` | Authenticated user | Proxy to Formula API `/execute/batch` |
 | POST | `/calc/formula/execute-sheet` | Authenticated user | Proxy to Formula API `/execute/sheet` |
@@ -39,11 +35,8 @@ All routes are registered at the Directus custom endpoint level (e.g. `POST /par
 
 The `/calc/formula/execute*` routes:
 1. Authenticate user session (`requireAuth`)
-2. Look up user's `active_account` from `directus_users`
-3. Find first non-revoked `formula_tokens` row for that account
-4. Decrypt the token (`TOKEN_ENCRYPTION_KEY`)
-5. Forward request to Formula API with `X-Auth-Token` header
-6. Return response as-is (including 422 errors for invalid formulas)
+2. Forward request to Formula API with `X-Admin-Token` header
+3. Return response as-is (including 422 errors for invalid formulas)
 
 ## Auth Middleware
 

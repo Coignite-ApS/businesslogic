@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { WidgetComponent, WidgetTheme, WidgetTemplate, DB } from './types.js';
 
 const COMPONENTS: WidgetComponent[] = [
@@ -73,6 +74,7 @@ export async function seedWidgetData(db: DB, logger: any): Promise<void> {
       const existing = await db('widget_components').where('slug', comp.slug).first('id');
       if (!existing) {
         await db('widget_components').insert({
+          id: randomUUID(),
           ...comp,
           default_props: JSON.stringify(comp.default_props),
           prop_schema: JSON.stringify(comp.prop_schema),
@@ -89,6 +91,7 @@ export async function seedWidgetData(db: DB, logger: any): Promise<void> {
         const existing = await db('widget_themes').where('slug', theme.slug).first('id');
         if (!existing) {
           await db('widget_themes').insert({
+            id: randomUUID(),
             ...theme,
             variables: JSON.stringify(theme.variables),
           });
@@ -104,6 +107,7 @@ export async function seedWidgetData(db: DB, logger: any): Promise<void> {
         const existing = await db('widget_templates').where('slug', tmpl.slug).first('id');
         if (!existing) {
           await db('widget_templates').insert({
+            id: randomUUID(),
             ...tmpl,
             layout_skeleton: JSON.stringify(tmpl.layout_skeleton),
           });

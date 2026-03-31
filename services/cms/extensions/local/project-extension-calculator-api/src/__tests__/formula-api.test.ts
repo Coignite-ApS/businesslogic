@@ -175,17 +175,6 @@ describe('FormulaApiClient', () => {
 			expect(result).toEqual({ status: 200, body });
 		});
 
-		it('includes X-Auth-Token when token provided', async () => {
-			const fetchMock = mockFetchOk({ schema: {} });
-			vi.stubGlobal('fetch', fetchMock);
-
-			await client.describeCalculator('calc-1', 'my-token');
-
-			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/calculator/calc-1/describe`, {
-				headers: { 'X-Internal-Secret': INTERNAL_SECRET, 'X-Auth-Token': 'my-token' },
-			});
-		});
-
 		it('throws FormulaApiGoneError on 410', async () => {
 			vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
 				ok: false,
@@ -212,19 +201,6 @@ describe('FormulaApiClient', () => {
 				body: JSON.stringify(input),
 			});
 			expect(result).toEqual({ status: 200, body });
-		});
-
-		it('includes X-Auth-Token header when token provided', async () => {
-			const fetchMock = mockFetchOk({ result: 42 });
-			vi.stubGlobal('fetch', fetchMock);
-
-			await client.executeCalculator('calc-1', { a: 1 }, 'my-token');
-
-			expect(fetchMock).toHaveBeenCalledWith(`${BASE}/execute/calculator/calc-1`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': INTERNAL_SECRET, 'X-Auth-Token': 'my-token' },
-				body: JSON.stringify({ a: 1 }),
-			});
 		});
 
 		it('throws FormulaApiGoneError on 410', async () => {

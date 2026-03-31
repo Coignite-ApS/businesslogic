@@ -11,7 +11,6 @@ import { safeTokenCompare, checkAdminToken, isGatewayRequest, validateGatewayAut
 import { redisWarn } from '../utils/redis-warn.js';
 import * as stats from '../services/stats.js';
 import * as rateLimiter from '../services/rate-limiter.js';
-import { compileIpAllowlist, validateOrigins, checkAllowlist, getClientIp, setCorsHeaders } from '../utils/allowlist.js';
 import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
 import { loadAccountLimits } from '../services/account-limits.js';
@@ -267,9 +266,6 @@ async function rebuildFromRecipe(id, recipe) {
     test: test ?? null,
     token: token ?? null,
     accountId: recipe.accountId ?? null,
-    allowedIps: recipe.allowedIps ?? null,
-    allowedOrigins: recipe.allowedOrigins ?? null,
-    _ipBlocklist: compileIpAllowlist(recipe.allowedIps),
     mcp: mcp ?? null,
     mcpInputSchema: recipe.mcpInputSchema ?? null,
     integration: integration ?? null,
@@ -536,24 +532,6 @@ export async function registerRoutes(app) {
   const routeById = routeByCalcId('params');
   const routeByBody = routeByCalcId('body');
 
-  // CORS preflight for execute
-  app.options('/execute/calculator/:id', async (req, reply) => {
-    const calc = store.get(req.params.id);
-    if (!calc) return reply.code(204).send();
-    const origin = req.headers['origin'] || null;
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
-    return reply.code(204).send();
-  });
-
-  // CORS preflight for describe
-  app.options('/calculator/:id/describe', async (req, reply) => {
-    const calc = store.get(req.params.id);
-    if (!calc) return reply.code(204).send();
-    const origin = req.headers['origin'] || null;
-    setCorsHeaders(reply, origin, calc.allowedOrigins);
-    return reply.code(204).send();
-  });
-
   // Calculator health check (non-test only)
   app.get('/calculator/:id/health', { preHandler: routeById }, async (req, reply) => {
     let calc;
@@ -678,14 +656,6 @@ export async function registerRoutes(app) {
       return reply.code(400).send({ error: 'output schema required with properties' });
     }
 
-    // Validate allowlist fields
-    if (allowedIps !== undefined && !Array.isArray(allowedIps)) {
-      return reply.code(400).send({ error: 'allowedIps must be an array' });
-    }
-    if (allowedOrigins !== undefined && !Array.isArray(allowedOrigins)) {
-      return reply.code(400).send({ error: 'allowedOrigins must be an array' });
-    }
-
     // Validate MCP config
     let mcpConfig = null;
     if (mcp != null) {
@@ -713,19 +683,6 @@ export async function registerRoutes(app) {
         skill: !!integration.skill,
         plugin: !!integration.plugin,
       };
-    }
-
-    let compiledIpBlocklist;
-    let validatedOrigins;
-    try {
-      compiledIpBlocklist = compileIpAllowlist(allowedIps);
-    } catch (err) {
-      return reply.code(400).send({ error: 'Invalid allowedIps', detail: err.message });
-    }
-    try {
-      validatedOrigins = validateOrigins(allowedOrigins);
-    } catch (err) {
-      return reply.code(400).send({ error: 'Invalid allowedOrigins', detail: err.message });
     }
 
     let built;
@@ -768,9 +725,6 @@ export async function registerRoutes(app) {
         test: test ?? null,
         token,
         accountId: accountId ?? null,
-        allowedIps: allowedIps || null,
-        allowedOrigins: validatedOrigins,
-        _ipBlocklist: compiledIpBlocklist,
         mcp: mcpConfig,
         integration: integrationConfig,
       });
@@ -788,8 +742,6 @@ export async function registerRoutes(app) {
         test: test ?? null,
         token,
         accountId: accountId ?? null,
-        allowedIps: allowedIps || null,
-        allowedOrigins: validatedOrigins,
         mcp: mcpConfig,
         integration: integrationConfig,
         profile,
@@ -806,8 +758,6 @@ export async function registerRoutes(app) {
         version: version ?? null,
         hasToken: true,
         accountId,
-        allowedIps: allowedIps || null,
-        allowedOrigins: validatedOrigins,
         input,
         output,
         profile,
@@ -844,7 +794,7 @@ export async function registerRoutes(app) {
     }
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
-    // Auth: admin token (internal), gateway HMAC, or legacy token
+    // Auth: admin token (internal) or gateway HMAC
     if (!checkAdminToken(req)) {
       // Admin token valid — trusted internal caller, skip further auth
     } else if (isGatewayRequest(req)) {
@@ -853,18 +803,6 @@ export async function registerRoutes(app) {
       if (calc.accountId && gw.accountId !== calc.accountId) {
         return reply.code(403).send({ error: 'Account does not own this calculator' });
       }
-    } else {
-      if (calc.token) {
-        const provided = req.headers['x-auth-token'];
-        if (!provided) return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-        if (!safeTokenCompare(provided, calc.token)) return reply.code(403).send({ error: 'Invalid auth token' });
-      }
-      const clientIp = getClientIp(req);
-      const origin = req.headers['origin'] || null;
-      if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-        return reply.code(403).send({ error: 'Access denied' });
-      }
-      setCorsHeaders(reply, origin, calc.allowedOrigins);
     }
 
     const resp = {
@@ -905,12 +843,10 @@ export async function registerRoutes(app) {
       toolName: calc.mcp.toolName,
       toolDescription: calc.mcp.toolDescription,
       responseTemplate: calc.mcp.responseTemplate ?? null,
-      auth: { type: 'header', name: 'X-Auth-Token' },
       claudeDesktop: {
         mcpServers: {
           [calc.mcp.toolName]: {
             url: `${baseUrl}${endpoint}`,
-            headers: { 'X-Auth-Token': '{token}' },
           },
         },
       },
@@ -973,33 +909,6 @@ export async function registerRoutes(app) {
       }
     }
 
-    // Validate allowlist fields if provided
-    if (allowedIps !== undefined && allowedIps !== null && !Array.isArray(allowedIps)) {
-      return reply.code(400).send({ error: 'allowedIps must be an array or null' });
-    }
-    if (allowedOrigins !== undefined && allowedOrigins !== null && !Array.isArray(allowedOrigins)) {
-      return reply.code(400).send({ error: 'allowedOrigins must be an array or null' });
-    }
-
-    let newIpBlocklist = calc._ipBlocklist ?? null;
-    const newAllowedIps = allowedIps !== undefined ? (allowedIps || null) : (calc.allowedIps ?? null);
-    let newAllowedOrigins = allowedOrigins !== undefined ? allowedOrigins : (calc.allowedOrigins ?? null);
-
-    if (allowedIps !== undefined) {
-      try {
-        newIpBlocklist = compileIpAllowlist(allowedIps);
-      } catch (err) {
-        return reply.code(400).send({ error: 'Invalid allowedIps', detail: err.message });
-      }
-    }
-    if (allowedOrigins !== undefined) {
-      try {
-        newAllowedOrigins = validateOrigins(allowedOrigins);
-      } catch (err) {
-        return reply.code(400).send({ error: 'Invalid allowedOrigins', detail: err.message });
-      }
-    }
-
     const newSheets = sheets || calc.sheets;
     const newFormulas = formulas || calc.formulas;
     const newInput = input || calc.inputSchema;
@@ -1059,9 +968,6 @@ export async function registerRoutes(app) {
           test: newTest ?? null,
           token: newToken,
           accountId: calc.accountId ?? null,
-          allowedIps: newAllowedIps,
-          allowedOrigins: newAllowedOrigins,
-          _ipBlocklist: newIpBlocklist,
           mcp: newMcp,
           integration: newIntegration,
         });
@@ -1078,8 +984,6 @@ export async function registerRoutes(app) {
           test: newTest ?? null,
           token: newToken,
           accountId: calc.accountId ?? null,
-          allowedIps: newAllowedIps,
-          allowedOrigins: newAllowedOrigins,
           mcp: newMcp,
           integration: newIntegration,
           profile: newProfile,
@@ -1094,8 +998,6 @@ export async function registerRoutes(app) {
           version: newVersion ?? null,
           hasToken: !!newToken,
           accountId: calc.accountId ?? null,
-          allowedIps: newAllowedIps,
-          allowedOrigins: newAllowedOrigins,
           input: newInput,
           output: newOutput,
           profile: newProfile,
@@ -1129,9 +1031,6 @@ export async function registerRoutes(app) {
       test: newTest ?? null,
       token: newToken,
       accountId: calc.accountId ?? null,
-      allowedIps: newAllowedIps,
-      allowedOrigins: newAllowedOrigins,
-      _ipBlocklist: newIpBlocklist,
       mcp: newMcp,
       integration: newIntegration,
     };
@@ -1149,8 +1048,6 @@ export async function registerRoutes(app) {
       test: newTest ?? null,
       token: newToken,
       accountId: calc.accountId ?? null,
-      allowedIps: newAllowedIps,
-      allowedOrigins: newAllowedOrigins,
       mcp: newMcp,
       integration: newIntegration,
       profile: calc.profile ?? null,
@@ -1165,8 +1062,6 @@ export async function registerRoutes(app) {
       version: newVersion ?? null,
       hasToken: !!newToken,
       accountId: calc.accountId ?? null,
-      allowedIps: newAllowedIps,
-      allowedOrigins: newAllowedOrigins,
       input: newInput,
       output: newOutput,
     };
@@ -1267,28 +1162,6 @@ export async function registerRoutes(app) {
         return reply.code(403).send({ error: 'Account does not own this calculator' });
       }
       authAccountId = gw.accountId;
-    } else {
-      // Legacy token auth
-      if (calc.token) {
-        const provided = req.headers['x-auth-token'];
-        if (!provided) {
-          stat({ cached: false, error: true, errorMessage: 'Missing auth token' });
-          return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-        }
-        if (!safeTokenCompare(provided, calc.token)) {
-          stat({ cached: false, error: true, errorMessage: 'Invalid auth token' });
-          return reply.code(403).send({ error: 'Invalid auth token' });
-        }
-      }
-
-      // Allowlist check (only for direct requests, gateway handles this)
-      const clientIp = getClientIp(req);
-      const origin = req.headers['origin'] || null;
-      if (!checkAllowlist(calc._ipBlocklist, calc.allowedOrigins, clientIp, origin)) {
-        stat({ cached: false, error: true, errorMessage: 'Access denied' });
-        return reply.code(403).send({ error: 'Access denied' });
-      }
-      setCorsHeaders(reply, origin, calc.allowedOrigins);
     }
 
     // Rate limiting

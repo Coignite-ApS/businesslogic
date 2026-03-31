@@ -1,11 +1,8 @@
 import { pool } from '../services/engine-pool.js';
 import * as cache from '../services/cache.js';
 import * as stats from '../services/stats.js';
-import * as rateLimiter from '../services/rate-limiter.js';
-import { loadAccountLimits } from '../services/account-limits.js';
 import { config, resolveLocale } from '../config.js';
 import { blockedRe, volatileRe, errorTypeMap } from '../blocked.js';
-import { validateFormulaToken } from '../utils/auth.js';
 import blExcel from '@coignite/businesslogic-excel';
 
 // Check if result is HyperFormula error
@@ -134,41 +131,12 @@ const sheetSchema = {
   },
 };
 
-// Formula token auth + rate limit preHandler
-const formulaAuth = async (req, reply) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) {
-    req.log.warn({ ip: req.ip }, '[auth] missing formula token');
-    return reply.code(401).send({ error: 'Missing X-Auth-Token header' });
-  }
-  const result = await validateFormulaToken(token);
-  if (!result) {
-    req.log.warn({ ip: req.ip }, '[auth] invalid formula token');
-    return reply.code(403).send({ error: 'Invalid auth token' });
-  }
-  req.formulaAccount = result; // { accountId, label }
-
-  // Rate limiting (same pattern as calculator routes)
-  const accountId = result.accountId;
-  if (accountId && !rateLimiter.has(accountId)) {
-    await loadAccountLimits(accountId);
-  }
-  const rl = await rateLimiter.check(accountId);
-  if (!rl.allowed) {
-    const msg = rl.reason === 'monthly' ? 'Monthly quota exceeded' : 'Rate limit exceeded';
-    if (rl.retryAfter) reply.header('Retry-After', String(rl.retryAfter));
-    return reply.code(429).send({ error: msg });
-  }
-};
-
 export async function registerRoutes(app) {
   // Single formula evaluation
-  app.post('/execute', { schema: singleSchema, preHandler: formulaAuth }, async (req, reply) => {
+  app.post('/execute', { schema: singleSchema }, async (req, reply) => {
     const start = Date.now();
-    const account = req.formulaAccount?.accountId;
     const stat = (opts) => {
-      stats.record({ calculatorId: null, responseTimeMs: Date.now() - start, type: 'formula', account, ...opts });
-      if (!opts.error) rateLimiter.record(account);
+      stats.record({ calculatorId: null, responseTimeMs: Date.now() - start, type: 'formula', ...opts });
     };
 
     const { formula, locale, data, expressions } = req.body;
@@ -220,12 +188,10 @@ export async function registerRoutes(app) {
   });
 
   // Batch formula evaluation
-  app.post('/execute/batch', { schema: batchSchema, preHandler: formulaAuth }, async (req, reply) => {
+  app.post('/execute/batch', { schema: batchSchema }, async (req, reply) => {
     const start = Date.now();
-    const account = req.formulaAccount?.accountId;
     const stat = (opts) => {
-      stats.record({ calculatorId: null, responseTimeMs: Date.now() - start, type: 'formula', account, ...opts });
-      if (!opts.error) rateLimiter.record(account);
+      stats.record({ calculatorId: null, responseTimeMs: Date.now() - start, type: 'formula', ...opts });
     };
 
     const { formulas, locale, data, expressions } = req.body;
@@ -359,12 +325,10 @@ export async function registerRoutes(app) {
   });
 
   // Sheet evaluation (no caching - cell data makes each unique)
-  app.post('/execute/sheet', { schema: sheetSchema, preHandler: formulaAuth }, async (req, reply) => {
+  app.post('/execute/sheet', { schema: sheetSchema }, async (req, reply) => {
     const start = Date.now();
-    const account = req.formulaAccount?.accountId;
     const stat = (opts) => {
-      stats.record({ calculatorId: null, responseTimeMs: Date.now() - start, type: 'formula', account, ...opts });
-      if (!opts.error) rateLimiter.record(account);
+      stats.record({ calculatorId: null, responseTimeMs: Date.now() - start, type: 'formula', ...opts });
     };
 
     const { data, sheets, formulas, locale, expressions } = req.body;

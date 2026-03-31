@@ -1,0 +1,59 @@
+{
+  "name": "Knowledge Base List",
+  "description": "Shows available knowledge bases",
+  "tool_binding": "list_knowledge_bases",
+  "resource_binding": null,
+  "status": "published",
+  "sort": 1,
+  "data_mapping": {
+    "count": "$.total | string | concat: knowledge bases",
+    "items": {
+      "source": "$.knowledge_bases",
+      "map": {
+        "name": "$.name",
+        "desc": "$.description | truncate:80 | default:No description",
+        "docs": "$.document_count | string | concat: docs"
+      }
+    }
+  },
+  "template": {
+    "component": "Card",
+    "props": { "size": "sm" },
+    "children": [
+      { "component": "Caption", "props": { "value": "{{count}}", "color": "secondary" } },
+      { "component": "Divider", "props": { "flush": true } },
+      {
+        "component": "ListView",
+        "props": { "limit": 5 },
+        "children": [{
+          "component": "__each",
+          "props": { "source": "items" },
+          "children": [{
+            "component": "ListViewItem",
+            "props": {
+              "onClickAction": { "type": "assistant.message", "payload": { "text": "Search {{name}} for recent updates" } }
+            },
+            "children": [
+              { "component": "Icon", "props": { "name": "book", "size": "sm" } },
+              {
+                "component": "Col",
+                "props": { "gap": "2px" },
+                "children": [
+                  {
+                    "component": "Row",
+                    "children": [
+                      { "component": "Text", "props": { "value": "{{name}}", "weight": "semibold" } },
+                      { "component": "Spacer" },
+                      { "component": "Badge", "props": { "label": "{{docs}}", "color": "secondary", "size": "sm" } }
+                    ]
+                  },
+                  { "component": "Caption", "props": { "value": "{{desc}}" } }
+                ]
+              }
+            ]
+          }]
+        }]
+      }
+    ]
+  }
+}

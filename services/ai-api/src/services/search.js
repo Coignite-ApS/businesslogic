@@ -126,7 +126,7 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
     .sort((a, b) => b.rrfScore - a.rrfScore)
     .slice(0, limit);
 
-  return ranked.map(r => ({
+  const results = ranked.map(r => ({
     id: r.id,
     content: r.content,
     metadata: r.metadata,
@@ -135,4 +135,13 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
     knowledge_base_id: r.knowledge_base_id,
     knowledge_base_name: r.knowledge_base_name,
   }));
+
+  // Compute similarity stats for observability
+  const similarities = results.map(r => r.similarity).filter(s => s > 0);
+  const topSimilarity = similarities.length ? Math.max(...similarities) : null;
+  const avgSimilarity = similarities.length
+    ? Math.round((similarities.reduce((a, b) => a + b, 0) / similarities.length) * 1000) / 1000
+    : null;
+
+  return { results, topSimilarity, avgSimilarity };
 }

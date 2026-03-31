@@ -111,27 +111,11 @@
 
 			<!-- Widget tab -->
 			<template v-if="integrationTab === 'widget'">
-				<div v-if="!isDeployed" class="deploy-notice">
-					<v-icon name="cloud_off" />
-					<span>Not deployed to Formula API. Deploy from the dashboard first.</span>
-				</div>
-				<template v-else>
-					<div class="code-section">
-						<h2 class="section-title">Embed Widget (Gateway Mode)</h2>
-						<p class="code-section-desc">
-							Add this to your HTML page. The widget authenticates via your API key through the gateway.
-						</p>
-						<code-block :code="widgetEmbedGateway" :copy-code="widgetEmbedGateway" language="html" />
-					</div>
-
-					<div class="code-section">
-						<h2 class="section-title">Embed Widget (Legacy Direct Mode)</h2>
-						<p class="code-section-desc">
-							Uses a per-calculator token to connect directly to the Formula API. Use Gateway Mode above for new integrations.
-						</p>
-						<code-block :code="widgetEmbedDirect" :copy-code="widgetEmbedDirect" language="html" />
-					</div>
-				</template>
+				<widget-tab
+					:is-deployed="isDeployed"
+					:widget-embed-gateway="widgetEmbedGateway"
+					:widget-embed-direct="widgetEmbedDirect"
+				/>
 			</template>
 
 			<!-- API tab -->
@@ -296,6 +280,7 @@ import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
 import { useActiveAccount } from '../composables/use-active-account';
 import CalculatorNavigation from '../components/navigation.vue';
+import WidgetTab from '../components/widget-tab.vue';
 import CodeExamples from '../components/code-examples.vue';
 import McpConfigEditor from '../components/mcp-config.vue';
 import McpSnippets from '../components/mcp-snippets.vue';

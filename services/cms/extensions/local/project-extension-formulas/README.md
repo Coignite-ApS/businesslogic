@@ -15,19 +15,15 @@ Directus module for testing Formula API execute endpoints directly from the admi
 ```
 User → Formulas module → POST /calc/formula/execute
                         → calculator-api hook (requireAuth)
-                        → looks up user's formula_tokens
-                        → decrypts token
-                        → forwards to Formula API with X-Auth-Token
+                        → forwards to Formula API with X-Admin-Token
                         → returns result (or 422 error) to UI
 ```
 
-The module does NOT call the Formula API directly — all requests go through the calculator-api proxy routes which handle auth and token management.
+The module does NOT call the Formula API directly — all requests go through the calculator-api proxy routes which handle auth.
 
 ## Prerequisites
 
 - User must have an `active_account`
-- Account must have at least one non-revoked `formula_tokens` entry
-- A default API key is auto-created on account registration
 
 ## File Structure
 

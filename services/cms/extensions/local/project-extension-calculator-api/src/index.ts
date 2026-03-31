@@ -1,5 +1,4 @@
 import { defineHook } from '@directus/extensions-sdk';
-import { randomUUID } from 'node:crypto';
 import { FormulaApiClient, FormulaApiError, FormulaApiGoneError } from './formula-api.js';
 import { requireAuth, requireAdmin, requireCalculatorAccess, requireActiveSubscription, getSubscriptionInfo, parseCalcId } from './auth.js';
 import { handleFormulaApiError, buildPayload, buildRecipe, configIsComplete, toSnakeCase, buildMcpInputSchema, buildMcpSnippets, lookupCalculatorConfig } from './helpers.js';
@@ -633,14 +632,12 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				try {
-					const result = await client.executeCalculator(calcId, req.body, token);
+					const result = await client.executeCalculator(calcId, req.body);
 					return res.status(result.status).json(result.body);
 				} catch (err) {
 					if (err instanceof FormulaApiGoneError) {
-						return await selfHeal(client, db, calcId, (fid) => client.executeCalculator(fid, req.body, token), res);
+						return await selfHeal(client, db, calcId, (fid) => client.executeCalculator(fid, req.body), res);
 					}
 					throw err;
 				}
@@ -663,8 +660,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				// Load all test cases for this calculator
 				const rows = await db('calculator_test_cases')
 					.where('calculator', calculatorId)
@@ -678,7 +673,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 					const expected = tc.expected_outputs || {};
 					const tolerance = tc.tolerance ?? 0;
 					try {
-						const execResult = await client.executeCalculator(calcId, input, token);
+						const execResult = await client.executeCalculator(calcId, input);
 						const actual = (execResult.body as Record<string, unknown>) || {};
 						const { passed, diff } = compareOutputs(actual, expected, tolerance);
 						results.push({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
@@ -718,8 +713,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				const tc = await db('calculator_test_cases')
 					.where('id', testId)
 					.where('calculator', calculatorId)
@@ -735,7 +728,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const tolerance = tc.tolerance ?? 0;
 
 				try {
-					const execResult = await client.executeCalculator(calcId, input, token);
+					const execResult = await client.executeCalculator(calcId, input);
 					const actual = (execResult.body as Record<string, unknown>) || {};
 					const { passed, diff } = compareOutputs(actual, expected, tolerance);
 					return res.json({ id: tc.id, name: tc.name, passed, expected, actual, diff, error: null });
@@ -869,14 +862,12 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				if (!config) {
 					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
 				}
-				const token = decryptToken(config.api_key);
-
 				try {
-					const result = await client.describeCalculator(calcId, token);
+					const result = await client.describeCalculator(calcId);
 					return res.status(result.status).json(stripDescribeInternals(result.body));
 				} catch (err) {
 					if (err instanceof FormulaApiGoneError) {
-						return await selfHeal(client, db, calcId, (fid) => client.describeCalculator(fid, token), res, stripDescribeInternals);
+						return await selfHeal(client, db, calcId, (fid) => client.describeCalculator(fid), res, stripDescribeInternals);
 					}
 					throw err;
 				}
@@ -936,7 +927,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				}
 
 				const mcpUrl = `${apiUrl}/mcp/calculator/${calcId}`;
-				const token = decryptToken(config.api_key) || '';
 
 				const inputSchema = buildMcpInputSchema(
 					config.input as Record<string, unknown>,
@@ -946,14 +936,13 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const snippets = buildMcpSnippets({
 					toolName: mcp.toolName,
 					mcpUrl,
-					token,
 				});
 
 				return res.json({
 					enabled: true,
 					url: mcpUrl,
 					transport: 'sse',
-					auth: token ? { type: 'bearer', token } : null,
+					auth: null,
 					tool: {
 						name: mcp.toolName,
 						description: mcp.toolDescription,
@@ -999,174 +988,26 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 			}
 		});
 
-		// ─── A13: Formula token CRUD ────────────────────────────
-
-		app.post('/calc/formula-tokens', requireAuth, async (req: any, res: any) => {
-			const userId = req.accountability?.user;
-			try {
-				const user = await db('directus_users').where('id', userId).select('active_account').first();
-				if (!user?.active_account) {
-					return res.status(400).json({ errors: [{ message: 'No active account' }] });
-				}
-
-				const { label } = req.body || {};
-				const tokenValue = randomUUID();
-				const encryptedToken = encryptionKey ? encryptToken(tokenValue) : tokenValue;
-
-				const id = randomUUID();
-				await db('formula_tokens').insert({
-					id,
-					account: user.active_account,
-					label: label || 'API Key',
-					token: encryptedToken,
-					date_created: new Date().toISOString(),
-					revoked: false,
-				});
-
-				// Return plaintext token — shown once only
-				return res.status(201).json({ id, label: label || 'API Key', token: tokenValue });
-			} catch (err: any) {
-				logger.error(`Create formula token failed: ${err}`);
-				return res.status(500).json({ errors: [{ message: 'Failed to create token' }] });
-			}
-		});
-
-		app.get('/calc/formula-tokens', requireAuth, async (req: any, res: any) => {
-			const userId = req.accountability?.user;
-			try {
-				const user = await db('directus_users').where('id', userId).select('active_account').first();
-				if (!user?.active_account) {
-					return res.status(400).json({ errors: [{ message: 'No active account' }] });
-				}
-
-				const tokens = await db('formula_tokens')
-					.where('account', user.active_account)
-					.select('id', 'label', 'date_created', 'last_used_at', 'revoked', 'revoked_at')
-					.orderBy('date_created', 'desc');
-
-				return res.json({ data: tokens });
-			} catch (err: any) {
-				logger.error(`List formula tokens failed: ${err}`);
-				return res.status(500).json({ errors: [{ message: 'Failed to list tokens' }] });
-			}
-		});
-
-		app.delete('/calc/formula-tokens/:id', requireAuth, async (req: any, res: any) => {
-			const userId = req.accountability?.user;
-			const tokenId = req.params.id;
-			try {
-				const user = await db('directus_users').where('id', userId).select('active_account').first();
-				if (!user?.active_account) {
-					return res.status(400).json({ errors: [{ message: 'No active account' }] });
-				}
-
-				const token = await db('formula_tokens').where('id', tokenId).select('account').first();
-				if (!token || token.account !== user.active_account) {
-					return res.status(404).json({ errors: [{ message: 'Token not found' }] });
-				}
-
-				await db('formula_tokens').where('id', tokenId).update({
-					revoked: true,
-					revoked_at: new Date().toISOString(),
-				});
-
-				return res.json({ revoked: true });
-			} catch (err: any) {
-				logger.error(`Revoke formula token failed: ${err}`);
-				return res.status(500).json({ errors: [{ message: 'Failed to revoke token' }] });
-			}
-		});
-
-		// ─── B1: Token validation endpoint (for Formula API) ────
-
-		app.get('/management/calc/validate-token', async (req: any, res: any) => {
-			// Auth: role-based (same as /management/calc/recipes)
-			if (!req.accountability?.user && !req.accountability?.role) {
-				return res.status(401).json({ errors: [{ message: 'Authentication required' }] });
-			}
-
-			const tokenValue = req.query.token as string;
-			if (!tokenValue) {
-				return res.json({ valid: false });
-			}
-
-			try {
-				const tokens = await db('formula_tokens')
-					.where('revoked', false)
-					.select('id', 'account', 'label', 'token');
-
-				// Must decrypt each to compare (cannot query encrypted values)
-				for (const row of tokens) {
-					const plain = decryptToken(row.token);
-					if (plain === tokenValue) {
-						// Update last_used_at
-						db('formula_tokens').where('id', row.id).update({ last_used_at: new Date().toISOString() }).catch(() => {});
-						return res.json({ valid: true, account_id: row.account, label: row.label });
-					}
-				}
-
-				return res.json({ valid: false });
-			} catch (err: any) {
-				logger.error(`Token validation failed: ${err}`);
-				return res.status(500).json({ errors: [{ message: 'Token validation failed' }] });
-			}
-		});
-
-		// GET /calc/formula-token-value — returns decrypted first non-revoked token
-		app.get('/calc/formula-token-value', requireAuth, async (req: any, res: any) => {
-			const userId = req.accountability?.user;
-			try {
-				const user = await db('directus_users').where('id', userId).select('active_account').first();
-				if (!user?.active_account) {
-					return res.status(400).json({ errors: [{ message: 'No active account' }] });
-				}
-				const row = await db('formula_tokens')
-					.where('account', user.active_account)
-					.where('revoked', false)
-					.orderBy('date_created', 'asc')
-					.select('token')
-					.first();
-				if (!row) {
-					return res.status(404).json({ errors: [{ message: 'No API key found' }] });
-				}
-				const value = decryptToken(row.token);
-				return res.json({ data: value });
-			} catch (err: any) {
-				logger.error(`Get formula token value failed: ${err}`);
-				return res.status(500).json({ errors: [{ message: 'Failed to get token value' }] });
-			}
-		});
-
 		// ─── Formula execute proxy routes ────────────────────
 		// These proxy /execute, /execute/batch, /execute/sheet to Formula API
-		// using the user's first non-revoked formula token for auth.
+		// using admin auth (X-Admin-Token) — no user token required.
 
-		async function getActiveAccount(userId: string): Promise<string | null> {
-			const user = await db('directus_users').where('id', userId).select('active_account').first();
-			return user?.active_account || null;
-		}
+		const formulaAdminToken = (env['FORMULA_API_ADMIN_TOKEN'] as string) || '';
+		const formulaDirectUrl = ((env['FORMULA_API_URL'] as string) || '').replace(/\/+$/, '');
 
-		async function getFormulaToken(accountId: string, res: any): Promise<string | null> {
-			const row = await db('formula_tokens')
-				.where('account', accountId)
-				.where('revoked', false)
-				.orderBy('date_created', 'asc')
-				.select('token')
-				.first();
-			if (!row) {
-				res.status(400).json({ errors: [{ message: 'No API key found. Create one in Account settings.' }] });
-				return null;
-			}
-			return decryptToken(row.token) || null;
-		}
+		const execFetch = async (path: string, body: unknown) => {
+			const r = await fetch(`${formulaDirectUrl}${path}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'X-Admin-Token': formulaAdminToken },
+				body: JSON.stringify(body),
+			});
+			const data = await r.json();
+			return { status: r.status, body: data };
+		};
 
 		app.post('/calc/formula/execute', requireAuth, async (req: any, res: any) => {
 			try {
-				const accountId = await getActiveAccount(req.accountability?.user);
-				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
-				const token = await getFormulaToken(accountId, res);
-				if (!token) return;
-				const result = await client.executeFormula(req.body, token);
+				const result = await execFetch('/execute', req.body);
 				return res.status(result.status).json(result.body);
 			} catch (err: any) {
 				logger.error(`Formula execute failed: ${err}`);
@@ -1176,11 +1017,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 
 		app.post('/calc/formula/execute-batch', requireAuth, async (req: any, res: any) => {
 			try {
-				const accountId = await getActiveAccount(req.accountability?.user);
-				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
-				const token = await getFormulaToken(accountId, res);
-				if (!token) return;
-				const result = await client.executeFormulaBatch(req.body, token);
+				const result = await execFetch('/execute/batch', req.body);
 				return res.status(result.status).json(result.body);
 			} catch (err: any) {
 				logger.error(`Formula batch execute failed: ${err}`);
@@ -1190,11 +1027,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 
 		app.post('/calc/formula/execute-sheet', requireAuth, async (req: any, res: any) => {
 			try {
-				const accountId = await getActiveAccount(req.accountability?.user);
-				if (!accountId) return res.status(403).json({ errors: [{ message: 'No active account' }] });
-				const token = await getFormulaToken(accountId, res);
-				if (!token) return;
-				const result = await client.executeFormulaSheet(req.body, token);
+				const result = await execFetch('/execute/sheet', req.body);
 				return res.status(result.status).json(result.body);
 			} catch (err: any) {
 				logger.error(`Formula sheet execute failed: ${err}`);

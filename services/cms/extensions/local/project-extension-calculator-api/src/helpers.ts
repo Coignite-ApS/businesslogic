@@ -231,21 +231,20 @@ export function buildMcpInputSchema(input: Record<string, unknown>, paramDescrip
 export interface McpSnippetParams {
 	toolName: string;
 	mcpUrl: string;
-	token: string;
 }
 
 /** Generate platform-specific MCP config snippets */
-export function buildMcpSnippets({ toolName, mcpUrl, token }: McpSnippetParams): Record<string, { config: string; filePath: string }> {
+export function buildMcpSnippets({ toolName, mcpUrl }: McpSnippetParams): Record<string, { config: string; filePath: string }> {
 	const fmt = (obj: unknown) => JSON.stringify(obj, null, 2);
 
 	const remoteBlock = {
 		command: 'npx',
-		args: ['-y', 'mcp-remote', mcpUrl, '--header', `X-Auth-Token:${token}`],
+		args: ['-y', 'mcp-remote', mcpUrl],
 	};
 
 	return {
 		claude_desktop: {
-			config: fmt({ mcpServers: { [toolName]: { url: mcpUrl, headers: { 'X-Auth-Token': token } } } }),
+			config: fmt({ mcpServers: { [toolName]: { url: mcpUrl } } }),
 			filePath: 'claude_desktop_config.json',
 		},
 		cursor: {

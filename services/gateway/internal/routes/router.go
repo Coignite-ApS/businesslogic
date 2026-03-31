@@ -9,12 +9,14 @@ import (
 	"github.com/coignite-aps/bl-gateway/internal/handler"
 	"github.com/coignite-aps/bl-gateway/internal/middleware"
 	"github.com/coignite-aps/bl-gateway/internal/proxy"
+	"github.com/coignite-aps/bl-gateway/internal/service"
 )
 
 type Router struct {
 	backends             map[string]*proxy.Backend
 	mux                  *http.ServeMux
 	apiKeyHandler        *handler.APIKeyHandler
+	keyService           *service.KeyService
 	responseCache        *cache.ResponseCache
 	internalSecret       string
 	formulaAPIAdminToken string
@@ -26,6 +28,7 @@ type Router struct {
 type RouterConfig struct {
 	Backends             map[string]*proxy.Backend
 	APIKeyHandler        *handler.APIKeyHandler
+	KeyService           *service.KeyService
 	ResponseCache        *cache.ResponseCache
 	InternalSecret       string
 	FormulaAPIAdminToken string
@@ -40,6 +43,7 @@ func New(cfg RouterConfig) *Router {
 		backends:             cfg.Backends,
 		mux:                  http.NewServeMux(),
 		apiKeyHandler:        cfg.APIKeyHandler,
+		keyService:           cfg.KeyService,
 		responseCache:        cfg.ResponseCache,
 		internalSecret:       cfg.InternalSecret,
 		formulaAPIAdminToken: cfg.FormulaAPIAdminToken,
@@ -78,8 +82,8 @@ func (r *Router) setup() {
 	// Widget routes (GW-03)
 	r.setupWidgetRoutes()
 
-	// Account MCP route (GW-06)
-	r.setupMCPAccountRoute()
+	// MCP by key prefix route (GW-06)
+	r.setupMCPKeyPrefixRoute()
 
 	// Internal service proxy routes (GW-04)
 	r.setupInternalServiceProxy()
@@ -88,16 +92,28 @@ func (r *Router) setup() {
 	r.setupInternalRoutes()
 }
 
-func (r *Router) setupMCPAccountRoute() {
+func (r *Router) setupMCPKeyPrefixRoute() {
 	formulaBackend, ok := r.backends["formula-api"]
 	if !ok {
 		return
 	}
 
-	mcpHandler := handler.NewMCPHandler(formulaBackend)
-	checkCalc := middleware.CheckServiceAccess("calc")
+	// NOTE: This route does NOT use standard Auth middleware — the key prefix IS the auth.
+	// The handler itself resolves prefix → account and checks permissions.
+	mcpHandler := handler.NewMCPHandler(formulaBackend, r.keyService)
 
-	r.mux.Handle("/v1/mcp/account/", checkCalc(http.HandlerFunc(mcpHandler.AccountMCP)))
+	// Register with a trailing slash to catch /v1/mcp/:keyPrefix
+	// Must be registered AFTER /v1/mcp/calc/ and /v1/mcp/ai/ (more specific prefixes win in ServeMux).
+	r.mux.HandleFunc("/v1/mcp/", func(w http.ResponseWriter, req *http.Request) {
+		// Only handle paths that look like /v1/mcp/:keyPrefix (not already matched by calc/ai routes)
+		rest := strings.TrimPrefix(req.URL.Path, "/v1/mcp/")
+		if strings.HasPrefix(rest, "calc/") || strings.HasPrefix(rest, "ai/") {
+			// Should be handled by the standard proxy routes above — fallback 404
+			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+			return
+		}
+		mcpHandler.ByKeyPrefix(w, req)
+	})
 }
 
 func (r *Router) setupWidgetRoutes() {
@@ -196,6 +212,8 @@ func (r *Router) setupInternalRoutes() {
 		case http.MethodPost:
 			if strings.HasSuffix(path, "/rotate") {
 				r.apiKeyHandler.Rotate(w, req)
+			} else if path == "/internal/api-keys/auto-provision" {
+				r.apiKeyHandler.AutoProvision(w, req)
 			} else if path == "/internal/api-keys/" || path == "/internal/api-keys" {
 				r.apiKeyHandler.Create(w, req)
 			} else {
@@ -204,6 +222,8 @@ func (r *Router) setupInternalRoutes() {
 		case http.MethodGet:
 			if path == "/internal/api-keys/" || path == "/internal/api-keys" {
 				r.apiKeyHandler.List(w, req)
+			} else if path == "/internal/api-keys/check-live" {
+				r.apiKeyHandler.CheckLiveKey(w, req)
 			} else {
 				r.apiKeyHandler.Get(w, req)
 			}

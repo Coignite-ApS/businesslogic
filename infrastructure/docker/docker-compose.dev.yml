@@ -19,6 +19,8 @@
 # Legacy (for comparison testing):
 ##############################################################################
 
+name: businesslogic
+
 services:
 
   # ════════════════════════════════════════════════════
@@ -123,8 +125,20 @@ services:
       # AI proxy (routes through gateway /internal/ai/ when enabled)
       - AI_SERVICE_ENABLED=${AI_SERVICE_ENABLED:-false}
     volumes:
-      # Mount local extensions for hot-reload during development
-      - ../../services/cms/extensions/local:/directus/extensions/local:ro
+      # Override baked-in extension copies with local source for hot-reload
+      - ../../services/cms/extensions/local/project-extension-calculators:/directus/extensions/project-extension-calculators
+      - ../../services/cms/extensions/local/project-extension-calculator-api:/directus/extensions/project-extension-calculator-api
+      - ../../services/cms/extensions/local/project-extension-stripe:/directus/extensions/project-extension-stripe
+      - ../../services/cms/extensions/local/project-extension-account:/directus/extensions/project-extension-account
+      - ../../services/cms/extensions/local/project-extension-admin:/directus/extensions/project-extension-admin
+      - ../../services/cms/extensions/local/project-extension-flow-hooks:/directus/extensions/project-extension-flow-hooks
+      - ../../services/cms/extensions/local/project-extension-flows:/directus/extensions/project-extension-flows
+      - ../../services/cms/extensions/local/project-extension-formulas:/directus/extensions/project-extension-formulas
+      - ../../services/cms/extensions/local/project-extension-ai-api:/directus/extensions/project-extension-ai-api
+      - ../../services/cms/extensions/local/project-extension-ai-assistant:/directus/extensions/project-extension-ai-assistant
+      - ../../services/cms/extensions/local/project-extension-knowledge-api:/directus/extensions/project-extension-knowledge-api
+      - ../../services/cms/extensions/local/project-extension-knowledge:/directus/extensions/project-extension-knowledge
+      - ../../services/cms/extensions/local/project-extension-widget-api:/directus/extensions/project-extension-widget-api
       - ../../services/cms/email-templates:/directus/email-templates:ro
     depends_on:
       postgres: { condition: service_healthy }

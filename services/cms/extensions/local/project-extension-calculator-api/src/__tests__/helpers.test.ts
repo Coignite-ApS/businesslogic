@@ -390,7 +390,6 @@ describe('buildMcpSnippets', () => {
 		const result = buildMcpSnippets({
 			toolName: 'my_calc',
 			mcpUrl: 'https://api.example.com/mcp/calculator/my-calc',
-			token: 'tok-123',
 		});
 
 		expect(result.claude_desktop).toBeDefined();
@@ -404,21 +403,21 @@ describe('buildMcpSnippets', () => {
 			expect(parsed).toBeTruthy();
 		}
 
-		// Claude Desktop uses native Streamable HTTP (url + headers)
+		// Claude Desktop uses native Streamable HTTP (url only, no auth headers)
 		const cd = JSON.parse(result.claude_desktop.config);
 		expect(cd.mcpServers.my_calc.url).toBe('https://api.example.com/mcp/calculator/my-calc');
-		expect(cd.mcpServers.my_calc.headers['X-Auth-Token']).toBe('tok-123');
+		expect(cd.mcpServers.my_calc.headers).toBeUndefined();
 		expect(cd.mcpServers.my_calc.command).toBeUndefined();
 
-		// Other platforms use mcp-remote with X-Auth-Token header
+		// Other platforms use mcp-remote (no auth header, URL embeds auth)
 		const cursor = JSON.parse(result.cursor.config);
 		expect(cursor.mcpServers.my_calc.command).toBe('npx');
 		expect(cursor.mcpServers.my_calc.args).toContain('mcp-remote');
-		expect(cursor.mcpServers.my_calc.args).toContain('X-Auth-Token:tok-123');
+		expect(cursor.mcpServers.my_calc.args).not.toContain('--header');
 	});
 
 	it('includes file path hints', () => {
-		const result = buildMcpSnippets({ toolName: 't', mcpUrl: 'u', token: '' });
+		const result = buildMcpSnippets({ toolName: 't', mcpUrl: 'u' });
 
 		expect(result.claude_desktop.filePath).toBe('claude_desktop_config.json');
 		expect(result.cursor.filePath).toBe('.cursor/mcp.json');

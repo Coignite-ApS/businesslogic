@@ -64,3 +64,21 @@ export interface FieldMeta {
   schema: SchemaProperty;
   value?: unknown;
 }
+
+/** ChatKit component tree node format */
+export interface ChatKitNode {
+  component: string;
+  props?: Record<string, unknown>;
+  children?: ChatKitNode[];
+}
+
+/** Union type for renderer input */
+export type RenderableNode = LayoutNode | ChatKitNode;
+
+/** Prop definition for component registry metadata */
+export interface PropDef {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  default?: unknown;
+  description?: string;
+  options?: Array<{ value: unknown; label: string }>;
+}

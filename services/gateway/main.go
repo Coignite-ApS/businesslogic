@@ -116,6 +116,7 @@ func main() {
 	router := routes.New(routes.RouterConfig{
 		Backends:             backends,
 		APIKeyHandler:        apiKeyHandler,
+		KeyService:           keyService,
 		ResponseCache:        responseCache,
 		InternalSecret:       cfg.InternalSecret,
 		FormulaAPIAdminToken: cfg.FormulaAPIAdminToken,

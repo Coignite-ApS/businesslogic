@@ -89,6 +89,7 @@ export function parsePermissions(perms: ResourcePermissions | null | undefined):
 
 /** Summarize permissions for display (e.g. "3 calculators, 1 KB") */
 export function summarizePermissions(perms: ResourcePermissions | null | undefined): string {
+	if (perms === null) return 'Full access';
 	if (!perms?.services) return 'No permissions';
 	const parts: string[] = [];
 

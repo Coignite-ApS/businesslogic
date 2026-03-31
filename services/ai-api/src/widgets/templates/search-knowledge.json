@@ -1,0 +1,65 @@
+{
+  "name": "KB Search Results",
+  "description": "Shows search results as a list with similarity scores",
+  "tool_binding": "search_knowledge",
+  "resource_binding": null,
+  "status": "published",
+  "sort": 1,
+  "data_mapping": {
+    "query": "$.query",
+    "total": "$.total_results | string | concat: results",
+    "results": {
+      "source": "$.results",
+      "map": {
+        "title": "$.document_title | default:Untitled",
+        "content": "$.content | truncate:150",
+        "score": "$.similarity | percent",
+        "source": "$.kb_name"
+      }
+    }
+  },
+  "template": {
+    "component": "Card",
+    "props": { "size": "sm" },
+    "children": [
+      {
+        "component": "Col",
+        "props": { "gap": "4px" },
+        "children": [
+          { "component": "Caption", "props": { "value": "Knowledge Search", "color": "secondary" } },
+          { "component": "Title", "props": { "value": "{{total}}", "size": "sm" } }
+        ]
+      },
+      { "component": "Divider", "props": { "flush": true } },
+      {
+        "component": "ListView",
+        "props": { "limit": 3 },
+        "children": [{
+          "component": "__each",
+          "props": { "source": "results" },
+          "children": [{
+            "component": "ListViewItem",
+            "children": [
+              {
+                "component": "Col",
+                "props": { "gap": "2px" },
+                "children": [
+                  {
+                    "component": "Row",
+                    "children": [
+                      { "component": "Text", "props": { "value": "{{title}}", "weight": "semibold", "size": "sm" } },
+                      { "component": "Spacer" },
+                      { "component": "Badge", "props": { "label": "{{score}}", "color": "info", "size": "sm" } }
+                    ]
+                  },
+                  { "component": "Caption", "props": { "value": "{{content}}" } },
+                  { "component": "Caption", "props": { "value": "{{source}}", "size": "sm", "color": "tertiary" } }
+                ]
+              }
+            ]
+          }]
+        }]
+      }
+    ]
+  }
+}

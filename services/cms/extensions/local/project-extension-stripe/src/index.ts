@@ -1,5 +1,4 @@
 import { defineHook } from '@directus/extensions-sdk';
-import { randomUUID, randomBytes, createCipheriv } from 'node:crypto';
 import { getStripe } from './stripe-client.js';
 import { getRegistrationPage } from './register.js';
 import {
@@ -150,35 +149,6 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 			});
 
 			logger.info(`Trial subscription created for account ${key}: ${plan.name}, ${plan.trial_days} days`);
-
-			// Auto-create a default formula API key so user can use Formulas module immediately
-			try {
-				const encryptionKey = env['TOKEN_ENCRYPTION_KEY'] as string | undefined;
-				const tokenValue = randomUUID();
-				let encryptedToken = tokenValue;
-
-				if (encryptionKey) {
-					const keyBuf = Buffer.from(encryptionKey, 'hex');
-					const iv = randomBytes(12);
-					const cipher = createCipheriv('aes-256-gcm', keyBuf, iv);
-					const encrypted = Buffer.concat([cipher.update(tokenValue, 'utf8'), cipher.final()]);
-					const tag = cipher.getAuthTag();
-					encryptedToken = `v1:${iv.toString('base64')}:${tag.toString('base64')}:${encrypted.toString('base64')}`;
-				}
-
-				await db('formula_tokens').insert({
-					id: randomUUID(),
-					account: key,
-					label: 'Default API Key',
-					token: encryptedToken,
-					date_created: new Date().toISOString(),
-					revoked: false,
-				});
-
-				logger.info(`Default formula API key created for account ${key}`);
-			} catch (tokenErr) {
-				logger.error(`Failed to create default formula API key for account ${key}: ${tokenErr}`);
-			}
 		} catch (err) {
 			logger.error(`Failed to create trial subscription for account ${key}: ${err}`);
 		}

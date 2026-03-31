@@ -552,9 +552,9 @@ async function handleExecute() {
 
 onMounted(async () => {
 	// Load token status + examples + user preference in parallel
-	const tokenPromise = api.get('/calc/formula-tokens').then(({ data }: any) => {
-		const tokens = data?.data || data;
-		hasToken.value = Array.isArray(tokens) && tokens.some((t: any) => !t.revoked);
+	const tokenPromise = api.get('/calc/api-keys').then(({ data }: any) => {
+		const keys = data?.data || data;
+		hasToken.value = Array.isArray(keys) && keys.length > 0;
 	}).catch(() => {
 		hasToken.value = false;
 	}).finally(() => {

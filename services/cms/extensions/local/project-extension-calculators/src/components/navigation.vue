@@ -5,21 +5,6 @@
 			New calculator
 		</v-button>
 
-		<v-list class="account-links">
-			<v-list-item
-				:active="currentView === 'account-mcp'"
-				clickable
-				@click="$router.push('/calculators/account-mcp')"
-			>
-				<v-list-item-icon>
-					<v-icon name="smart_toy" small />
-				</v-list-item-icon>
-				<v-list-item-content>
-					<v-text-overflow text="Account MCP" />
-				</v-list-item-content>
-			</v-list-item>
-		</v-list>
-
 		<v-list v-if="calculators.length > 0" class="calculator-list">
 			<template v-for="calc in calculators" :key="calc.id">
 				<v-list-item
@@ -99,7 +84,7 @@ defineProps<{
 	currentId: string | null;
 	loading: boolean;
 	creating: boolean;
-	currentView?: 'dashboard' | 'configure' | 'test' | 'integration' | 'account-mcp' | null;
+	currentView?: 'dashboard' | 'configure' | 'test' | 'integration' | null;
 	hasExcel?: boolean;
 	hasConfig?: boolean;
 }>();
@@ -119,13 +104,6 @@ function statusDotClass(calc: Calculator): string {
 <style scoped>
 .calculator-navigation {
 	padding: 12px;
-}
-
-.account-links {
-	margin-top: 8px;
-	margin-bottom: 4px;
-	border-bottom: var(--theme--border-width) solid var(--theme--border-color-subdued);
-	padding-bottom: 8px;
 }
 
 .calculator-list {

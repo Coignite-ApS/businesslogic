@@ -1,4 +1,4 @@
-import { createDecipheriv, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { queryAll, queryOne, query } from '../db.js';
 import { config } from '../config.js';
 import { executeToolViaFlow, isFlowToolEnabled } from './flow-tools.js';
@@ -301,9 +301,7 @@ async function describeCalculator(accountId, calculatorId) {
 
   // Try Formula API describe
   try {
-    const token = decryptApiKey(cfg.api_key, config.tokenEncryptionKey);
     const headers = {};
-    if (token) headers['X-Auth-Token'] = token;
     if (config.formulaApiAdminToken) headers['X-Admin-Token'] = config.formulaApiAdminToken;
     const res = await fetch(`${config.formulaApiUrl}/calculator/${encodeURIComponent(calculatorId)}/describe`, { headers });
     if (res.ok) {
@@ -329,9 +327,7 @@ async function executeCalculator(accountId, calculatorId, inputs, test) {
   );
   if (!cfg) return { result: `Calculator "${calculatorId}" has no ${test ? 'test' : 'live'} configuration.`, isError: true };
 
-  const token = decryptApiKey(cfg.api_key, config.tokenEncryptionKey);
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['X-Auth-Token'] = token;
   if (config.formulaApiAdminToken) headers['X-Admin-Token'] = config.formulaApiAdminToken;
 
   const res = await fetch(`${config.formulaApiUrl}/execute/calculator/${encodeURIComponent(formulaId)}`, {
@@ -477,10 +473,8 @@ async function deployCalculator(accountId, calculatorId, test, logger) {
   if (Object.keys(inputSchema?.properties || {}).length === 0) return { result: 'Cannot deploy: no input fields configured.', isError: true };
   if (Object.keys(outputSchema?.properties || {}).length === 0) return { result: 'Cannot deploy: no output fields configured.', isError: true };
 
-  const token = decryptApiKey(cfg.api_key, config.tokenEncryptionKey);
   const formulaId = test ? `${calculatorId}-test` : calculatorId;
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['X-Auth-Token'] = token;
   if (config.formulaApiAdminToken) headers['X-Admin-Token'] = config.formulaApiAdminToken;
 
   try {
@@ -624,20 +618,3 @@ async function uploadToKb(accountId, input, logger) {
   }
 }
 
-// ─── Crypto helper ───────────────────────────────────────────
-
-function decryptApiKey(encryptedKey, encryptionKey) {
-  if (!encryptedKey || !encryptionKey) return null;
-  try {
-    const [ivHex, tag, ciphertext] = encryptedKey.split(':');
-    const key = Buffer.from(encryptionKey, 'hex');
-    const iv = Buffer.from(ivHex, 'hex');
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(Buffer.from(tag, 'hex'));
-    let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch {
-    return null;
-  }
-}

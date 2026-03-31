@@ -1,0 +1,52 @@
+{
+  "name": "KB Answer",
+  "description": "Shows AI answer with confidence and sources",
+  "tool_binding": "ask_knowledge",
+  "resource_binding": null,
+  "status": "published",
+  "sort": 1,
+  "data_mapping": {
+    "answer": "$.answer",
+    "confidence": "$.confidence",
+    "confidenceLabel": "$.confidence | default:unknown",
+    "sourceCount": "$.sources | string",
+    "sources": {
+      "source": "$.sources",
+      "map": {
+        "title": "$.document_title | default:Source",
+        "excerpt": "$.content | truncate:100"
+      }
+    }
+  },
+  "template": {
+    "component": "Card",
+    "props": { "size": "sm" },
+    "children": [
+      {
+        "component": "Row",
+        "children": [
+          { "component": "Caption", "props": { "value": "Knowledge Answer", "color": "secondary" } },
+          { "component": "Spacer" },
+          { "component": "Badge", "props": { "label": "{{confidenceLabel}}", "color": "success", "size": "sm" } }
+        ]
+      },
+      { "component": "Divider", "props": { "flush": true } },
+      { "component": "Markdown", "props": { "value": "{{answer}}" } },
+      {
+        "component": "Row",
+        "props": { "gap": "8px" },
+        "children": [
+          {
+            "component": "Button",
+            "props": {
+              "label": "Ask follow-up",
+              "variant": "ghost",
+              "size": "sm",
+              "onClickAction": { "type": "assistant.message", "payload": { "text": "Tell me more about this" } }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

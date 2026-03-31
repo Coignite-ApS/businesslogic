@@ -6,6 +6,7 @@ import { getActiveAccount } from '../utils/auth.js';
 import { EmbeddingClient } from '../services/embeddings.js';
 import { hybridSearch } from '../services/search.js';
 import { generateAnswer } from '../services/answer.js';
+import { logRetrievalQuality } from '../services/retrieval-logger.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
 import { triggerFlowIngest, isFlowIngestEnabled } from '../services/flow-ingest.js';
 
@@ -359,7 +360,22 @@ export async function registerRoutes(app) {
 
     const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-    const results = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const searchStart = Date.now();
+    const { results, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const searchLatencyMs = Date.now() - searchStart;
+
+    // Log retrieval quality (fire-and-forget)
+    logRetrievalQuality({
+      accountId,
+      knowledgeBaseId: kb_id || null,
+      queryText: searchQuery.trim(),
+      queryType: 'search',
+      resultCount: results.length,
+      topSimilarity,
+      avgSimilarity,
+      minSimilarityThreshold: searchConfig.minSimilarity,
+      searchLatencyMs,
+    });
 
     return { data: results };
   });
@@ -382,25 +398,60 @@ export async function registerRoutes(app) {
 
     const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-    const chunks = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const searchStart = Date.now();
+    const { results: chunks, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const searchLatencyMs = Date.now() - searchStart;
 
     // Check for curated answers
     let curatedContext = [];
+    let curatedMatch = { matched: false, id: null, mode: null };
     if (kb_id) {
       try {
         const curated = await queryAll(
-          `SELECT question, answer FROM kb_curated_answers
+          `SELECT id, question, answer, metadata FROM kb_curated_answers
            WHERE knowledge_base = $1 AND question_embedding IS NOT NULL
            ORDER BY question_embedding <=> (SELECT question_embedding FROM kb_curated_answers WHERE knowledge_base = $1 LIMIT 1)
            LIMIT 3`,
           [kb_id],
         );
         curatedContext = curated;
+        if (curated.length > 0) {
+          curatedMatch = { matched: true, id: curated[0].id, mode: curated[0].metadata?.priority || 'boost' };
+        }
       } catch { /* curated matching optional */ }
     }
 
     const answerModel = model || config.defaultModel;
     const result = await generateAnswer(config.anthropicApiKey, question.trim(), chunks, answerModel, curatedContext);
+    const totalLatencyMs = Date.now() - searchStart;
+
+    // Calculate context utilization
+    const chunksInjected = chunks.length;
+    const chunksUtilized = result.sourceRefs.length;
+    const utilizationRate = chunksInjected > 0
+      ? Math.round((chunksUtilized / chunksInjected) * 1000) / 1000
+      : null;
+
+    // Log retrieval quality (fire-and-forget)
+    logRetrievalQuality({
+      accountId,
+      knowledgeBaseId: kb_id || null,
+      queryText: question.trim(),
+      queryType: 'ask',
+      resultCount: chunks.length,
+      topSimilarity,
+      avgSimilarity,
+      minSimilarityThreshold: searchConfig.minSimilarity,
+      chunksInjected,
+      chunksUtilized,
+      utilizationRate,
+      curatedAnswerMatched: curatedMatch.matched,
+      curatedAnswerId: curatedMatch.id,
+      curatedAnswerMode: curatedMatch.mode,
+      searchLatencyMs,
+      totalLatencyMs,
+      confidence: result.confidence,
+    });
 
     return {
       data: {

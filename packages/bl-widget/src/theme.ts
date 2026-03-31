@@ -16,6 +16,18 @@ export const defaultThemeVars: Record<string, string> = {
   '--bl-spacing-sm': '8px',
   '--bl-spacing-xs': '4px',
   '--bl-transition': '200ms ease',
+  // ChatKit semantic tokens
+  '--bl-surface': '#ffffff',
+  '--bl-surface-secondary': '#f9fafb',
+  '--bl-surface-elevated': '#ffffff',
+  '--bl-text-prose': '#1f2937',
+  '--bl-text-emphasis': '#111827',
+  '--bl-text-tertiary': '#9ca3af',
+  '--bl-text-success': '#16a34a',
+  '--bl-text-warning': '#d97706',
+  '--bl-text-danger': '#dc2626',
+  '--bl-border-subtle': '#f3f4f6',
+  '--bl-border-strong': '#6b7280',
 };
 
 /** Shared reset styles for Shadow DOM components */

@@ -1,0 +1,51 @@
+{
+  "name": "Calculator List",
+  "description": "Shows available calculators",
+  "tool_binding": "list_calculators",
+  "resource_binding": null,
+  "status": "published",
+  "sort": 1,
+  "data_mapping": {
+    "count": "$.total | string | concat: calculators",
+    "items": {
+      "source": "$.calculators",
+      "map": {
+        "name": "$.name",
+        "desc": "$.description | truncate:80 | default:No description"
+      }
+    }
+  },
+  "template": {
+    "component": "Card",
+    "props": { "size": "sm" },
+    "children": [
+      { "component": "Caption", "props": { "value": "{{count}}", "color": "secondary" } },
+      { "component": "Divider", "props": { "flush": true } },
+      {
+        "component": "ListView",
+        "props": { "limit": 5 },
+        "children": [{
+          "component": "__each",
+          "props": { "source": "items" },
+          "children": [{
+            "component": "ListViewItem",
+            "props": {
+              "onClickAction": { "type": "assistant.message", "payload": { "text": "Describe the calculator {{name}}" } }
+            },
+            "children": [
+              { "component": "Icon", "props": { "name": "calculator", "size": "sm" } },
+              {
+                "component": "Col",
+                "props": { "gap": "2px" },
+                "children": [
+                  { "component": "Text", "props": { "value": "{{name}}", "weight": "semibold" } },
+                  { "component": "Caption", "props": { "value": "{{desc}}" } }
+                ]
+              }
+            ]
+          }]
+        }]
+      }
+    ]
+  }
+}

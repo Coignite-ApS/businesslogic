@@ -1,0 +1,64 @@
+{
+  "name": "Calculator Description",
+  "description": "Shows calculator schema details",
+  "tool_binding": "describe_calculator",
+  "resource_binding": null,
+  "status": "published",
+  "sort": 1,
+  "data_mapping": {
+    "name": "$.name | default:Calculator",
+    "desc": "$.description | default:No description",
+    "inputFields": "$.expected_input.properties | entries",
+    "outputFields": "$.expected_output.properties | entries"
+  },
+  "template": {
+    "component": "Card",
+    "props": { "size": "sm" },
+    "children": [
+      {
+        "component": "Col",
+        "props": { "gap": "4px" },
+        "children": [
+          { "component": "Title", "props": { "value": "{{name}}", "size": "md" } },
+          { "component": "Caption", "props": { "value": "{{desc}}" } }
+        ]
+      },
+      { "component": "Divider", "props": { "flush": true } },
+      { "component": "Label", "props": { "value": "Inputs", "weight": "semibold" } },
+      {
+        "component": "__each",
+        "props": { "source": "inputFields" },
+        "children": [{
+          "component": "Row",
+          "children": [
+            { "component": "Text", "props": { "value": "{{key}}", "color": "secondary", "size": "sm" } },
+            { "component": "Spacer" },
+            { "component": "Caption", "props": { "value": "{{value.type}}" } }
+          ]
+        }]
+      },
+      { "component": "Label", "props": { "value": "Outputs", "weight": "semibold" } },
+      {
+        "component": "__each",
+        "props": { "source": "outputFields" },
+        "children": [{
+          "component": "Row",
+          "children": [
+            { "component": "Text", "props": { "value": "{{key}}", "color": "secondary", "size": "sm" } },
+            { "component": "Spacer" },
+            { "component": "Caption", "props": { "value": "{{value.type}}" } }
+          ]
+        }]
+      },
+      {
+        "component": "Button",
+        "props": {
+          "label": "Run this calculator",
+          "variant": "filled",
+          "size": "sm",
+          "onClickAction": { "type": "assistant.message", "payload": { "text": "Execute this calculator with default values" } }
+        }
+      }
+    ]
+  }
+}

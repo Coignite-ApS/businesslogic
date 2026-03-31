@@ -1,6 +1,6 @@
 # 11. Calculator Integration Tabs — Claude Skill & Cowork Plugin
 
-**Status:** planned
+**Status:** completed
 **Phase:** 1 — builds on existing MCP UI
 **Depends on:** Formula API skill/plugin endpoints (already shipped)
 
@@ -132,10 +132,10 @@ export async function downloadZip(filename: string, files: Record<string, string
 
 ## Acceptance Criteria
 
-- [ ] Tab bar shows all 4 tabs: API, MCP, Claude Skill, Cowork Plugin
-- [ ] Skill/Plugin tabs show "Enable MCP first" when MCP disabled
-- [ ] Enable toggle PATCHes `integration.skill` / `integration.plugin`
-- [ ] Generated content fetched from Formula API and displayed
-- [ ] Copy + Download buttons work
-- [ ] Download produces valid zip with correct file structure
-- [ ] Works in both test and live environments
+- [x] Tab bar shows all 6 tabs: Widget, API, AI, MCP, Claude Skill, Cowork Plugin
+- [x] Skill/Plugin tabs show "Enable MCP first" when MCP disabled
+- [x] Enable toggle PATCHes `integration.skill` / `integration.plugin`
+- [x] Generated content fetched from Formula API and displayed
+- [x] Copy + Download buttons work
+- [x] Download produces valid zip with correct file structure
+- [x] Works in both test and live environments

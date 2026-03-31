@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,12 +13,23 @@ import (
 	"time"
 
 	"github.com/coignite-aps/bl-gateway/internal/service"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
+// dbPool is the minimal interface used by APIKeyHandler, satisfied by both
+// *pgxpool.Pool and pgxmock.PgxPoolIface.
+type dbPool interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type APIKeyHandler struct {
-	db    *pgxpool.Pool
+	db    dbPool
 	redis *redis.Client
 }
 
@@ -25,42 +37,47 @@ func NewAPIKeyHandler(db *pgxpool.Pool, rdb *redis.Client) *APIKeyHandler {
 	return &APIKeyHandler{db: db, redis: rdb}
 }
 
+// NewAPIKeyHandlerWithDB creates a handler with a dbPool interface (for testing).
+func NewAPIKeyHandlerWithDB(db dbPool, rdb *redis.Client) *APIKeyHandler {
+	return &APIKeyHandler{db: db, redis: rdb}
+}
+
 type createKeyRequest struct {
-	AccountID      string                      `json:"account_id"`
-	Name           string                      `json:"name"`
-	Environment    string                      `json:"environment"`
-	Permissions    service.ResourcePermissions  `json:"permissions"`
-	AllowedIPs     []string                    `json:"allowed_ips"`
-	AllowedOrigins []string                    `json:"allowed_origins"`
-	RateLimitRPS   *int                        `json:"rate_limit_rps"`
-	MonthlyQuota   *int                        `json:"monthly_quota"`
-	ExpiresAt      *time.Time                  `json:"expires_at"`
+	AccountID      string                       `json:"account_id"`
+	Name           string                       `json:"name"`
+	Environment    string                       `json:"environment"`
+	Permissions    *service.ResourcePermissions `json:"permissions"`
+	AllowedIPs     []string                     `json:"allowed_ips"`
+	AllowedOrigins []string                     `json:"allowed_origins"`
+	RateLimitRPS   *int                         `json:"rate_limit_rps"`
+	MonthlyQuota   *int                         `json:"monthly_quota"`
+	ExpiresAt      *time.Time                   `json:"expires_at"`
 }
 
 type updateKeyRequest struct {
-	Name           *string                     `json:"name"`
+	Name           *string                      `json:"name"`
 	Permissions    *service.ResourcePermissions `json:"permissions"`
-	AllowedIPs     *[]string                   `json:"allowed_ips"`
-	AllowedOrigins *[]string                   `json:"allowed_origins"`
-	RateLimitRPS   *int                        `json:"rate_limit_rps"`
-	MonthlyQuota   *int                        `json:"monthly_quota"`
+	AllowedIPs     *[]string                    `json:"allowed_ips"`
+	AllowedOrigins *[]string                    `json:"allowed_origins"`
+	RateLimitRPS   *int                         `json:"rate_limit_rps"`
+	MonthlyQuota   *int                         `json:"monthly_quota"`
 }
 
 type keyResponse struct {
-	ID             string                      `json:"id"`
-	KeyPrefix      string                      `json:"key_prefix"`
-	RawKey         string                      `json:"raw_key,omitempty"`
-	AccountID      string                      `json:"account_id"`
-	Name           string                      `json:"name"`
-	Environment    string                      `json:"environment"`
-	Permissions    service.ResourcePermissions  `json:"permissions"`
-	AllowedIPs     []string                    `json:"allowed_ips"`
-	AllowedOrigins []string                    `json:"allowed_origins"`
-	RateLimitRPS   *int                        `json:"rate_limit_rps"`
-	MonthlyQuota   *int                        `json:"monthly_quota"`
-	ExpiresAt      *time.Time                  `json:"expires_at"`
-	LastUsedAt     *time.Time                  `json:"last_used_at"`
-	CreatedAt      time.Time                   `json:"created_at"`
+	ID             string                       `json:"id"`
+	KeyPrefix      string                       `json:"key_prefix"`
+	RawKey         string                       `json:"raw_key,omitempty"`
+	AccountID      string                       `json:"account_id"`
+	Name           string                       `json:"name"`
+	Environment    string                       `json:"environment"`
+	Permissions    *service.ResourcePermissions `json:"permissions"`
+	AllowedIPs     []string                     `json:"allowed_ips"`
+	AllowedOrigins []string                     `json:"allowed_origins"`
+	RateLimitRPS   *int                         `json:"rate_limit_rps"`
+	MonthlyQuota   *int                         `json:"monthly_quota"`
+	ExpiresAt      *time.Time                   `json:"expires_at"`
+	LastUsedAt     *time.Time                   `json:"last_used_at"`
+	CreatedAt      time.Time                    `json:"created_at"`
 }
 
 // Create generates a new API key. Raw key is returned ONLY in this response.
@@ -96,7 +113,11 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	keyHash := hex.EncodeToString(hash[:])
 	keyPrefix := rawKey[:11] // "bl_" + first 8 chars of encoded key
 
-	permJSON, _ := json.Marshal(req.Permissions)
+	// nil permissions → store as SQL NULL (full access, v3 default)
+	var permJSON []byte
+	if req.Permissions != nil {
+		permJSON, _ = json.Marshal(req.Permissions)
+	}
 
 	var resp keyResponse
 	err := h.db.QueryRow(r.Context(), `
@@ -118,7 +139,8 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.Unmarshal(permJSON, &resp.Permissions)
+	parsed := service.ParsePermissions(permJSON)
+	resp.Permissions = &parsed
 	resp.RawKey = rawKey
 
 	// Invalidate account cache
@@ -160,7 +182,8 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			continue
 		}
-		_ = json.Unmarshal(permJSON, &k.Permissions)
+		p := service.ParsePermissions(permJSON)
+		k.Permissions = &p
 		keys = append(keys, k)
 	}
 
@@ -194,7 +217,8 @@ func (h *APIKeyHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
 		return
 	}
-	_ = json.Unmarshal(permJSON, &k.Permissions)
+	p := service.ParsePermissions(permJSON)
+	k.Permissions = &p
 	writeJSON(w, http.StatusOK, k)
 }
 
@@ -311,7 +335,7 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.Unmarshal(permJSON, &old.Permissions)
+	// (permJSON kept as raw bytes to pass to new key insert — no need to parse old.Permissions)
 
 	// Revoke old key
 	_, _ = h.db.Exec(r.Context(), `UPDATE api_keys SET revoked_at = NOW() WHERE id = $1`, id)
@@ -347,11 +371,134 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.Unmarshal(permJSON, &resp.Permissions)
+	rp := service.ParsePermissions(permJSON)
+	resp.Permissions = &rp
 	resp.RawKey = rawKey
 
 	h.invalidateAccountCache(r, old.AccountID)
 	writeJSON(w, http.StatusCreated, resp)
+}
+
+type autoProvisionRequest struct {
+	AccountID string `json:"account_id"`
+}
+
+type autoProvisionResponse struct {
+	Provisioned bool         `json:"provisioned"`
+	Message     string       `json:"message,omitempty"`
+	Key         *keyResponse `json:"key,omitempty"`
+}
+
+// AutoProvision creates a test key for an account that has none. Idempotent.
+func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
+	var req autoProvisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	if req.AccountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "account_id required"})
+		return
+	}
+
+	// Guard: check if account already has non-revoked keys
+	var count int
+	err := h.db.QueryRow(r.Context(),
+		`SELECT count(*) FROM api_keys WHERE account_id = $1 AND revoked_at IS NULL`,
+		req.AccountID,
+	).Scan(&count)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "query failed"})
+		return
+	}
+	if count > 0 {
+		writeJSON(w, http.StatusOK, autoProvisionResponse{
+			Provisioned: false,
+			Message:     "account already has keys",
+		})
+		return
+	}
+
+	rawBytes := make([]byte, 48)
+	if _, err := rand.Read(rawBytes); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
+		return
+	}
+	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
+	hash := sha256.Sum256([]byte(rawKey))
+	keyHash := hex.EncodeToString(hash[:])
+	keyPrefix := rawKey[:11]
+
+	var resp keyResponse
+	var permJSON []byte
+	err = h.db.QueryRow(r.Context(), `
+		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
+			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
+		VALUES ($1, $2, $3, 'test', 'Test', NULL, '{}', '{}', NULL, NULL, NULL)
+		RETURNING id, key_prefix, account_id, name, environment, permissions,
+			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
+			expires_at, last_used_at, created_at
+	`, keyHash, keyPrefix, req.AccountID,
+	).Scan(
+		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
+		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
+		&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
+	)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
+		return
+	}
+	resp.Permissions = nil // full access
+	resp.RawKey = rawKey
+
+	h.invalidateAccountCache(r, req.AccountID)
+
+	writeJSON(w, http.StatusCreated, autoProvisionResponse{
+		Provisioned: true,
+		Key:         &resp,
+	})
+}
+
+type checkLiveKeyResponse struct {
+	HasLiveKey bool `json:"has_live_key"`
+	KeyCount   int  `json:"key_count"`
+}
+
+// CheckLiveKey returns whether an account has any live-environment non-revoked keys.
+func (h *APIKeyHandler) CheckLiveKey(w http.ResponseWriter, r *http.Request) {
+	accountID := r.URL.Query().Get("account_id")
+	if accountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "account_id query param required"})
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT environment FROM api_keys
+		WHERE account_id = $1 AND revoked_at IS NULL
+	`, accountID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "query failed"})
+		return
+	}
+	defer rows.Close()
+
+	var total int
+	var hasLive bool
+	for rows.Next() {
+		var env string
+		if err := rows.Scan(&env); err != nil {
+			continue
+		}
+		total++
+		if env == "live" {
+			hasLive = true
+		}
+	}
+
+	writeJSON(w, http.StatusOK, checkLiveKeyResponse{
+		HasLiveKey: hasLive,
+		KeyCount:   total,
+	})
 }
 
 func (h *APIKeyHandler) invalidateAccountCache(r *http.Request, accountID string) {
@@ -387,4 +534,3 @@ func pgParam(col string, idx *int) string {
 	*idx++
 	return s
 }
-
