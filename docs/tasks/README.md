@@ -48,6 +48,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 28 | Flow-Hooks Gateway Auth Migration | completed | [cms/28-flow-hooks-gateway-auth.md](cms/28-flow-hooks-gateway-auth.md) |
 | 29 | Widget-API Auth Cleanup | completed | [cms/29-widget-api-auth-cleanup.md](cms/29-widget-api-auth-cleanup.md) |
 | 30 | Formulas Integration Page Update (X-Auth-Token → X-API-Key) | completed | [cms/30-formulas-integration-update.md](cms/30-formulas-integration-update.md) |
+| 31 | Widget Template Polish — Improve Widgets & Dialog UX | planned | [cms/31-widget-template-polish.md](cms/31-widget-template-polish.md) |
 
 ---
 
@@ -67,7 +68,7 @@ AI chat, knowledge base backend, embeddings, public API.
 | 08 | Budget Warning Injection for Tool Use | completed | [ai-api/08-budget-warning-injection.md](ai-api/08-budget-warning-injection.md) |
 | 09 | Progressive Tool Loading | completed | [ai-api/09-progressive-tool-loading.md](ai-api/09-progressive-tool-loading.md) |
 | 10 | AI Observability & Self-Improvement Dashboard | in-progress | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
-| 11 | Contextual Widgets for AI Assistant | planned | [ai-api/11-contextual-widgets.md](ai-api/11-contextual-widgets.md) |
+| 11 | Contextual Widgets for AI Assistant | completed | [ai-api/11-contextual-widgets.md](ai-api/11-contextual-widgets.md) |
 | 12 | Observatory Improvements & Controls | planned | [ai-api/12-observatory-improvements.md](ai-api/12-observatory-improvements.md) |
 
 ---
@@ -142,7 +143,7 @@ Infrastructure and multi-service concerns.
 | 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
 | 06 | MCP Server — Expose BusinessLogic as AI Tool | planned | [cross-cutting/06-mcp-server.md](cross-cutting/06-mcp-server.md) |
 | 07 | AI Safety Quick Fixes (4 items) | completed | [cross-cutting/07-ai-safety-quick-fixes.md](cross-cutting/07-ai-safety-quick-fixes.md) |
-| 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | planned | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
+| 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | completed | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
 
 ---
 
@@ -255,11 +256,11 @@ Phase 1C tasks are sequential: 08 first (foundation), then 11 (first consumer). 
 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
-| CMS | 16 | 0 | 13 | 29 |
-| AI API | 5 | 1 | 4 | 10 |
+| CMS | 16 | 0 | 13 | 30 |
+| AI API | 4 | 1 | 5 | 10 |
 | Formula API | 1 | 0 | 6 | 7 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 1 | 3 |
 | Gateway | 0 | 0 | 6 | 6 |
-| Cross-Cutting | 3 | 0 | 5 | 8 |
-| **Total** | **35** | **1** | **36** | **72** |
+| Cross-Cutting | 2 | 0 | 6 | 8 |
+| **Total** | **34** | **1** | **38** | **74** |
