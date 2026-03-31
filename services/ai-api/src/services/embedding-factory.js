@@ -4,13 +4,17 @@
  */
 
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 import { LocalEmbeddingClient } from './local-embeddings.js';
 
+export const LOCAL_EMBEDDING_MODEL = 'BAAI/bge-small-en-v1.5';
+
+// Update this map when adding new embedding models
 export const MODEL_DIMENSIONS = {
   'text-embedding-3-small': 1536,
   'text-embedding-3-large': 3072,
   'text-embedding-ada-002': 1536,
-  'BAAI/bge-small-en-v1.5': 384,
+  [LOCAL_EMBEDDING_MODEL]: 384,
 };
 
 /**
@@ -25,13 +29,17 @@ export function getModelDimensions(model) {
 /**
  * Create the correct embedding client for a given KB's locked model.
  * Ignores USE_LOCAL_EMBEDDINGS — always uses the KB's stored model.
- * @param {{ embedding_model?: string }} kb
+ * @param {{ embedding_model?: string, id?: string }} kb
  * @returns {Promise<LocalEmbeddingClient|import('./embeddings.js').EmbeddingClient>}
  */
 export async function createEmbeddingClientForKb(kb) {
-  const kbModel = kb.embedding_model || config.embeddingModel;
+  let kbModel = kb.embedding_model;
+  if (!kbModel) {
+    kbModel = config.embeddingModel;
+    logger.warn({ kbId: kb.id }, 'KB has no embedding_model set — falling back to global config. Legacy KB may use wrong model.');
+  }
 
-  if (kbModel === 'BAAI/bge-small-en-v1.5') {
+  if (kbModel === LOCAL_EMBEDDING_MODEL) {
     return new LocalEmbeddingClient();
   }
 
