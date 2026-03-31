@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,16 +13,32 @@ import (
 	"time"
 
 	"github.com/coignite-aps/bl-gateway/internal/service"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
+// dbPool is the minimal interface used by APIKeyHandler, satisfied by both
+// *pgxpool.Pool and pgxmock.PgxPoolIface.
+type dbPool interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type APIKeyHandler struct {
-	db    *pgxpool.Pool
+	db    dbPool
 	redis *redis.Client
 }
 
 func NewAPIKeyHandler(db *pgxpool.Pool, rdb *redis.Client) *APIKeyHandler {
+	return &APIKeyHandler{db: db, redis: rdb}
+}
+
+// NewAPIKeyHandlerWithDB creates a handler with a dbPool interface (for testing).
+func NewAPIKeyHandlerWithDB(db dbPool, rdb *redis.Client) *APIKeyHandler {
 	return &APIKeyHandler{db: db, redis: rdb}
 }
 
@@ -360,6 +377,109 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 
 	h.invalidateAccountCache(r, old.AccountID)
 	writeJSON(w, http.StatusCreated, resp)
+}
+
+type autoProvisionRequest struct {
+	AccountID string `json:"account_id"`
+}
+
+type autoProvisionResponse struct {
+	Provisioned bool          `json:"provisioned"`
+	Message     string        `json:"message,omitempty"`
+	Keys        []keyResponse `json:"keys,omitempty"`
+}
+
+// AutoProvision creates test + live keys for an account that has none. Idempotent.
+func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
+	var req autoProvisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	if req.AccountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "account_id required"})
+		return
+	}
+
+	// Guard: check if account already has non-revoked keys
+	var count int
+	err := h.db.QueryRow(r.Context(),
+		`SELECT count(*) FROM api_keys WHERE account_id = $1 AND revoked_at IS NULL`,
+		req.AccountID,
+	).Scan(&count)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "query failed"})
+		return
+	}
+	if count > 0 {
+		writeJSON(w, http.StatusOK, autoProvisionResponse{
+			Provisioned: false,
+			Message:     "account already has keys",
+		})
+		return
+	}
+
+	// Generate both keys inside a transaction
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "transaction failed"})
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var createdKeys []keyResponse
+
+	for _, env := range []string{"test", "live"} {
+		rawBytes := make([]byte, 48)
+		if _, err := rand.Read(rawBytes); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
+			return
+		}
+		rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
+		hash := sha256.Sum256([]byte(rawKey))
+		keyHash := hex.EncodeToString(hash[:])
+		keyPrefix := rawKey[:11]
+
+		name := "Test"
+		if env == "live" {
+			name = "Live"
+		}
+
+		var resp keyResponse
+		var permJSON []byte
+		err = tx.QueryRow(r.Context(), `
+			INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
+				permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
+			VALUES ($1, $2, $3, $4, $5, NULL, '{}', '{}', NULL, NULL, NULL)
+			RETURNING id, key_prefix, account_id, name, environment, permissions,
+				allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
+				expires_at, last_used_at, created_at
+		`, keyHash, keyPrefix, req.AccountID, env, name,
+		).Scan(
+			&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
+			&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
+			&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
+		)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
+			return
+		}
+		resp.Permissions = nil // full access
+		resp.RawKey = rawKey
+		createdKeys = append(createdKeys, resp)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "commit failed"})
+		return
+	}
+
+	h.invalidateAccountCache(r, req.AccountID)
+
+	writeJSON(w, http.StatusCreated, autoProvisionResponse{
+		Provisioned: true,
+		Keys:        createdKeys,
+	})
 }
 
 func (h *APIKeyHandler) invalidateAccountCache(r *http.Request, accountID string) {

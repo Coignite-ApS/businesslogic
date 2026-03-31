@@ -212,6 +212,8 @@ func (r *Router) setupInternalRoutes() {
 		case http.MethodPost:
 			if strings.HasSuffix(path, "/rotate") {
 				r.apiKeyHandler.Rotate(w, req)
+			} else if path == "/internal/api-keys/auto-provision" {
+				r.apiKeyHandler.AutoProvision(w, req)
 			} else if path == "/internal/api-keys/" || path == "/internal/api-keys" {
 				r.apiKeyHandler.Create(w, req)
 			} else {
