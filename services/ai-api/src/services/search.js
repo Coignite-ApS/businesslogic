@@ -4,12 +4,21 @@ import { detectLanguage, pgTsConfig } from './language.js';
 /**
  * Hybrid search: vector + full-text with Reciprocal Rank Fusion.
  */
-export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId, limit, searchConfig) {
+export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId, limit, searchConfig, expectedDimensions) {
   const fetchCount = limit * 3;
   const { minSimilarity, rrfK } = searchConfig;
 
   // Embed query
   const queryEmbedding = await embeddingClient.embedQuery(searchQuery);
+
+  // Validate dimensions if caller specified expected
+  if (expectedDimensions && queryEmbedding.length !== expectedDimensions) {
+    throw new Error(
+      `Embedding dimension mismatch: query vector has ${queryEmbedding.length} dimensions ` +
+      `but KB expects ${expectedDimensions}. The KB's embedding model may differ from the active model.`,
+    );
+  }
+
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
   // Detect query language for FTS
