@@ -540,6 +540,47 @@ func TestInternalAuth_CorrectSecret(t *testing.T) {
 	}
 }
 
+func TestAuthMiddleware_SkipsMCPKeyPrefixEndpoints(t *testing.T) {
+	keyService := service.NewKeyService(nil, nil, 0, 0)
+	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// MCP key prefix path should skip auth (handler does its own auth)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/bl_abcdef12", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for /v1/mcp/:keyPrefix path (skips API key auth), got %d", rec.Code)
+	}
+}
+
+func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
+	keyService := service.NewKeyService(nil, nil, 0, 0)
+	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// /v1/mcp/calc/ should still require X-API-Key
+	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/calc/some-endpoint", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for /v1/mcp/calc/ without API key, got %d", rec.Code)
+	}
+
+	// /v1/mcp/ai/ should still require X-API-Key
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/mcp/ai/some-endpoint", nil)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for /v1/mcp/ai/ without API key, got %d", rec2.Code)
+	}
+}
+
 func TestAuthMiddleware_SkipsInternalEndpoints(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
 	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

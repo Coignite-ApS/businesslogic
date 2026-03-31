@@ -16,8 +16,8 @@ const AccountContextKey contextKey = "account"
 func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip auth for health and internal endpoints
-			if r.URL.Path == "/health" || r.URL.Path == "/metrics" || strings.HasPrefix(r.URL.Path, "/internal/") {
+			// Skip auth for health, internal, and MCP key-prefix endpoints (MCP does its own auth via key prefix)
+			if r.URL.Path == "/health" || r.URL.Path == "/metrics" || strings.HasPrefix(r.URL.Path, "/internal/") || isMCPKeyPrefixPath(r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -47,4 +47,14 @@ func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// isMCPKeyPrefixPath returns true for /v1/mcp/:keyPrefix paths.
+// Excludes /v1/mcp/calc/ and /v1/mcp/ai/ which use standard X-API-Key auth.
+func isMCPKeyPrefixPath(path string) bool {
+	if !strings.HasPrefix(path, "/v1/mcp/") {
+		return false
+	}
+	rest := strings.TrimPrefix(path, "/v1/mcp/")
+	return rest != "" && !strings.HasPrefix(rest, "calc/") && !strings.HasPrefix(rest, "ai/")
 }
