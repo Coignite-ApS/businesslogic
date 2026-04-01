@@ -16,6 +16,16 @@
 			/>
 		</template>
 
+		<!-- Feature gate -->
+		<div v-if="featureLoading" class="feature-gate-loading">
+			<v-progress-circular indeterminate />
+		</div>
+		<div v-else-if="!featureAllowed" class="feature-gate-unavailable">
+			<v-info icon="block" title="Feature Unavailable" center>
+				AI Assistant is not available for your account. Contact your administrator.
+			</v-info>
+		</div>
+		<template v-else>
 		<div class="ai-assistant">
 			<!-- Empty state / prompt picker -->
 			<template v-if="!currentConversationId && !streaming">
@@ -129,11 +139,13 @@
 				</v-card-actions>
 			</v-card>
 		</v-dialog>
+		</template>
 	</private-view>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue';
+import { useFeatureGate } from '../../project-extension-feature-gate/src/use-feature-gate';
 import { useApi } from '@directus/extensions-sdk';
 import { useRoute, useRouter } from 'vue-router';
 import { useActiveAccount } from './composables/use-active-account';
@@ -145,6 +157,7 @@ import PromptPicker from './components/prompt-picker.vue';
 import MessageBubble from './components/message-bubble.vue';
 
 const api = useApi();
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'ai.chat');
 const route = useRoute();
 const router = useRouter();
 
@@ -532,5 +545,15 @@ function resetTextareaHeight() {
 	font-size: 13px;
 	color: var(--theme--foreground-subdued);
 	margin-bottom: 8px;
+}
+.feature-gate-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 400px;
+}
+.feature-gate-unavailable {
+	padding: var(--content-padding);
+	padding-top: 120px;
 }
 </style>

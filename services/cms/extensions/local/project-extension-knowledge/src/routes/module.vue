@@ -39,6 +39,16 @@
 			</v-dialog>
 		</template>
 
+		<!-- Feature gate -->
+		<div v-if="featureLoading" class="feature-gate-loading">
+			<v-progress-circular indeterminate />
+		</div>
+		<div v-else-if="!featureAllowed" class="feature-gate-unavailable">
+			<v-info icon="block" title="Feature Unavailable" center>
+				Knowledge Base is not available for your account. Contact your administrator.
+			</v-info>
+		</div>
+		<template v-else>
 		<div v-if="currentId && currentKb" class="module-content">
 			<kb-detail
 				:kb="currentKb"
@@ -79,6 +89,7 @@
 			<v-progress-circular indeterminate />
 		</div>
 
+		</template>
 		<template #sidebar>
 			<sidebar-detail icon="help_outline" title="About Knowledge Bases" close>
 				<div class="sidebar-info">
@@ -126,6 +137,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useFeatureGate } from '../../../project-extension-feature-gate/src/use-feature-gate';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useKnowledgeBases } from '../composables/use-knowledge-bases';
@@ -137,6 +149,7 @@ import KbNavigation from '../components/navigation.vue';
 import KbDetail from '../components/kb-detail.vue';
 
 const api = useApi();
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'ai.kb');
 const route = useRoute();
 const router = useRouter();
 
@@ -359,5 +372,15 @@ watch(currentId, (id) => {
 .info-value.mono {
 	font-family: var(--theme--fonts--monospace--font-family, monospace);
 	font-size: 12px;
+}
+.feature-gate-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 400px;
+}
+.feature-gate-unavailable {
+	padding: var(--content-padding);
+	padding-top: 120px;
 }
 </style>

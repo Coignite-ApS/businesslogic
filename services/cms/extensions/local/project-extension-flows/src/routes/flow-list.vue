@@ -23,6 +23,16 @@
 			</v-button>
 		</template>
 
+		<!-- Feature gate -->
+		<div v-if="featureLoading" class="feature-gate-loading">
+			<v-progress-circular indeterminate />
+		</div>
+		<div v-else-if="!featureAllowed" class="feature-gate-unavailable">
+			<v-info icon="block" title="Feature Unavailable" center>
+				Flows are not available for your account. Contact your administrator.
+			</v-info>
+		</div>
+		<template v-else>
 		<div v-if="flows.length > 0" class="flow-grid">
 			<div
 				v-for="flow in flows"
@@ -52,6 +62,7 @@
 			<v-progress-circular indeterminate />
 		</div>
 
+		</template>
 		<template #sidebar>
 			<sidebar-detail icon="help_outline" title="About Flows" close>
 				<div class="sidebar-info">
@@ -77,6 +88,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import { useFeatureGate } from '../../../project-extension-feature-gate/src/use-feature-gate';
 import { useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useFlows } from '../composables/use-flows';
@@ -84,6 +96,7 @@ import { useActiveAccount } from '../composables/use-active-account';
 import FlowNavigation from '../components/navigation.vue';
 
 const api = useApi();
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'flow.execute');
 const router = useRouter();
 const { flows, loading, saving, fetchAll, create } = useFlows(api);
 const { activeAccountId, fetchActiveAccount } = useActiveAccount(api);
@@ -209,5 +222,15 @@ onMounted(async () => {
 .sidebar-info li {
 	font-size: 14px;
 	line-height: 1.6;
+}
+.feature-gate-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 400px;
+}
+.feature-gate-unavailable {
+	padding: var(--content-padding);
+	padding-top: 120px;
 }
 </style>
