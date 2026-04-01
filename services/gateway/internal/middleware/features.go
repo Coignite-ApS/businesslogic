@@ -21,7 +21,7 @@ var routeFeatureMap = map[string]string{
 
 // CheckFeatureFlag returns (featureKey, allowed).
 // featureKey is empty when no route mapping exists (passthrough).
-// Exported for testing; internal callers use the unexported alias below.
+// Checks account-level override first, then platform default; fail-closed if neither is set.
 func CheckFeatureFlag(ctx context.Context, rdb *redis.Client, accountID, path string) (string, bool) {
 	// Find matching feature key by prefix
 	featureKey := ""
@@ -53,7 +53,10 @@ func CheckFeatureFlag(ctx context.Context, rdb *redis.Client, accountID, path st
 	// First non-nil wins (account override > platform default)
 	for _, v := range vals {
 		if v != nil {
-			return featureKey, v.(string) == "1"
+			s, ok := v.(string)
+			if ok {
+				return featureKey, s == "1"
+			}
 		}
 	}
 

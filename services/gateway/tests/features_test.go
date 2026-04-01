@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/coignite-aps/bl-gateway/internal/middleware"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestRouteFeatureMapping(t *testing.T) {
@@ -61,6 +63,65 @@ func TestFeatureCheck_Passthrough(t *testing.T) {
 	}
 	if !allowed {
 		t.Error("expected allowed=true for unmapped path")
+	}
+}
+
+func newTestRedis(t *testing.T) (*miniredis.Miniredis, *redis.Client) {
+	t.Helper()
+	s := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: s.Addr()})
+	return s, rdb
+}
+
+func TestFeatureCheck_AccountOverrideWins(t *testing.T) {
+	s, rdb := newTestRedis(t)
+	s.Set("cms:features:acc123:ai.chat", "1")
+	s.Set("cms:features:ai.chat", "0")
+
+	key, allowed := middleware.CheckFeatureFlag(context.Background(), rdb, "acc123", "/v1/ai/chat/completions")
+	if key != "ai.chat" || !allowed {
+		t.Errorf("expected ai.chat allowed=true, got key=%s allowed=%v", key, allowed)
+	}
+}
+
+func TestFeatureCheck_AccountOverrideDenies(t *testing.T) {
+	s, rdb := newTestRedis(t)
+	s.Set("cms:features:acc123:ai.chat", "0")
+	s.Set("cms:features:ai.chat", "1")
+
+	key, allowed := middleware.CheckFeatureFlag(context.Background(), rdb, "acc123", "/v1/ai/chat/completions")
+	if key != "ai.chat" || allowed {
+		t.Errorf("expected ai.chat allowed=false, got key=%s allowed=%v", key, allowed)
+	}
+}
+
+func TestFeatureCheck_PlatformDefault(t *testing.T) {
+	s, rdb := newTestRedis(t)
+	s.Set("cms:features:ai.chat", "1")
+
+	key, allowed := middleware.CheckFeatureFlag(context.Background(), rdb, "acc123", "/v1/ai/chat/completions")
+	if key != "ai.chat" || !allowed {
+		t.Errorf("expected ai.chat allowed=true, got key=%s allowed=%v", key, allowed)
+	}
+}
+
+func TestFeatureCheck_PlatformDenied(t *testing.T) {
+	s, rdb := newTestRedis(t)
+	s.Set("cms:features:ai.chat", "0")
+
+	key, allowed := middleware.CheckFeatureFlag(context.Background(), rdb, "acc123", "/v1/ai/chat/completions")
+	if key != "ai.chat" || allowed {
+		t.Errorf("expected ai.chat allowed=false, got key=%s allowed=%v", key, allowed)
+	}
+}
+
+func TestFeatureCheck_NotRegistered(t *testing.T) {
+	_, rdb := newTestRedis(t)
+	// no keys set
+
+	key, allowed := middleware.CheckFeatureFlag(context.Background(), rdb, "acc123", "/v1/ai/chat/completions")
+	if key != "ai.chat" || allowed {
+		t.Errorf("expected ai.chat allowed=false (fail-closed), got key=%s allowed=%v", key, allowed)
 	}
 }
 
