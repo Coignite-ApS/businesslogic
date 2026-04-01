@@ -64,6 +64,8 @@ services:
       - ./extensions/local/project-extension-knowledge-api:/directus/extensions/project-extension-knowledge-api
       - ./extensions/local/project-extension-knowledge:/directus/extensions/project-extension-knowledge
       - ./extensions/local/project-extension-widget-api:/directus/extensions/project-extension-widget-api
+      - ./extensions/local/project-extension-feature-flags:/directus/extensions/project-extension-feature-flags
+      - ./extensions/local/project-extension-layout-builder:/directus/extensions/project-extension-layout-builder
 
       # Uploads persistence
       - directus_uploads:/directus/uploads
