@@ -3,6 +3,7 @@ import { requireAuth, requireAdmin } from './auth.js';
 import { ensureSchema } from './schema.js';
 import { seedFeatures } from './seed.js';
 import { FeatureFlagCache } from './redis-sync.js';
+import { createResolveOwnHandler } from './resolve-own.js';
 
 export default defineHook(({ init }, { env, logger, database }) => {
 	const db = database;
@@ -229,6 +230,9 @@ export default defineHook(({ init }, { env, logger, database }) => {
 				res.status(500).json({ errors: [{ message: 'Failed to resolve features' }] });
 			}
 		});
+
+		// GET /features/my — resolve features for current user (non-admin)
+		app.get('/features/my', requireAuth, createResolveOwnHandler(db));
 
 		logger.info('[feature-flags] routes registered');
 	});
