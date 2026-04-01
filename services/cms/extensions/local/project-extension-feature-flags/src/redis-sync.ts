@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 export class FeatureFlagCache {
 	private client: Redis;
 	private ready = false;
+	private readyCallbacks: Array<() => void> = [];
 
 	constructor(redisUrl: string, private logger: any) {
 		this.client = new Redis(redisUrl, { lazyConnect: true, enableOfflineQueue: false });
@@ -10,6 +11,10 @@ export class FeatureFlagCache {
 		this.client.on('ready', () => {
 			this.ready = true;
 			logger.info('[feature-flags] Redis connected');
+			for (const cb of this.readyCallbacks) {
+				try { cb(); } catch { /* ignore */ }
+			}
+			this.readyCallbacks = [];
 		});
 
 		this.client.on('error', (err: Error) => {
@@ -22,21 +27,38 @@ export class FeatureFlagCache {
 		});
 	}
 
+	/** Call cb immediately if already ready, else queue for when ready fires. */
+	onReady(cb: () => void): void {
+		if (this.ready) {
+			try { cb(); } catch { /* ignore */ }
+		} else {
+			this.readyCallbacks.push(cb);
+		}
+	}
+
 	private get ok(): boolean {
 		return this.ready;
 	}
 
-	/** Full sync: all platform flags + all account overrides */
+	/** Full sync: all platform flags + all account overrides.
+	 *  Cleans up stale keys first by scanning and deleting all cms:features:* keys. */
 	async fullSync(db: any): Promise<void> {
 		if (!this.ok) return;
 
 		try {
+			// Purge all existing cms:features:* keys to remove stale overrides
+			let cursor = '0';
+			do {
+				const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', 'cms:features:*', 'COUNT', 100);
+				cursor = nextCursor;
+				if (keys.length > 0) {
+					await this.client.del(...keys);
+				}
+			} while (cursor !== '0');
+
 			const features = await db('platform_features').select('key', 'enabled');
 
 			const pipeline = this.client.pipeline();
-
-			// Clear old keys set
-			pipeline.del('cms:features:_keys');
 
 			for (const f of features) {
 				pipeline.set(`cms:features:${f.key}`, f.enabled ? '1' : '0');

@@ -14,18 +14,17 @@ export async function seedFeatures(db: any, logger: any): Promise<void> {
 		const count = await db('platform_features').count('id as n').first();
 		if (parseInt(count?.n ?? '0', 10) > 0) return;
 
-		for (let i = 0; i < SEED_FEATURES.length; i++) {
-			const f = SEED_FEATURES[i];
-			await db('platform_features').insert({
-				key: f.key,
-				name: f.name,
-				category: f.category,
-				enabled: f.enabled,
-				sort: i + 1,
-				date_created: new Date().toISOString(),
-				date_updated: new Date().toISOString(),
-			});
-		}
+		const now = new Date().toISOString();
+		const rows = SEED_FEATURES.map((f, i) => ({
+			key: f.key,
+			name: f.name,
+			category: f.category,
+			enabled: f.enabled,
+			sort: i + 1,
+			date_created: now,
+			date_updated: now,
+		}));
+		await db('platform_features').insert(rows);
 
 		logger.info(`[feature-flags] seeded ${SEED_FEATURES.length} platform features`);
 	} catch (err: any) {

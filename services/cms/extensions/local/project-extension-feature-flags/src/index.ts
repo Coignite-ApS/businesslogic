@@ -30,10 +30,12 @@ export default defineHook(({ init }, { env, logger, database }) => {
 		// Redis — optional
 		try {
 			cache = new FeatureFlagCache(redisUrl, logger);
-			// Full sync after brief delay to let Redis connect
-			setTimeout(async () => {
-				if (cache) await cache.fullSync(db);
-			}, 2000);
+			// Full sync once Redis is ready (no arbitrary timeout)
+			cache.onReady(() => {
+				cache!.fullSync(db).catch((err: Error) => {
+					logger.warn(`[feature-flags] Redis full sync failed: ${err.message}`);
+				});
+			});
 		} catch (err: any) {
 			logger.warn(`[feature-flags] Redis init failed — continuing without cache: ${err.message}`);
 		}
