@@ -67,7 +67,7 @@ AI chat, knowledge base backend, embeddings, public API.
 | 07 | Calculator Skill Memory (Closed Learning Loop) | planned | [ai-api/07-calculator-skill-memory.md](ai-api/07-calculator-skill-memory.md) |
 | 08 | Budget Warning Injection for Tool Use | completed | [ai-api/08-budget-warning-injection.md](ai-api/08-budget-warning-injection.md) |
 | 09 | Progressive Tool Loading | completed | [ai-api/09-progressive-tool-loading.md](ai-api/09-progressive-tool-loading.md) |
-| 10 | AI Observability & Self-Improvement Dashboard | in-progress | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
+| 10 | AI Observability & Self-Improvement Dashboard | completed | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
 | 11 | Contextual Widgets for AI Assistant | completed | [ai-api/11-contextual-widgets.md](ai-api/11-contextual-widgets.md) |
 | 12 | Observatory Improvements & Controls | planned | [ai-api/12-observatory-improvements.md](ai-api/12-observatory-improvements.md) |
 
@@ -257,10 +257,10 @@ Phase 1C tasks are sequential: 08 first (foundation), then 11 (first consumer). 
 | Service | Planned | In-Progress | Completed | Total |
 |---------|---------|-------------|-----------|-------|
 | CMS | 16 | 0 | 13 | 30 |
-| AI API | 4 | 1 | 5 | 10 |
+| AI API | 4 | 0 | 6 | 10 |
 | Formula API | 1 | 0 | 6 | 7 |
 | Formula Engine | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 1 | 3 |
 | Gateway | 0 | 0 | 6 | 6 |
 | Cross-Cutting | 2 | 0 | 6 | 8 |
-| **Total** | **34** | **1** | **38** | **74** |
+| **Total** | **34** | **0** | **39** | **74** |
