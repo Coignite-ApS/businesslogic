@@ -71,27 +71,33 @@ export function useAdminApi(api: any) {
 	}
 
 	async function fetchPlatformFeatures(): Promise<PlatformFeature[] | null> {
-		return request<PlatformFeature[]>(() => api.get('/features/platform'));
+		const result = await request<{ data: PlatformFeature[] }>(() => api.get('/features/platform'));
+		return result?.data ?? null;
 	}
 
 	async function updatePlatformFeature(id: string, data: { enabled?: boolean; name?: string; description?: string }): Promise<any> {
-		return request<any>(() => api.put(`/features/platform/${id}`, data));
+		const result = await request<{ data: any }>(() => api.put(`/features/platform/${id}`, data));
+		return result?.data ?? null;
 	}
 
 	async function fetchAccountOverrides(accountId: string): Promise<AccountFeatureOverride[] | null> {
-		return request<AccountFeatureOverride[]>(() => api.get(`/features/account/${accountId}`));
+		const result = await request<{ data: AccountFeatureOverride[] }>(() => api.get(`/features/account/${accountId}`));
+		return result?.data ?? null;
 	}
 
 	async function upsertAccountOverride(accountId: string, featureId: string, enabled: boolean): Promise<any> {
-		return request<any>(() => api.put(`/features/account/${accountId}/${featureId}`, { enabled }));
+		const result = await request<{ data: any }>(() => api.put(`/features/account/${accountId}/${featureId}`, { enabled }));
+		return result?.data ?? null;
 	}
 
 	async function deleteAccountOverride(accountId: string, featureId: string): Promise<any> {
-		return request<any>(() => api.delete(`/features/account/${accountId}/${featureId}`));
+		const result = await request<{ data: any }>(() => api.delete(`/features/account/${accountId}/${featureId}`));
+		return result?.data ?? null;
 	}
 
 	async function resolveAccountFeatures(accountId: string): Promise<ResolvedFeature[] | null> {
-		return request<ResolvedFeature[]>(() => api.get(`/features/resolve/${accountId}`));
+		const result = await request<{ data: ResolvedFeature[] }>(() => api.get(`/features/resolve/${accountId}`));
+		return result?.data ?? null;
 	}
 
 	return {
