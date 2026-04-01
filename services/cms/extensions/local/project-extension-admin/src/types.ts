@@ -142,3 +142,34 @@ export interface AiAccountUsage {
 	output_tokens: number;
 	cost: number;
 }
+
+export interface PlatformFeature {
+	id: string;
+	key: string;
+	name: string;
+	description: string | null;
+	enabled: boolean;
+	category: string;
+	sort: number;
+	date_created: string;
+	date_updated: string;
+}
+
+export interface AccountFeatureOverride {
+	id: string;
+	account: string;
+	feature: string;
+	feature_key: string;
+	feature_name: string;
+	enabled: boolean;
+	date_created: string;
+	date_updated: string;
+}
+
+export interface ResolvedFeature {
+	key: string;
+	name: string;
+	category: string;
+	enabled: boolean;
+	source: 'platform' | 'override';
+}
