@@ -78,6 +78,7 @@ AI chat, knowledge base backend, embeddings, public API.
 | 16 | Reranker Integration (Cohere Rerank) | completed | [ai-api/16-reranker-integration.md](ai-api/16-reranker-integration.md) |
 | 17 | Retrieval Quality Metrics Enhancement | completed | [ai-api/17-retrieval-quality-metrics.md](ai-api/17-retrieval-quality-metrics.md) |
 | 18 | KB Re-index Endpoint | completed | [ai-api/18-kb-reindex-endpoint.md](ai-api/18-kb-reindex-endpoint.md) |
+| 20 | API Key → KB Scoping (data isolation) | planned | [ai-api/20-api-key-kb-scoping.md](ai-api/20-api-key-kb-scoping.md) |
 
 ---
 
