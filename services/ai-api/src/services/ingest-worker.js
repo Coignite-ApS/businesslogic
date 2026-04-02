@@ -9,10 +9,11 @@ import IORedis from 'ioredis';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { query, queryOne, queryAll } from '../db.js';
-import { chunkDocument, estimateTokens } from './chunker.js';
+import { chunkDocument, chunkDocumentWithParents, estimateTokens } from './chunker.js';
 import { computeChunkHash, diffChunks } from './content-hash.js';
 import { createEmbeddingClientForKb } from './embedding-factory.js';
 import { detectLanguage, pgTsConfig } from './language.js';
+import { generateContextualPrefixes } from './context-generator.js';
 
 let worker = null;
 let connection = null;
@@ -68,16 +69,41 @@ async function processIngestJob(job, logger) {
       throw new Error('No content could be extracted from file');
     }
 
-    // Chunk the document
-    const chunks = chunkDocument(content.text, content.fileName || fileId, {
-      targetSize: config.kbChunkSize,
+    // Fetch KB settings for feature flags
+    const kb = await queryOne('SELECT embedding_model, contextual_retrieval_enabled, parent_doc_enabled FROM knowledge_bases WHERE id = $1', [kbId]);
+    if (!kb) throw new Error(`Knowledge base ${kbId} not found`);
+
+    const useParentDoc = (kb.parent_doc_enabled ?? config.kbParentDocEnabled) && config.kbParentDocEnabled !== false;
+    const chunkOpts = {
+      targetSize: useParentDoc ? config.kbParentChunkSize : config.kbChunkSize,
       minSize: config.kbChunkMinSize,
       maxSize: config.kbChunkMaxSize,
       overlapRatio: config.kbChunkOverlap,
-    });
+    };
+
+    // Chunk the document (with or without parent sections)
+    let chunks, sections = [];
+    if (useParentDoc) {
+      const result = chunkDocumentWithParents(content.text, content.fileName || fileId, chunkOpts);
+      chunks = result.chunks;
+      sections = result.sections;
+    } else {
+      chunks = chunkDocument(content.text, content.fileName || fileId, chunkOpts);
+    }
 
     if (chunks.length === 0) {
       throw new Error('No chunks generated from content');
+    }
+
+    // Contextual retrieval: generate LLM context prefix per chunk
+    const useContextual = (kb.contextual_retrieval_enabled ?? config.kbContextualRetrieval) && config.kbContextualRetrieval !== false;
+    let contextualContents = null;
+    if (useContextual) {
+      const ctxResult = await generateContextualPrefixes(content.text, chunks, { enabled: true }, logger);
+      contextualContents = ctxResult.contents;
+      if (ctxResult.inputTokens > 0) {
+        logger.info?.(`Document ${documentId}: contextual retrieval used ${ctxResult.inputTokens} input tokens, ${ctxResult.outputTokens} output tokens`);
+      }
     }
 
     // Detect document language from full text
@@ -90,7 +116,7 @@ async function processIngestJob(job, logger) {
       [documentId],
     );
 
-    // Diff: identify changed vs unchanged chunks
+    // Diff: identify changed vs unchanged chunks (diff on raw content, not contextual)
     const newChunksForDiff = chunks.map((c) => ({
       content: c.content,
       chunk_index: c.metadata.chunk_index,
@@ -102,16 +128,32 @@ async function processIngestJob(job, logger) {
       logger.info?.(`Document ${documentId}: ${skippedCount} chunks unchanged, skipping re-embed`);
     }
 
-    // Embed only changed chunks — use the KB's locked model, not the global config
+    // Embed only changed chunks — use contextual_content for embedding if available
     let embeddings = [];
-    let kbModel = null;
+    const kbModel = kb.embedding_model;
     if (diff.toEmbed.length > 0) {
-      const kb = await queryOne('SELECT embedding_model FROM knowledge_bases WHERE id = $1', [kbId]);
-      if (!kb) throw new Error(`Knowledge base ${kbId} not found`);
-      kbModel = kb.embedding_model;
       const embedClient = await createEmbeddingClientForKb(kb);
-      const textsToEmbed = diff.toEmbed.map((c) => c.content);
+      const textsToEmbed = diff.toEmbed.map((c) => {
+        if (contextualContents) {
+          const idx = chunks.findIndex(ch => ch.metadata.chunk_index === c.chunk_index);
+          return idx >= 0 ? contextualContents[idx] : c.content;
+        }
+        return c.content;
+      });
       embeddings = await embedClient.embedBatch(textsToEmbed);
+    }
+
+    // Insert parent sections if using parent-doc retrieval
+    if (useParentDoc && sections.length > 0) {
+      // Clear existing sections for this document
+      await query('DELETE FROM kb_sections WHERE document = $1', [documentId]);
+      for (const section of sections) {
+        await query(
+          `INSERT INTO kb_sections (id, document, knowledge_base, section_index, heading, content, token_count)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [section.id, documentId, kbId, section.section_index, section.heading || null, section.content, section.token_count],
+        );
+      }
     }
 
     // Delete old chunks that are no longer reused
@@ -137,10 +179,10 @@ async function processIngestJob(job, logger) {
       );
     }
 
-    // Insert new chunks
+    // Insert new chunks (with contextual_content and section_id if applicable)
     for (let i = 0; i < diff.toEmbed.length; i += 50) {
       const batch = diff.toEmbed.slice(i, i + 50);
-      await insertChunkBatch(batch, embeddings.slice(i, i + 50), chunks, documentId, kbId, accountId, docLanguage, tsConfig, kbModel);
+      await insertChunkBatch(batch, embeddings.slice(i, i + 50), chunks, documentId, kbId, accountId, docLanguage, tsConfig, kbModel, contextualContents, sections);
     }
 
     // Calculate total token count
@@ -199,27 +241,38 @@ async function fetchFileContent(fileId) {
 /**
  * Insert a batch of chunks using parameterized pg queries.
  * @param {string|null} embeddingModel - The model used to generate these embeddings
+ * @param {string[]|null} contextualContents - Contextual content per chunk (indexed by allChunks)
+ * @param {Array|null} sections - Parent sections for section_id FK
  */
-async function insertChunkBatch(toEmbed, embeddings, allChunks, documentId, kbId, accountId, language, tsConfig, embeddingModel = null) {
+async function insertChunkBatch(toEmbed, embeddings, allChunks, documentId, kbId, accountId, language, tsConfig, embeddingModel = null, contextualContents = null, sections = null) {
   for (let j = 0; j < toEmbed.length; j++) {
     const chunk = toEmbed[j];
     const embedding = embeddings[j];
     const fullChunk = allChunks.find((c) => c.metadata.chunk_index === chunk.chunk_index);
     const metadata = fullChunk ? fullChunk.metadata : { chunk_index: chunk.chunk_index };
+    const chunkIdx = allChunks.findIndex((c) => c.metadata.chunk_index === chunk.chunk_index);
+
+    // Contextual content for embedding/search (raw content stored separately)
+    const ctxContent = contextualContents && chunkIdx >= 0 ? contextualContents[chunkIdx] : null;
+    // Section FK for parent-doc retrieval
+    const sectionId = fullChunk?.metadata?.section_id || null;
 
     const id = randomUUID();
     const embeddingLiteral = `[${embedding.join(',')}]`;
+    // Use contextual content for search_vector if available
+    const searchText = ctxContent || chunk.content;
 
     await query(
-      `INSERT INTO kb_chunks (id, document, knowledge_base, account_id, chunk_index, content, content_hash, embedding, embedding_model, metadata, token_count, language, search_vector)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10::jsonb, $11, $12, to_tsvector($13::regconfig, $14))`,
+      `INSERT INTO kb_chunks (id, document, knowledge_base, account_id, chunk_index, content, contextual_content, content_hash, embedding, embedding_model, metadata, token_count, language, search_vector, section_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10::jsonb, $11, $12, to_tsvector($13::regconfig, $14), $15)`,
       [
         id, documentId, kbId, accountId,
-        chunk.chunk_index, chunk.content, chunk.content_hash,
+        chunk.chunk_index, chunk.content, ctxContent,
         embeddingLiteral, embeddingModel,
         JSON.stringify({ ...metadata, language }),
         fullChunk?.tokenCount || estimateTokens(chunk.content),
-        language, tsConfig, chunk.content,
+        language, tsConfig, searchText,
+        sectionId,
       ],
     );
   }

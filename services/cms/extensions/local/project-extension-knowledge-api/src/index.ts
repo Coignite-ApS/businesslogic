@@ -174,6 +174,8 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 				if (req.body.description !== undefined) updates.description = req.body.description;
 				if (req.body.icon !== undefined) updates.icon = req.body.icon;
 				if (req.body.sort !== undefined) updates.sort = req.body.sort;
+				if (req.body.contextual_retrieval_enabled !== undefined) updates.contextual_retrieval_enabled = req.body.contextual_retrieval_enabled;
+				if (req.body.parent_doc_enabled !== undefined) updates.parent_doc_enabled = req.body.parent_doc_enabled;
 
 				if (Object.keys(updates).length > 0) {
 					await db('knowledge_bases').where('id', req.params.kbId).update(updates);

@@ -101,6 +101,8 @@ export async function registerRoutes(app) {
     if (req.body.description !== undefined) { updates.push(`description = $${idx++}`); params.push(req.body.description); }
     if (req.body.icon !== undefined) { updates.push(`icon = $${idx++}`); params.push(req.body.icon); }
     if (req.body.sort !== undefined) { updates.push(`sort = $${idx++}`); params.push(req.body.sort); }
+    if (req.body.contextual_retrieval_enabled !== undefined) { updates.push(`contextual_retrieval_enabled = $${idx++}`); params.push(req.body.contextual_retrieval_enabled); }
+    if (req.body.parent_doc_enabled !== undefined) { updates.push(`parent_doc_enabled = $${idx++}`); params.push(req.body.parent_doc_enabled); }
     if (updates.length === 0) return { data: ctx.kb };
 
     updates.push('date_updated = NOW()');
@@ -247,6 +249,56 @@ export async function registerRoutes(app) {
     return { data: { id: req.params.docId, status: 'pending' } };
   });
 
+  // Re-index entire KB (all documents)
+  app.post('/v1/ai/kb/:kbId/reindex', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    const ctx = await verifyKbOwnership(req, reply);
+    if (!ctx) return;
+
+    const docs = await queryAll(
+      'SELECT id, file_id FROM kb_documents WHERE knowledge_base = $1',
+      [req.params.kbId],
+    );
+
+    if (docs.length === 0) {
+      return { data: { queued: 0, message: 'No documents to re-index' } };
+    }
+
+    // Clear contextual_content so it regenerates
+    await query(
+      'UPDATE kb_chunks SET contextual_content = NULL WHERE knowledge_base = $1',
+      [req.params.kbId],
+    );
+
+    let queued = 0;
+    for (const doc of docs) {
+      await query(
+        "UPDATE kb_documents SET status = 'pending', date_updated = NOW() WHERE id = $1",
+        [doc.id],
+      );
+
+      const ingestData = {
+        documentId: doc.id,
+        kbId: req.params.kbId,
+        accountId: ctx.accountId,
+        fileId: doc.file_id,
+        reindex: true,
+      };
+
+      let dispatched = false;
+      if (isFlowIngestEnabled()) {
+        const flowResult = await triggerFlowIngest(ingestData, req.log);
+        dispatched = flowResult.triggered;
+      }
+      if (!dispatched) {
+        const enqueued = await enqueueIngest(ingestData);
+        dispatched = !!enqueued;
+      }
+      if (dispatched) queued++;
+    }
+
+    return { data: { queued, message: `Re-indexing ${queued} documents` } };
+  });
+
   // ─── Curated Answers ────────────────────────────────────────
 
   // List curated answers
@@ -370,8 +422,15 @@ export async function registerRoutes(app) {
 
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
     const searchStart = Date.now();
-    const { results, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
+    const { results, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
     const searchLatencyMs = Date.now() - searchStart;
+
+    // Determine active features
+    const featuresActive = {
+      reranker: rerankerUsed || false,
+      contextualRetrieval: config.kbContextualRetrieval,
+      parentDoc: config.kbParentDocEnabled,
+    };
 
     // Log retrieval quality (fire-and-forget)
     logRetrievalQuality({
@@ -384,6 +443,9 @@ export async function registerRoutes(app) {
       avgSimilarity,
       minSimilarityThreshold: searchConfig.minSimilarity,
       searchLatencyMs,
+      rerankerUsed: rerankerUsed || false,
+      rerankerLatencyMs: rerankerLatencyMs || null,
+      featuresActive,
     });
 
     return { data: results };
@@ -416,7 +478,7 @@ export async function registerRoutes(app) {
 
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
     const searchStart = Date.now();
-    const { results: chunks, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
+    const { results: chunks, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
     const searchLatencyMs = Date.now() - searchStart;
 
     // Check for curated answers
@@ -449,6 +511,13 @@ export async function registerRoutes(app) {
       ? Math.round((chunksUtilized / chunksInjected) * 1000) / 1000
       : null;
 
+    // Determine active features
+    const featuresActive = {
+      reranker: rerankerUsed || false,
+      contextualRetrieval: config.kbContextualRetrieval,
+      parentDoc: config.kbParentDocEnabled,
+    };
+
     // Log retrieval quality (fire-and-forget)
     logRetrievalQuality({
       accountId,
@@ -468,6 +537,11 @@ export async function registerRoutes(app) {
       searchLatencyMs,
       totalLatencyMs,
       confidence: result.confidence,
+      rerankerUsed: rerankerUsed || false,
+      contextualRetrievalUsed: config.kbContextualRetrieval,
+      parentDocUsed: chunks.some(c => !!c.parent_content),
+      rerankerLatencyMs: rerankerLatencyMs || null,
+      featuresActive,
     });
 
     return {
