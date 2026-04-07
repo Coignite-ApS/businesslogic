@@ -158,7 +158,7 @@ export function useAccount(api: any) {
 
 	async function fetchApiKeys() {
 		try {
-			const { data } = await api.get('/calc/api-keys');
+			const { data } = await api.get('/account/api-keys');
 			apiKeys.value = data.data || [];
 		} catch {
 			apiKeys.value = [];
@@ -174,7 +174,7 @@ export function useAccount(api: any) {
 	}): Promise<any | null> {
 		error.value = null;
 		try {
-			const { data } = await api.post('/calc/api-keys', body);
+			const { data } = await api.post('/account/api-keys', body);
 			await fetchApiKeys();
 			return data;
 		} catch (err: any) {
@@ -186,7 +186,7 @@ export function useAccount(api: any) {
 	async function updateApiKey(id: string, body: any) {
 		error.value = null;
 		try {
-			await api.patch(`/calc/api-keys/${id}`, body);
+			await api.patch(`/account/api-keys/${id}`, body);
 			await fetchApiKeys();
 		} catch (err: any) {
 			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
@@ -196,7 +196,7 @@ export function useAccount(api: any) {
 	async function revokeApiKey(id: string) {
 		error.value = null;
 		try {
-			await api.delete(`/calc/api-keys/${id}`);
+			await api.delete(`/account/api-keys/${id}`);
 			await fetchApiKeys();
 		} catch (err: any) {
 			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
@@ -206,7 +206,7 @@ export function useAccount(api: any) {
 	async function rotateApiKey(id: string): Promise<any | null> {
 		error.value = null;
 		try {
-			const { data } = await api.post(`/calc/api-keys/${id}/rotate`);
+			const { data } = await api.post(`/account/api-keys/${id}/rotate`);
 			await fetchApiKeys();
 			return data;
 		} catch (err: any) {

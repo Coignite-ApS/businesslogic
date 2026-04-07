@@ -31,7 +31,7 @@ export function useApiKeys(api: any) {
 		loading.value = true;
 		try {
 			const [keysRes, urlRes] = await Promise.all([
-				api.get('/calc/api-keys'),
+				api.get('/account/api-keys'),
 				api.get('/calc/formula-api-url').catch(() => ({ data: {} })),
 			]);
 
@@ -59,7 +59,7 @@ export function useApiKeys(api: any) {
 
 	async function createDefaultKey(): Promise<ApiKey | null> {
 		try {
-			const { data } = await api.post('/calc/api-keys', {
+			const { data } = await api.post('/account/api-keys', {
 				name: 'Default',
 				environment: 'live',
 				permissions: {
