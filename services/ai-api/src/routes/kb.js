@@ -29,19 +29,19 @@ async function verifyKbOwnership(req, reply) {
   const accountId = req.accountId || await getActiveAccount(req.userId);
   if (!accountId) { reply.code(403).send({ errors: [{ message: 'No active account' }] }); return null; }
 
-  const kb = await queryOne(
-    'SELECT * FROM knowledge_bases WHERE id = $1 AND account = $2',
-    [req.params.kbId, accountId],
-  );
-  if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
-
-  // API key KB scoping — check if key has access to this specific KB
+  // API key KB scoping — check BEFORE DB lookup to avoid leaking KB existence
   try {
     assertKbAccess(req, req.params.kbId);
   } catch (err) {
     reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
     return null;
   }
+
+  const kb = await queryOne(
+    'SELECT * FROM knowledge_bases WHERE id = $1 AND account = $2',
+    [req.params.kbId, accountId],
+  );
+  if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
 
   return { accountId, kb };
 }
