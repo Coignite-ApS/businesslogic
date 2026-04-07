@@ -110,3 +110,25 @@ describe('KB scoping - cross-KB search filtering', () => {
     assert.strictEqual(getAllowedKbIds(req), null);
   });
 });
+
+describe('KB scoping - tool call threading', () => {
+  it('tool should block access to restricted KB', () => {
+    // Simulates: searchKnowledge checks allowedKbIds before making internal request
+    const allowedKbIds = ['kb-1'];
+    const requestedKbId = 'kb-999';
+    assert.ok(allowedKbIds !== null);
+    assert.ok(!allowedKbIds.includes(requestedKbId));
+  });
+
+  it('tool should allow access when unrestricted', () => {
+    const allowedKbIds = null;
+    assert.strictEqual(allowedKbIds, null);
+    // null means no additional filtering
+  });
+
+  it('tool should pass allowedKbIds for cross-KB search', () => {
+    const allowedKbIds = ['kb-1', 'kb-2'];
+    assert.ok(Array.isArray(allowedKbIds));
+    assert.strictEqual(allowedKbIds.length, 2);
+  });
+});

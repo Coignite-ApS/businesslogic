@@ -220,7 +220,7 @@ export function filterToolsByPermissions(tools, permissions, isPublicRequest = f
 }
 
 export async function executeTool(toolName, toolInput, deps) {
-  const { accountId, logger } = deps;
+  const { accountId, logger, allowedKbIds } = deps;
 
   // Try flow-based execution first (if enabled)
   if (isFlowToolEnabled()) {
@@ -249,11 +249,11 @@ export async function executeTool(toolName, toolInput, deps) {
       case 'deploy_calculator':
         return await deployCalculator(accountId, toolInput.calculator_id, toolInput.test ?? false, logger);
       case 'search_knowledge':
-        return await searchKnowledge(accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit);
+        return await searchKnowledge(accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit, allowedKbIds);
       case 'ask_knowledge':
-        return await askKnowledge(accountId, toolInput.question, toolInput.knowledge_base_id);
+        return await askKnowledge(accountId, toolInput.question, toolInput.knowledge_base_id, allowedKbIds);
       case 'list_knowledge_bases':
-        return await listKnowledgeBases(accountId);
+        return await listKnowledgeBases(accountId, allowedKbIds);
       case 'create_knowledge_base':
         return await createKnowledgeBase(accountId, toolInput);
       case 'get_knowledge_base':
@@ -509,7 +509,11 @@ async function deployCalculator(accountId, calculatorId, test, logger) {
 
 // ─── Knowledge base tools ────────────────────────────────────
 
-async function searchKnowledge(accountId, searchQuery, kbId, limit) {
+async function searchKnowledge(accountId, searchQuery, kbId, limit, allowedKbIds) {
+  // Check KB scoping: if key is restricted and tool requests a specific KB
+  if (kbId && allowedKbIds !== null && allowedKbIds !== undefined && !allowedKbIds.includes(kbId)) {
+    return { result: 'API key does not have access to this knowledge base', isError: true };
+  }
   // This delegates to the KB search endpoint (internal call)
   const params = { query: searchQuery, knowledge_base_id: kbId, limit: limit || 5 };
   const headers = { 'Content-Type': 'application/json' };
@@ -533,7 +537,11 @@ async function searchKnowledge(accountId, searchQuery, kbId, limit) {
   }
 }
 
-async function askKnowledge(accountId, question, kbId) {
+async function askKnowledge(accountId, question, kbId, allowedKbIds) {
+  // Check KB scoping: if key is restricted and tool requests a specific KB
+  if (kbId && allowedKbIds !== null && allowedKbIds !== undefined && !allowedKbIds.includes(kbId)) {
+    return { result: 'API key does not have access to this knowledge base', isError: true };
+  }
   const params = { question, knowledge_base_id: kbId };
   const headers = { 'Content-Type': 'application/json' };
   if (config.adminToken) headers['X-Admin-Token'] = config.adminToken;
@@ -556,12 +564,23 @@ async function askKnowledge(accountId, question, kbId) {
   }
 }
 
-async function listKnowledgeBases(accountId) {
-  const kbs = await queryAll(
-    `SELECT id, name, description, icon, document_count, chunk_count, last_indexed, status
-     FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
-    [accountId],
-  );
+async function listKnowledgeBases(accountId, allowedKbIds) {
+  let kbs;
+  if (allowedKbIds !== null && allowedKbIds !== undefined) {
+    if (allowedKbIds.length === 0) return { result: { knowledge_bases: [], count: 0 } };
+    kbs = await queryAll(
+      `SELECT id, name, description, icon, document_count, chunk_count, last_indexed, status
+       FROM knowledge_bases WHERE account = $1 AND id = ANY($2::uuid[])
+       ORDER BY sort, name`,
+      [accountId, allowedKbIds],
+    );
+  } else {
+    kbs = await queryAll(
+      `SELECT id, name, description, icon, document_count, chunk_count, last_indexed, status
+       FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
+      [accountId],
+    );
+  }
   return { result: { knowledge_bases: kbs, count: kbs.length } };
 }
 
