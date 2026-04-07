@@ -726,15 +726,6 @@ async function handleGoLive() {
 	execError.value = null;
 	try {
 		await launchConfig(currentId.value, testConfig.value);
-
-		// Auto-generate live API key if not set
-		const configs = current.value?.configs || [];
-		const liveConfig = configs.find((c) => !c.test_environment);
-		if (liveConfig && !liveConfig.api_key) {
-			const newKey = crypto.randomUUID().replace(/-/g, '');
-			await updateConfig(liveConfig.id, currentId.value, { api_key: newKey });
-		}
-
 		await activateCalc(currentId.value);
 		await fetchSubscriptionInfo();
 		await fetchAll(activeAccountId.value);

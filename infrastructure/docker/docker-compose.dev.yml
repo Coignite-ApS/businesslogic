@@ -170,7 +170,7 @@ services:
     environment:
       - PORT=3000
       - POOL_SIZE=4
-      - REQUEST_TIMEOUT_MS=30000
+      - REQUEST_TIMEOUT_MS=60000
       - REDIS_URL=redis://redis:6379
       - ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
@@ -183,6 +183,8 @@ services:
       - DATABASE_URL=postgresql://directus:directus@postgres:5432/directus
       - ADMIN_API_URL=${ADMIN_API_URL:-http://bl-cms:8055}
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}
+      - GATEWAY_SHARED_SECRET=${GATEWAY_SHARED_SECRET:-dev-shared-secret}
+      - NODE_OPTIONS=--max-old-space-size=1024 --max-semi-space-size=64
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -301,6 +303,7 @@ services:
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
       - GATEWAY_SHARED_SECRET=${GATEWAY_SHARED_SECRET:-dev-shared-secret}
       - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}
+      - KEY_ENCRYPTION_KEY=${KEY_ENCRYPTION_KEY:-deadbeef0123456789abcdef0123456789abcdef0123456789abcdef01234567}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
       - OTEL_ENABLED=true
     depends_on:

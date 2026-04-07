@@ -305,12 +305,6 @@ export function useCalculators(api: any) {
 		await fetchTestCases(calculatorId);
 	}
 
-	/** Fetch decrypted api_key for a config (on-demand) */
-	async function fetchApiKey(configId: string): Promise<string> {
-		const { data } = await api.get(`/calc/api-key/${configId}`);
-		return data.api_key || '';
-	}
-
 	/** Download annotated Excel via Formula API */
 	async function downloadExcel(configId: string, filename: string) {
 		const { data } = await api.post('/calc/generate-xlsx', { config_id: configId }, { responseType: 'blob' });
@@ -396,6 +390,5 @@ export function useCalculators(api: any) {
 		disableTest,
 		activateCalc,
 		downloadExcel,
-		fetchApiKey,
 	};
 }

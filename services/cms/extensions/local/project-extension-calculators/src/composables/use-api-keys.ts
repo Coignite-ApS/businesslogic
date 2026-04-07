@@ -21,9 +21,13 @@ export function useApiKeys(api: any) {
 	const selectedKey = ref<ApiKey | null>(null);
 	const loading = ref(true);
 	const gatewayUrl = ref('');
+
 	const hasKeys = computed(() => keys.value.length > 0);
 	const calcKeys = computed(() => keys.value.filter(hasCalcPermission));
 	const hasCalcKeys = computed(() => calcKeys.value.length > 0);
+
+	const testCalcKeys = computed(() => calcKeys.value.filter((k) => k.environment === 'test'));
+	const liveCalcKeys = computed(() => calcKeys.value.filter((k) => k.environment === 'live'));
 
 	async function fetchKeys() {
 		loading.value = true;
@@ -38,10 +42,9 @@ export function useApiKeys(api: any) {
 
 			gatewayUrl.value = urlRes.data?.url || urlRes.data?.data || '';
 
-			// Auto-select first live key with calc permission, fallback to any calc key
-			const withCalc = keys.value.filter(hasCalcPermission);
-			const liveKey = withCalc.find((k) => k.environment === 'live');
-			selectedKey.value = liveKey || withCalc[0] || null;
+			// Auto-select first live calc key, fallback to any calc key
+			const liveKey = liveCalcKeys.value[0];
+			selectedKey.value = liveKey || calcKeys.value[0] || null;
 		} catch {
 			keys.value = [];
 			selectedKey.value = null;
@@ -53,6 +56,23 @@ export function useApiKeys(api: any) {
 	function selectKey(id: string) {
 		const found = keys.value.find((k) => k.id === id);
 		if (found) selectedKey.value = found;
+	}
+
+	function selectKeyForEnv(environment: 'test' | 'live') {
+		const pool = environment === 'test' ? testCalcKeys.value : liveCalcKeys.value;
+		if (pool.length > 0) {
+			selectedKey.value = pool[0];
+		} else if (calcKeys.value.length > 0) {
+			selectedKey.value = calcKeys.value[0];
+		}
+	}
+
+	async function ensureCalcKey(environment: 'test' | 'live'): Promise<ApiKey | null> {
+		const pool = environment === 'test' ? testCalcKeys.value : liveCalcKeys.value;
+		if (pool.length > 0) return pool[0];
+
+		// Auto-provision a new key
+		return createCalcKey(environment);
 	}
 
 	async function rotateKey(id: string): Promise<ApiKey | null> {
@@ -67,11 +87,11 @@ export function useApiKeys(api: any) {
 		}
 	}
 
-	async function createDefaultKey(): Promise<ApiKey | null> {
+	async function createCalcKey(environment: 'test' | 'live'): Promise<ApiKey | null> {
 		try {
 			const { data } = await api.post('/account/api-keys', {
-				name: 'Default',
-				environment: 'live',
+				name: environment === 'test' ? 'Calculator Test' : 'Calculator Live',
+				environment,
 				permissions: {
 					services: {
 						calc: { enabled: true, resources: ['*'], actions: ['execute', 'describe'] },
@@ -81,9 +101,7 @@ export function useApiKeys(api: any) {
 				},
 			});
 			const key = data?.data || data;
-			// Refresh list so the new key appears
 			await fetchKeys();
-			// Select the newly created key
 			if (key?.id) selectKey(key.id);
 			return key;
 		} catch {
@@ -98,10 +116,14 @@ export function useApiKeys(api: any) {
 		hasKeys,
 		calcKeys,
 		hasCalcKeys,
+		testCalcKeys,
+		liveCalcKeys,
 		gatewayUrl,
 		fetchKeys,
 		selectKey,
+		selectKeyForEnv,
+		ensureCalcKey,
 		rotateKey,
-		createDefaultKey,
+		createCalcKey,
 	};
 }

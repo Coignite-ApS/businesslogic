@@ -38,12 +38,12 @@ func TestAutoProvision_FirstCall_CreatesTestKey(t *testing.T) {
 		WithArgs(testAutoProvisionAccountID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
-	// Expect INSERT for live key (11 args via shared insertKey)
+	// Expect INSERT for live key (12 args via shared insertKey, includes encrypted_key)
 	defaultPermsJSON := []byte(`{"services":{"calc":{"enabled":true,"resources":["*"],"actions":["execute","describe"]},"kb":{"enabled":true,"resources":["*"],"actions":["search","ask"]},"flow":{"enabled":true,"resources":["*"],"actions":["trigger"]}}}`)
 	mock.ExpectQuery(`INSERT INTO api_keys`).
 		WithArgs(
 			pgxmock.AnyArg(), pgxmock.AnyArg(), testAutoProvisionAccountID, "live", "Default",
-			pgxmock.AnyArg(), []string{}, []string{}, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+			pgxmock.AnyArg(), []string{}, []string{}, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{
 			"id", "key_prefix", "account_id", "name", "environment", "permissions",

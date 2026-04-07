@@ -89,16 +89,25 @@ func (h *APIKeyHandler) insertKey(ctx context.Context, gk *service.GeneratedKey,
 		req.AllowedOrigins = []string{}
 	}
 
+	// Encrypt the raw key if KEY_ENCRYPTION_KEY is configured
+	var encryptedKey *string
+	if service.EncryptionKeyAvailable() {
+		enc, err := service.Encrypt(gk.RawKey)
+		if err == nil {
+			encryptedKey = &enc
+		}
+	}
+
 	var resp keyResponse
 	err := h.db.QueryRow(ctx, `
 		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
-			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at, encrypted_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
 			expires_at, last_used_at, created_at
 	`, gk.KeyHash, gk.KeyPrefix, req.AccountID, req.Environment, req.Name,
-		permJSON, req.AllowedIPs, req.AllowedOrigins, req.RateLimitRPS, req.MonthlyQuota, req.ExpiresAt,
+		permJSON, req.AllowedIPs, req.AllowedOrigins, req.RateLimitRPS, req.MonthlyQuota, req.ExpiresAt, encryptedKey,
 	).Scan(
 		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
 		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
@@ -161,7 +170,7 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
+			expires_at, last_used_at, created_at, encrypted_key
 		FROM api_keys
 		WHERE account_id = $1 AND revoked_at IS NULL
 		ORDER BY created_at DESC
@@ -176,15 +185,22 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var k keyResponse
 		var permJSON []byte
+		var encryptedKey *string
 		if err := rows.Scan(
 			&k.ID, &k.KeyPrefix, &k.AccountID, &k.Name, &k.Environment, &permJSON,
 			&k.AllowedIPs, &k.AllowedOrigins, &k.RateLimitRPS, &k.MonthlyQuota,
-			&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt,
+			&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt, &encryptedKey,
 		); err != nil {
 			continue
 		}
 		p := service.ParsePermissions(permJSON)
 		k.Permissions = &p
+		// Decrypt raw key if available
+		if encryptedKey != nil {
+			if raw, err := service.Decrypt(*encryptedKey); err == nil {
+				k.RawKey = raw
+			}
+		}
 		keys = append(keys, k)
 	}
 
@@ -204,15 +220,16 @@ func (h *APIKeyHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var k keyResponse
 	var permJSON []byte
+	var encryptedKey *string
 	err := h.db.QueryRow(r.Context(), `
 		SELECT id, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
+			expires_at, last_used_at, created_at, encrypted_key
 		FROM api_keys WHERE id = $1 AND revoked_at IS NULL
 	`, id).Scan(
 		&k.ID, &k.KeyPrefix, &k.AccountID, &k.Name, &k.Environment, &permJSON,
 		&k.AllowedIPs, &k.AllowedOrigins, &k.RateLimitRPS, &k.MonthlyQuota,
-		&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt,
+		&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt, &encryptedKey,
 	)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
@@ -220,6 +237,12 @@ func (h *APIKeyHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	p := service.ParsePermissions(permJSON)
 	k.Permissions = &p
+	// Decrypt raw key if available
+	if encryptedKey != nil {
+		if raw, err := service.Decrypt(*encryptedKey); err == nil {
+			k.RawKey = raw
+		}
+	}
 	writeJSON(w, http.StatusOK, k)
 }
 

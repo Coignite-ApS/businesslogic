@@ -78,6 +78,7 @@
 				:live-test-result="liveTestResult"
 				:live-test-error="liveTestError"
 				:action-error="actionError"
+			:gateway-api-key="gatewayKey?.raw_key || gatewayKey?.key_prefix || ''"
 				@apply-template="handleApplyTemplate"
 				@select-file="handleSelectFile"
 				@drop-file="handleDropFile"
@@ -89,7 +90,7 @@
 				@complete-onboarding="handleCompleteOnboarding"
 				@activate="handleActivate"
 				@deactivate="handleDeactivate"
-				@regenerate-api-key="handleRegenerateApiKey"
+
 				@enable-test="handleEnableTest"
 				@disable-test="handleDisableTest"
 				@download-excel="handleDownloadExcel"
@@ -190,6 +191,7 @@ import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
 import { useActiveAccount } from '../composables/use-active-account';
 import { useSubscription } from '../composables/use-subscription';
+import { useApiKeys } from '../composables/use-api-keys';
 import CalculatorNavigation from '../components/navigation.vue';
 import CalculatorDetail from '../components/calculator-detail.vue';
 import type { Calculator, CalculatorConfig, CalculatorTemplate } from '../types';
@@ -217,6 +219,13 @@ const {
 	activeAccountId,
 	fetchActiveAccount,
 } = useActiveAccount(api);
+
+const {
+	selectedKey: gatewayKey,
+	fetchKeys,
+	ensureCalcKey,
+	selectKeyForEnv,
+} = useApiKeys(api);
 
 const pendingFile = ref<File | null>(null);
 const pendingFileName = ref<string | null>(null);
@@ -365,12 +374,9 @@ async function handleUploadFile() {
 			});
 		}
 
-		// Auto-generate test API key if not set
-		const updatedTestCfg = current.value?.configs?.find((c) => c.test_environment);
-		if (updatedTestCfg && !updatedTestCfg.api_key) {
-			const newKey = crypto.randomUUID().replace(/-/g, '');
-			await updateConfig(updatedTestCfg.id, currentId.value, { api_key: newKey });
-		}
+		// Auto-provision gateway test key
+		const provisionedUpload = await ensureCalcKey('test');
+		if (provisionedUpload && !gatewayKey.value) selectKeyForEnv('test');
 
 		uploadedFileName.value = pendingFile.value.name;
 		pendingFile.value = null;
@@ -415,12 +421,9 @@ async function handleApplyTemplate(template: CalculatorTemplate) {
 		await createConfig(currentId.value, configData);
 	}
 
-	// Auto-generate test API key if not set
-	const updatedTestCfg = current.value?.configs?.find((c) => c.test_environment);
-	if (updatedTestCfg && !updatedTestCfg.api_key) {
-		const newKey = crypto.randomUUID().replace(/-/g, '');
-		await updateConfig(updatedTestCfg.id, currentId.value, { api_key: newKey });
-	}
+	// Auto-provision gateway test key
+	const provisionedTemplate = await ensureCalcKey('test');
+	if (provisionedTemplate && !gatewayKey.value) selectKeyForEnv('test');
 }
 
 async function handleLaunch() {
@@ -430,16 +433,10 @@ async function handleLaunch() {
 
 	await launchConfig(currentId.value, testConfig.value);
 
-	// Launch activates the calculator via the activate endpoint (handles limits)
-	const configs = current.value?.configs || [];
-	const liveConfig = configs.find((c) => !c.test_environment);
-	if (liveConfig) {
-		// Auto-generate live API key if not set
-		if (!liveConfig.api_key) {
-			const newKey = crypto.randomUUID().replace(/-/g, '');
-			await updateConfig(liveConfig.id, currentId.value, { api_key: newKey });
-		}
-	}
+	// Auto-provision gateway live key
+	const provisionedLaunch = await ensureCalcKey('live');
+	if (provisionedLaunch && !gatewayKey.value) selectKeyForEnv('live');
+
 	await activateCalc(currentId.value);
 	await fetchSubscriptionInfo();
 
@@ -536,25 +533,6 @@ async function handleDelete() {
 	router.push('/calculators');
 }
 
-async function handleRegenerateApiKey(env: string) {
-	if (!currentId.value) return;
-	const newKey = crypto.randomUUID().replace(/-/g, '');
-
-	if (env === 'test') {
-		if (testConfig.value) {
-			await updateConfig(testConfig.value.id, currentId.value, { api_key: newKey });
-		} else {
-			await createConfig(currentId.value, { api_key: newKey, test_environment: true });
-		}
-	} else if (env === 'prod') {
-		if (prodConfig.value) {
-			await updateConfig(prodConfig.value.id, currentId.value, { api_key: newKey });
-		} else {
-			await createConfig(currentId.value, { api_key: newKey, test_environment: false });
-		}
-	}
-}
-
 async function handleSaveConfig(payload: { input: Record<string, unknown>; output: Record<string, unknown> }) {
 	if (!currentId.value) return;
 	const { input, output } = payload;
@@ -642,6 +620,7 @@ function formatDate(date: string | null | undefined): string {
 fetchActiveAccount().then(() => {
 	fetchAll(activeAccountId.value);
 	fetchSubscriptionInfo();
+	fetchKeys();
 });
 fetchTemplates();
 fetchFormulaApiUrl().then((url) => { formulaApiUrl.value = url; }).catch(() => {});

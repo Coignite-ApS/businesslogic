@@ -102,48 +102,6 @@
 						/>
 					</div>
 				</div>
-				<div class="config-field">
-					<div class="config-label">API token</div>
-					<div class="config-value token-value">
-						<template v-if="config.api_key">
-							<v-progress-circular v-if="fetchingKey" x-small indeterminate />
-							<code v-else-if="showApiKey && decryptedKey">{{ decryptedKey }}</code>
-							<code v-else>{{ maskedKey }}</code>
-							<v-icon
-								class="token-action"
-								:name="showApiKey ? 'visibility_off' : 'visibility'"
-								small
-								clickable
-								@click="toggleShowKey"
-							/>
-							<v-icon
-								class="token-action"
-								name="content_copy"
-								small
-								clickable
-								v-tooltip.bottom="'Copy'"
-								@click="copyApiKey"
-							/>
-						</template>
-						<span v-else class="muted">not set</span>
-						<v-dialog v-model="confirmRegenerate" @esc="confirmRegenerate = false">
-							<template #activator="{ on }">
-								<span class="token-action-link" @click="on">
-									<v-icon name="refresh" small class="token-action" />
-									{{ config.api_key ? 'Regenerate' : 'Generate' }}
-								</span>
-							</template>
-							<v-card>
-								<v-card-title>Regenerate Token</v-card-title>
-								<v-card-text>{{ config.api_key ? 'The current token will be replaced. Any integrations using it will stop working.' : 'A new API token will be generated for this configuration.' }}</v-card-text>
-								<v-card-actions>
-									<v-button secondary @click="confirmRegenerate = false">Cancel</v-button>
-									<v-button kind="danger" @click="$emit('regenerate-api-key'); confirmRegenerate = false">Regenerate Token</v-button>
-								</v-card-actions>
-							</v-card>
-						</v-dialog>
-					</div>
-				</div>
 			</div>
 		</div>
 
@@ -269,7 +227,6 @@ defineEmits<{
 	test: [];
 	activate: [];
 	deactivate: [];
-	'regenerate-api-key': [];
 	download: [];
 }>();
 
@@ -331,10 +288,6 @@ watch(configIsComplete, (complete) => {
 	else verified.value = null;
 }, { immediate: true });
 
-const showApiKey = ref(false);
-const decryptedKey = ref<string | null>(null);
-const fetchingKey = ref(false);
-const confirmRegenerate = ref(false);
 const confirmDeactivateVisible = ref(false);
 
 function countdownText(expiresAt: string | null | undefined): string {
@@ -352,54 +305,9 @@ const testActive = computed(() => {
 	return props.testEnabled && props.testExpiresAt && new Date(props.testExpiresAt) > new Date();
 });
 
-const maskedKey = computed(() => {
-	if (decryptedKey.value) {
-		const key = decryptedKey.value;
-		if (key.length <= 8) return '*'.repeat(key.length);
-		return key.slice(0, 4) + '*'.repeat(key.length - 8) + key.slice(-4);
-	}
-	// Token exists but not yet decrypted — show generic mask
-	return props.config?.api_key ? '••••••••••••••••' : '';
-});
-
-async function ensureDecrypted(): Promise<string | null> {
-	if (decryptedKey.value) return decryptedKey.value;
-	if (!props.config?.id) return null;
-	fetchingKey.value = true;
-	try {
-		const { data } = await api.get(`/calc/api-key/${props.config.id}`);
-		decryptedKey.value = data.api_key || null;
-		return decryptedKey.value;
-	} catch {
-		return null;
-	} finally {
-		fetchingKey.value = false;
-	}
-}
-
-async function toggleShowKey() {
-	if (showApiKey.value) {
-		showApiKey.value = false;
-		return;
-	}
-	await ensureDecrypted();
-	showApiKey.value = true;
-}
-
 function copyText(text: string) {
 	navigator.clipboard.writeText(text);
 }
-
-async function copyApiKey() {
-	const key = await ensureDecrypted();
-	if (key) navigator.clipboard.writeText(key);
-}
-
-// Reset decrypted key when config changes
-watch(() => props.config?.api_key, () => {
-	decryptedKey.value = null;
-	showApiKey.value = false;
-});
 
 // Upgrade plan dialog
 const upgradeVisible = ref(false);
@@ -618,23 +526,6 @@ async function handleCheckout(planId: string) {
 	font-style: italic;
 }
 
-.token-action-link {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 14px;
-	color: var(--theme--foreground-subdued);
-	cursor: pointer;
-	margin-top: -4px;
-}
-
-.token-action-link:hover {
-	color: var(--theme--foreground);
-}
-
-.token-action-link:hover .token-action {
-	color: var(--theme--foreground);
-}
 
 .muted {
 	color: var(--theme--foreground-subdued);

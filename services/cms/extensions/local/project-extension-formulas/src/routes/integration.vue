@@ -58,23 +58,32 @@
 				Use your API key to evaluate Excel formulas from any language. All endpoints accept JSON and return JSON.
 			</p>
 
-			<!-- Raw key notice (just created) -->
-			<v-notice v-if="justCreatedRawKey" type="warning" style="margin-bottom: 16px;">
-				<div class="raw-key-notice">
-					<div>Copy this key — it won't be shown again:</div>
-					<code class="raw-key-value">{{ justCreatedRawKey }}</code>
-					<v-button x-small secondary @click="dismissRawKey">Dismiss</v-button>
+			<!-- Key bar -->
+			<div class="key-bar">
+				<label class="key-bar-label">API Key</label>
+				<div v-if="calcKeys.length > 1" class="key-bar-selector">
+					<v-select
+						:model-value="selectedKey?.id"
+						:items="keySelectItems"
+						@update:model-value="selectKey($event)"
+					/>
 				</div>
-			</v-notice>
-
-			<!-- Key selector (only when 2+ calc keys) -->
-			<div v-if="calcKeys.length > 1" class="key-selector">
-				<label class="key-selector-label">API Key:</label>
-				<v-select
-					:model-value="selectedKey?.id"
-					:items="keySelectItems"
-					@update:model-value="selectKey($event)"
+				<code class="key-mono">{{ displayKey }}</code>
+				<v-icon
+					class="key-copy"
+					name="content_copy"
+					small
+					clickable
+					v-tooltip.bottom="'Copy'"
+					@click="navigator.clipboard.writeText(displayKey)"
 				/>
+			</div>
+
+			<!-- Rotation prompt for pre-encryption keys -->
+			<div v-if="selectedKey && !selectedKey.raw_key && selectedKey.key_prefix" class="key-rotation-notice">
+				<v-icon name="warning" small />
+				<span>Key created before encryption — rotate to get full key</span>
+				<v-button x-small @click="rotateKey(selectedKey!.id)">Rotate</v-button>
 			</div>
 
 			<code-examples :snippet-params="snippetParams" />
@@ -115,8 +124,8 @@ const api = useApi();
 const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
 const {
 	loading, hasKeys, calcKeys, hasCalcKeys, selectedKey,
-	gatewayUrl, justCreatedRawKey,
-	fetchKeys, selectKey, createDefaultKey, dismissRawKey,
+	gatewayUrl,
+	fetchKeys, selectKey, rotateKey, createDefaultKey,
 } = useApiKeys(api);
 
 const creating = ref(false);
@@ -128,9 +137,11 @@ const keySelectItems = computed(() =>
 	})),
 );
 
+const displayKey = computed(() => selectedKey.value?.raw_key || selectedKey.value?.key_prefix || '');
+
 const snippetParams = computed<FormulaSnippetParams>(() => ({
 	baseUrl: gatewayUrl.value,
-	apiKey: justCreatedRawKey.value || selectedKey.value?.key_prefix || '',
+	apiKey: displayKey.value,
 }));
 
 async function handleCreateKey() {
@@ -176,46 +187,63 @@ onMounted(fetchKeys);
 	height: 400px;
 }
 
-.key-selector {
+.key-bar {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 8px;
-	margin-bottom: 12px;
+	gap: 12px;
+	padding: 10px 16px;
+	background: var(--theme--background-subdued);
+	border: var(--theme--border-width) solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	margin-bottom: 16px;
 }
 
-.key-selector-label {
+.key-bar-label {
 	font-size: 13px;
 	font-weight: 600;
 	color: var(--theme--foreground-subdued);
 	white-space: nowrap;
 }
 
-.key-selector :deep(.v-select),
-.key-selector :deep(.v-select .v-input) {
+.key-bar-selector :deep(.v-select),
+.key-bar-selector :deep(.v-select .v-input) {
 	max-width: 300px;
 	width: 300px;
 }
 
-.key-selector :deep(.v-input.full-width) {
+.key-bar-selector :deep(.v-input.full-width) {
 	max-width: 300px !important;
 	width: 300px !important;
 }
 
-.raw-key-notice {
+.key-rotation-notice {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	flex-wrap: wrap;
+	gap: 8px;
+	padding: 8px 16px;
+	background: var(--theme--warning-background);
+	border-radius: var(--theme--border-radius);
+	font-size: 13px;
+	color: var(--theme--warning);
+	margin-bottom: 16px;
 }
 
-.raw-key-value {
-	background: var(--theme--background-subdued);
-	padding: 4px 8px;
-	border-radius: 4px;
+.key-mono {
 	font-family: var(--theme--fonts--monospace--font-family, monospace);
 	font-size: 13px;
 	word-break: break-all;
+	flex: 1;
+	min-width: 0;
+}
+
+.key-copy {
+	color: var(--theme--foreground-subdued);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.key-copy:hover {
+	color: var(--theme--foreground);
 }
 
 .sidebar-info {
