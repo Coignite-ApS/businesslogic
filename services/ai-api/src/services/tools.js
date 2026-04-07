@@ -257,9 +257,9 @@ export async function executeTool(toolName, toolInput, deps) {
       case 'create_knowledge_base':
         return await createKnowledgeBase(accountId, toolInput);
       case 'get_knowledge_base':
-        return await getKnowledgeBase(accountId, toolInput);
+        return await getKnowledgeBase(accountId, toolInput, allowedKbIds);
       case 'upload_to_knowledge_base':
-        return await uploadToKb(accountId, toolInput, logger);
+        return await uploadToKb(accountId, toolInput, logger, allowedKbIds);
       default:
         return { result: `Unknown tool: ${toolName}`, isError: true };
     }
@@ -516,6 +516,10 @@ async function searchKnowledge(accountId, searchQuery, kbId, limit, allowedKbIds
   }
   // This delegates to the KB search endpoint (internal call)
   const params = { query: searchQuery, knowledge_base_id: kbId, limit: limit || 5 };
+  // Pass allowed KBs for cross-KB search filtering
+  if (!kbId && allowedKbIds !== null && allowedKbIds !== undefined) {
+    params.allowed_kb_ids = allowedKbIds;
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (config.adminToken) headers['X-Admin-Token'] = config.adminToken;
   headers['X-Account-Id'] = accountId;
@@ -543,6 +547,10 @@ async function askKnowledge(accountId, question, kbId, allowedKbIds) {
     return { result: 'API key does not have access to this knowledge base', isError: true };
   }
   const params = { question, knowledge_base_id: kbId };
+  // Pass allowed KBs for cross-KB search filtering
+  if (!kbId && allowedKbIds !== null && allowedKbIds !== undefined) {
+    params.allowed_kb_ids = allowedKbIds;
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (config.adminToken) headers['X-Admin-Token'] = config.adminToken;
   headers['X-Account-Id'] = accountId;
@@ -599,7 +607,11 @@ async function createKnowledgeBase(accountId, input) {
   return { result: kb };
 }
 
-async function getKnowledgeBase(accountId, input) {
+async function getKnowledgeBase(accountId, input, allowedKbIds) {
+  // KB scoping: check if API key has access to this specific KB
+  if (input.id && allowedKbIds !== null && allowedKbIds !== undefined && !allowedKbIds.includes(input.id)) {
+    return { result: 'API key does not have access to this knowledge base', isError: true };
+  }
   let kb;
   if (input.id) {
     kb = await queryOne('SELECT * FROM knowledge_bases WHERE id = $1 AND account = $2', [input.id, accountId]);
@@ -616,7 +628,11 @@ async function getKnowledgeBase(accountId, input) {
   return { result: { ...kb, documents: docs } };
 }
 
-async function uploadToKb(accountId, input, logger) {
+async function uploadToKb(accountId, input, logger, allowedKbIds) {
+  // KB scoping: check if API key has access to this specific KB
+  if (input.knowledge_base_id && allowedKbIds !== null && allowedKbIds !== undefined && !allowedKbIds.includes(input.knowledge_base_id)) {
+    return { result: 'API key does not have access to this knowledge base', isError: true };
+  }
   // This delegates to the KB upload endpoint (internal call)
   const params = { file_id: input.file_id, title: input.title };
   const headers = { 'Content-Type': 'application/json' };

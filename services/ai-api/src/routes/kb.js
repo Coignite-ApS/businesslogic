@@ -451,7 +451,16 @@ export async function registerRoutes(app) {
     }
 
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-    const allowedKbIds = kb_id ? null : getAllowedKbIds(req);
+    let allowedKbIds;
+    if (kb_id) {
+      allowedKbIds = null;
+    } else {
+      allowedKbIds = getAllowedKbIds(req);
+      // For internal admin calls (tool functions), accept allowed_kb_ids from body
+      if (allowedKbIds === null && Array.isArray(req.body?.allowed_kb_ids)) {
+        allowedKbIds = req.body.allowed_kb_ids;
+      }
+    }
     const searchStart = Date.now();
     const { results, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions, allowedKbIds);
     const searchLatencyMs = Date.now() - searchStart;
@@ -515,7 +524,16 @@ export async function registerRoutes(app) {
     }
 
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-    const allowedKbIds = kb_id ? null : getAllowedKbIds(req);
+    let allowedKbIds;
+    if (kb_id) {
+      allowedKbIds = null;
+    } else {
+      allowedKbIds = getAllowedKbIds(req);
+      // For internal admin calls (tool functions), accept allowed_kb_ids from body
+      if (allowedKbIds === null && Array.isArray(req.body?.allowed_kb_ids)) {
+        allowedKbIds = req.body.allowed_kb_ids;
+      }
+    }
     const searchStart = Date.now();
     const { results: chunks, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions, allowedKbIds);
     const searchLatencyMs = Date.now() - searchStart;
