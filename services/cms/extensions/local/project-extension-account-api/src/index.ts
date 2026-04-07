@@ -52,8 +52,8 @@ export default defineHook(({ init }, { env, logger, database: db }) => {
                 const user = await db('directus_users').where('id', userId).select('active_account').first();
                 if (!user?.active_account) return res.status(400).json({ errors: [{ message: 'No active account' }] });
                 const gw = await gwFetch('/internal/api-keys/', 'POST', {
-                    account_id: user.active_account,
                     ...req.body,
+                    account_id: user.active_account,
                 });
                 return res.status(gw.status).json(gw.data);
             } catch (err: any) {
