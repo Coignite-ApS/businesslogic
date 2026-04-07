@@ -4,6 +4,7 @@ import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
 import { getActiveAccount } from '../utils/auth.js';
 import { hybridSearch } from '../services/search.js';
+import { assertKbAccess, getAllowedKbIds } from '../utils/kb-access.js';
 import { createEmbeddingClientForKb, getModelDimensions, LOCAL_EMBEDDING_MODEL } from '../services/embedding-factory.js';
 // createEmbeddingClient: global-toggle-aware factory for cross-KB search (no specific KB)
 import { createEmbeddingClient } from '../services/local-embeddings.js';
@@ -33,6 +34,15 @@ async function verifyKbOwnership(req, reply) {
     [req.params.kbId, accountId],
   );
   if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
+
+  // API key KB scoping — check if key has access to this specific KB
+  try {
+    assertKbAccess(req, req.params.kbId);
+  } catch (err) {
+    reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
+    return null;
+  }
+
   return { accountId, kb };
 }
 
@@ -45,11 +55,24 @@ export async function registerRoutes(app) {
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
-    const rows = await queryAll(
-      `SELECT id, name, description, icon, sort, date_created, date_updated
-       FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
-      [accountId],
-    );
+    const allowedKbIds = getAllowedKbIds(req);
+
+    let rows;
+    if (allowedKbIds !== null) {
+      if (allowedKbIds.length === 0) return { data: [] };
+      rows = await queryAll(
+        `SELECT id, name, description, icon, sort, date_created, date_updated
+         FROM knowledge_bases WHERE account = $1 AND id = ANY($2::uuid[])
+         ORDER BY sort, name`,
+        [accountId, allowedKbIds],
+      );
+    } else {
+      rows = await queryAll(
+        `SELECT id, name, description, icon, sort, date_created, date_updated
+         FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
+        [accountId],
+      );
+    }
     return { data: rows };
   });
 
