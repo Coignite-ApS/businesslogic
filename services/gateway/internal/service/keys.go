@@ -85,7 +85,8 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 
 	var acct AccountData
 	var permJSON []byte
-	var allowedOrigins, allowedIPs []string
+	var allowedOrigins, allowedIPs *[]string
+	var rateLimitRPS, monthlyQuota *int
 	var expiresAt, revokedAt *time.Time
 
 	err := ks.db.QueryRow(ctx, `
@@ -95,7 +96,7 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 		FROM api_keys WHERE key_hash = $1
 	`, keyHash).Scan(
 		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
-		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
+		&allowedOrigins, &allowedIPs, &rateLimitRPS, &monthlyQuota,
 		&expiresAt, &revokedAt,
 	)
 	if err != nil {
@@ -110,8 +111,18 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 	}
 
 	acct.Permissions = ParsePermissions(permJSON)
-	acct.AllowedOrigins = allowedOrigins
-	acct.AllowedIPs = allowedIPs
+	if allowedOrigins != nil {
+		acct.AllowedOrigins = *allowedOrigins
+	}
+	if allowedIPs != nil {
+		acct.AllowedIPs = *allowedIPs
+	}
+	if rateLimitRPS != nil {
+		acct.RateLimitRPS = *rateLimitRPS
+	}
+	if monthlyQuota != nil {
+		acct.MonthlyQuota = *monthlyQuota
+	}
 
 	return &acct, nil
 }
@@ -161,7 +172,8 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 
 	var acct AccountData
 	var permJSON []byte
-	var allowedOrigins, allowedIPs []string
+	var allowedOrigins, allowedIPs *[]string
+	var rateLimitRPS, monthlyQuota *int
 	var expiresAt, revokedAt *time.Time
 
 	err := ks.db.QueryRow(ctx, `
@@ -171,7 +183,7 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 		FROM api_keys WHERE key_prefix = $1
 	`, prefix).Scan(
 		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
-		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
+		&allowedOrigins, &allowedIPs, &rateLimitRPS, &monthlyQuota,
 		&expiresAt, &revokedAt,
 	)
 	if err != nil {
@@ -186,8 +198,18 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 	}
 
 	acct.Permissions = ParsePermissions(permJSON)
-	acct.AllowedOrigins = allowedOrigins
-	acct.AllowedIPs = allowedIPs
+	if allowedOrigins != nil {
+		acct.AllowedOrigins = *allowedOrigins
+	}
+	if allowedIPs != nil {
+		acct.AllowedIPs = *allowedIPs
+	}
+	if rateLimitRPS != nil {
+		acct.RateLimitRPS = *rateLimitRPS
+	}
+	if monthlyQuota != nil {
+		acct.MonthlyQuota = *monthlyQuota
+	}
 
 	return &acct, nil
 }

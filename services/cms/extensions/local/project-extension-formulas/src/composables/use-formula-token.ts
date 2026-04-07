@@ -14,8 +14,11 @@ export function useFormulaToken(api: any) {
 			const keys = data?.data || data;
 			hasToken.value = Array.isArray(keys) && keys.length > 0;
 
-			if (hasToken.value && keys[0]?.key) {
-				tokenValue.value = keys[0].key;
+			if (hasToken.value) {
+				// Gateway list returns key_prefix, not the full key (security).
+				// Use prefix as placeholder — user must copy their key from Account settings.
+				const first = keys[0];
+				tokenValue.value = first?.raw_key || first?.key || (first?.key_prefix ? `${first.key_prefix}...your-key-here` : '');
 			} else {
 				tokenValue.value = '';
 			}

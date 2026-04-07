@@ -119,6 +119,8 @@ services:
       # Gateway internal auth (CMS→gateway→services)
       - GATEWAY_URL=http://bl-gateway:8080
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET:-dev-internal-secret}
+      # Public gateway URL for code snippets
+      - GATEWAY_PUBLIC_URL=${GATEWAY_PUBLIC_URL:-http://localhost:18080}
       # Direct service URLs (for public URL exposure + legacy)
       - FORMULA_API_URL=http://bl-formula-api:3000
       - FORMULA_API_ADMIN_TOKEN=${FORMULA_API_ADMIN_TOKEN:-dev-formula-token}

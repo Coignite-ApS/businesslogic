@@ -269,10 +269,10 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 
 	init('routes.custom.before', ({ app }) => {
 
-		// GET /calc/formula-api-url — expose public Formula API URL to frontend (for code snippets)
-		const publicApiUrl = (env['FORMULA_API_PUBLIC_URL'] as string) || (env['FORMULA_API_URL'] as string) || apiUrl;
+		// GET /calc/formula-api-url — expose public gateway URL to frontend (for code snippets)
+		const publicGatewayUrl = (env['GATEWAY_PUBLIC_URL'] as string) || (env['GATEWAY_URL'] as string) || '';
 		app.get('/calc/formula-api-url', requireAuth, (_req: any, res: any) => {
-			return res.json({ url: publicApiUrl });
+			return res.json({ url: publicGatewayUrl ? `${publicGatewayUrl}/v1/calc` : '' });
 		});
 
 		// GET /calc/health — proxy Formula API health (admin only)

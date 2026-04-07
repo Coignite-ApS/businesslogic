@@ -149,6 +149,27 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 			});
 
 			logger.info(`Trial subscription created for account ${key}: ${plan.name}, ${plan.trial_days} days`);
+
+			// Auto-provision a default API key via the gateway
+			try {
+				const gwUrl = (env['GATEWAY_URL'] as string) || '';
+				const gwSecret = (env['GATEWAY_INTERNAL_SECRET'] as string) || '';
+				if (gwUrl && gwSecret) {
+					const provisionRes = await fetch(`${gwUrl}/internal/api-keys/auto-provision`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': gwSecret },
+						body: JSON.stringify({ account_id: key }),
+					});
+					const result = await provisionRes.json();
+					if (result.provisioned) {
+						logger.info(`Auto-provisioned API key for account ${key}`);
+					} else {
+						logger.debug(`API key auto-provision skipped for account ${key}: ${result.message || 'already has keys'}`);
+					}
+				}
+			} catch (provisionErr) {
+				logger.warn(`API key auto-provision failed for account ${key}: ${provisionErr}`);
+			}
 		} catch (err) {
 			logger.error(`Failed to create trial subscription for account ${key}: ${err}`);
 		}

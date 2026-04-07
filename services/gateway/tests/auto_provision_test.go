@@ -38,15 +38,16 @@ func TestAutoProvision_FirstCall_CreatesTestKey(t *testing.T) {
 		WithArgs(testAutoProvisionAccountID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
-	// Expect INSERT for test key (3 args: keyHash, keyPrefix, accountID)
+	// Expect INSERT for live key (4 args: keyHash, keyPrefix, accountID, permissions JSON)
+	defaultPermsJSON := []byte(`{"services":{"calc":{"enabled":true,"resources":["*"],"actions":["execute","describe"]},"kb":{"enabled":true,"resources":["*"],"actions":["search","ask"]},"flow":{"enabled":true,"resources":["*"],"actions":["trigger"]}}}`)
 	mock.ExpectQuery(`INSERT INTO api_keys`).
-		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), testAutoProvisionAccountID).
+		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), testAutoProvisionAccountID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{
 			"id", "key_prefix", "account_id", "name", "environment", "permissions",
 			"allowed_ips", "allowed_origins", "rate_limit_rps", "monthly_quota",
 			"expires_at", "last_used_at", "created_at",
 		}).AddRow(
-			"id-test-1", "bl_testXXX", testAutoProvisionAccountID, "Test", "test", nil,
+			"id-test-1", "bl_testXXX", testAutoProvisionAccountID, "Default", "live", defaultPermsJSON,
 			[]string{}, []string{}, nil, nil, nil, nil, now,
 		))
 
@@ -78,11 +79,26 @@ func TestAutoProvision_FirstCall_CreatesTestKey(t *testing.T) {
 		t.Fatalf("expected key object in response, got %v", resp["key"])
 	}
 
-	if key["environment"] != "test" {
-		t.Errorf("expected key environment=test, got %v", key["environment"])
+	if key["environment"] != "live" {
+		t.Errorf("expected key environment=live, got %v", key["environment"])
 	}
-	if key["name"] != "Test" {
-		t.Errorf("expected key name=Test, got %v", key["name"])
+	if key["name"] != "Default" {
+		t.Errorf("expected key name=Default, got %v", key["name"])
+	}
+
+	// Verify permissions include calc, kb, flow services
+	perms, ok := key["permissions"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected permissions object in key")
+	}
+	services, ok := perms["services"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected services in permissions")
+	}
+	for _, svc := range []string{"calc", "kb", "flow"} {
+		if services[svc] == nil {
+			t.Errorf("expected %s service in permissions", svc)
+		}
 	}
 
 	// raw_key must be present (only surfaced at creation time)

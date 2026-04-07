@@ -162,8 +162,11 @@ describe('summarizePermissions', () => {
 		expect(summarizePermissions(perms)).toBe('1 calculator, All KBs');
 	});
 
-	it('returns "No permissions" for empty', () => {
-		expect(summarizePermissions(null)).toBe('No permissions');
+	it('returns "Full access" for null (no restrictions)', () => {
+		expect(summarizePermissions(null)).toBe('Full access');
+	});
+
+	it('returns "No permissions" for empty services', () => {
 		expect(summarizePermissions({ services: {} })).toBe('No permissions');
 	});
 });

@@ -118,6 +118,13 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Permissions != nil {
 		permJSON, _ = json.Marshal(req.Permissions)
 	}
+	// Default nil slices to empty arrays to avoid NULL in DB
+	if req.AllowedIPs == nil {
+		req.AllowedIPs = []string{}
+	}
+	if req.AllowedOrigins == nil {
+		req.AllowedOrigins = []string{}
+	}
 
 	var resp keyResponse
 	err := h.db.QueryRow(r.Context(), `
@@ -429,16 +436,20 @@ func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
 	keyHash := hex.EncodeToString(hash[:])
 	keyPrefix := rawKey[:11]
 
+	// Default permissions: all services enabled with wildcard access.
+	// Feature flags are the real gate — these permissions just ensure the key works everywhere.
+	defaultPerms := `{"services":{"calc":{"enabled":true,"resources":["*"],"actions":["execute","describe"]},"kb":{"enabled":true,"resources":["*"],"actions":["search","ask"]},"flow":{"enabled":true,"resources":["*"],"actions":["trigger"]}}}`
+
 	var resp keyResponse
 	var permJSON []byte
 	err = h.db.QueryRow(r.Context(), `
 		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
 			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
-		VALUES ($1, $2, $3, 'test', 'Test', NULL, '{}', '{}', NULL, NULL, NULL)
+		VALUES ($1, $2, $3, 'live', 'Default', $4::jsonb, '{}', '{}', NULL, NULL, NULL)
 		RETURNING id, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
 			expires_at, last_used_at, created_at
-	`, keyHash, keyPrefix, req.AccountID,
+	`, keyHash, keyPrefix, req.AccountID, defaultPerms,
 	).Scan(
 		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
 		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
@@ -448,7 +459,8 @@ func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
 		return
 	}
-	resp.Permissions = nil // full access
+	parsed := service.ParsePermissions(permJSON)
+	resp.Permissions = &parsed
 	resp.RawKey = rawKey
 
 	h.invalidateAccountCache(r, req.AccountID)
