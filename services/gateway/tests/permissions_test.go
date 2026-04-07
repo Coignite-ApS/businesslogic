@@ -581,6 +581,28 @@ func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
 	}
 }
 
+func TestDefaultPermissions_AllServicesEnabled(t *testing.T) {
+	dp := service.DefaultPermissions
+	for _, svc := range []string{"calc", "kb", "flow"} {
+		if !dp.HasServiceAccess(svc) {
+			t.Errorf("DefaultPermissions should grant %s service access", svc)
+		}
+	}
+}
+
+func TestDefaultPermissions_WildcardAccess(t *testing.T) {
+	dp := service.DefaultPermissions
+	if !dp.HasAccess("calc", "any-uuid", "execute") {
+		t.Error("DefaultPermissions should grant calc wildcard access")
+	}
+	if !dp.HasAccess("kb", "any-uuid", "search") {
+		t.Error("DefaultPermissions should grant kb wildcard access")
+	}
+	if !dp.HasAccess("flow", "any-uuid", "trigger") {
+		t.Error("DefaultPermissions should grant flow wildcard access")
+	}
+}
+
 func TestAuthMiddleware_SkipsInternalEndpoints(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
 	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
