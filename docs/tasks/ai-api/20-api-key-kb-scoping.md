@@ -1,6 +1,6 @@
 # ai-api/20 — API Key → KB Scoping
 
-**Status:** planned
+**Status:** in-progress
 **Priority:** critical
 **Service:** ai-api, cms
 **Spec:** [docs/superpowers/specs/2026-04-02-api-key-kb-scoping-design.md](../../superpowers/specs/2026-04-02-api-key-kb-scoping-design.md)
@@ -11,18 +11,19 @@ Enforce per-KB access restrictions on API keys. Currently all API keys within an
 
 ## Key Tasks
 
-- [ ] Create `utils/kb-access.js` — `getAllowedKbIds(req)`, `assertKbAccess(req, kbId)`
-- [ ] Enforce in `verifyKbOwnership()` — call `assertKbAccess` after account check
-- [ ] Enforce in `GET /v1/ai/kb/list` — filter by allowed KB IDs
-- [ ] Enforce in `POST /v1/ai/kb/search` — inject `WHERE knowledge_base = ANY(...)` when scoped
-- [ ] Enforce in `POST /v1/ai/kb/ask` — same as search
-- [ ] Update `hybridSearch()` — accept `allowedKbIds` param, add SQL filter
-- [ ] Enforce in tool calls (`search_knowledge`, `ask_knowledge`) — pass allowed KBs through
-- [ ] Update `POST /v1/ai/kb/:kbId/reindex` — inherits via verifyKbOwnership
-- [ ] CMS API key UI — add KB multi-select picker on create/edit form
-- [ ] CMS API key proxy — save selected IDs into `permissions.services.ai.resources.kb`
-- [ ] Tests: kb-access unit tests, integration tests for scoped vs unscoped search
-- [ ] Verify backwards compat: existing keys with `resources: null` remain unrestricted
+- [x] Create `utils/kb-access.js` — `getAllowedKbIds(req)`, `assertKbAccess(req, kbId)`
+- [x] Preserve `req.permissionsRaw` in `verifyAuth` for resource-level scoping
+- [x] Enforce in `verifyKbOwnership()` — call `assertKbAccess` after account check
+- [x] Enforce in `GET /v1/ai/kb/list` — filter by allowed KB IDs
+- [x] Enforce in `POST /v1/ai/kb/search` — `assertKbAccess` for specific kb_id + `allowedKbIds` SQL filter for cross-KB
+- [x] Enforce in `POST /v1/ai/kb/ask` — same as search
+- [x] Update `hybridSearch()` — accept `allowedKbIds` param, `AND c.knowledge_base = ANY($N::uuid[])` filter
+- [x] Enforce in tool calls (`search_knowledge`, `ask_knowledge`, `list_knowledge_bases`) — thread `allowedKbIds` from chat handler
+- [x] Update `POST /v1/ai/kb/:kbId/reindex` — inherits via verifyKbOwnership
+- [x] CMS API key UI — verified `resource-picker.vue` already builds `services.kb.resources` correctly
+- [x] Tests: 13 kb-access unit tests + 14 kb-scoping tests (27 total)
+- [x] Verify backwards compat: existing keys with `resources: null`/missing → unrestricted (null = all)
+- [ ] CMS: fix pre-existing `summarizePermissions(null)` test assertion (returns "Full access" not "No permissions")
 
 ## Affected Files
 
@@ -35,9 +36,22 @@ Enforce per-KB access restrictions on API keys. Currently all API keys within an
 | Modify | `services/ai-api/src/services/tools.js` |
 | Modify | `services/cms/extensions/local/project-extension-account/src/` (API key UI) |
 
+## Implementation Notes
+
+**Design deviation from spec:** Uses `services.kb.resources` (top-level service) instead of spec's `services.ai.resources.kb` (nested). Reason: gateway Go struct `ServicePermission.Resources` is `*[]string` (incompatible with nested objects), and CMS already builds `services.kb.resources`. Zero gateway changes.
+
+**Enforcement points:**
+- `verifyKbOwnership()` → gates all `:kbId` endpoints (15+ routes)
+- `GET /v1/ai/kb/list` → SQL filter `AND id = ANY($2::uuid[])`
+- `POST /v1/ai/kb/search` + `POST /v1/ai/kb/ask` → `assertKbAccess` for specific kb_id, `allowedKbIds` SQL filter for cross-KB
+- `hybridSearch()` → `AND c.knowledge_base = ANY($3::uuid[])` in vector + FTS queries
+- `search_knowledge`/`ask_knowledge`/`list_knowledge_bases` tools → threaded from chat handler via `deps.allowedKbIds`
+
 ## Security Notes
 
 - `resources: null` = all (backwards-compatible default)
-- `resources: { kb: [] }` = no KB access (explicit deny)
+- `resources: []` = no KB access (explicit deny)
+- `resources: ["*"]` = all (wildcard)
 - Gateway passes permissions through unchanged — no gateway changes needed
+- Admin token requests → always unrestricted (no permissionsRaw)
 - Pattern extensible to calc/flow scoping later
