@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { config } from '../config.js';
 import { queryOne, queryAll } from '../db.js';
 import { getActiveAccount } from '../utils/auth.js';
-import { EmbeddingClient } from '../services/embeddings.js';
+import { createEmbeddingClientForKb } from '../services/embedding-factory.js';
 import { hybridSearch } from '../services/search.js';
 import { generateAnswer } from '../services/answer.js';
 
@@ -81,7 +81,7 @@ export async function registerRoutes(app) {
     // Verify KB ownership
     const kbId = req.params.kbId;
     const kb = await queryOne(
-      'SELECT id, name, description FROM knowledge_bases WHERE id = $1 AND account_id = $2',
+      'SELECT id, name, description, embedding_model, dimensions FROM knowledge_bases WHERE id = $1 AND account_id = $2',
       [kbId, accountId],
     );
     if (!kb) {
@@ -142,13 +142,14 @@ export async function registerRoutes(app) {
           if (!args.query?.trim()) {
             return reply.send(jsonRpcError(id, INVALID_PARAMS, 'query is required'));
           }
-          if (!config.openaiApiKey) {
-            return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'Embedding service not configured'));
+          let embedClient;
+          try {
+            embedClient = await createEmbeddingClientForKb(kb);
+          } catch (err) {
+            return reply.send(jsonRpcError(id, INTERNAL_ERROR, err.message));
           }
-
-          const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
           const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const { results } = await hybridSearch(embedClient, args.query.trim(), accountId, kbId, args.limit || 10, searchConfig);
+          const { results } = await hybridSearch(embedClient, args.query.trim(), accountId, kbId, args.limit || 10, searchConfig, kb.dimensions);
 
           const content = [{ type: 'text', text: JSON.stringify(results) }];
           return reply.send(jsonRpcResult(id, { content }));
@@ -159,13 +160,18 @@ export async function registerRoutes(app) {
           if (!args.question?.trim()) {
             return reply.send(jsonRpcError(id, INVALID_PARAMS, 'question is required'));
           }
-          if (!config.openaiApiKey || !config.anthropicApiKey) {
-            return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'AI services not configured'));
+          if (!config.anthropicApiKey) {
+            return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'AI service not configured'));
           }
 
-          const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
-          const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const { results: chunks } = await hybridSearch(embedClient, args.question.trim(), accountId, kbId, 10, searchConfig);
+          let askEmbedClient;
+          try {
+            askEmbedClient = await createEmbeddingClientForKb(kb);
+          } catch (err) {
+            return reply.send(jsonRpcError(id, INTERNAL_ERROR, err.message));
+          }
+          const askSearchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
+          const { results: chunks } = await hybridSearch(askEmbedClient, args.question.trim(), accountId, kbId, 10, askSearchConfig, kb.dimensions);
 
           // Check for curated answers
           let curatedContext = [];
@@ -312,23 +318,24 @@ export async function registerRoutes(app) {
           if (!args.query?.trim()) {
             return reply.send(jsonRpcError(id, INVALID_PARAMS, 'query is required'));
           }
-          if (!config.openaiApiKey) {
-            return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'Embedding service not configured'));
-          }
-
           // Resolve full KB ID from prefix
           const prefix = toolName.replace('kb_search_', '');
-          const kb = await queryOne(
-            'SELECT id FROM knowledge_bases WHERE id LIKE $1 AND account_id = $2',
+          const resolvedKb = await queryOne(
+            'SELECT id, embedding_model, dimensions FROM knowledge_bases WHERE id LIKE $1 AND account_id = $2',
             [`${prefix}%`, accountId],
           );
-          if (!kb) {
+          if (!resolvedKb) {
             return reply.send(jsonRpcError(id, INVALID_PARAMS, 'Knowledge base not found'));
           }
 
-          const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
+          let embedClient;
+          try {
+            embedClient = await createEmbeddingClientForKb(resolvedKb);
+          } catch (err) {
+            return reply.send(jsonRpcError(id, INTERNAL_ERROR, err.message));
+          }
           const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const { results } = await hybridSearch(embedClient, args.query.trim(), accountId, kb.id, args.limit || 10, searchConfig);
+          const { results } = await hybridSearch(embedClient, args.query.trim(), accountId, resolvedKb.id, args.limit || 10, searchConfig, resolvedKb.dimensions);
 
           return reply.send(jsonRpcResult(id, { content: [{ type: 'text', text: JSON.stringify(results) }] }));
         }
@@ -338,22 +345,27 @@ export async function registerRoutes(app) {
           if (!args.question?.trim()) {
             return reply.send(jsonRpcError(id, INVALID_PARAMS, 'question is required'));
           }
-          if (!config.openaiApiKey || !config.anthropicApiKey) {
-            return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'AI services not configured'));
+          if (!config.anthropicApiKey) {
+            return reply.send(jsonRpcError(id, INTERNAL_ERROR, 'AI service not configured'));
           }
 
-          const prefix = toolName.replace('kb_ask_', '');
-          const kb = await queryOne(
-            'SELECT id FROM knowledge_bases WHERE id LIKE $1 AND account_id = $2',
-            [`${prefix}%`, accountId],
+          const askPrefix = toolName.replace('kb_ask_', '');
+          const askKb = await queryOne(
+            'SELECT id, embedding_model, dimensions FROM knowledge_bases WHERE id LIKE $1 AND account_id = $2',
+            [`${askPrefix}%`, accountId],
           );
-          if (!kb) {
+          if (!askKb) {
             return reply.send(jsonRpcError(id, INVALID_PARAMS, 'Knowledge base not found'));
           }
 
-          const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
-          const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
-          const { results: chunks } = await hybridSearch(embedClient, args.question.trim(), accountId, kb.id, 10, searchConfig);
+          let askClient;
+          try {
+            askClient = await createEmbeddingClientForKb(askKb);
+          } catch (err) {
+            return reply.send(jsonRpcError(id, INTERNAL_ERROR, err.message));
+          }
+          const askSearchCfg = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
+          const { results: chunks } = await hybridSearch(askClient, args.question.trim(), accountId, askKb.id, 10, askSearchCfg, askKb.dimensions);
           const model = config.defaultModel;
           const result = await generateAnswer(config.anthropicApiKey, args.question.trim(), chunks, model, []);
 

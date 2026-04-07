@@ -105,6 +105,51 @@
 					@create-curated-from="handleCreateCuratedFrom"
 				/>
 			</template>
+
+			<template v-if="activeTab === 'settings'">
+				<div class="settings-panel">
+					<div class="settings-section">
+						<h3 class="settings-heading">Retrieval Features</h3>
+						<p class="settings-desc">Configure how this knowledge base processes and retrieves content.</p>
+
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Contextual Retrieval</span>
+								<span class="setting-help">LLM-generates context prefix per chunk during ingest for improved retrieval accuracy.</span>
+							</div>
+							<input
+								type="checkbox"
+								class="setting-toggle"
+								:checked="contextualRetrievalEnabled"
+								@change="toggleContextualRetrieval(($event.target as HTMLInputElement).checked)"
+							/>
+						</div>
+
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Parent-Document Retrieval</span>
+								<span class="setting-help">Embeds small child chunks for precision, returns full parent section to the LLM for richer context.</span>
+							</div>
+							<input
+								type="checkbox"
+								class="setting-toggle"
+								:checked="parentDocEnabled"
+								@change="toggleParentDoc(($event.target as HTMLInputElement).checked)"
+							/>
+						</div>
+					</div>
+
+					<div class="settings-section">
+						<h3 class="settings-heading">Model Info</h3>
+						<div class="setting-row">
+							<div class="setting-info">
+								<span class="setting-label">Embedding Model</span>
+								<span class="setting-help">{{ kb.embedding_model || 'default' }}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</template>
 		</div>
 	</div>
 </template>
@@ -169,6 +214,7 @@ const tabs = [
 	{ id: 'ask', label: 'Ask', icon: 'question_answer' },
 	{ id: 'curated', label: 'Curated', icon: 'star' },
 	{ id: 'feedback', label: 'Feedback', icon: 'thumbs_up_down' },
+	{ id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 const activeTab = ref('documents');
@@ -177,6 +223,16 @@ const showIconPicker = ref(false);
 const editName = ref(props.kb.name);
 const editDescription = ref(props.kb.description || '');
 const currentIcon = computed(() => props.kb.icon || 'menu_book');
+const contextualRetrievalEnabled = computed(() => props.kb.contextual_retrieval_enabled !== false);
+const parentDocEnabled = computed(() => props.kb.parent_doc_enabled === true);
+
+function toggleContextualRetrieval(val: boolean) {
+	emit('update', { contextual_retrieval_enabled: val } as any);
+}
+
+function toggleParentDoc(val: boolean) {
+	emit('update', { parent_doc_enabled: val } as any);
+}
 
 function selectIcon(icon: string) {
 	showIconPicker.value = false;
@@ -354,5 +410,58 @@ function handleCreateCuratedFrom(query: string) {
 
 .tab-content {
 	min-height: 300px;
+}
+
+.settings-panel {
+	max-width: 600px;
+}
+
+.settings-section {
+	margin-bottom: 24px;
+}
+
+.settings-heading {
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 4px;
+}
+
+.settings-desc {
+	font-size: 13px;
+	color: var(--theme--foreground-subdued);
+	margin: 0 0 16px;
+}
+
+.setting-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--theme--border-color-subdued);
+}
+
+.setting-info {
+	flex: 1;
+	margin-right: 16px;
+}
+
+.setting-label {
+	display: block;
+	font-weight: 500;
+	font-size: 14px;
+}
+
+.setting-help {
+	display: block;
+	font-size: 12px;
+	color: var(--theme--foreground-subdued);
+	margin-top: 2px;
+}
+
+.setting-toggle {
+	width: 18px;
+	height: 18px;
+	cursor: pointer;
+	accent-color: var(--theme--primary);
 }
 </style>

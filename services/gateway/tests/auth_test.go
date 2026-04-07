@@ -11,7 +11,7 @@ import (
 
 func TestAuthMiddleware_MissingKey(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
-	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -27,7 +27,7 @@ func TestAuthMiddleware_MissingKey(t *testing.T) {
 
 func TestAuthMiddleware_InvalidKey(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
-	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -44,7 +44,7 @@ func TestAuthMiddleware_InvalidKey(t *testing.T) {
 
 func TestAuthMiddleware_SkipsHealthEndpoint(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
-	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

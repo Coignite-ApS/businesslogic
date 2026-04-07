@@ -3,8 +3,11 @@ import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
 import { getActiveAccount } from '../utils/auth.js';
-import { EmbeddingClient } from '../services/embeddings.js';
 import { hybridSearch } from '../services/search.js';
+import { assertKbAccess, getAllowedKbIds } from '../utils/kb-access.js';
+import { createEmbeddingClientForKb, getModelDimensions, LOCAL_EMBEDDING_MODEL } from '../services/embedding-factory.js';
+// createEmbeddingClient: global-toggle-aware factory for cross-KB search (no specific KB)
+import { createEmbeddingClient } from '../services/local-embeddings.js';
 import { generateAnswer } from '../services/answer.js';
 import { logRetrievalQuality } from '../services/retrieval-logger.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
@@ -31,6 +34,15 @@ async function verifyKbOwnership(req, reply) {
     [req.params.kbId, accountId],
   );
   if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
+
+  // API key KB scoping — check if key has access to this specific KB
+  try {
+    assertKbAccess(req, req.params.kbId);
+  } catch (err) {
+    reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
+    return null;
+  }
+
   return { accountId, kb };
 }
 
@@ -43,11 +55,24 @@ export async function registerRoutes(app) {
     const accountId = req.accountId || await getActiveAccount(req.userId);
     if (!accountId) return reply.code(403).send({ errors: [{ message: 'No active account' }] });
 
-    const rows = await queryAll(
-      `SELECT id, name, description, icon, sort, date_created, date_updated
-       FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
-      [accountId],
-    );
+    const allowedKbIds = getAllowedKbIds(req);
+
+    let rows;
+    if (allowedKbIds !== null) {
+      if (allowedKbIds.length === 0) return { data: [] };
+      rows = await queryAll(
+        `SELECT id, name, description, icon, sort, date_created, date_updated
+         FROM knowledge_bases WHERE account = $1 AND id = ANY($2::uuid[])
+         ORDER BY sort, name`,
+        [accountId, allowedKbIds],
+      );
+    } else {
+      rows = await queryAll(
+        `SELECT id, name, description, icon, sort, date_created, date_updated
+         FROM knowledge_bases WHERE account = $1 ORDER BY sort, name`,
+        [accountId],
+      );
+    }
     return { data: rows };
   });
 
@@ -60,11 +85,13 @@ export async function registerRoutes(app) {
     const { name, description, icon, sort } = req.body || {};
     if (!name?.trim()) return reply.code(400).send({ errors: [{ message: 'Name is required' }] });
 
+    const embeddingModel = config.useLocalEmbeddings ? LOCAL_EMBEDDING_MODEL : config.embeddingModel;
+
     const id = randomUUID();
     await query(
-      `INSERT INTO knowledge_bases (id, account, name, description, icon, sort, date_created, date_updated)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
-      [id, accountId, name.trim(), description || null, icon || null, sort ?? 0],
+      `INSERT INTO knowledge_bases (id, account, name, description, icon, sort, embedding_model, date_created, date_updated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+      [id, accountId, name.trim(), description || null, icon || null, sort ?? 0, embeddingModel],
     );
     const item = await queryOne('SELECT * FROM knowledge_bases WHERE id = $1', [id]);
     return { data: item };
@@ -97,6 +124,8 @@ export async function registerRoutes(app) {
     if (req.body.description !== undefined) { updates.push(`description = $${idx++}`); params.push(req.body.description); }
     if (req.body.icon !== undefined) { updates.push(`icon = $${idx++}`); params.push(req.body.icon); }
     if (req.body.sort !== undefined) { updates.push(`sort = $${idx++}`); params.push(req.body.sort); }
+    if (req.body.contextual_retrieval_enabled !== undefined) { updates.push(`contextual_retrieval_enabled = $${idx++}`); params.push(req.body.contextual_retrieval_enabled); }
+    if (req.body.parent_doc_enabled !== undefined) { updates.push(`parent_doc_enabled = $${idx++}`); params.push(req.body.parent_doc_enabled); }
     if (updates.length === 0) return { data: ctx.kb };
 
     updates.push('date_updated = NOW()');
@@ -243,6 +272,56 @@ export async function registerRoutes(app) {
     return { data: { id: req.params.docId, status: 'pending' } };
   });
 
+  // Re-index entire KB (all documents)
+  app.post('/v1/ai/kb/:kbId/reindex', { preHandler: [app.verifyAuth] }, async (req, reply) => {
+    const ctx = await verifyKbOwnership(req, reply);
+    if (!ctx) return;
+
+    const docs = await queryAll(
+      'SELECT id, file_id FROM kb_documents WHERE knowledge_base = $1',
+      [req.params.kbId],
+    );
+
+    if (docs.length === 0) {
+      return { data: { queued: 0, message: 'No documents to re-index' } };
+    }
+
+    // Clear contextual_content so it regenerates
+    await query(
+      'UPDATE kb_chunks SET contextual_content = NULL WHERE knowledge_base = $1',
+      [req.params.kbId],
+    );
+
+    let queued = 0;
+    for (const doc of docs) {
+      await query(
+        "UPDATE kb_documents SET status = 'pending', date_updated = NOW() WHERE id = $1",
+        [doc.id],
+      );
+
+      const ingestData = {
+        documentId: doc.id,
+        kbId: req.params.kbId,
+        accountId: ctx.accountId,
+        fileId: doc.file_id,
+        reindex: true,
+      };
+
+      let dispatched = false;
+      if (isFlowIngestEnabled()) {
+        const flowResult = await triggerFlowIngest(ingestData, req.log);
+        dispatched = flowResult.triggered;
+      }
+      if (!dispatched) {
+        const enqueued = await enqueueIngest(ingestData);
+        dispatched = !!enqueued;
+      }
+      if (dispatched) queued++;
+    }
+
+    return { data: { queued, message: `Re-indexing ${queued} documents` } };
+  });
+
   // ─── Curated Answers ────────────────────────────────────────
 
   // List curated answers
@@ -268,13 +347,11 @@ export async function registerRoutes(app) {
     if (!answer?.trim()) return reply.code(400).send({ errors: [{ message: 'Answer is required' }] });
 
     let embedding = null;
-    if (config.openaiApiKey) {
-      try {
-        const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
-        embedding = await embedClient.embedQuery(question);
-      } catch (err) {
-        logger.error({ err: err.message }, 'Failed to embed curated question');
-      }
+    try {
+      const embedClient = await createEmbeddingClientForKb(ctx.kb);
+      embedding = await embedClient.embedQuery(question);
+    } catch (err) {
+      logger.error({ err: err.message }, 'Failed to embed curated question');
     }
 
     const id = randomUUID();
@@ -307,9 +384,9 @@ export async function registerRoutes(app) {
     if (updates.length === 0) return { data: existing };
 
     // Re-embed if question changed
-    if (req.body.question && config.openaiApiKey) {
+    if (req.body.question) {
       try {
-        const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
+        const embedClient = await createEmbeddingClientForKb(ctx.kb);
         const embedding = await embedClient.embedQuery(req.body.question);
         updates.push(`question_embedding = $${idx++}`);
         params.push(`[${embedding.join(',')}]`);
@@ -354,15 +431,46 @@ export async function registerRoutes(app) {
     const { query: searchQuery, kb_id, limit } = req.body || {};
     if (!searchQuery?.trim()) return reply.code(400).send({ errors: [{ message: 'Query is required' }] });
 
-    if (!config.openaiApiKey) {
-      return reply.code(503).send({ errors: [{ message: 'Embedding service not configured' }] });
+    // KB scoping: block access to restricted KB
+    if (kb_id) {
+      try { assertKbAccess(req, kb_id); } catch (err) {
+        return reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
+      }
     }
 
-    const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
+    // Resolve embedding client — use KB's locked model if kb_id provided
+    let embedClient;
+    let expectedDimensions;
+    if (kb_id) {
+      const kb = await queryOne('SELECT embedding_model FROM knowledge_bases WHERE id = $1 AND account = $2', [kb_id, accountId]);
+      if (!kb) return reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] });
+      embedClient = await createEmbeddingClientForKb(kb);
+      expectedDimensions = getModelDimensions(kb.embedding_model || config.embeddingModel);
+    } else {
+      embedClient = await createEmbeddingClient();
+    }
+
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
+    let allowedKbIds;
+    if (kb_id) {
+      allowedKbIds = null;
+    } else {
+      allowedKbIds = getAllowedKbIds(req);
+      // For internal admin calls (tool functions), accept allowed_kb_ids from body
+      if (allowedKbIds === null && Array.isArray(req.body?.allowed_kb_ids)) {
+        allowedKbIds = req.body.allowed_kb_ids;
+      }
+    }
     const searchStart = Date.now();
-    const { results, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const { results, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions, allowedKbIds);
     const searchLatencyMs = Date.now() - searchStart;
+
+    // Determine active features
+    const featuresActive = {
+      reranker: rerankerUsed || false,
+      contextualRetrieval: config.kbContextualRetrieval,
+      parentDoc: config.kbParentDocEnabled,
+    };
 
     // Log retrieval quality (fire-and-forget)
     logRetrievalQuality({
@@ -375,6 +483,9 @@ export async function registerRoutes(app) {
       avgSimilarity,
       minSimilarityThreshold: searchConfig.minSimilarity,
       searchLatencyMs,
+      rerankerUsed: rerankerUsed || false,
+      rerankerLatencyMs: rerankerLatencyMs || null,
+      featuresActive,
     });
 
     return { data: results };
@@ -389,17 +500,42 @@ export async function registerRoutes(app) {
     const { question, kb_id, model, limit } = req.body || {};
     if (!question?.trim()) return reply.code(400).send({ errors: [{ message: 'Question is required' }] });
 
-    if (!config.openaiApiKey) {
-      return reply.code(503).send({ errors: [{ message: 'Embedding service not configured' }] });
+    // KB scoping: block access to restricted KB
+    if (kb_id) {
+      try { assertKbAccess(req, kb_id); } catch (err) {
+        return reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
+      }
     }
+
     if (!config.anthropicApiKey) {
       return reply.code(503).send({ errors: [{ message: 'AI service not configured' }] });
     }
 
-    const embedClient = new EmbeddingClient(config.openaiApiKey, config.embeddingModel);
+    // Resolve embedding client — use KB's locked model if kb_id provided
+    let embedClient;
+    let expectedDimensions;
+    if (kb_id) {
+      const kb = await queryOne('SELECT embedding_model FROM knowledge_bases WHERE id = $1 AND account = $2', [kb_id, accountId]);
+      if (!kb) return reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] });
+      embedClient = await createEmbeddingClientForKb(kb);
+      expectedDimensions = getModelDimensions(kb.embedding_model || config.embeddingModel);
+    } else {
+      embedClient = await createEmbeddingClient();
+    }
+
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
+    let allowedKbIds;
+    if (kb_id) {
+      allowedKbIds = null;
+    } else {
+      allowedKbIds = getAllowedKbIds(req);
+      // For internal admin calls (tool functions), accept allowed_kb_ids from body
+      if (allowedKbIds === null && Array.isArray(req.body?.allowed_kb_ids)) {
+        allowedKbIds = req.body.allowed_kb_ids;
+      }
+    }
     const searchStart = Date.now();
-    const { results: chunks, topSimilarity, avgSimilarity } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig);
+    const { results: chunks, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions, allowedKbIds);
     const searchLatencyMs = Date.now() - searchStart;
 
     // Check for curated answers
@@ -432,6 +568,13 @@ export async function registerRoutes(app) {
       ? Math.round((chunksUtilized / chunksInjected) * 1000) / 1000
       : null;
 
+    // Determine active features
+    const featuresActive = {
+      reranker: rerankerUsed || false,
+      contextualRetrieval: config.kbContextualRetrieval,
+      parentDoc: config.kbParentDocEnabled,
+    };
+
     // Log retrieval quality (fire-and-forget)
     logRetrievalQuality({
       accountId,
@@ -451,6 +594,11 @@ export async function registerRoutes(app) {
       searchLatencyMs,
       totalLatencyMs,
       confidence: result.confidence,
+      rerankerUsed: rerankerUsed || false,
+      contextualRetrievalUsed: config.kbContextualRetrieval,
+      parentDocUsed: chunks.some(c => !!c.parent_content),
+      rerankerLatencyMs: rerankerLatencyMs || null,
+      featuresActive,
     });
 
     return {

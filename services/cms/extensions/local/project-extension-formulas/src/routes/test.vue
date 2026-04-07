@@ -10,6 +10,16 @@
 			<formula-navigation current-view="test" />
 		</template>
 
+		<!-- Feature gate -->
+		<div v-if="featureLoading" class="feature-gate-loading">
+			<v-progress-circular indeterminate />
+		</div>
+		<div v-else-if="!featureAllowed" class="feature-gate-unavailable">
+			<v-info icon="block" title="Feature Unavailable" center>
+				Formula testing is not available for your account. Contact your administrator.
+			</v-info>
+		</div>
+		<template v-else>
 		<!-- No-token notice -->
 		<div v-if="!hasToken && !tokenLoading" class="no-token-notice">
 			<v-info icon="vpn_key" title="API Key Required" center>
@@ -325,6 +335,7 @@
 			</div>
 		</div>
 
+		</template>
 		<template #sidebar>
 			<sidebar-detail icon="help_outline" title="About Formulas" close>
 				<div class="sidebar-info">
@@ -348,6 +359,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
+import { useFeatureGate } from '../../../project-extension-feature-gate/src/use-feature-gate';
 import { useApi } from '@directus/extensions-sdk';
 import { useFormulas } from '../composables/use-formulas';
 import FormulaNavigation from '../components/navigation.vue';
@@ -356,6 +368,7 @@ import type { FormulaExample } from '../types';
 import type { SheetFormula } from '../types';
 
 const api = useApi();
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
 const {
 	executing, error: formulaError, result: resultData,
 	requestPayload, statusCode,
@@ -989,5 +1002,15 @@ onMounted(async () => {
 
 .toggle-track.on .toggle-thumb {
 	left: 18px;
+}
+.feature-gate-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 400px;
+}
+.feature-gate-unavailable {
+	padding: var(--content-padding);
+	padding-top: 120px;
 }
 </style>

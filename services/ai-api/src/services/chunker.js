@@ -3,6 +3,8 @@
  * Ported from legacy chunker.ts — uses ESM, no TypeScript.
  */
 
+import { randomUUID } from 'node:crypto';
+
 const DEFAULT_CONFIG = {
   targetSize: 512,
   minSize: 128,
@@ -136,6 +138,53 @@ export function chunkDocument(text, sourceFile, cfg) {
   }
 
   return chunks;
+}
+
+/**
+ * Chunk with parent-document retrieval: small child chunks for embedding precision,
+ * full parent sections stored separately for LLM context.
+ * @param {string} text
+ * @param {string} sourceFile
+ * @param {object} [cfg]
+ * @returns {{chunks: Array, sections: Array<{id: string, section_index: number, heading: string|null, content: string, token_count: number}>}}
+ */
+export function chunkDocumentWithParents(text, sourceFile, cfg) {
+  const c = { ...DEFAULT_CONFIG, ...cfg };
+  const rawSections = splitIntoSections(text);
+  const chunks = [];
+  const sections = [];
+  let globalIndex = 0;
+
+  for (let si = 0; si < rawSections.length; si++) {
+    const section = rawSections[si];
+    const rawText = section.text.trim();
+    if (!rawText) continue;
+
+    const heading = section.heading;
+    const sectionContent = heading ? `${heading}\n\n${rawText}` : rawText;
+    const sectionTokens = estimateTokens(sectionContent);
+
+    // Store full section as parent
+    const sectionId = randomUUID();
+    sections.push({
+      id: sectionId,
+      section_index: si,
+      heading,
+      content: sectionContent,
+      token_count: sectionTokens,
+    });
+
+    // Create small child chunks from this section
+    const childChunks = chunkDocument(sectionContent, sourceFile, c);
+    for (const child of childChunks) {
+      child.metadata.chunk_index = globalIndex;
+      child.metadata.section_id = sectionId;
+      chunks.push(child);
+      globalIndex++;
+    }
+  }
+
+  return { chunks, sections };
 }
 
 /**

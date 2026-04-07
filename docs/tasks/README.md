@@ -6,7 +6,8 @@ Improvements organized by service. Use `/improvements` to manage, or `/improveme
 
 ## Status Legend
 
-- `planned` — Not started
+- `idea` — Concept, not yet scoped
+- `planned` — Scoped, ready to start
 - `in-progress` — Active development
 - `completed` — Done, pending removal
 - `deferred` — Parked until preconditions met
@@ -41,7 +42,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 21 | DOMPurify for All v-html Usage | completed | [cms/21-dompurify-v-html.md](cms/21-dompurify-v-html.md) |
 | 22 | API Key Management UI | completed | [cms/22-api-key-ui.md](cms/22-api-key-ui.md) |
 | 23 | Widget Client Gateway Mode | completed | [cms/23-widget-gateway-mode.md](cms/23-widget-gateway-mode.md) |
-| 24 | Widget Layout Builder | planned | [cms/24-widget-layout-builder.md](cms/24-widget-layout-builder.md) |
+| 24 | Widget Layout Builder | completed | [cms/24-widget-layout-builder.md](cms/24-widget-layout-builder.md) |
 | 25 | Calculator-API Gateway Auth Migration | completed | [cms/25-calculator-api-gateway-auth.md](cms/25-calculator-api-gateway-auth.md) |
 | 26 | Calculators Code Snippets Update (X-Auth-Token → X-API-Key) | completed | [cms/26-calculators-code-snippets-update.md](cms/26-calculators-code-snippets-update.md) |
 | 27 | AI-API & Knowledge-API Gateway Auth Migration | completed | [cms/27-ai-api-gateway-auth.md](cms/27-ai-api-gateway-auth.md) |
@@ -49,6 +50,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 29 | Widget-API Auth Cleanup | completed | [cms/29-widget-api-auth-cleanup.md](cms/29-widget-api-auth-cleanup.md) |
 | 30 | Formulas Integration Page Update (X-Auth-Token → X-API-Key) | completed | [cms/30-formulas-integration-update.md](cms/30-formulas-integration-update.md) |
 | 31 | Widget Template Polish — Improve Widgets & Dialog UX | planned | [cms/31-widget-template-polish.md](cms/31-widget-template-polish.md) |
+| 32 | KB Admin UI — Per-KB Feature Toggles | completed | [cms/32-kb-admin-ui-toggles.md](cms/32-kb-admin-ui-toggles.md) |
 
 ---
 
@@ -60,16 +62,23 @@ AI chat, knowledge base backend, embeddings, public API.
 |---|-------------|--------|-----|
 | 01 | AI Assistant — Public API + Widget | completed | [ai-api/01-public-api-widget.md](ai-api/01-public-api-widget.md) |
 | 02 | AI Response Template with @mentions | completed | [ai-api/02-ai-response-template.md](ai-api/02-ai-response-template.md) |
-| 03 | AI Name & Response Template Overrides | planned | [ai-api/03-ai-name-overrides.md](ai-api/03-ai-name-overrides.md) |
+| 03 | AI Name & Response Template Overrides | completed | [ai-api/03-ai-name-overrides.md](ai-api/03-ai-name-overrides.md) |
 | 04 | Digital Twin / Second Brain (Personal AI Memory) | planned | [ai-api/04-digital-twin-second-brain.md](ai-api/04-digital-twin-second-brain.md) |
 | 05 | Contextual Memory Intelligence (Digital Twin Brain) | planned | [ai-api/05-contextual-memory-intelligence.md](ai-api/05-contextual-memory-intelligence.md) |
 | 06 | AI Partner Configuration (Behavioral Settings) | planned | [ai-api/06-ai-partner-configuration.md](ai-api/06-ai-partner-configuration.md) |
 | 07 | Calculator Skill Memory (Closed Learning Loop) | planned | [ai-api/07-calculator-skill-memory.md](ai-api/07-calculator-skill-memory.md) |
 | 08 | Budget Warning Injection for Tool Use | completed | [ai-api/08-budget-warning-injection.md](ai-api/08-budget-warning-injection.md) |
 | 09 | Progressive Tool Loading | completed | [ai-api/09-progressive-tool-loading.md](ai-api/09-progressive-tool-loading.md) |
-| 10 | AI Observability & Self-Improvement Dashboard | in-progress | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
+| 10 | AI Observability & Self-Improvement Dashboard | completed | [ai-api/10-ai-observability-dashboard.md](ai-api/10-ai-observability-dashboard.md) |
 | 11 | Contextual Widgets for AI Assistant | completed | [ai-api/11-contextual-widgets.md](ai-api/11-contextual-widgets.md) |
 | 12 | Observatory Improvements & Controls | planned | [ai-api/12-observatory-improvements.md](ai-api/12-observatory-improvements.md) |
+| 13 | KB Embedding Dimension Mismatch Fix | completed | [ai-api/13-kb-embedding-dimension-mismatch.md](ai-api/13-kb-embedding-dimension-mismatch.md) |
+| 14 | Contextual Retrieval (LLM chunk prefixes) | completed | [ai-api/14-contextual-retrieval.md](ai-api/14-contextual-retrieval.md) |
+| 15 | Parent-Document Retrieval | completed | [ai-api/15-parent-doc-retrieval.md](ai-api/15-parent-doc-retrieval.md) |
+| 16 | Reranker Integration (Cohere Rerank) | completed | [ai-api/16-reranker-integration.md](ai-api/16-reranker-integration.md) |
+| 17 | Retrieval Quality Metrics Enhancement | completed | [ai-api/17-retrieval-quality-metrics.md](ai-api/17-retrieval-quality-metrics.md) |
+| 18 | KB Re-index Endpoint | completed | [ai-api/18-kb-reindex-endpoint.md](ai-api/18-kb-reindex-endpoint.md) |
+| 20 | API Key → KB Scoping (data isolation) | planned | [ai-api/20-api-key-kb-scoping.md](ai-api/20-api-key-kb-scoping.md) |
 
 ---
 
@@ -85,20 +94,20 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | 04 | MCP Error Code Mapping | completed | [formula-api/04-mcp-error-mapping.md](formula-api/04-mcp-error-mapping.md) |
 | 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
 | 06 | Account-Level MCP | completed | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
-| 07 | Direct Database Migration | planned | [formula-api/07-direct-db-migration.md](formula-api/07-direct-db-migration.md) |
+| 07 | Direct Database Migration | completed | [formula-api/07-direct-db-migration.md](formula-api/07-direct-db-migration.md) |
 
 ### Formula Engine — bl-excel (Rust)
 
 | # | Improvement | Status | Doc |
 |---|-------------|--------|-----|
-| 01 | Spill Array Support | planned | [formula-api/engine/01-spill-array-support.md](formula-api/engine/01-spill-array-support.md) |
-| 02 | OFFSET/INDIRECT in Aggregates | planned | [formula-api/engine/02-offset-indirect-aggregates.md](formula-api/engine/02-offset-indirect-aggregates.md) |
-| 03 | Volatile Function Tracking | planned | [formula-api/engine/03-volatile-tracking.md](formula-api/engine/03-volatile-tracking.md) |
-| 04 | Benchmark CI | planned | [formula-api/engine/04-benchmark-ci.md](formula-api/engine/04-benchmark-ci.md) |
-| 05 | WASM Target | planned | [formula-api/engine/05-wasm-target.md](formula-api/engine/05-wasm-target.md) |
-| 06 | Missing Array Functions | planned | [formula-api/engine/06-missing-array-functions.md](formula-api/engine/06-missing-array-functions.md) |
-| 07 | Numeric Precision | planned | [formula-api/engine/07-numeric-precision.md](formula-api/engine/07-numeric-precision.md) |
-| 08 | TEXT Format Engine | planned | [formula-api/engine/08-text-format-engine.md](formula-api/engine/08-text-format-engine.md) |
+| 01 | Spill Array Support | idea | [formula-api/engine/01-spill-array-support.md](formula-api/engine/01-spill-array-support.md) |
+| 02 | OFFSET/INDIRECT in Aggregates | idea | [formula-api/engine/02-offset-indirect-aggregates.md](formula-api/engine/02-offset-indirect-aggregates.md) |
+| 03 | Volatile Function Tracking | idea | [formula-api/engine/03-volatile-tracking.md](formula-api/engine/03-volatile-tracking.md) |
+| 04 | Benchmark CI | idea | [formula-api/engine/04-benchmark-ci.md](formula-api/engine/04-benchmark-ci.md) |
+| 05 | WASM Target | idea | [formula-api/engine/05-wasm-target.md](formula-api/engine/05-wasm-target.md) |
+| 06 | Missing Array Functions | idea | [formula-api/engine/06-missing-array-functions.md](formula-api/engine/06-missing-array-functions.md) |
+| 07 | Numeric Precision | idea | [formula-api/engine/07-numeric-precision.md](formula-api/engine/07-numeric-precision.md) |
+| 08 | TEXT Format Engine | idea | [formula-api/engine/08-text-format-engine.md](formula-api/engine/08-text-format-engine.md) |
 | 09 | Missing Function Analysis (~150 remaining) | completed | [formula-api/engine/09-missing-function-analysis.md](formula-api/engine/09-missing-function-analysis.md) |
 
 ---
@@ -144,6 +153,8 @@ Infrastructure and multi-service concerns.
 | 06 | MCP Server — Expose BusinessLogic as AI Tool | planned | [cross-cutting/06-mcp-server.md](cross-cutting/06-mcp-server.md) |
 | 07 | AI Safety Quick Fixes (4 items) | completed | [cross-cutting/07-ai-safety-quick-fixes.md](cross-cutting/07-ai-safety-quick-fixes.md) |
 | 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | completed | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
+| 09 | API Key & Resource Management Cleanup | completed | [cross-cutting/09-api-key-resource-cleanup.md](cross-cutting/09-api-key-resource-cleanup.md) |
+| 10 | Platform Feature Flags (DB + Redis + Gateway + Admin UI + Module Gating) | completed | — |
 
 ---
 
@@ -151,47 +162,17 @@ Infrastructure and multi-service concerns.
 
 Build & test locally first. Infrastructure/launch comes after all building blocks are in place.
 
-### Phase 1A — Foundation (must complete before Account MCP sprint)
+### ~~Phase 1A — Foundation~~ COMPLETED
+### ~~Phase 1B — Core Platform Sprint~~ COMPLETED
+### ~~Phase 1B+ — Cost Optimization~~ COMPLETED
+### ~~Phase 1C — Widget Foundation + AI Widgets~~ COMPLETED
+### ~~Phase 1D — Monetization~~ PARTIALLY COMPLETED (cms/24 done)
+
+### Phase 1D (remaining) — Monetization
 
 | # | Service | Task | Why |
 |---|---------|------|-----|
-| 1 | formula-api/07 | Direct Database Migration | Removes CMS dependency, consistent DB pattern across all services |
-
-### Phase 1B — Core Platform Sprint (parallel after foundation)
-
-| # | Service | Task | Why |
-|---|---------|------|-----|
-| 2 | formula-api/06 | Account-Level MCP (backend) | THE differentiator — "talk to your business brain" |
-| 3 | gateway/06 | Account MCP Route | Gateway proxy for MCP traffic |
-| 4 | cms/20 | Account-Level MCP (UI) | Config page, snippets, toggle MCP per calculator |
-| 5 | ai-api/01 | Public AI API (Phase 1) | Opens AI pillar externally + fixes HMAC security gap |
-| 6 | ai-api/03 | AI Name & Template Overrides | Branded AI responses per account |
-| 7 | gateway/05 | Request Logging & Audit Trail | Billing + security audit trail |
-
-### Phase 1B+ — Cost Optimization (parallel, quick wins)
-
-| # | Service | Task | Why |
-|---|---------|------|-----|
-| 7b | cross-cutting/07 | AI Safety Quick Fixes (4 items) | Prompt caching, summarization, pricing safety, circuit breaker — 2-3 days |
-| 7c | ai-api/08 | Budget Warning Injection | Graceful budget handling, cost savings, 2-3 days effort |
-| 7d | ai-api/09 | Progressive Tool Loading | 30-50% token reduction on simple queries, 1 week effort |
-| 7e | ai-api/10 | AI Observability Dashboard (Panels 1-3) | Cost, quality, tool usage — see what AI is doing. 1 week |
-
-### Phase 1C — Widget Foundation + AI Widgets
-
-| # | Service | Task | Why | Est. |
-|---|---------|------|-----|------|
-| 8 | cross-cutting/08 | Unified Widget Foundation | Shared component library — prerequisite for cms/24 and ai-api/11 | ~9-11 days |
-| 9 | ai-api/11 | Contextual Widgets for AI Assistant | Rich inline widgets in chat — validates foundation before builder | ~5-7 days |
-
-Phase 1C tasks are sequential: 08 first (foundation), then 11 (first consumer). 1A and 1B can run in parallel alongside.
-
-### Phase 1D — Monetization
-
-| # | Service | Task | Why |
-|---|---------|------|-----|
-| 10 | cms/08 | Pricing & Billing | Tiers, tax, enforcement — can't monetize without it |
-| 11 | cms/24 | Widget Layout Builder | Drag-drop layout design — makes widgets sellable. Depends on cross-cutting/08. |
+| 1 | cms/08 | Pricing & Billing | Tiers, tax, enforcement — can't monetize without it |
 
 ### Phase 2 — Growth & Distribution
 
@@ -254,13 +235,13 @@ Phase 1C tasks are sequential: 08 first (foundation), then 11 (first consumer). 
 
 ## Totals
 
-| Service | Planned | In-Progress | Completed | Total |
-|---------|---------|-------------|-----------|-------|
-| CMS | 16 | 0 | 13 | 30 |
-| AI API | 4 | 1 | 5 | 10 |
-| Formula API | 1 | 0 | 6 | 7 |
-| Formula Engine | 8 | 0 | 1 | 9 |
-| Flow | 2 | 0 | 1 | 3 |
-| Gateway | 0 | 0 | 6 | 6 |
-| Cross-Cutting | 2 | 0 | 6 | 8 |
-| **Total** | **34** | **1** | **38** | **74** |
+| Service | Planned | Idea | In-Progress | Completed | Total |
+|---------|---------|------|-------------|-----------|-------|
+| CMS | 14 | 0 | 0 | 17 | 31 |
+| AI API | 3 | 0 | 0 | 8 | 11 |
+| Formula API | 0 | 0 | 0 | 7 | 7 |
+| Formula Engine | 0 | 8 | 0 | 1 | 9 |
+| Flow | 2 | 0 | 0 | 1 | 3 |
+| Gateway | 0 | 0 | 0 | 6 | 6 |
+| Cross-Cutting | 2 | 0 | 0 | 8 | 10 |
+| **Total** | **21** | **8** | **0** | **48** | **77** |

@@ -48,6 +48,16 @@
 			</v-dialog>
 		</template>
 
+		<!-- Feature gate -->
+		<div v-if="featureLoading" class="feature-gate-loading">
+			<v-progress-circular indeterminate />
+		</div>
+		<div v-else-if="!featureAllowed" class="feature-gate-unavailable">
+			<v-info icon="block" title="Feature Unavailable" center>
+				Flows are not available for your account. Contact your administrator.
+			</v-info>
+		</div>
+		<template v-else>
 		<div v-if="current" class="editor-layout">
 			<node-palette
 				:categories="categories"
@@ -141,6 +151,7 @@
 			<v-progress-circular indeterminate />
 		</div>
 
+		</template>
 		<template #sidebar>
 			<sidebar-detail icon="settings" title="Flow Settings" close>
 				<div class="sidebar-settings">
@@ -174,6 +185,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, provide, onMounted, markRaw } from 'vue';
+import { useFeatureGate } from '../../../project-extension-feature-gate/src/use-feature-gate';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { VueFlow, type Connection } from '@vue-flow/core';
@@ -201,6 +213,7 @@ import ExecutionDetailComp from '../components/execution-detail.vue';
 import BaseNode from '../components/custom-nodes/base-node.vue';
 
 const api = useApi();
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'flow.execute');
 const route = useRoute();
 const router = useRouter();
 
@@ -544,5 +557,15 @@ onMounted(async () => {
 
 .right-panel .panel-header .v-button {
 	margin-left: auto;
+}
+.feature-gate-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 400px;
+}
+.feature-gate-unavailable {
+	padding: var(--content-padding);
+	padding-top: 120px;
 }
 </style>

@@ -90,16 +90,19 @@ export async function verifyAuth(req, reply) {
     req.isAdmin = req.headers['x-is-admin'] === 'true';
 
     // Parse API key permissions
-    // Gateway sends nested format: {"services":{"ai":{"enabled":true,...},"calc":{"enabled":true,...}}}
-    // ai-api uses flat format: {"ai":true,"calc":true,"flow":false}
+    // Gateway sends nested format: {"services":{"ai":{"enabled":true,...},"kb":{"enabled":true,"resources":[...]}}}
+    // req.permissions = flat format for existing checks (ai:true/false)
+    // req.permissionsRaw = full nested structure for resource-level scoping
     const permHeader = req.headers['x-api-permissions'];
     if (permHeader) {
       try {
         const raw = JSON.parse(permHeader);
         req.permissions = normalizePermissions(raw);
-      } catch { req.permissions = {}; }
+        req.permissionsRaw = raw;
+      } catch { req.permissions = {}; req.permissionsRaw = null; }
     } else {
       req.permissions = {};
+      req.permissionsRaw = null;
     }
 
     // Public request = gateway-forwarded + not admin

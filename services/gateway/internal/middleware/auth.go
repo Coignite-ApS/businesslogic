@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"github.com/coignite-aps/bl-gateway/internal/service"
+	"github.com/redis/go-redis/v9"
 )
 
 type contextKey string
 
 const AccountContextKey contextKey = "account"
 
-func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
+func Auth(keyService *service.KeyService, rdb *redis.Client) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip auth for health, internal, and MCP key-prefix endpoints (MCP does its own auth via key prefix)
@@ -42,6 +43,13 @@ func Auth(keyService *service.KeyService) func(http.Handler) http.Handler {
 			// Forward permissions as JSON
 			if permBytes, err := json.Marshal(account.Permissions); err == nil {
 				r.Header.Set("X-API-Permissions", string(permBytes))
+			}
+
+			// Feature flag check
+			featureKey, allowed := CheckFeatureFlag(r.Context(), rdb, account.AccountID, r.URL.Path)
+			if !allowed {
+				WriteFeatureDenied(w, featureKey)
+				return
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))

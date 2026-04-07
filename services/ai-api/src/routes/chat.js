@@ -10,6 +10,7 @@ import { sanitizeMessage } from '../utils/sanitize.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { calculateCost } from '../utils/cost.js';
 import { checkAiQuota, getActiveAccount } from '../utils/auth.js';
+import { getAllowedKbIds } from '../utils/kb-access.js';
 import { checkBudget, recordCost, getConversationBudgetWarning, injectBudgetWarning } from '../services/budget.js';
 import { compressIfNeeded } from '../services/summarize.js';
 import { resolveWidget } from '../widgets/resolver.js';
@@ -307,6 +308,7 @@ export async function registerRoutes(app) {
           const { result, isError } = await executeTool(tu.name, tu.input, {
             accountId,
             logger: req.log,
+            allowedKbIds: getAllowedKbIds(req),
           });
           const toolDuration = Date.now() - toolStart;
 
@@ -674,6 +676,7 @@ export async function registerRoutes(app) {
           const { result, isError } = await executeTool(tu.name, tu.input, {
             accountId,
             logger: req.log,
+            allowedKbIds: getAllowedKbIds(req),
           });
           const toolDuration = Date.now() - toolStart;
 

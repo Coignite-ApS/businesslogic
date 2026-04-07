@@ -26,6 +26,7 @@ const navItems = [
 	{ to: '/admin-dashboard/calculators', icon: 'calculate', label: 'Calculators' },
 	{ to: '/admin-dashboard/infrastructure', icon: 'dns', label: 'Infrastructure' },
 	{ to: '/admin-dashboard/ai', icon: 'smart_toy', label: 'AI' },
+	{ to: '/admin-dashboard/features', icon: 'toggle_on', label: 'Features' },
 ];
 
 function isActive(path: string): boolean {

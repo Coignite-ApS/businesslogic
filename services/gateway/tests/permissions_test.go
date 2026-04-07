@@ -542,7 +542,7 @@ func TestInternalAuth_CorrectSecret(t *testing.T) {
 
 func TestAuthMiddleware_SkipsMCPKeyPrefixEndpoints(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
-	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -558,7 +558,7 @@ func TestAuthMiddleware_SkipsMCPKeyPrefixEndpoints(t *testing.T) {
 
 func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
-	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -583,7 +583,7 @@ func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
 
 func TestAuthMiddleware_SkipsInternalEndpoints(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
-	handler := middleware.Auth(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.Auth(keyService, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

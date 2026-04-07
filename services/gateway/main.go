@@ -151,7 +151,7 @@ func main() {
 	h = middleware.CORS(h)
 	h = middleware.RateLimit(keyService)(h)
 	h = middleware.RequestLog(requestLogFn)(h)
-	h = middleware.Auth(keyService)(h)
+	h = middleware.Auth(keyService, rdb)(h)
 	h = middleware.Tracing(h)
 	h = middleware.Logging(h)
 	h = middleware.SecurityHeaders(h)

@@ -49,6 +49,8 @@ export const config = {
   kbMinSimilarity: parseFloat(env.KB_MIN_SIMILARITY || '0.2'),
   kbRrfK: parseInt(env.KB_RRF_K || '60', 10),
   kbContextualRetrieval: env.KB_CONTEXTUAL_RETRIEVAL !== 'false',
+  kbParentDocEnabled: env.KB_PARENT_DOC_ENABLED === 'true',
+  kbParentChunkSize: parseInt(env.KB_PARENT_CHUNK_SIZE || '300', 10),
   kbAnswerCacheTtl: parseInt(env.KB_ANSWER_CACHE_TTL || '3600', 10),
 
   // Reranker

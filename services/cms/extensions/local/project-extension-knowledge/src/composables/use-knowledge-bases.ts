@@ -12,6 +12,8 @@ export interface KnowledgeBase {
 	status: 'active' | 'indexing' | 'error';
 	sort: number | null;
 	date_created: string;
+	contextual_retrieval_enabled: boolean | null;
+	parent_doc_enabled: boolean | null;
 }
 
 export function useKnowledgeBases(api: any) {

@@ -1,32 +1,51 @@
 import { queryAll } from '../db.js';
 import { detectLanguage, pgTsConfig } from './language.js';
+import { rerank } from './reranker.js';
 
 /**
  * Hybrid search: vector + full-text with Reciprocal Rank Fusion.
  */
-export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId, limit, searchConfig) {
+export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId, limit, searchConfig, expectedDimensions, allowedKbIds) {
   const fetchCount = limit * 3;
   const { minSimilarity, rrfK } = searchConfig;
 
   // Embed query
   const queryEmbedding = await embeddingClient.embedQuery(searchQuery);
+
+  // Validate dimensions if caller specified expected
+  if (expectedDimensions && queryEmbedding.length !== expectedDimensions) {
+    throw new Error(
+      `Embedding dimension mismatch: query vector has ${queryEmbedding.length} dimensions ` +
+      `but KB expects ${expectedDimensions}. The KB's embedding model may differ from the active model.`,
+    );
+  }
+
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
   // Detect query language for FTS
   const queryLang = detectLanguage(searchQuery);
   const queryTsConfig = pgTsConfig(queryLang);
 
-  const kbFilter = kbId ? 'AND c.knowledge_base = $3' : '';
-  const kbParams = kbId ? [kbId] : [];
+  let kbFilter = '';
+  let kbParams = [];
+  if (kbId) {
+    kbFilter = 'AND c.knowledge_base = $3';
+    kbParams = [kbId];
+  } else if (allowedKbIds !== null && allowedKbIds !== undefined) {
+    kbFilter = 'AND c.knowledge_base = ANY($3::uuid[])';
+    kbParams = [allowedKbIds];
+  }
 
-  // Run vector + FTS in parallel
+  // Run vector + FTS in parallel (with parent section JOIN)
   const [vectorRows, ftsRows] = await Promise.all([
     queryAll(
       `SELECT c.id, c.content, c.metadata, c.token_count, c.knowledge_base as knowledge_base_id,
               kb.name as knowledge_base_name,
+              s.content as parent_content,
               1 - (c.embedding <=> $1::vector) as similarity
        FROM kb_chunks c
        LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base
+       LEFT JOIN kb_sections s ON s.id = c.section_id
        WHERE c.account_id = $2 ${kbFilter}
        ORDER BY c.embedding <=> $1::vector
        LIMIT ${fetchCount}`,
@@ -35,12 +54,14 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
     queryAll(
       `SELECT c.id, c.content, c.metadata, c.token_count, c.knowledge_base as knowledge_base_id,
               kb.name as knowledge_base_name,
+              s.content as parent_content,
               NULL::float as similarity,
               ts_rank(c.search_vector, query) as fts_rank
        FROM kb_chunks c
-       LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base,
+       LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base
+       LEFT JOIN kb_sections s ON s.id = c.section_id,
             plainto_tsquery($1::regconfig, $2) query
-       WHERE c.account_id = $3 ${kbFilter.replace('$3', kbId ? '$4' : '$3')}
+       WHERE c.account_id = $3 ${kbFilter.replace('$3', kbParams.length > 0 ? '$4' : '$3')}
              AND c.search_vector IS NOT NULL
              AND c.search_vector @@ query
        ORDER BY fts_rank DESC
@@ -56,12 +77,14 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
       simpleFtsRows = await queryAll(
         `SELECT c.id, c.content, c.metadata, c.token_count, c.knowledge_base as knowledge_base_id,
                 kb.name as knowledge_base_name,
+                s.content as parent_content,
                 NULL::float as similarity,
                 ts_rank(c.search_vector, query) as fts_rank
          FROM kb_chunks c
-         LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base,
+         LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base
+         LEFT JOIN kb_sections s ON s.id = c.section_id,
               plainto_tsquery('simple', $1) query
-         WHERE c.account_id = $2 ${kbFilter.replace('$3', kbId ? '$3' : '$2')}
+         WHERE c.account_id = $2 ${kbFilter.replace('$3', kbParams.length > 0 ? '$3' : '$2')}
                AND c.search_vector IS NOT NULL
                AND c.search_vector @@ query
          ORDER BY fts_rank DESC
@@ -93,6 +116,7 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
     scoreMap.set(row.id, {
       id: row.id,
       content: row.content,
+      parent_content: row.parent_content || null,
       metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
       token_count: row.token_count,
       similarity: Math.round(sim * 1000) / 1000,
@@ -112,6 +136,7 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
       scoreMap.set(row.id, {
         id: row.id,
         content: row.content,
+        parent_content: row.parent_content || null,
         metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
         token_count: row.token_count,
         similarity: null,
@@ -122,13 +147,23 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
     }
   }
 
-  const ranked = Array.from(scoreMap.values())
+  let ranked = Array.from(scoreMap.values())
     .sort((a, b) => b.rrfScore - a.rrfScore)
     .slice(0, limit);
+
+  // Reranker post-processing
+  let rerankerResult = { reranked: false, latencyMs: 0 };
+  if (ranked.length > 0) {
+    rerankerResult = await rerank(searchQuery, ranked);
+    if (rerankerResult.reranked) {
+      ranked = rerankerResult.results;
+    }
+  }
 
   const results = ranked.map(r => ({
     id: r.id,
     content: r.content,
+    parent_content: r.parent_content || null,
     metadata: r.metadata,
     token_count: r.token_count,
     similarity: r.similarity ?? 0,
@@ -143,5 +178,5 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
     ? Math.round((similarities.reduce((a, b) => a + b, 0) / similarities.length) * 1000) / 1000
     : null;
 
-  return { results, topSimilarity, avgSimilarity };
+  return { results, topSimilarity, avgSimilarity, rerankerUsed: rerankerResult.reranked, rerankerLatencyMs: rerankerResult.latencyMs };
 }

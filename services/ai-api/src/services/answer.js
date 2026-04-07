@@ -35,7 +35,9 @@ export async function generateAnswer(apiKey, question, chunks, model = 'claude-s
         meta.page_number && `Page: ${meta.page_number}`,
         meta.section_heading && `Section: ${meta.section_heading}`,
       ].filter(Boolean).join(', ');
-      return `[SOURCE_${curatedOffset + i + 1}] (${location})\n${chunk.content}`;
+      // Use parent section content for LLM context if available, raw chunk content otherwise
+      const sourceContent = chunk.parent_content || chunk.content;
+      return `[SOURCE_${curatedOffset + i + 1}] (${location})\n${sourceContent}`;
     })
     .join('\n\n---\n\n');
 

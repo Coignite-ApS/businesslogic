@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { OverviewData, AccountListItem, AccountDetail, AdminCalculator, PaginatedResponse, AiOverviewData, AiAccountUsage } from '../types';
+import type { OverviewData, AccountListItem, AccountDetail, AdminCalculator, PaginatedResponse, AiOverviewData, AiAccountUsage, PlatformFeature, AccountFeatureOverride, ResolvedFeature } from '../types';
 
 export function useAdminApi(api: any) {
 	const loading = ref(false);
@@ -70,11 +70,44 @@ export function useAdminApi(api: any) {
 		return request<AiAccountUsage[]>(() => api.get('/assistant/admin/accounts'));
 	}
 
+	async function fetchPlatformFeatures(): Promise<PlatformFeature[] | null> {
+		const result = await request<{ data: PlatformFeature[] }>(() => api.get('/features/platform'));
+		return result?.data ?? null;
+	}
+
+	async function updatePlatformFeature(id: string, data: { enabled?: boolean; name?: string; description?: string }): Promise<any> {
+		const result = await request<{ data: any }>(() => api.put(`/features/platform/${id}`, data));
+		return result?.data ?? null;
+	}
+
+	async function fetchAccountOverrides(accountId: string): Promise<AccountFeatureOverride[] | null> {
+		const result = await request<{ data: AccountFeatureOverride[] }>(() => api.get(`/features/account/${accountId}`));
+		return result?.data ?? null;
+	}
+
+	async function upsertAccountOverride(accountId: string, featureId: string, enabled: boolean): Promise<any> {
+		const result = await request<{ data: any }>(() => api.put(`/features/account/${accountId}/${featureId}`, { enabled }));
+		return result?.data ?? null;
+	}
+
+	async function deleteAccountOverride(accountId: string, featureId: string): Promise<any> {
+		const result = await request<{ data: any }>(() => api.delete(`/features/account/${accountId}/${featureId}`));
+		return result?.data ?? null;
+	}
+
+	async function resolveAccountFeatures(accountId: string): Promise<ResolvedFeature[] | null> {
+		const result = await request<{ data: ResolvedFeature[] }>(() => api.get(`/features/resolve/${accountId}`));
+		return result?.data ?? null;
+	}
+
 	return {
 		loading, error,
 		fetchOverview, fetchAccounts, fetchAccountDetail,
 		fetchCalculators, fetchCalculatorErrors, fetchHealthHistory,
 		extendTrial, setExempt,
 		fetchAiOverview, fetchAiAccounts,
+		fetchPlatformFeatures, updatePlatformFeature,
+		fetchAccountOverrides, upsertAccountOverride, deleteAccountOverride,
+		resolveAccountFeatures,
 	};
 }

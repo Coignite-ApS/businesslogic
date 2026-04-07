@@ -27,6 +27,16 @@
 			</v-button>
 		</template>
 
+		<!-- Feature gate -->
+		<div v-if="featureLoading" class="feature-gate-loading">
+			<v-progress-circular indeterminate />
+		</div>
+		<div v-else-if="!featureAllowed" class="feature-gate-unavailable">
+			<v-info icon="block" title="Feature Unavailable" center>
+				Flows are not available for your account. Contact your administrator.
+			</v-info>
+		</div>
+		<template v-else>
 		<div v-if="executions.length > 0" class="executions-content">
 			<table class="exec-table">
 				<thead>
@@ -74,6 +84,7 @@
 			<v-progress-circular indeterminate />
 		</div>
 
+		</template>
 		<template #sidebar>
 			<sidebar-detail icon="bug_report" title="Execution Detail" close>
 				<execution-detail :execution="selectedDetail" />
@@ -84,6 +95,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
+import { useFeatureGate } from '../../../project-extension-feature-gate/src/use-feature-gate';
 import { useRoute } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useFlows } from '../composables/use-flows';
@@ -94,6 +106,7 @@ import FlowNavigation from '../components/navigation.vue';
 import ExecutionDetail from '../components/execution-detail.vue';
 
 const api = useApi();
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'flow.execute');
 const route = useRoute();
 const { flows, loading: flowLoading, fetchAll } = useFlows(api);
 const { getFlowExecutions, getExecution } = useTriggerClient(api);
@@ -244,5 +257,15 @@ onMounted(async () => {
 	align-items: center;
 	justify-content: center;
 	height: 400px;
+}
+.feature-gate-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 400px;
+}
+.feature-gate-unavailable {
+	padding: var(--content-padding);
+	padding-top: 120px;
 }
 </style>
