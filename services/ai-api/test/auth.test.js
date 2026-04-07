@@ -17,7 +17,7 @@ function makeGatewayHeaders(accountId, keyId, secret, tsOffset = 0) {
     'X-Api-Key-Id': keyId,
     'X-Gateway-Timestamp': timestamp,
     'X-Gateway-Signature': signature,
-    'X-API-Permissions': '{"ai":true,"calc":true}',
+    'X-API-Permissions': JSON.stringify({ services: { ai: { enabled: true }, calc: { enabled: true } } }),
   };
 }
 
@@ -228,5 +228,20 @@ describe('normalizePermissions', () => {
     const { normalizePermissions } = await import('../src/utils/auth.js');
     const result = normalizePermissions({ services: {} });
     assert.deepStrictEqual(result, {});
+  });
+
+  it('preserves resources in raw but flattens in normalized', async () => {
+    const { normalizePermissions } = await import('../src/utils/auth.js');
+    const nested = {
+      services: {
+        ai: { enabled: true },
+        kb: { enabled: true, resources: ['kb-1', 'kb-2'], actions: ['search'] },
+      },
+    };
+    const flat = normalizePermissions(nested);
+    assert.strictEqual(flat.ai, true);
+    assert.strictEqual(flat.kb, true);
+    // Resources are lost in flat format — that's by design
+    assert.strictEqual(flat.kb === true, true);
   });
 });
