@@ -10,6 +10,8 @@ import (
 	"github.com/coignite-aps/bl-gateway/internal/service"
 )
 
+func intPtr(v int) *int { return &v }
+
 func TestRateLimit_SkipsHealthEndpoint(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
 	handler := middleware.RateLimit(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,7 @@ func TestRateLimit_WithAccountNoRedis_FallsBackToMemory(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
 	acct := &service.AccountData{
 		AccountID:    "test-account-123",
-		RateLimitRPS: 5,
+		RateLimitRPS: intPtr(5),
 	}
 
 	handler := middleware.RateLimit(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

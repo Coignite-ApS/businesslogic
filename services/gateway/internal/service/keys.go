@@ -20,10 +20,10 @@ type AccountData struct {
 	KeyID          string              `json:"key_id"`
 	Environment    string              `json:"environment"`
 	Permissions    ResourcePermissions `json:"permissions"`
-	AllowedOrigins []string            `json:"allowed_origins"`
-	AllowedIPs     []string            `json:"allowed_ips"`
-	RateLimitRPS   int                 `json:"rate_limit_rps"`
-	MonthlyQuota   int                 `json:"monthly_quota"`
+	AllowedOrigins []string            `json:"allowed_origins,omitempty"`
+	AllowedIPs     []string            `json:"allowed_ips,omitempty"`
+	RateLimitRPS   *int                `json:"rate_limit_rps,omitempty"`
+	MonthlyQuota   *int                `json:"monthly_quota,omitempty"`
 }
 
 type KeyService struct {
@@ -88,7 +88,6 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 	var acct AccountData
 	var permJSON []byte
 	var allowedOrigins, allowedIPs *[]string
-	var rateLimitRPS, monthlyQuota *int
 	var expiresAt, revokedAt *time.Time
 
 	err := ks.db.QueryRow(ctx, `
@@ -98,7 +97,7 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 		FROM api_keys WHERE key_hash = $1
 	`, keyHash).Scan(
 		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
-		&allowedOrigins, &allowedIPs, &rateLimitRPS, &monthlyQuota,
+		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
 		&expiresAt, &revokedAt,
 	)
 	if err != nil {
@@ -118,12 +117,6 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 	}
 	if allowedIPs != nil {
 		acct.AllowedIPs = *allowedIPs
-	}
-	if rateLimitRPS != nil {
-		acct.RateLimitRPS = *rateLimitRPS
-	}
-	if monthlyQuota != nil {
-		acct.MonthlyQuota = *monthlyQuota
 	}
 
 	return &acct, nil
@@ -175,7 +168,6 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 	var acct AccountData
 	var permJSON []byte
 	var allowedOrigins, allowedIPs *[]string
-	var rateLimitRPS, monthlyQuota *int
 	var expiresAt, revokedAt *time.Time
 
 	err := ks.db.QueryRow(ctx, `
@@ -185,7 +177,7 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 		FROM api_keys WHERE key_prefix = $1
 	`, prefix).Scan(
 		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
-		&allowedOrigins, &allowedIPs, &rateLimitRPS, &monthlyQuota,
+		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
 		&expiresAt, &revokedAt,
 	)
 	if err != nil {
@@ -205,12 +197,6 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 	}
 	if allowedIPs != nil {
 		acct.AllowedIPs = *allowedIPs
-	}
-	if rateLimitRPS != nil {
-		acct.RateLimitRPS = *rateLimitRPS
-	}
-	if monthlyQuota != nil {
-		acct.MonthlyQuota = *monthlyQuota
 	}
 
 	return &acct, nil
