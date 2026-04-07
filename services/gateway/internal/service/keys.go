@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -235,6 +237,26 @@ func (ks *KeyService) CheckRateLimit(ctx context.Context, accountID string, rpsL
 		remaining = 0
 	}
 	return count <= rpsLimit, remaining, nil
+}
+
+type GeneratedKey struct {
+	RawKey    string
+	KeyHash   string
+	KeyPrefix string
+}
+
+func GenerateKey() (*GeneratedKey, error) {
+	rawBytes := make([]byte, 48)
+	if _, err := rand.Read(rawBytes); err != nil {
+		return nil, err
+	}
+	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
+	hash := sha256.Sum256([]byte(rawKey))
+	return &GeneratedKey{
+		RawKey:    rawKey,
+		KeyHash:   hex.EncodeToString(hash[:]),
+		KeyPrefix: rawKey[:11],
+	}, nil
 }
 
 func hashKey(key string) string {
