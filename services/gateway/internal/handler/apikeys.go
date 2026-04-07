@@ -146,7 +146,7 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.invalidateAccountCache(r, req.AccountID)
+	h.invalidateKeyCache(r.Context(), gk.KeyHash, gk.KeyPrefix)
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -273,17 +273,17 @@ func (h *APIKeyHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := fmt.Sprintf("UPDATE api_keys SET %s WHERE id = $%d AND revoked_at IS NULL RETURNING account_id",
+	query := fmt.Sprintf("UPDATE api_keys SET %s WHERE id = $%d AND revoked_at IS NULL RETURNING key_hash, key_prefix",
 		strings.Join(sets, ", "), argIdx)
 	args = append(args, id)
 
-	var accountID string
-	if err := h.db.QueryRow(r.Context(), query, args...).Scan(&accountID); err != nil {
+	var keyHash, keyPrefix string
+	if err := h.db.QueryRow(r.Context(), query, args...).Scan(&keyHash, &keyPrefix); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
 		return
 	}
 
-	h.invalidateAccountCache(r, accountID)
+	h.invalidateKeyCache(r.Context(), keyHash, keyPrefix)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
@@ -295,18 +295,18 @@ func (h *APIKeyHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var accountID string
+	var keyHash, keyPrefix string
 	err := h.db.QueryRow(r.Context(), `
 		UPDATE api_keys SET revoked_at = NOW()
 		WHERE id = $1 AND revoked_at IS NULL
-		RETURNING account_id
-	`, id).Scan(&accountID)
+		RETURNING key_hash, key_prefix
+	`, id).Scan(&keyHash, &keyPrefix)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
 		return
 	}
 
-	h.invalidateAccountCache(r, accountID)
+	h.invalidateKeyCache(r.Context(), keyHash, keyPrefix)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
 }
 
@@ -323,12 +323,13 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 	// Get existing key details
 	var old keyResponse
 	var permJSON []byte
+	var oldKeyHash string
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, account_id, name, environment, permissions,
+		SELECT id, key_hash, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at
 		FROM api_keys WHERE id = $1 AND revoked_at IS NULL
 	`, id).Scan(
-		&old.ID, &old.AccountID, &old.Name, &old.Environment, &permJSON,
+		&old.ID, &oldKeyHash, &old.KeyPrefix, &old.AccountID, &old.Name, &old.Environment, &permJSON,
 		&old.AllowedIPs, &old.AllowedOrigins, &old.RateLimitRPS, &old.MonthlyQuota, &old.ExpiresAt,
 	)
 	if err != nil {
@@ -364,7 +365,8 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.invalidateAccountCache(r, old.AccountID)
+	h.invalidateKeyCache(r.Context(), oldKeyHash, old.KeyPrefix)
+	h.invalidateKeyCache(r.Context(), gk.KeyHash, gk.KeyPrefix)
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -426,7 +428,7 @@ func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.invalidateAccountCache(r, req.AccountID)
+	h.invalidateKeyCache(r.Context(), gk.KeyHash, gk.KeyPrefix)
 
 	writeJSON(w, http.StatusCreated, autoProvisionResponse{
 		Provisioned: true,
@@ -476,15 +478,15 @@ func (h *APIKeyHandler) CheckLiveKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *APIKeyHandler) invalidateAccountCache(r *http.Request, accountID string) {
+func (h *APIKeyHandler) invalidateKeyCache(ctx context.Context, keyHash, keyPrefix string) {
 	if h.redis == nil {
 		return
 	}
-	// Clear all cached keys for this account by scanning gw:key:* pattern
-	// This is a blunt approach but safe — keys re-cache on next validation
-	iter := h.redis.Scan(r.Context(), 0, "gw:key:*", 100).Iterator()
-	for iter.Next(r.Context()) {
-		h.redis.Del(r.Context(), iter.Val())
+	if keyHash != "" {
+		h.redis.Del(ctx, "gw:key:"+keyHash)
+	}
+	if keyPrefix != "" {
+		h.redis.Del(ctx, "gw:prefix:"+keyPrefix)
 	}
 }
 
