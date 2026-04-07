@@ -132,6 +132,7 @@ services:
       - ../../services/cms/extensions/local/project-extension-calculator-api:/directus/extensions/project-extension-calculator-api
       - ../../services/cms/extensions/local/project-extension-stripe:/directus/extensions/project-extension-stripe
       - ../../services/cms/extensions/local/project-extension-account:/directus/extensions/project-extension-account
+      - ../../services/cms/extensions/local/project-extension-account-api:/directus/extensions/project-extension-account-api
       - ../../services/cms/extensions/local/project-extension-admin:/directus/extensions/project-extension-admin
       - ../../services/cms/extensions/local/project-extension-flow-hooks:/directus/extensions/project-extension-flow-hooks
       - ../../services/cms/extensions/local/project-extension-flows:/directus/extensions/project-extension-flows
