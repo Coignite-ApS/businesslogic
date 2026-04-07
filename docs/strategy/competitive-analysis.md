@@ -1,6 +1,6 @@
 # Competitive Analysis
 
-**Last updated:** 2026-03-24
+**Last updated:** 2026-04-07
 
 ---
 
@@ -21,7 +21,8 @@ BusinessLogic has **no direct competitor** offering the full stack: Excel-grade 
 | **Embeddable.co** | Free-paid | YES | Partial | NO | NO | NO | YES | Modern UX, AI-assisted builder | No formula engine, no KB |
 | **Calculoid** | $19+/mo | YES | NO | NO | NO | NO | Basic | PDF reports, payments | Limited, dated |
 | **uCalc** | Free-$9.99/mo | YES | NO | NO | NO | NO | Basic | Cheapest | Minimal features |
-| **Taskade** | Free-$50/mo | Partial | YES | YES | NO | NO | NO | AI app builder, fast | Not calculator-focused |
+| **Taskade** | Free-$19/mo | Partial | YES | YES | NO | NO | NO | AI "vibe coding" builder, zero marginal cost | No formula engine, no KB/RAG, no MCP |
+| **Embeddable.co** | Free-paid | YES | YES | NO | NO | NO | YES | AI editor suggestions, plain-English formulas, modern UX | No formula engine, no KB, no MCP |
 | **BusinessLogic** | $9.90-149.90/mo | YES | YES | YES | YES | YES | Planned | Full stack, Rust engine | 1 customer, no marketing |
 
 ---
@@ -66,7 +67,9 @@ These are not direct competitors but could become so if they add calculator/form
 
 ## Competitor Moves to Watch
 
-1. **Embeddable.co adding AI builder** — Closest to replicating BL's calc+AI combo, but no formula engine
-2. **Outgrow adding AI features** — They have distribution; AI would make them more competitive
-3. **Taskade expanding calculator depth** — AI-powered but calculators are secondary feature
-4. **LangChain/LlamaIndex adding no-code interfaces** — Would make RAG accessible to non-developers
+1. **Taskade Genesis "vibe coding"** — AI-generates working calculators from text prompts. Zero marginal cost per visitor. Pricing at $4-19/mo undercuts everyone. Threat: commoditizes simple calculators. Defense: no formula engine (VLOOKUP, financial functions), no KB/RAG, no MCP.
+2. **Embeddable.co AI editor** — Now offers AI editor suggestions + plain-English formula creation. Charts/graphs in results. HubSpot/Stripe integrations. Threat: narrowing design gap. Defense: no Rust formula engine, no KB, no MCP.
+3. **Coherent Spark Assistant** — New Excel add-in for enterprise users. Salesforce AppExchange + AWS Marketplace listings. Duck Creek insurance partnership. Threat: low for SMB (still $50K+/year). Watch for any SMB pricing signal.
+4. **Outgrow price increase** — Raised from $14/mo to $22/mo entry. No AI features added. Falling behind. Threat: declining.
+5. **MCP Registry** — Central discovery service for MCP servers in development. When it launches, BL MUST be listed. First-mover advantage for "business logic MCP" category.
+6. **EU AI Act** — August 2, 2026 enforcement. <30% of EU SMEs compliant. Creates urgency for AI tools with audit trails and transparency — BL's deterministic formulas are naturally compliant.

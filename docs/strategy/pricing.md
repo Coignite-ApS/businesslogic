@@ -1,6 +1,6 @@
 # Pricing Strategy
 
-**Last updated:** 2026-03-24
+**Last updated:** 2026-04-07
 
 ---
 
@@ -85,12 +85,15 @@
 
 ## AI Cost Analysis
 
-### Per-Query Costs (2026)
-| Model Tier | Cost/query | Use Case |
-|-----------|-----------|----------|
-| Haiku-class | $0.002-0.005 | KB search, simple chat |
-| Sonnet-class | $0.01-0.03 | Complex chat, tool use |
-| Opus-class | $0.05-0.15 | Deep analysis (rare) |
+### Per-Query Costs (April 2026 — updated)
+| Model Tier | Cost/query | Trend vs Mar | Use Case |
+|-----------|-----------|:---:|----------|
+| Haiku-class (4.5) | $0.001-0.004 | Down 20% | KB search, simple chat |
+| Sonnet-class | $0.008-0.025 | Down 15% | Complex chat, tool use |
+| Opus-class | $0.04-0.12 | Down 20% | Deep analysis (rare) |
+| Nano-class (GPT-4.1) | $0.0005-0.002 | NEW | Ultra-cheap KB search, embeddings |
+
+Note: Batch API discounts (50% off) available from both OpenAI and Anthropic for non-real-time workloads. Combined techniques (caching, batching, prompt compression) can reduce costs 5-10x further.
 
 ### Margin by Tier (AI queries)
 | Tier | AI queries | Est. COGS | Revenue | AI Margin |
@@ -100,7 +103,13 @@
 | Growth | 500 | $2.50 | $79 | 96.8% |
 | Business | 5,000 | $25 | $249 | 90.0% |
 
-**Key insight:** AI margins are excellent and improving. Inference costs decline ~50x/year. Price on value, not cost.
+**Key insight:** AI margins are excellent and improving. Inference costs decline ~10x/year (GPT-4 equivalent: $20 in 2022 -> $0.40 in 2026). Price on value, not cost. Warning: providers may be pricing below cost for market share — expect some normalization, but BL's 90%+ margins provide ample buffer.
+
+### Market Pricing Model Trends (April 2026)
+- 43% of SaaS companies now use hybrid pricing (base + usage), projected 61% by end 2026
+- Credit-based: 79 companies in PricingSaaS 500 (126% YoY growth), but seen as transitional
+- Trend swinging back to simplicity: all-inclusive tiers with clear usage limits preferred over complex credit systems
+- BL's designed model (subscription tiers + AI query limits) aligns with winning pattern
 
 ---
 
