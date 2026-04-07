@@ -224,14 +224,17 @@ For prefix-based cache: keys validated via `LookupByPrefix` are cached under `gw
 | `migrations/gateway/005_fix_permissions_default.sql` | Fix column default to v3 |
 | `services/cms/.../composables/use-formula-token.ts` | Delete |
 
-## Not in scope (Phase 2)
+## Not in scope (deferred)
 
-Deferred to a separate spec after this cleanup lands:
+### Phase 2a — API Key Extraction (spec: `2026-04-07-api-key-extraction-design.md`)
+- Moving key management out of calculator-api into new `project-extension-account-api` hook — **DONE: spec written**
 
-- Moving key management out of calculator-api extension into its own extension
+### Phase 2b — New features (not yet scoped)
 - Audit logging for key operations
 - Monthly quota enforcement
-- Restructuring CMS proxy layer
+
+### Assessed and closed
+- CMS proxy layer restructuring — assessed during Phase 2a brainstorming, deemed unnecessary. Pattern is already consistent across all hooks.
 
 ## Verification
 
