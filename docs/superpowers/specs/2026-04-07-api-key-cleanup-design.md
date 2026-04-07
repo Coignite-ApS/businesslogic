@@ -224,11 +224,13 @@ For prefix-based cache: keys validated via `LookupByPrefix` are cached under `gw
 | `migrations/gateway/005_fix_permissions_default.sql` | Fix column default to v3 |
 | `services/cms/.../composables/use-formula-token.ts` | Delete |
 
-## Not in scope
+## Not in scope (Phase 2)
 
-- Moving key management out of calculator-api extension (structural, not cleanup)
-- Audit logging for key operations (new feature)
-- Monthly quota enforcement (new feature)
+Deferred to a separate spec after this cleanup lands:
+
+- Moving key management out of calculator-api extension into its own extension
+- Audit logging for key operations
+- Monthly quota enforcement
 - Restructuring CMS proxy layer
 
 ## Verification
