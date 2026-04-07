@@ -68,3 +68,45 @@ describe('KB scoping - list filtering', () => {
     assert.deepStrictEqual(getAllowedKbIds(req), []);
   });
 });
+
+describe('KB scoping - search/ask with specific kb_id', () => {
+  it('assertKbAccess blocks search on restricted KB', () => {
+    const req = {
+      permissionsRaw: {
+        services: { kb: { enabled: true, resources: ['kb-allowed'] } },
+      },
+    };
+    try {
+      assertKbAccess(req, 'kb-not-allowed');
+      assert.fail('Should have thrown 403');
+    } catch (err) {
+      assert.strictEqual(err.statusCode, 403);
+    }
+  });
+
+  it('assertKbAccess allows search on permitted KB', () => {
+    const req = {
+      permissionsRaw: {
+        services: { kb: { enabled: true, resources: ['kb-allowed'] } },
+      },
+    };
+    assert.doesNotThrow(() => assertKbAccess(req, 'kb-allowed'));
+  });
+});
+
+describe('KB scoping - cross-KB search filtering', () => {
+  it('getAllowedKbIds returns IDs for cross-KB SQL filter', () => {
+    const req = {
+      permissionsRaw: {
+        services: { kb: { enabled: true, resources: ['kb-1', 'kb-2'] } },
+      },
+    };
+    const allowed = getAllowedKbIds(req);
+    assert.deepStrictEqual(allowed, ['kb-1', 'kb-2']);
+  });
+
+  it('getAllowedKbIds returns null for unrestricted cross-KB search', () => {
+    const req = { permissionsRaw: null };
+    assert.strictEqual(getAllowedKbIds(req), null);
+  });
+});

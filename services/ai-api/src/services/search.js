@@ -5,7 +5,7 @@ import { rerank } from './reranker.js';
 /**
  * Hybrid search: vector + full-text with Reciprocal Rank Fusion.
  */
-export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId, limit, searchConfig, expectedDimensions) {
+export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId, limit, searchConfig, expectedDimensions, allowedKbIds) {
   const fetchCount = limit * 3;
   const { minSimilarity, rrfK } = searchConfig;
 
@@ -26,8 +26,15 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
   const queryLang = detectLanguage(searchQuery);
   const queryTsConfig = pgTsConfig(queryLang);
 
-  const kbFilter = kbId ? 'AND c.knowledge_base = $3' : '';
-  const kbParams = kbId ? [kbId] : [];
+  let kbFilter = '';
+  let kbParams = [];
+  if (kbId) {
+    kbFilter = 'AND c.knowledge_base = $3';
+    kbParams = [kbId];
+  } else if (allowedKbIds !== null && allowedKbIds !== undefined) {
+    kbFilter = 'AND c.knowledge_base = ANY($3::uuid[])';
+    kbParams = [allowedKbIds];
+  }
 
   // Run vector + FTS in parallel (with parent section JOIN)
   const [vectorRows, ftsRows] = await Promise.all([
@@ -54,7 +61,7 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
        LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base
        LEFT JOIN kb_sections s ON s.id = c.section_id,
             plainto_tsquery($1::regconfig, $2) query
-       WHERE c.account_id = $3 ${kbFilter.replace('$3', kbId ? '$4' : '$3')}
+       WHERE c.account_id = $3 ${kbFilter.replace('$3', kbParams.length > 0 ? '$4' : '$3')}
              AND c.search_vector IS NOT NULL
              AND c.search_vector @@ query
        ORDER BY fts_rank DESC
@@ -77,7 +84,7 @@ export async function hybridSearch(embeddingClient, searchQuery, accountId, kbId
          LEFT JOIN knowledge_bases kb ON kb.id = c.knowledge_base
          LEFT JOIN kb_sections s ON s.id = c.section_id,
               plainto_tsquery('simple', $1) query
-         WHERE c.account_id = $2 ${kbFilter.replace('$3', kbId ? '$3' : '$2')}
+         WHERE c.account_id = $2 ${kbFilter.replace('$3', kbParams.length > 0 ? '$3' : '$2')}
                AND c.search_vector IS NOT NULL
                AND c.search_vector @@ query
          ORDER BY fts_rank DESC

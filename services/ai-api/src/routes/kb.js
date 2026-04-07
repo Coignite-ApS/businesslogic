@@ -431,6 +431,13 @@ export async function registerRoutes(app) {
     const { query: searchQuery, kb_id, limit } = req.body || {};
     if (!searchQuery?.trim()) return reply.code(400).send({ errors: [{ message: 'Query is required' }] });
 
+    // KB scoping: block access to restricted KB
+    if (kb_id) {
+      try { assertKbAccess(req, kb_id); } catch (err) {
+        return reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
+      }
+    }
+
     // Resolve embedding client — use KB's locked model if kb_id provided
     let embedClient;
     let expectedDimensions;
@@ -444,8 +451,9 @@ export async function registerRoutes(app) {
     }
 
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
+    const allowedKbIds = kb_id ? null : getAllowedKbIds(req);
     const searchStart = Date.now();
-    const { results, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
+    const { results, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, searchQuery.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions, allowedKbIds);
     const searchLatencyMs = Date.now() - searchStart;
 
     // Determine active features
@@ -483,6 +491,13 @@ export async function registerRoutes(app) {
     const { question, kb_id, model, limit } = req.body || {};
     if (!question?.trim()) return reply.code(400).send({ errors: [{ message: 'Question is required' }] });
 
+    // KB scoping: block access to restricted KB
+    if (kb_id) {
+      try { assertKbAccess(req, kb_id); } catch (err) {
+        return reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
+      }
+    }
+
     if (!config.anthropicApiKey) {
       return reply.code(503).send({ errors: [{ message: 'AI service not configured' }] });
     }
@@ -500,8 +515,9 @@ export async function registerRoutes(app) {
     }
 
     const searchConfig = { minSimilarity: config.kbMinSimilarity, rrfK: config.kbRrfK };
+    const allowedKbIds = kb_id ? null : getAllowedKbIds(req);
     const searchStart = Date.now();
-    const { results: chunks, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions);
+    const { results: chunks, topSimilarity, avgSimilarity, rerankerUsed, rerankerLatencyMs } = await hybridSearch(embedClient, question.trim(), accountId, kb_id || null, limit || 10, searchConfig, expectedDimensions, allowedKbIds);
     const searchLatencyMs = Date.now() - searchStart;
 
     // Check for curated answers
