@@ -51,6 +51,8 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 30 | Formulas Integration Page Update (X-Auth-Token → X-API-Key) | completed | [cms/30-formulas-integration-update.md](cms/30-formulas-integration-update.md) |
 | 31 | Widget Template Polish — Improve Widgets & Dialog UX | planned | [cms/31-widget-template-polish.md](cms/31-widget-template-polish.md) |
 | 32 | KB Admin UI — Per-KB Feature Toggles | completed | [cms/32-kb-admin-ui-toggles.md](cms/32-kb-admin-ui-toggles.md) |
+| 33 | Feature Flag Key Migration (calc → formula/calculator) | planned | [cms/33-feature-flag-key-migration.md](cms/33-feature-flag-key-migration.md) |
+| 34 | AI-API Extension: /internal/calc → /internal/formula | planned | [cms/34-ai-api-internal-calc-path-fix.md](cms/34-ai-api-internal-calc-path-fix.md) |
 
 ---
 
@@ -136,6 +138,7 @@ Auth, rate limiting, routing, CORS.
 | 04 | Internal Service Proxy Routes | completed | [gateway/04-internal-service-proxy.md](gateway/04-internal-service-proxy.md) |
 | 05 | Request Logging & Audit Trail | completed | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
 | 06 | Account MCP Route | completed | [gateway/06-account-mcp-route.md](gateway/06-account-mcp-route.md) |
+| 07 | Fix MCP Calculator Auth Bypass | planned | [gateway/07-mcp-auth-bypass-fix.md](gateway/07-mcp-auth-bypass-fix.md) |
 
 ---
 
@@ -167,6 +170,16 @@ Build & test locally first. Infrastructure/launch comes after all building block
 ### ~~Phase 1B+ — Cost Optimization~~ COMPLETED
 ### ~~Phase 1C — Widget Foundation + AI Widgets~~ COMPLETED
 ### ~~Phase 1D — Monetization~~ PARTIALLY COMPLETED (cms/24 done)
+
+### Phase 0 — Critical Fixes (dm/api-key-extraction branch)
+
+Must ship before merging the API key extraction branch.
+
+| # | Service | Task | Why |
+|---|---------|------|-----|
+| 1 | gateway/07 | Fix MCP Calculator Auth Bypass | **P0 security** — unauthenticated calculator execution |
+| 2 | cms/33 | Feature Flag Key Migration | **P1** — bricks existing deploys, all renamed features denied |
+| 3 | cms/34 | AI-API /internal/calc Path Fix | **P1** — AI assistant calculator tools return 404 |
 
 ### Phase 1D (remaining) — Monetization
 
@@ -237,11 +250,11 @@ Build & test locally first. Infrastructure/launch comes after all building block
 
 | Service | Planned | Idea | In-Progress | Completed | Total |
 |---------|---------|------|-------------|-----------|-------|
-| CMS | 14 | 0 | 0 | 17 | 31 |
+| CMS | 16 | 0 | 0 | 17 | 33 |
 | AI API | 3 | 0 | 0 | 8 | 11 |
 | Formula API | 0 | 0 | 0 | 7 | 7 |
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 1 | 3 |
-| Gateway | 0 | 0 | 0 | 6 | 6 |
+| Gateway | 1 | 0 | 0 | 6 | 7 |
 | Cross-Cutting | 2 | 0 | 0 | 8 | 10 |
-| **Total** | **21** | **8** | **0** | **48** | **77** |
+| **Total** | **24** | **8** | **0** | **48** | **80** |
