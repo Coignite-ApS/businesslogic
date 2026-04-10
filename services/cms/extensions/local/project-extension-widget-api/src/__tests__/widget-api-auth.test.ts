@@ -24,7 +24,7 @@ describe('widget-api auth (CMS-29)', () => {
 
   it('uses gateway internal proxy for describe calls', () => {
     expect(indexSource).toContain('gatewayUrl');
-    expect(indexSource).toContain('/internal/calc/calculator/');
+    expect(indexSource).toContain('/internal/formula/calculator/');
     expect(indexSource).toContain('describe');
   });
 

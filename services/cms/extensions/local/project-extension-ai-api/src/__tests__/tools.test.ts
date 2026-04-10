@@ -30,7 +30,7 @@ function makeDeps(dbOverrides?: Record<string, any>): ToolExecutorDeps {
 	return {
 		db: createMockDb(),
 		accountId: 'acc-123',
-		gatewayCalcUrl: 'http://bl-gateway:8080/internal/calc',
+		gatewayCalcUrl: 'http://bl-gateway:8080/internal/formula',
 		internalSecret: 'dev-internal-secret',
 		encryptionKey: undefined,
 		logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },

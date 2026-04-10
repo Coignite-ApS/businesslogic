@@ -31,7 +31,7 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 	const maxConversationMessages = parseInt(env['AI_MAX_CONVERSATION_MESSAGES'] as string, 10) || 50;
 	const gwUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
 	const gwSecret = env['GATEWAY_INTERNAL_SECRET'] as string || '';
-	const gatewayCalcUrl = gwUrl ? `${gwUrl}/internal/calc` : '';
+	const gatewayCalcUrl = gwUrl ? `${gwUrl}/internal/formula` : '';
 	const internalSecret = gwSecret;
 	const encryptionKey = env['TOKEN_ENCRYPTION_KEY'] as string | undefined;
 	const rateLimitPerMinute = parseInt(env['AI_RATE_LIMIT_PER_MINUTE'] as string, 10) || 20;
