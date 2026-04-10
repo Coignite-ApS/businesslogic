@@ -79,12 +79,13 @@ describe('requireAdmin', () => {
 // ─── Seed data ────────────────────────────────────────────────────────────────
 
 describe('seedFeatures', () => {
-	function createMockDb(count: number) {
+	// Minimal mock for empty-table (fresh install) path
+	function createEmptyDb() {
 		const insertMock = vi.fn().mockResolvedValue(undefined);
 
 		const countChain: any = {
 			count: vi.fn().mockReturnThis(),
-			first: vi.fn().mockResolvedValue({ n: String(count) }),
+			first: vi.fn().mockResolvedValue({ n: '0' }),
 		};
 
 		const db: any = vi.fn((table: string) => {
@@ -100,31 +101,72 @@ describe('seedFeatures', () => {
 		return { db, insertMock };
 	}
 
-	it('inserts 8 features when table is empty', async () => {
-		const { db, insertMock } = createMockDb(0);
+	// Mock for existing-install migration path
+	function createMigrationDb(opts: {
+		existingKeys?: string[];   // keys already in platform_features
+		oldRows?: Record<string, any>; // old rows keyed by feature key
+	} = {}) {
+		const { existingKeys = [], oldRows = {} } = opts;
+
+		const insertMock = vi.fn().mockImplementation((row: any) => ({
+			returning: vi.fn().mockResolvedValue([{ ...row, id: 'new-uuid-' + row.key }]),
+		}));
+		const updateMock = vi.fn().mockResolvedValue(1);
+		const deleteMock = vi.fn().mockResolvedValue(1);
+
+		const platformChain = (table: string) => {
+			const chain: any = {};
+			chain.count = vi.fn().mockReturnValue({
+				count: vi.fn().mockReturnThis(),
+				first: vi.fn().mockResolvedValue({ n: '5' }),
+			});
+			chain.insert = insertMock;
+			chain.select = vi.fn().mockImplementation((col?: string) => {
+				if (!col || col === 'key') {
+					// Used by "get existing keys" query
+					return Promise.resolve(existingKeys.map((k) => ({ key: k })));
+				}
+				return chain;
+			});
+			chain.where = vi.fn().mockImplementation((_col: string, val: string) => {
+				const row = oldRows[val] ?? null;
+				return {
+					first: vi.fn().mockResolvedValue(row),
+					update: updateMock,
+					delete: deleteMock,
+				};
+			});
+			return chain;
+		};
+
+		const accountChain = () => ({
+			where: vi.fn().mockReturnThis(),
+			update: updateMock,
+		});
+
+		const db: any = vi.fn((table: string) => {
+			if (table === 'platform_features') return platformChain(table);
+			if (table === 'account_features') return accountChain();
+			return {};
+		});
+
+		return { db, insertMock, updateMock, deleteMock };
+	}
+
+	it('inserts 10 features when table is empty', async () => {
+		const { db, insertMock } = createEmptyDb();
 		const logger = { info: vi.fn(), error: vi.fn() };
 
-		// Reset module cache so we get a fresh import
 		const { seedFeatures } = await import('../seed.js');
 		await seedFeatures(db, logger);
 
 		expect(insertMock).toHaveBeenCalledTimes(1);
 		const rows = insertMock.mock.calls[0][0];
-		expect(rows).toHaveLength(8);
+		expect(rows).toHaveLength(10);
 	});
 
-	it('skips insert when table is not empty (idempotent)', async () => {
-		const { db, insertMock } = createMockDb(5);
-		const logger = { info: vi.fn(), error: vi.fn() };
-
-		const { seedFeatures } = await import('../seed.js');
-		await seedFeatures(db, logger);
-
-		expect(insertMock).not.toHaveBeenCalled();
-	});
-
-	it('all 8 expected feature keys present with correct categories', async () => {
-		const { db, insertMock } = createMockDb(0);
+	it('all 10 expected feature keys present with correct categories', async () => {
+		const { db, insertMock } = createEmptyDb();
 		const logger = { info: vi.fn(), error: vi.fn() };
 
 		const { seedFeatures } = await import('../seed.js');
@@ -136,17 +178,109 @@ describe('seedFeatures', () => {
 		expect(keys).toContain('ai.chat');
 		expect(keys).toContain('ai.kb');
 		expect(keys).toContain('ai.embeddings');
-		expect(keys).toContain('calc.execute');
-		expect(keys).toContain('calc.mcp');
+		expect(keys).toContain('formula.execute');
+		expect(keys).toContain('formula.mcp');
+		expect(keys).toContain('calculator.execute');
+		expect(keys).toContain('calculator.mcp');
 		expect(keys).toContain('flow.execute');
 		expect(keys).toContain('widget.render');
 		expect(keys).toContain('widget.builder');
 
 		// categories
 		expect(rows.find((r) => r.key === 'ai.chat')?.category).toBe('ai');
-		expect(rows.find((r) => r.key === 'calc.execute')?.category).toBe('calc');
+		expect(rows.find((r) => r.key === 'formula.execute')?.category).toBe('formula');
+		expect(rows.find((r) => r.key === 'calculator.execute')?.category).toBe('calculator');
 		expect(rows.find((r) => r.key === 'flow.execute')?.category).toBe('flow');
 		expect(rows.find((r) => r.key === 'widget.render')?.category).toBe('widget');
+	});
+
+	it('renames calc.execute → calculator.execute on existing install', async () => {
+		const { db, insertMock, deleteMock } = createMigrationDb({
+			existingKeys: ['ai.chat', 'calc.execute', 'calc.mcp', 'flow.execute'],
+			oldRows: {
+				'calc.execute': { id: 'old-uuid-calc-execute', key: 'calc.execute', category: 'calc', enabled: true, sort: 4 },
+				'calc.mcp':     { id: 'old-uuid-calc-mcp',     key: 'calc.mcp',     category: 'calc', enabled: true, sort: 5 },
+			},
+		});
+		const logger = { info: vi.fn(), error: vi.fn() };
+
+		const { seedFeatures } = await import('../seed.js');
+		await seedFeatures(db, logger);
+
+		// Should have inserted calculator.execute and calculator.mcp
+		const insertedKeys = insertMock.mock.calls.map((c: any) => c[0].key);
+		expect(insertedKeys).toContain('calculator.execute');
+		expect(insertedKeys).toContain('calculator.mcp');
+
+		// Should have deleted old rows
+		expect(deleteMock).toHaveBeenCalledTimes(2);
+	});
+
+	it('inserts formula.execute and formula.mcp when missing on existing install', async () => {
+		const { db, insertMock } = createMigrationDb({
+			// existing install with calc.* already migrated but formula.* still missing
+			existingKeys: ['ai.chat', 'calculator.execute', 'calculator.mcp', 'flow.execute'],
+			oldRows: {},
+		});
+		const logger = { info: vi.fn(), error: vi.fn() };
+
+		const { seedFeatures } = await import('../seed.js');
+		await seedFeatures(db, logger);
+
+		const insertedKeys = insertMock.mock.calls.map((c: any) => c[0].key);
+		expect(insertedKeys).toContain('formula.execute');
+		expect(insertedKeys).toContain('formula.mcp');
+	});
+
+	it('skips rename if new key already exists', async () => {
+		const { db, insertMock, deleteMock } = createMigrationDb({
+			existingKeys: ['calc.execute', 'calculator.execute'],
+			oldRows: {
+				'calc.execute': { id: 'old-uuid-calc-execute', key: 'calc.execute', category: 'calc', enabled: true, sort: 4 },
+				// calculator.execute already present — first() would return non-null
+			},
+		});
+
+		// Override: when queried for 'calculator.execute', return existing row
+		const origDb = db;
+		const wrappedDb: any = vi.fn((table: string) => {
+			if (table === 'platform_features') {
+				const chain = origDb(table);
+				const origWhere = chain.where.bind(chain);
+				chain.where = vi.fn().mockImplementation((col: string, val: string) => {
+					if (val === 'calculator.execute') {
+						return { first: vi.fn().mockResolvedValue({ id: 'existing-uuid-calculator-execute', key: 'calculator.execute' }), update: vi.fn(), delete: deleteMock };
+					}
+					return origWhere(col, val);
+				});
+				return chain;
+			}
+			return origDb(table);
+		});
+
+		const logger = { info: vi.fn(), error: vi.fn() };
+		const { seedFeatures } = await import('../seed.js');
+		await seedFeatures(wrappedDb, logger);
+
+		// calc.execute old row should be deleted but no insert for calculator.execute
+		const insertedKeys = insertMock.mock.calls.map((c: any) => c[0]?.key).filter(Boolean);
+		expect(insertedKeys).not.toContain('calculator.execute');
+	});
+
+	it('migrates account_features overrides when renaming keys', async () => {
+		const { db, updateMock } = createMigrationDb({
+			existingKeys: ['calc.execute'],
+			oldRows: {
+				'calc.execute': { id: 'old-uuid-calc-execute', key: 'calc.execute', category: 'calc', enabled: true, sort: 4 },
+			},
+		});
+		const logger = { info: vi.fn(), error: vi.fn() };
+
+		const { seedFeatures } = await import('../seed.js');
+		await seedFeatures(db, logger);
+
+		// account_features.where('feature', oldRow.id).update({ feature: newRow.id })
+		expect(updateMock).toHaveBeenCalledWith({ feature: 'new-uuid-calculator.execute' });
 	});
 });
 
