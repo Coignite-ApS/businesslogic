@@ -58,11 +58,11 @@ func Auth(keyService *service.KeyService, rdb *redis.Client) func(http.Handler) 
 }
 
 // isMCPKeyPrefixPath returns true for /v1/mcp/:keyPrefix paths.
-// Excludes /v1/mcp/calc/ and /v1/mcp/ai/ which use standard X-API-Key auth.
+// Excludes /v1/mcp/calculator/, /v1/mcp/formula/, and /v1/mcp/ai/ which use standard X-API-Key auth.
 func isMCPKeyPrefixPath(path string) bool {
 	if !strings.HasPrefix(path, "/v1/mcp/") {
 		return false
 	}
 	rest := strings.TrimPrefix(path, "/v1/mcp/")
-	return rest != "" && !strings.HasPrefix(rest, "calc/") && !strings.HasPrefix(rest, "ai/")
+	return rest != "" && !strings.HasPrefix(rest, "calculator/") && !strings.HasPrefix(rest, "formula/") && !strings.HasPrefix(rest, "ai/")
 }

@@ -562,13 +562,13 @@ func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// /v1/mcp/calc/ should still require X-API-Key
-	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/calc/some-endpoint", nil)
+	// /v1/mcp/calculator/ should still require X-API-Key (renamed from /v1/mcp/calc/)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/calculator/some-endpoint", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401 for /v1/mcp/calc/ without API key, got %d", rec.Code)
+		t.Errorf("expected 401 for /v1/mcp/calculator/ without API key, got %d", rec.Code)
 	}
 
 	// /v1/mcp/ai/ should still require X-API-Key
