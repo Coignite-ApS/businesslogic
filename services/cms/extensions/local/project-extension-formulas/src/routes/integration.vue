@@ -121,7 +121,7 @@ import { maskToken } from '../utils/code-snippets';
 import type { FormulaSnippetParams } from '../utils/code-snippets';
 
 const api = useApi();
-const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'formula.execute');
 const {
 	loading, hasKeys, calcKeys, hasCalcKeys, selectedKey,
 	gatewayUrl,

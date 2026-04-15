@@ -361,6 +361,7 @@ const {
 } = useApiKeys(api);
 
 const formulaApiUrl = ref<string | null>(null);
+const mcpBaseUrl = ref<string | null>(null);
 const env = ref<'test' | 'live'>('test');
 const integrationTab = ref<'widget' | 'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('widget');
 const mcpSaving = ref(false);
@@ -564,7 +565,7 @@ const mcpDirty = computed(() => {
 
 const mcpSnippetParams = computed<McpSnippetParams>(() => ({
 	toolName: mcpConfigLocal.value.toolName || 'calculator',
-	mcpUrl: `${formulaApiUrl.value || ''}/mcp/calculator/${effectiveId.value}`,
+	mcpUrl: `${mcpBaseUrl.value || formulaApiUrl.value || ''}/${effectiveId.value}`,
 	apiKey: apiKey.value,
 }));
 
@@ -679,7 +680,10 @@ fetchActiveAccount().then(() => {
 	fetchAll(activeAccountId.value);
 	fetchKeys();
 });
-fetchFormulaApiUrl().then((url) => { formulaApiUrl.value = url; }).catch(() => {});
+api.get('/calc/formula-api-url').then((res: any) => {
+	formulaApiUrl.value = res.data?.url || '';
+	mcpBaseUrl.value = res.data?.mcpUrl || null;
+}).catch(() => {});
 
 watch(activeAccountId, (id) => { fetchAll(id); });
 watch(currentId, (id) => { if (id) fetchOne(id); }, { immediate: true });

@@ -264,7 +264,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 		return;
 	}
 
-	const apiUrl = `${gwUrl}/internal/calc`;
+	const apiUrl = `${gwUrl}/internal/formula`;
 	const client = new FormulaApiClient(apiUrl, gwSecret);
 
 	init('routes.custom.before', ({ app }) => {
@@ -272,7 +272,11 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 		// GET /calc/formula-api-url — expose public gateway URL to frontend (for code snippets)
 		const publicGatewayUrl = (env['GATEWAY_PUBLIC_URL'] as string) || (env['GATEWAY_URL'] as string) || '';
 		app.get('/calc/formula-api-url', requireAuth, (_req: any, res: any) => {
-			return res.json({ url: publicGatewayUrl ? `${publicGatewayUrl}/v1/calc` : '' });
+			return res.json({
+				url: publicGatewayUrl ? `${publicGatewayUrl}/v1/calculator` : '',
+				formulaUrl: publicGatewayUrl ? `${publicGatewayUrl}/v1/formula` : '',
+				mcpUrl: publicGatewayUrl ? `${publicGatewayUrl}/v1/mcp/calculator` : '',
+			});
 		});
 
 		// GET /calc/health — proxy Formula API health (admin only)

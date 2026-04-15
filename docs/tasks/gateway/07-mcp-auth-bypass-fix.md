@@ -1,6 +1,6 @@
 # Gateway 07 — Fix MCP Calculator Auth Bypass
 
-- **Status:** planned
+- **Status:** completed
 - **Priority:** P0 (critical security)
 - **Service:** gateway
 - **Branch:** dm/api-key-extraction
@@ -28,11 +28,11 @@ return rest != "" && !strings.HasPrefix(rest, "calculator/") && !strings.HasPref
 
 ## Key Tasks
 
-- [ ] Update `isMCPKeyPrefixPath()` in `services/gateway/internal/middleware/auth.go`
-- [ ] Add regression test: `/v1/mcp/calculator/:id` returns 401 without X-API-Key
-- [ ] Add regression test: `/v1/mcp/formula/:id` returns 401 without X-API-Key
-- [ ] Verify key-prefix MCP paths (e.g. `/v1/mcp/{accountKeyPrefix}/`) still work
-- [ ] Run full gateway test suite
+- [x] Update `isMCPKeyPrefixPath()` in `services/gateway/internal/middleware/auth.go`
+- [x] Add regression test: `/v1/mcp/calculator/:id` returns 401 without X-API-Key
+- [x] Add regression test: `/v1/mcp/formula/:id` returns 401 without X-API-Key
+- [x] Verify key-prefix MCP paths (e.g. `/v1/mcp/{accountKeyPrefix}/`) still work
+- [x] Run full gateway test suite
 
 ## Files
 

@@ -50,7 +50,7 @@ func TestInternalProxy_RequiresSecret(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	paths := []string{"/internal/calc/health", "/internal/ai/health", "/internal/flow/health"}
+	paths := []string{"/internal/formula/health", "/internal/ai/health", "/internal/flow/health"}
 
 	for _, path := range paths {
 		t.Run("no secret "+path, func(t *testing.T) {
@@ -100,8 +100,8 @@ func TestInternalProxy_ProxiesCorrectly(t *testing.T) {
 		body     string
 		wantPath string
 	}{
-		{"calc GET", http.MethodGet, "/internal/calc/health", "", "/health"},
-		{"calc POST", http.MethodPost, "/internal/calc/execute/calculator/123", `{"inputs":{}}`, "/execute/calculator/123"},
+		{"formula GET", http.MethodGet, "/internal/formula/health", "", "/health"},
+		{"formula POST", http.MethodPost, "/internal/formula/execute/calculator/123", `{"inputs":{}}`, "/execute/calculator/123"},
 		{"ai GET", http.MethodGet, "/internal/ai/chat/conversations", "", "/chat/conversations"},
 		{"ai POST", http.MethodPost, "/internal/ai/chat/send", `{"message":"hi"}`, "/chat/send"},
 		{"flow POST", http.MethodPost, "/internal/flow/webhook/trigger", `{"flow":"f1"}`, "/webhook/trigger"},
@@ -146,7 +146,7 @@ func TestInternalProxy_StripsInternalSecret(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/internal/calc/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/formula/health", nil)
 	req.Header.Set("X-Internal-Secret", testInternalSecret)
 	req.Header.Set("X-Custom-Header", "keep-me")
 	rec := httptest.NewRecorder()
@@ -193,7 +193,7 @@ func TestInternalProxy_ForwardsUserContext(t *testing.T) {
 	}
 }
 
-func TestInternalProxy_InjectsAdminTokenForCalc(t *testing.T) {
+func TestInternalProxy_InjectsAdminTokenForFormula(t *testing.T) {
 	var receivedHeaders http.Header
 
 	router, _ := setupInternalProxyRouter(t, func(w http.ResponseWriter, r *http.Request) {
@@ -201,8 +201,8 @@ func TestInternalProxy_InjectsAdminTokenForCalc(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// /internal/calc/ should get X-Admin-Token injected
-	req := httptest.NewRequest(http.MethodGet, "/internal/calc/health", nil)
+	// /internal/formula/ should get X-Admin-Token injected
+	req := httptest.NewRequest(http.MethodGet, "/internal/formula/health", nil)
 	req.Header.Set("X-Internal-Secret", testInternalSecret)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -215,7 +215,7 @@ func TestInternalProxy_InjectsAdminTokenForCalc(t *testing.T) {
 	}
 }
 
-func TestInternalProxy_NoAdminTokenForNonCalc(t *testing.T) {
+func TestInternalProxy_NoAdminTokenForNonFormula(t *testing.T) {
 	var receivedHeaders http.Header
 
 	router, _ := setupInternalProxyRouter(t, func(w http.ResponseWriter, r *http.Request) {
@@ -223,7 +223,7 @@ func TestInternalProxy_NoAdminTokenForNonCalc(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// /internal/ai/ should NOT get X-Admin-Token
+	// /internal/ai/ should NOT get X-Admin-Token (non-formula route)
 	req := httptest.NewRequest(http.MethodGet, "/internal/ai/chat/send", nil)
 	req.Header.Set("X-Internal-Secret", testInternalSecret)
 	rec := httptest.NewRecorder()
@@ -233,6 +233,6 @@ func TestInternalProxy_NoAdminTokenForNonCalc(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 	if receivedHeaders.Get("X-Admin-Token") != "" {
-		t.Error("X-Admin-Token should NOT be injected for non-calc routes")
+		t.Error("X-Admin-Token should NOT be injected for non-formula routes")
 	}
 }

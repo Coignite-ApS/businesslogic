@@ -198,7 +198,7 @@ import type { Calculator, CalculatorConfig, CalculatorTemplate } from '../types'
 import { extractErrorMessage } from '../utils/error';
 
 const api = useApi();
-const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calculator.execute');
 const route = useRoute();
 const router = useRouter();
 

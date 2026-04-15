@@ -20,8 +20,11 @@ func TestRouteFeatureMapping(t *testing.T) {
 		{"/v1/ai/chat/send", "ai.chat"},
 		{"/v1/ai/kb/search", "ai.kb"},
 		{"/v1/ai/embed/", "ai.embeddings"},
-		{"/v1/calc/execute/123", "calc.execute"},
-		{"/v1/calc/mcp/tool", "calc.mcp"},
+		{"/v1/formula/execute", "formula.execute"},
+		{"/v1/calculator/execute/123", "calculator.execute"},
+		{"/v1/calculator/describe/123", "calculator.execute"},
+		{"/v1/mcp/formula/tools/list", "formula.mcp"},
+		{"/v1/mcp/calculator/some-id", "calculator.mcp"},
 		{"/v1/flow/run", "flow.execute"},
 		{"/v1/widget/render", "widget.render"},
 	}

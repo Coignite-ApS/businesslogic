@@ -36,7 +36,7 @@ export function useApiKeys(api: any) {
 			const raw = keysRes.data?.data || keysRes.data;
 			keys.value = Array.isArray(raw) ? raw : [];
 
-			gatewayUrl.value = urlRes.data?.url || urlRes.data?.data || '';
+			gatewayUrl.value = urlRes.data?.formulaUrl || urlRes.data?.url || urlRes.data?.data || '';
 
 			// Auto-select first live key with calc permission, fallback to any calc key
 			const withCalc = keys.value.filter(hasCalcPermission);

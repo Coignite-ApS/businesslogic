@@ -3,7 +3,7 @@ import { languages, maskToken } from '../utils/code-snippets';
 import type { FormulaSnippetParams } from '../utils/code-snippets';
 
 const params: FormulaSnippetParams = {
-	baseUrl: 'https://api.example.com/v1/calc',
+	baseUrl: 'https://api.example.com/v1/formula',
 	apiKey: 'test-api-key-12345',
 };
 
@@ -52,18 +52,18 @@ describe('code-snippets', () => {
 		for (const lang of languages) {
 			it(`${lang.label} single uses /execute`, () => {
 				const snippet = lang.snippet('single', params);
-				expect(snippet).toContain('/v1/calc/execute');
-				expect(snippet).not.toContain('/v1/calc/execute/batch');
+				expect(snippet).toContain('/v1/formula/execute');
+				expect(snippet).not.toContain('/v1/formula/execute/batch');
 			});
 
 			it(`${lang.label} batch uses /execute/batch`, () => {
 				const snippet = lang.snippet('batch', params);
-				expect(snippet).toContain('/v1/calc/execute/batch');
+				expect(snippet).toContain('/v1/formula/execute/batch');
 			});
 
 			it(`${lang.label} sheet uses /execute/sheet`, () => {
 				const snippet = lang.snippet('sheet', params);
-				expect(snippet).toContain('/v1/calc/execute/sheet');
+				expect(snippet).toContain('/v1/formula/execute/sheet');
 			});
 		}
 	});

@@ -351,7 +351,7 @@ import type { FormulaExample } from '../types';
 import type { SheetFormula } from '../types';
 
 const api = useApi();
-const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'formula.execute');
 const {
 	executing, error: formulaError, result: resultData,
 	requestPayload, statusCode,

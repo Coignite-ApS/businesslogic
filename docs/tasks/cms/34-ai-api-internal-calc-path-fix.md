@@ -1,6 +1,6 @@
 # CMS 34 — AI-API Extension: Migrate /internal/calc → /internal/formula
 
-- **Status:** planned
+- **Status:** completed
 - **Priority:** P1 (high — AI assistant calculator tools broken)
 - **Service:** cms (ai-api extension)
 - **Branch:** dm/api-key-extraction
@@ -18,11 +18,11 @@ Update ai-api extension to use `/internal/formula` and fix stale widget-api test
 
 ## Key Tasks
 
-- [ ] Update `index.ts:34` in `project-extension-ai-api`: change `/internal/calc` → `/internal/formula`
-- [ ] Update `tools.ts` if any hardcoded `/internal/calc` references remain
-- [ ] Fix `widget-api-auth.test.ts` assertion from `/internal/calc/calculator/` → `/internal/formula/calculator/`
-- [ ] Run ai-api extension tests
-- [ ] Run widget-api extension tests
+- [x] Update `index.ts:34` in `project-extension-ai-api`: change `/internal/calc` → `/internal/formula`
+- [x] Update `tools.ts` if any hardcoded `/internal/calc` references remain
+- [x] Fix `widget-api-auth.test.ts` assertion from `/internal/calc/calculator/` → `/internal/formula/calculator/`
+- [x] Run ai-api extension tests
+- [x] Run widget-api extension tests
 
 ## Files
 

@@ -1,6 +1,6 @@
 # CMS 33 — Feature Flag Key Migration (calc → formula/calculator)
 
-- **Status:** planned
+- **Status:** completed
 - **Priority:** P1 (high — bricks existing deploys)
 - **Service:** cms (feature-flags extension)
 - **Branch:** dm/api-key-extraction
@@ -21,11 +21,11 @@ Add upsert/migration logic to `seedFeatures()` that:
 
 ## Key Tasks
 
-- [ ] Add migration logic in `seedFeatures()` to rename `calc.execute` → `calculator.execute`, `calc.mcp` → `calculator.mcp`
-- [ ] Insert new `formula.execute` and `formula.mcp` keys if missing
-- [ ] Migrate any `account_feature_overrides` referencing old keys
-- [ ] Update tests to cover non-empty table migration path
-- [ ] Verify Redis sync picks up new keys after migration
+- [x] Add migration logic in `seedFeatures()` to rename `calc.execute` → `calculator.execute`, `calc.mcp` → `calculator.mcp`
+- [x] Insert new `formula.execute` and `formula.mcp` keys if missing
+- [x] Migrate any `account_feature_overrides` referencing old keys
+- [x] Update tests to cover non-empty table migration path
+- [x] Verify Redis sync picks up new keys after migration
 
 ## Files
 

@@ -30,6 +30,7 @@ When a new conversation starts, greet the user with a brief status overview. Do 
   /browser-qa                — verify UI changes in Chrome
   /bizdev-strategy           — market & pricing analysis
   /project-review            — full health check
+  /ux-tester                 — simulate real user testing with personas
   /test-all                  — run all tests
   /dev-up                    — start Docker dev environment
 
@@ -59,6 +60,8 @@ Read these before making changes:
 | `.claude/skills/devops-review/SKILL.md` | DevOps infrastructure review: Terraform, Docker, Coolify, networking, backups, monitoring |
 | `.claude/skills/bizdev-strategy/SKILL.md` | Business development: market research, pricing, competitive analysis, opportunity discovery |
 | `.claude/skills/browser-qa/SKILL.md` | Browser-based QA: Chrome DevTools verification, screenshot evidence, pass/fail reports |
+| `.claude/skills/ux-tester/SKILL.md` | Persona-based UX testing: simulated users, journey flows, holistic scoring |
+| `docs/ux-testing/` | UX testing framework: personas, flows, credentials, experience history |
 | `docs/strategy/` | Strategy documents maintained by BizDev agent (pricing, marketing, gaps, GTM) |
 
 ## Agent Model Policy
@@ -75,6 +78,7 @@ Read these before making changes:
 | Frontend Designer (review) | **Opus** | UX judgment, accessibility audits |
 | QA Reviewer (robo-sprint) | **Opus** | Code quality judgment, test coverage validation |
 | Browser QA | **Opus** | Visual verification, UI judgment, interpreting browser state |
+| UX Tester | **Opus** | Persona simulation, UX judgment, holistic experience scoring |
 | Frontend Designer (build) | **Sonnet** | Implementation speed, cost efficiency |
 | Implementation Teammate | **Sonnet** | TDD coding, focused task execution |
 
@@ -103,6 +107,8 @@ This project has four specialist agents that run as **independent sub-agents** (
 | When discussing what to build next | **BizDev Strategy** | `/bizdev-strategy opportunities` |
 | After UI/extension changes need verification | **Browser QA** | `/browser-qa cms/22` or `/browser-qa` |
 | When robo-sprint completes UI tasks | **Browser QA** | Auto-triggered in Phase 4.5 |
+| When evaluating end-to-end user experience | **UX Tester** | `/ux-tester` or `/ux-tester sarah calculator-builder` |
+| Before a release, for holistic UX assessment | **UX Tester** | `/ux-tester marcus first-login+calculator-builder+ai-assistant` |
 
 ### How to Invoke
 

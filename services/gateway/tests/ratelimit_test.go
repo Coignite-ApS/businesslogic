@@ -34,7 +34,7 @@ func TestRateLimit_NoAccountPassesThrough(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/calc/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/formula/test", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -57,7 +57,7 @@ func TestRateLimit_WithAccountNoRedis_FallsBackToMemory(t *testing.T) {
 
 	// Should use in-memory fallback since no Redis
 	for i := 0; i < 5; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/v1/calc/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/formula/test", nil)
 		ctx := context.WithValue(req.Context(), middleware.AccountContextKey, acct)
 		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
