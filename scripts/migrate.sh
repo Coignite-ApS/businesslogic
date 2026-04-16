@@ -108,7 +108,7 @@ is_applied() {
     return 1
   fi
   local result
-  result=$(psql "$DB_URL" -tAc "SELECT 1 FROM gateway.schema_migrations WHERE schema_name='$schema' AND filename='$filename'" 2>/dev/null || true)
+  result=$(psql "$DB_URL" -tAc "SELECT 1 FROM gateway.schema_migrations WHERE schema_name=:'schema' AND filename=:'filename'" -v schema="$schema" -v filename="$filename" 2>/dev/null || true)
   [ "$result" = "1" ]
 }
 
@@ -119,7 +119,7 @@ record_applied() {
   if [ "$TRACKING_AVAILABLE" = "false" ]; then
     return 0
   fi
-  psql "$DB_URL" -c "INSERT INTO gateway.schema_migrations (schema_name, filename) VALUES ('$schema', '$filename') ON CONFLICT DO NOTHING" 2>/dev/null || true
+  psql "$DB_URL" -c "INSERT INTO gateway.schema_migrations (schema_name, filename) VALUES (:'schema', :'filename') ON CONFLICT DO NOTHING" -v schema="$schema" -v filename="$filename" 2>/dev/null || true
 }
 
 # Helper: remove a migration record (rollback)
@@ -130,7 +130,7 @@ record_removed() {
     return 0
   fi
   # Table may have just been dropped — ignore errors
-  psql "$DB_URL" -c "DELETE FROM gateway.schema_migrations WHERE schema_name='$schema' AND filename='$filename'" 2>/dev/null || true
+  psql "$DB_URL" -c "DELETE FROM gateway.schema_migrations WHERE schema_name=:'schema' AND filename=:'filename'" -v schema="$schema" -v filename="$filename" 2>/dev/null || true
 }
 
 applied=0
