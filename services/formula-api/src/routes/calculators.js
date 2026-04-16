@@ -18,6 +18,9 @@ import { loadRecipeFromDb, loadMcpConfigFromDb } from '../services/calculator-db
 import { getPool } from '../db.js';
 
 
+/** @type {import('pino').Logger | null} */
+let log = null;
+
 function cleanSchemaForDescribe(schema) {
   if (!schema) return schema;
   const clean = JSON.parse(JSON.stringify(schema));
@@ -146,7 +149,7 @@ async function loadFromDb(id) {
     return await loadRecipeFromDb(id);
   } catch (err) {
     // Log but don't throw — cache miss is handled upstream
-    console.error('[calculators] loadFromDb failed:', err.message);
+    (log || console).error({ err }, '[calculators] loadFromDb failed');
     return null;
   }
 }
@@ -156,7 +159,7 @@ async function fetchMcpConfig(id) {
   try {
     return await loadMcpConfigFromDb(id);
   } catch (err) {
-    console.error('[calculators] fetchMcpConfig failed:', err.message);
+    (log || console).error({ err }, '[calculators] fetchMcpConfig failed');
     return null;
   }
 }
@@ -529,6 +532,7 @@ export async function executeCalculatorCore(calc, calcId, inputData) {
 }
 
 export async function registerRoutes(app) {
+  log = app.log;
   const routeById = routeByCalcId('params');
   const routeByBody = routeByCalcId('body');
 
