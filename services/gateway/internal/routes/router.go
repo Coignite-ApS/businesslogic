@@ -23,6 +23,7 @@ type Router struct {
 	configCacheTTL       time.Duration
 	catalogCacheTTL      time.Duration
 	auditFn              middleware.AuditLogFn
+	internalHandler      http.Handler
 }
 
 type RouterConfig struct {
@@ -52,6 +53,7 @@ func New(cfg RouterConfig) *Router {
 		auditFn:              cfg.AuditFn,
 	}
 	r.setup()
+	r.internalHandler = middleware.InternalAuth(r.internalSecret)(middleware.InternalAudit(r.auditFn)(r.mux))
 	return r
 }
 
@@ -352,9 +354,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Defense-in-depth: any new /internal/ route is automatically protected
 	// even if the handler forgets to apply per-route middleware.
 	if strings.HasPrefix(req.URL.Path, "/internal/") {
-		internalAuth := middleware.InternalAuth(r.internalSecret)
-		internalAudit := middleware.InternalAudit(r.auditFn)
-		internalAuth(internalAudit(r.mux)).ServeHTTP(w, req)
+		r.internalHandler.ServeHTTP(w, req)
 		return
 	}
 	r.mux.ServeHTTP(w, req)
