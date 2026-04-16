@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -58,6 +60,36 @@ func Load() *Config {
 		WidgetConfigCacheTTL:  envDuration("WIDGET_CONFIG_CACHE_TTL", 1*time.Hour),
 		WidgetCatalogCacheTTL: envDuration("WIDGET_CATALOG_CACHE_TTL", 24*time.Hour),
 	}
+}
+
+// Validate checks that critical secrets are set.
+// Returns an error if secrets are missing and SKIP_SECRET_VALIDATION is not "true".
+func (c *Config) Validate() error {
+	type check struct {
+		name  string
+		value string
+	}
+	checks := []check{
+		{"GATEWAY_SHARED_SECRET", c.GatewaySharedSecret},
+	}
+
+	var missing []string
+	for _, ch := range checks {
+		if ch.value == "" {
+			missing = append(missing, ch.name)
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	if envStr("SKIP_SECRET_VALIDATION", "") == "true" {
+		fmt.Printf("[config] WARN: SKIP_SECRET_VALIDATION=true — missing secrets ignored: %s\n", strings.Join(missing, ", "))
+		return nil
+	}
+
+	return fmt.Errorf("missing required secrets: %s. Set them or use SKIP_SECRET_VALIDATION=true for local dev", strings.Join(missing, ", "))
 }
 
 func envStr(key, fallback string) string {

@@ -5,7 +5,7 @@ import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
-import { config } from './config.js';
+import { config, validateSecrets } from './config.js';
 import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
 import { initBudget, closeBudget } from './services/budget.js';
@@ -122,6 +122,9 @@ process.on('uncaughtException', (err) => {
 });
 
 export async function start() {
+  // Fail fast if critical secrets missing
+  validateSecrets();
+
   try {
     // Init database (optional — runs without DB for health checks)
     if (config.databaseUrl) {

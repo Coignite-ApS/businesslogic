@@ -29,6 +29,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Allow services to start without real secrets during tests
+export SKIP_SECRET_VALIDATION=true
+
 run_test() {
   local name="$1"
   local dir="$2"

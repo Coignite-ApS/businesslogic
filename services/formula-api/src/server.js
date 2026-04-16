@@ -22,7 +22,7 @@ import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
-import { config } from './config.js';
+import { config, validateSecrets } from './config.js';
 import { pool } from './services/engine-pool.js';
 import * as cache from './services/cache.js';
 import { registerRoutes as registerHealthRoutes } from './routes/health.js';
@@ -155,6 +155,9 @@ process.on('uncaughtException', (err) => {
 
 // Start
 const start = async () => {
+  // Fail fast if critical secrets missing
+  validateSecrets();
+
   try {
     await cache.initCache();
     if (config.databaseUrl) {

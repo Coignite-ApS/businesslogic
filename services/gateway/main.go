@@ -26,6 +26,12 @@ import (
 func main() {
 	cfg := config.Load()
 
+	// Validate critical secrets before proceeding
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "[config] FATAL: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Setup logging
 	level, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {

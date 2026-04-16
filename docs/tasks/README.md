@@ -164,7 +164,7 @@ Infrastructure and multi-service concerns.
 | 10 | Platform Feature Flags (DB + Redis + Gateway + Admin UI + Module Gating) | completed | — |
 | 11 | Migration Rollback Scripts | planned | [cross-cutting/11-migration-rollbacks.md](cross-cutting/11-migration-rollbacks.md) |
 | 12 | Container Resource Limits | planned | [cross-cutting/12-container-resource-limits.md](cross-cutting/12-container-resource-limits.md) |
-| 13 | Startup Secret Validation (Fail-Fast) | planned | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
+| 13 | Startup Secret Validation (Fail-Fast) | completed | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
 
 ---
 
@@ -277,5 +277,5 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 3 | 0 | 0 | 1 | 4 |
 | Gateway | 1 | 0 | 0 | 7 | 8 |
-| Cross-Cutting | 5 | 0 | 0 | 8 | 13 |
-| **Total** | **27** | **8** | **0** | **52** | **87** |
+| Cross-Cutting | 4 | 0 | 0 | 9 | 13 |
+| **Total** | **26** | **8** | **0** | **53** | **87** |
