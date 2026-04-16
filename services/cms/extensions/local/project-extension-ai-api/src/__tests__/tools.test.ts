@@ -305,8 +305,10 @@ describe('get_calculator_config', () => {
 		expect(result.has_sheets).toBe(true);
 		expect(result.has_formulas).toBe(true);
 		expect(result.is_complete).toBe(true);
-		expect(result.input_field_names).toEqual(['amount']);
-		expect(result.output_field_names).toEqual(['result']);
+		expect(result.input).toEqual({ properties: { amount: { type: 'number', title: 'Amount' } } });
+		expect(result.output).toEqual({ properties: { result: { type: 'number', title: 'Result' } } });
+		expect(result.sheets).toEqual([{ name: 'Sheet1' }]);
+		expect(result.formulas).toEqual([{ id: 'f1' }]);
 	});
 
 	it('rejects if calculator not in account', async () => {

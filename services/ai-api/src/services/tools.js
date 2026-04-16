@@ -62,24 +62,24 @@ export const AI_TOOLS = [
   },
   {
     name: 'get_calculator_config',
-    description: 'Get the full configuration status of a calculator.',
+    description: 'Get the full configuration of a calculator including input/output schemas with mappings, sheet data, and formulas. Use this to inspect available cells before configuring inputs/outputs. Defaults to test environment.',
     input_schema: {
       type: 'object',
       properties: {
         calculator_id: { type: 'string', description: 'The calculator ID' },
-        test: { type: 'boolean', description: 'If true, get test config. Defaults to false.' },
+        test: { type: 'boolean', description: 'If true, get test config. Defaults to true (test).' },
       },
       required: ['calculator_id'],
     },
   },
   {
     name: 'configure_calculator',
-    description: "Configure a calculator's input and/or output schema. Uses partial merge.",
+    description: "Configure a calculator's input and/or output schema (test environment by default). Every field MUST include a 'mapping' cell reference (e.g. 'Sheet1'!A1). Use get_calculator_config first to inspect sheets and formulas for available cells. Uses partial merge — set a field to null to remove it.",
     input_schema: {
       type: 'object',
       properties: {
         calculator_id: { type: 'string', description: 'The calculator ID to configure' },
-        test: { type: 'boolean', description: 'If true, configure test config.' },
+        test: { type: 'boolean', description: 'If true, configure test config. Defaults to true (test).' },
         input: { type: 'object', description: 'Input schema with "properties" key' },
         output: { type: 'object', description: 'Output schema with "properties" key' },
       },
@@ -88,12 +88,12 @@ export const AI_TOOLS = [
   },
   {
     name: 'deploy_calculator',
-    description: 'Deploy a calculator to the Formula API. Config must be complete before deploying.',
+    description: 'Deploy a calculator to the Formula API (test environment by default). Always deploy to test first and verify before deploying live.',
     input_schema: {
       type: 'object',
       properties: {
         calculator_id: { type: 'string', description: 'The calculator ID to deploy' },
-        test: { type: 'boolean', description: 'If true, deploy to test (6h window).' },
+        test: { type: 'boolean', description: 'If true, deploy to test (6h window). Defaults to true (test).' },
       },
       required: ['calculator_id'],
     },
@@ -243,11 +243,11 @@ export async function executeTool(toolName, toolInput, deps) {
       case 'update_calculator':
         return await updateCalculator(accountId, toolInput);
       case 'get_calculator_config':
-        return await getCalculatorConfig(accountId, toolInput.calculator_id, toolInput.test ?? false);
+        return await getCalculatorConfig(accountId, toolInput.calculator_id, toolInput.test ?? true);
       case 'configure_calculator':
         return await configureCalculator(accountId, toolInput);
       case 'deploy_calculator':
-        return await deployCalculator(accountId, toolInput.calculator_id, toolInput.test ?? false, logger);
+        return await deployCalculator(accountId, toolInput.calculator_id, toolInput.test ?? true, logger);
       case 'search_knowledge':
         return await searchKnowledge(accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit, allowedKbIds);
       case 'ask_knowledge':
@@ -398,8 +398,8 @@ async function getCalculatorConfig(accountId, calculatorId, test) {
   const outputSchema = typeof cfg.output === 'string' ? JSON.parse(cfg.output) : cfg.output;
   const inputFields = Object.keys(inputSchema?.properties || {}).length;
   const outputFields = Object.keys(outputSchema?.properties || {}).length;
-  const hasSheets = !!cfg.sheets;
-  const hasFormulas = !!cfg.formulas;
+  const sheets = cfg.sheets ? (typeof cfg.sheets === 'string' ? JSON.parse(cfg.sheets) : cfg.sheets) : [];
+  const formulas = cfg.formulas ? (typeof cfg.formulas === 'string' ? JSON.parse(cfg.formulas) : cfg.formulas) : [];
 
   return {
     result: {
@@ -407,11 +407,13 @@ async function getCalculatorConfig(accountId, calculatorId, test) {
       environment: test ? 'test' : 'live',
       input_fields: inputFields,
       output_fields: outputFields,
-      has_sheets: hasSheets,
-      has_formulas: hasFormulas,
-      complete: inputFields > 0 && outputFields > 0 && hasSheets && hasFormulas,
+      has_sheets: sheets.length > 0,
+      has_formulas: formulas.length > 0,
+      complete: inputFields > 0 && outputFields > 0 && sheets.length > 0 && formulas.length > 0,
       input: inputSchema,
       output: outputSchema,
+      sheets,
+      formulas,
     },
   };
 }
@@ -420,7 +422,7 @@ async function configureCalculator(accountId, input) {
   const calc = await queryOne('SELECT id FROM calculators WHERE id = $1 AND account = $2', [input.calculator_id, accountId]);
   if (!calc) return { result: `Calculator "${input.calculator_id}" not found.`, isError: true };
 
-  const test = input.test ?? false;
+  const test = input.test ?? true;
   const cfg = await queryOne(
     'SELECT id, input, output FROM calculator_configs WHERE calculator = $1 AND test_environment = $2',
     [input.calculator_id, test],

@@ -302,6 +302,12 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 				const schema = await getSchema();
 				const { ItemsService } = services;
 
+				// AI tool accountability — non-admin to enforce test-only write policies
+				const aiToolAccountability = {
+					...req.accountability,
+					admin: false,
+				};
+
 				// Load or create conversation
 				let conversationId = conversation_id;
 				let messages: ConversationMessage[] = [];
@@ -467,6 +473,9 @@ export default defineHook(({ init }, { env, logger, database, services, getSchem
 							encryptionKey,
 							authToken,
 							logger,
+							accountability: aiToolAccountability,
+							schema,
+							services,
 						});
 
 						const resultStr = typeof result === 'string' ? result : JSON.stringify(result);

@@ -93,7 +93,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 	},
 	{
 		name: 'get_calculator_config',
-		description: 'Get the full configuration status of a calculator, including input/output field counts, whether it has sheets and formulas, and completeness status.',
+		description: 'Get the full configuration of a calculator including input/output schemas with mappings, sheet data, and formulas. Use this to inspect available cells before configuring inputs/outputs. Defaults to test environment.',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -103,7 +103,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 				},
 				test: {
 					type: 'boolean',
-					description: 'If true, get test config. Defaults to false (live).',
+					description: 'If true, get test config. Defaults to true (test).',
 				},
 			},
 			required: ['calculator_id'],
@@ -111,7 +111,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 	},
 	{
 		name: 'configure_calculator',
-		description: 'Configure a calculator\'s input and/or output schema. Uses partial merge — new fields are added/updated without removing existing ones. Set a field to null to remove it. Types must be: string, number, integer, or boolean.',
+		description: 'Configure a calculator\'s input and/or output schema (test environment by default). Every field MUST include a \'mapping\' cell reference (e.g. \'Sheet1\'!A1). Use get_calculator_config first to inspect sheets and formulas for available cells. Uses partial merge — set a field to null to remove it.',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -121,7 +121,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 				},
 				test: {
 					type: 'boolean',
-					description: 'If true, configure the test environment config. Defaults to false (live).',
+					description: 'If true, configure the test environment config. Defaults to true (test).',
 				},
 				input: {
 					type: 'object',
@@ -137,7 +137,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 	},
 	{
 		name: 'deploy_calculator',
-		description: 'Deploy a calculator to the Formula API. For test: enables a 6-hour test window and deploys. For live: activates the calculator (respects subscription limits) and deploys. Config must be complete (sheets, formulas, input, output) before deploying.',
+		description: 'Deploy a calculator to the Formula API (test environment by default). For test: enables a 6-hour test window. For live: requires an active test deployment first — deploy to test, execute to verify, then deploy live.',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -147,7 +147,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 				},
 				test: {
 					type: 'boolean',
-					description: 'If true, deploy to test environment (6h window). Defaults to false (live).',
+					description: 'If true, deploy to test environment (6h window). Defaults to true (test).',
 				},
 			},
 			required: ['calculator_id'],
@@ -270,6 +270,9 @@ export interface ToolExecutorDeps {
 	encryptionKey?: string;
 	authToken?: string;
 	logger: any;
+	accountability?: any;
+	schema?: any;
+	services?: any;
 }
 
 export async function executeTool(
@@ -277,7 +280,7 @@ export async function executeTool(
 	toolInput: any,
 	deps: ToolExecutorDeps,
 ): Promise<{ result: unknown; isError?: boolean }> {
-	const { db, accountId, gatewayCalcUrl, internalSecret, encryptionKey, authToken, logger } = deps;
+	const { db, accountId, gatewayCalcUrl, internalSecret, encryptionKey, authToken, logger, accountability, schema, services } = deps;
 
 	try {
 		switch (toolName) {
@@ -292,11 +295,11 @@ export async function executeTool(
 			case 'update_calculator':
 				return await updateCalculator(db, accountId, toolInput);
 			case 'get_calculator_config':
-				return await getCalculatorConfig(db, accountId, toolInput.calculator_id, toolInput.test ?? false);
+				return await getCalculatorConfig(db, accountId, toolInput.calculator_id, toolInput.test ?? true);
 			case 'configure_calculator':
-				return await configureCalculator(db, accountId, toolInput);
+				return await configureCalculator(db, accountId, toolInput, { accountability, schema, services });
 			case 'deploy_calculator':
-				return await deployCalculator(db, accountId, toolInput.calculator_id, toolInput.test ?? false, gatewayCalcUrl, internalSecret, encryptionKey, logger);
+				return await deployCalculator(db, accountId, toolInput.calculator_id, toolInput.test ?? true, gatewayCalcUrl, internalSecret, encryptionKey, logger, accountability);
 			case 'search_knowledge':
 				return await searchKnowledge(db, accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit, authToken);
 			case 'ask_knowledge':
@@ -569,17 +572,22 @@ async function getCalculatorConfig(db: DB, accountId: string, calculatorId: stri
 	const inputProps = inputSchema.properties || {};
 	const outputProps = outputSchema.properties || {};
 
+	const sheets = config.sheets ? (typeof config.sheets === 'string' ? JSON.parse(config.sheets) : config.sheets) : [];
+	const formulas = config.formulas ? (typeof config.formulas === 'string' ? JSON.parse(config.formulas) : config.formulas) : [];
+
 	return {
 		result: {
 			calculator_id: calculatorId,
 			environment: test ? 'test' : 'live',
 			input_fields: Object.keys(inputProps).length,
 			output_fields: Object.keys(outputProps).length,
-			input_field_names: Object.keys(inputProps),
-			output_field_names: Object.keys(outputProps),
-			has_sheets: !!(config.sheets && (typeof config.sheets === 'string' ? JSON.parse(config.sheets) : config.sheets).length > 0),
-			has_formulas: !!(config.formulas && (typeof config.formulas === 'string' ? JSON.parse(config.formulas) : config.formulas).length > 0),
-			is_complete: !!(config.sheets && config.formulas && Object.keys(inputProps).length > 0 && Object.keys(outputProps).length > 0),
+			input: inputSchema,
+			output: outputSchema,
+			sheets,
+			formulas,
+			has_sheets: sheets.length > 0,
+			has_formulas: formulas.length > 0,
+			is_complete: !!(sheets.length > 0 && formulas.length > 0 && Object.keys(inputProps).length > 0 && Object.keys(outputProps).length > 0),
 			config_version: config.config_version || 1,
 		},
 	};
@@ -587,11 +595,16 @@ async function getCalculatorConfig(db: DB, accountId: string, calculatorId: stri
 
 // ─── Configure calculator ────────────────────────────────────────
 
-async function configureCalculator(db: DB, accountId: string, input: { calculator_id: string; test?: boolean; input?: any; output?: any }) {
+async function configureCalculator(
+	db: DB,
+	accountId: string,
+	input: { calculator_id: string; test?: boolean; input?: any; output?: any },
+	ctx: { accountability?: any; schema?: any; services?: any },
+) {
 	const calc = await db('calculators').where('id', input.calculator_id).where('account', accountId).first();
 	if (!calc) return { result: `Calculator "${input.calculator_id}" not found in your account.`, isError: true };
 
-	const isTest = input.test ?? false;
+	const isTest = input.test ?? true;
 	const config = await db('calculator_configs')
 		.where('calculator', input.calculator_id)
 		.where('test_environment', isTest)
@@ -624,6 +637,13 @@ async function configureCalculator(db: DB, accountId: string, input: { calculato
 	}
 
 	if (Object.keys(updates).length > 0) {
+		// AI live config: only allowed after a successful test deploy (active test window)
+		if (ctx.accountability && !ctx.accountability.admin && !isTest) {
+			if (!calc.test_enabled_at || !calc.test_expires_at || new Date(calc.test_expires_at) < new Date()) {
+				return { result: 'Configure and deploy to test first, then verify results before configuring live. Set test=true.', isError: true };
+			}
+		}
+
 		await db('calculator_configs').where('id', config.id).update(updates);
 	}
 
@@ -668,9 +688,17 @@ async function deployCalculator(
 	internalSecret: string,
 	encryptionKey: string | undefined,
 	logger: any,
+	accountability?: any,
 ) {
 	const calc = await db('calculators').where('id', calculatorId).where('account', accountId).first();
 	if (!calc) return { result: `Calculator "${calculatorId}" not found in your account.`, isError: true };
+
+	// AI live deploy: only allowed after a successful test deploy (active test window)
+	if (accountability && !accountability.admin && !test) {
+		if (!calc.test_enabled_at || !calc.test_expires_at || new Date(calc.test_expires_at) < new Date()) {
+			return { result: 'Deploy to test first and verify results before deploying live. Use deploy_calculator with test=true.', isError: true };
+		}
+	}
 
 	const config = await db('calculator_configs')
 		.where('calculator', calculatorId)
