@@ -162,7 +162,7 @@ Infrastructure and multi-service concerns.
 | 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | completed | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
 | 09 | API Key & Resource Management Cleanup | completed | [cross-cutting/09-api-key-resource-cleanup.md](cross-cutting/09-api-key-resource-cleanup.md) |
 | 10 | Platform Feature Flags (DB + Redis + Gateway + Admin UI + Module Gating) | completed | — |
-| 11 | Migration Rollback Scripts | planned | [cross-cutting/11-migration-rollbacks.md](cross-cutting/11-migration-rollbacks.md) |
+| 11 | Migration Rollback Scripts | completed | [cross-cutting/11-migration-rollbacks.md](cross-cutting/11-migration-rollbacks.md) |
 | 12 | Container Resource Limits | planned | [cross-cutting/12-container-resource-limits.md](cross-cutting/12-container-resource-limits.md) |
 | 13 | Startup Secret Validation (Fail-Fast) | completed | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
 
@@ -277,5 +277,5 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 3 | 0 | 0 | 1 | 4 |
 | Gateway | 1 | 0 | 0 | 7 | 8 |
-| Cross-Cutting | 4 | 0 | 0 | 9 | 13 |
-| **Total** | **26** | **8** | **0** | **53** | **87** |
+| Cross-Cutting | 3 | 0 | 0 | 10 | 13 |
+| **Total** | **25** | **8** | **0** | **54** | **87** |
