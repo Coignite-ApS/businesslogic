@@ -73,6 +73,66 @@ echo "Target: $DB_URL"
 echo "Dry run: $DRY_RUN"
 echo ""
 
+# Bootstrap: ensure gateway.schema_migrations exists before forward migrations
+# Skip bootstrap in dry-run (no DB access needed) and during rollback
+TRACKING_AVAILABLE=false
+TRACKING_FILE="migrations/gateway/007_schema_migrations.sql"
+
+if [ "$DRY_RUN" = "false" ] && [ "$ROLLBACK" = "false" ]; then
+  table_exists=$(psql "$DB_URL" -tAc "SELECT to_regclass('gateway.schema_migrations')" 2>/dev/null || true)
+  if [ "$table_exists" = "gateway.schema_migrations" ]; then
+    TRACKING_AVAILABLE=true
+  elif [ -f "$TRACKING_FILE" ]; then
+    echo "Bootstrapping migration tracking table..."
+    if psql "$DB_URL" -f "$TRACKING_FILE" 2>&1; then
+      TRACKING_AVAILABLE=true
+      echo "Tracking table created."
+      echo ""
+    else
+      echo "WARNING: Could not create tracking table — running without state tracking"
+    fi
+  fi
+elif [ "$DRY_RUN" = "false" ] && [ "$ROLLBACK" = "true" ]; then
+  # During rollback, check if tracking table exists (may be rolled back itself)
+  table_exists=$(psql "$DB_URL" -tAc "SELECT to_regclass('gateway.schema_migrations')" 2>/dev/null || true)
+  if [ "$table_exists" = "gateway.schema_migrations" ]; then
+    TRACKING_AVAILABLE=true
+  fi
+fi
+
+# Helper: check if a migration is recorded in the tracking table
+is_applied() {
+  local schema="$1"
+  local filename="$2"
+  if [ "$TRACKING_AVAILABLE" = "false" ]; then
+    return 1
+  fi
+  local result
+  result=$(psql "$DB_URL" -tAc "SELECT 1 FROM gateway.schema_migrations WHERE schema_name='$schema' AND filename='$filename'" 2>/dev/null || true)
+  [ "$result" = "1" ]
+}
+
+# Helper: record a migration as applied
+record_applied() {
+  local schema="$1"
+  local filename="$2"
+  if [ "$TRACKING_AVAILABLE" = "false" ]; then
+    return 0
+  fi
+  psql "$DB_URL" -c "INSERT INTO gateway.schema_migrations (schema_name, filename) VALUES ('$schema', '$filename') ON CONFLICT DO NOTHING" 2>/dev/null || true
+}
+
+# Helper: remove a migration record (rollback)
+record_removed() {
+  local schema="$1"
+  local filename="$2"
+  if [ "$TRACKING_AVAILABLE" = "false" ]; then
+    return 0
+  fi
+  # Table may have just been dropped — ignore errors
+  psql "$DB_URL" -c "DELETE FROM gateway.schema_migrations WHERE schema_name='$schema' AND filename='$filename'" 2>/dev/null || true
+}
+
 applied=0
 failed=0
 skipped=0
@@ -116,14 +176,32 @@ for schema_dir in migrations/*/; do
 
     for migration in "${reversed[@]}"; do
       filename=$(basename "$migration")
+      # Derive the forward migration filename for tracking lookup
+      forward_filename="${filename/_down.sql/.sql}"
+
       if [ "$DRY_RUN" = "true" ]; then
         echo "  [DRY RUN] Would rollback: $filename"
         ((skipped++))
       else
+        # Skip if not recorded as applied (except 007 which tracks itself)
+        if [ "$TRACKING_AVAILABLE" = "true" ] && [[ "$forward_filename" != "007_schema_migrations.sql" ]]; then
+          if ! is_applied "$schema" "$forward_filename"; then
+            echo "  Not applied, skipping: $filename"
+            ((skipped++))
+            continue
+          fi
+        fi
+
         echo "  Rolling back: $filename"
         if psql "$DB_URL" -f "$migration" 2>&1; then
           ((applied++))
           echo "  Rolled back: $filename"
+          # Remove record — for 007 itself, table is now gone so this is a no-op
+          record_removed "$schema" "$forward_filename"
+          # If we just rolled back the tracking table, mark it unavailable
+          if [[ "$forward_filename" == "007_schema_migrations.sql" ]]; then
+            TRACKING_AVAILABLE=false
+          fi
         else
           ((failed++))
           echo "  FAILED rollback: $filename"
@@ -141,6 +219,17 @@ for schema_dir in migrations/*/; do
         continue
       fi
 
+      # Skip 007_schema_migrations.sql — already handled by bootstrap
+      if [ "$filename" = "007_schema_migrations.sql" ] && [ "$schema" = "gateway" ]; then
+        if [ "$DRY_RUN" = "false" ]; then
+          # Bootstrap already applied it; just ensure it's recorded
+          record_applied "$schema" "$filename"
+          echo "  Already bootstrapped: $filename"
+          ((skipped++))
+          continue
+        fi
+      fi
+
       # Filter by specific migration if specified
       if [ -n "$TARGET_MIGRATION" ] && [[ "$filename" != *"$TARGET_MIGRATION"* ]]; then
         continue
@@ -150,10 +239,18 @@ for schema_dir in migrations/*/; do
         echo "  [DRY RUN] Would apply: $filename"
         ((skipped++))
       else
+        # Check if already applied
+        if [ "$TRACKING_AVAILABLE" = "true" ] && is_applied "$schema" "$filename"; then
+          echo "  Already applied: $filename"
+          ((skipped++))
+          continue
+        fi
+
         echo "  Applying: $filename"
         if psql "$DB_URL" -f "$migration" 2>&1; then
           ((applied++))
           echo "  Applied: $filename"
+          record_applied "$schema" "$filename"
         else
           ((failed++))
           echo "  Failed: $filename"
@@ -165,9 +262,9 @@ done
 
 echo ""
 if [ "$ROLLBACK" = "true" ]; then
-  echo "Rollback complete. Rolled back: $applied, Failed: $failed, Skipped (dry-run): $skipped"
+  echo "Rollback complete. Rolled back: $applied, Failed: $failed, Skipped: $skipped"
 else
-  echo "Migrations complete. Applied: $applied, Failed: $failed, Skipped (dry-run): $skipped"
+  echo "Migrations complete. Applied: $applied, Failed: $failed, Skipped: $skipped"
 fi
 
 if [ "$failed" -gt 0 ]; then
