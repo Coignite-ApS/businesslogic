@@ -165,6 +165,21 @@ export const AI_TOOLS = [
       required: ['knowledge_base_id', 'file_id'],
     },
   },
+  {
+    name: 'save_test_case',
+    description: 'Save a test case for a calculator with input values and expected outputs. Use after executing a calculator to persist the inputs and results as a reusable test case for regression testing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        calculator_id: { type: 'string', description: 'The calculator ID' },
+        name: { type: 'string', description: 'Descriptive name (e.g. "Standard — 3 employees, 50% savings")' },
+        input: { type: 'object', description: 'Input values (same format as execute_calculator)' },
+        expected_outputs: { type: 'object', description: 'Expected output values to verify against' },
+        tolerance: { type: 'number', description: 'Numeric tolerance for output comparison. 0 = exact match. Default: 0' },
+      },
+      required: ['calculator_id', 'name', 'input', 'expected_outputs'],
+    },
+  },
 ];
 
 /**
@@ -203,7 +218,7 @@ export function filterToolsByPermissions(tools, permissions, isPublicRequest = f
   const calcTools = new Set([
     'list_calculators', 'describe_calculator', 'execute_calculator',
     'create_calculator', 'update_calculator', 'get_calculator_config',
-    'configure_calculator', 'deploy_calculator',
+    'configure_calculator', 'deploy_calculator', 'save_test_case',
   ]);
   const kbTools = new Set([
     'search_knowledge', 'ask_knowledge', 'list_knowledge_bases',
@@ -260,6 +275,8 @@ export async function executeTool(toolName, toolInput, deps) {
         return await getKnowledgeBase(accountId, toolInput, allowedKbIds);
       case 'upload_to_knowledge_base':
         return await uploadToKb(accountId, toolInput, logger, allowedKbIds);
+      case 'save_test_case':
+        return await saveTestCase(accountId, toolInput);
       default:
         return { result: `Unknown tool: ${toolName}`, isError: true };
     }
@@ -507,6 +524,27 @@ async function deployCalculator(accountId, calculatorId, test, logger) {
     logger.error(`Deploy calculator ${calculatorId} failed: ${err.message}`);
     return { result: `Deploy failed: ${err.message}`, isError: true };
   }
+}
+
+async function saveTestCase(accountId, input) {
+  const calc = await queryOne(
+    'SELECT id FROM calculators WHERE id = $1 AND account = $2',
+    [input.calculator_id, accountId],
+  );
+  if (!calc) return { result: `Calculator "${input.calculator_id}" not found in your account.`, isError: true };
+
+  if (!input.name?.trim()) return { result: 'Test case name is required', isError: true };
+  if (!input.input || typeof input.input !== 'object') return { result: 'Input values are required', isError: true };
+  if (!input.expected_outputs || typeof input.expected_outputs !== 'object') return { result: 'Expected outputs are required', isError: true };
+
+  const id = randomUUID();
+  await query(
+    `INSERT INTO calculator_test_cases (id, calculator, name, input, expected_outputs, tolerance, date_created)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+    [id, input.calculator_id, input.name.trim(), JSON.stringify(input.input), JSON.stringify(input.expected_outputs), input.tolerance ?? 0],
+  );
+
+  return { result: { saved: true, id, name: input.name.trim(), calculator_id: input.calculator_id } };
 }
 
 // ─── Knowledge base tools ────────────────────────────────────

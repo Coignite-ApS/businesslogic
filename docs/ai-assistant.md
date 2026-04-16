@@ -85,7 +85,7 @@ Both runtimes share identical tool definitions and system prompt text. Changes t
 | File | Purpose |
 |------|---------|
 | `index.ts` | **Entry point** — registers all `/assistant/*` Express routes (conversations CRUD, chat SSE, prompts, usage, admin dashboard, observatory). Orchestrates the chat tool loop. |
-| `tools.ts` | **Tool definitions** (`AI_TOOLS` array) and `executeTool()` dispatcher. All 13 calculator + KB tools. Validation helpers. Test-first policy enforcement. |
+| `tools.ts` | **Tool definitions** (`AI_TOOLS` array) and `executeTool()` dispatcher. All 15 calculator + KB tools. Validation helpers. Test-first policy enforcement. |
 | `system-prompt.ts` | **System prompt** — `DEFAULT_SYSTEM_PROMPT` constant. Rules for calculator configuration, KB usage, formatting. |
 | `ai-client.ts` | **Anthropic API client** — `AiClient.streamChat()` with SSE streaming, tool use support, abort signals. |
 | `auth.ts` | **Middleware** — `requireAuth`, `requireAdmin`, `requireActiveSubscription`, `requireAiQuota`, `getActiveAccount`. Quota enforcement per subscription plan. |
@@ -231,7 +231,7 @@ The `deps` object (`ToolExecutorDeps`) provides:
 | `schema` | any? | Directus schema (reserved for future ItemsService use) |
 | `services` | any? | Directus services (reserved for future ItemsService use) |
 
-### All 13 Tools
+### All 15 Tools
 
 | # | Tool | Category | Read/Write | Description |
 |---|------|----------|------------|-------------|
@@ -243,12 +243,13 @@ The `deps` object (`ToolExecutorDeps`) provides:
 | 6 | `get_calculator_config` | Calculator | Read | **Full config**: input/output schemas with mappings, sheet data, formulas. Defaults to test env. |
 | 7 | `configure_calculator` | Calculator | Write | **Configure I/O schemas** with partial merge. Defaults to test env. Policy-enforced. |
 | 8 | `deploy_calculator` | Calculator | Write | **Deploy** to Formula API. Defaults to test env. Policy-enforced. |
-| 9 | `search_knowledge` | KB | Read | Semantic similarity search across KB chunks |
-| 10 | `ask_knowledge` | KB | Read | RAG answer generation with citations |
-| 11 | `list_knowledge_bases` | KB | Read | List all KBs in account |
-| 12 | `create_knowledge_base` | KB | Write | Create KB (auto-selects icon) |
-| 13 | `get_knowledge_base` | KB | Read | KB details + documents + indexing status |
-| 14 | `upload_to_knowledge_base` | KB | Write | Link file to KB, trigger indexing |
+| 9 | `save_test_case` | Calculator | Write | Save test case with inputs + expected outputs for regression testing |
+| 10 | `search_knowledge` | KB | Read | Semantic similarity search across KB chunks |
+| 11 | `ask_knowledge` | KB | Read | RAG answer generation with citations |
+| 12 | `list_knowledge_bases` | KB | Read | List all KBs in account |
+| 13 | `create_knowledge_base` | KB | Write | Create KB (auto-selects icon) |
+| 14 | `get_knowledge_base` | KB | Read | KB details + documents + indexing status |
+| 15 | `upload_to_knowledge_base` | KB | Write | Link file to KB, trigger indexing |
 
 ### Public API Tool Filtering (bl-ai-api only)
 
@@ -347,6 +348,27 @@ Deployment calls the Formula API via gateway:
 3. Refreshes MCP cache (fire-and-forget)
 
 **Code reference:** `tools.ts:681-855` (CMS), `tools.js:461-508` (ai-api)
+
+### `save_test_case` — Persist Test Cases
+
+Saves a test case for a calculator with input values and expected outputs. Designed to be used after `execute_calculator` — the AI executes a calculator, verifies the results, then saves the inputs and outputs as a persistent test case for regression testing.
+
+```json
+{
+    "calculator_id": "roi-tilbudsberegning",
+    "name": "Standard — 3 employees, 50% savings",
+    "input": { "employees": 3, "savings_pct": 50 },
+    "expected_outputs": { "total_savings": 15000, "roi": 2.5 },
+    "tolerance": 0
+}
+```
+
+- **Not in `PUBLIC_TOOLS`** — internal only, not exposed via public API
+- **In `calcTools`** — filtered by calculator permissions
+- Writes to `calculator_test_cases` table (Directus-managed)
+- Running saved tests is a separate tool (planned)
+
+**Code reference:** `tools.ts:929-955` (CMS), `tools.js:512-530` (ai-api)
 
 ## Knowledge Base Tools
 

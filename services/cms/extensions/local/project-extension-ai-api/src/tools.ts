@@ -260,6 +260,36 @@ export const AI_TOOLS: ToolDefinition[] = [
 			required: ['knowledge_base_id', 'file_id'],
 		},
 	},
+	{
+		name: 'save_test_case',
+		description: 'Save a test case for a calculator with input values and expected outputs. Use after executing a calculator to persist the inputs and results as a reusable test case for regression testing.',
+		input_schema: {
+			type: 'object',
+			properties: {
+				calculator_id: {
+					type: 'string',
+					description: 'The calculator ID',
+				},
+				name: {
+					type: 'string',
+					description: 'Descriptive name (e.g. "Standard — 3 employees, 50% savings")',
+				},
+				input: {
+					type: 'object',
+					description: 'Input values (same format as execute_calculator)',
+				},
+				expected_outputs: {
+					type: 'object',
+					description: 'Expected output values to verify against',
+				},
+				tolerance: {
+					type: 'number',
+					description: 'Numeric tolerance for output comparison. 0 = exact match. Default: 0',
+				},
+			},
+			required: ['calculator_id', 'name', 'input', 'expected_outputs'],
+		},
+	},
 ];
 
 export interface ToolExecutorDeps {
@@ -312,6 +342,8 @@ export async function executeTool(
 				return await getKnowledgeBase(db, accountId, toolInput);
 			case 'upload_to_knowledge_base':
 				return await uploadToKnowledgeBase(db, accountId, toolInput, authToken, logger);
+			case 'save_test_case':
+				return await saveTestCase(db, accountId, toolInput);
 			default:
 				return { result: `Unknown tool: ${toolName}`, isError: true };
 		}
@@ -892,6 +924,34 @@ function decryptApiKey(encrypted: string | null | undefined, encryptionKey?: str
 	} catch {
 		return undefined;
 	}
+}
+
+async function saveTestCase(db: DB, accountId: string, input: any) {
+	const calc = await db('calculators')
+		.where('id', input.calculator_id)
+		.where('account', accountId)
+		.first();
+
+	if (!calc) {
+		return { result: `Calculator "${input.calculator_id}" not found in your account.`, isError: true };
+	}
+
+	if (!input.name?.trim()) return { result: 'Test case name is required', isError: true };
+	if (!input.input || typeof input.input !== 'object') return { result: 'Input values are required', isError: true };
+	if (!input.expected_outputs || typeof input.expected_outputs !== 'object') return { result: 'Expected outputs are required', isError: true };
+
+	const id = randomUUID();
+	await db('calculator_test_cases').insert({
+		id,
+		calculator: input.calculator_id,
+		name: input.name.trim(),
+		input: JSON.stringify(input.input),
+		expected_outputs: JSON.stringify(input.expected_outputs),
+		tolerance: input.tolerance ?? 0,
+		date_created: new Date(),
+	});
+
+	return { result: { saved: true, id, name: input.name.trim(), calculator_id: input.calculator_id } };
 }
 
 // ─── Knowledge Base tools ────────────────────────────────────────
