@@ -53,6 +53,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 32 | KB Admin UI — Per-KB Feature Toggles | completed | [cms/32-kb-admin-ui-toggles.md](cms/32-kb-admin-ui-toggles.md) |
 | 33 | Feature Flag Key Migration (calc → formula/calculator) | completed | [cms/33-feature-flag-key-migration.md](cms/33-feature-flag-key-migration.md) |
 | 34 | AI-API Extension: /internal/calc → /internal/formula | completed | [cms/34-ai-api-internal-calc-path-fix.md](cms/34-ai-api-internal-calc-path-fix.md) |
+| 35 | v-html Sanitization Audit (Round 2) | completed | [cms/35-v-html-sanitization-audit.md](cms/35-v-html-sanitization-audit.md) |
 
 ---
 
@@ -97,6 +98,7 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
 | 06 | Account-Level MCP | completed | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
 | 07 | Direct Database Migration | completed | [formula-api/07-direct-db-migration.md](formula-api/07-direct-db-migration.md) |
+| 08 | Replace console.log with Structured Logger | planned | [formula-api/08-console-log-cleanup.md](formula-api/08-console-log-cleanup.md) |
 
 ### Formula Engine — bl-excel (Rust)
 
@@ -123,6 +125,7 @@ DAG workflow execution, triggers, workers.
 | 01 | Replace Production unwrap() with Error Handling | completed | [flow/01-unwrap-error-handling.md](flow/01-unwrap-error-handling.md) |
 | 02 | Agent Node — ReAct Loop | planned | [flow/02-agent-node.md](flow/02-agent-node.md) |
 | 03 | MCP Client Node — External Tool Integration | planned | [flow/03-mcp-client-node.md](flow/03-mcp-client-node.md) |
+| 04 | Flow Engine unwrap() Audit — Round 2 | planned | [flow/04-unwrap-audit-round2.md](flow/04-unwrap-audit-round2.md) |
 
 ---
 
@@ -139,6 +142,7 @@ Auth, rate limiting, routing, CORS.
 | 05 | Request Logging & Audit Trail | completed | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
 | 06 | Account MCP Route | completed | [gateway/06-account-mcp-route.md](gateway/06-account-mcp-route.md) |
 | 07 | Fix MCP Calculator Auth Bypass | completed | [gateway/07-mcp-auth-bypass-fix.md](gateway/07-mcp-auth-bypass-fix.md) |
+| 08 | Blanket InternalAuth for /internal/ Routes | planned | [gateway/08-internal-route-auth-blanket.md](gateway/08-internal-route-auth-blanket.md) |
 
 ---
 
@@ -158,6 +162,9 @@ Infrastructure and multi-service concerns.
 | 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | completed | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
 | 09 | API Key & Resource Management Cleanup | completed | [cross-cutting/09-api-key-resource-cleanup.md](cross-cutting/09-api-key-resource-cleanup.md) |
 | 10 | Platform Feature Flags (DB + Redis + Gateway + Admin UI + Module Gating) | completed | — |
+| 11 | Migration Rollback Scripts | planned | [cross-cutting/11-migration-rollbacks.md](cross-cutting/11-migration-rollbacks.md) |
+| 12 | Container Resource Limits | planned | [cross-cutting/12-container-resource-limits.md](cross-cutting/12-container-resource-limits.md) |
+| 13 | Startup Secret Validation (Fail-Fast) | planned | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
 
 ---
 
@@ -180,6 +187,20 @@ Must ship before merging the API key extraction branch.
 | 1 | gateway/07 | Fix MCP Calculator Auth Bypass | **P0 security** — unauthenticated calculator execution |
 | 2 | cms/33 | Feature Flag Key Migration | **P1** — bricks existing deploys, all renamed features denied |
 | 3 | cms/34 | AI-API /internal/calc Path Fix | **P1** — AI assistant calculator tools return 404 |
+
+### Phase 0B — CTO Review Fixes (2026-04-15)
+
+Security and reliability fixes from CTO review. Must-fix before next production deploy.
+
+| # | Service | Task | Priority | Why |
+|---|---------|------|----------|-----|
+| 1 | flow/04 | unwrap() Audit Round 2 | **P0** | 169 panic points crash worker, kill in-flight executions |
+| 2 | cms/35 | v-html Sanitization Audit Round 2 | **P0** | XSS risk in AI assistant + knowledge components |
+| 3 | cross-cutting/13 | Startup Secret Validation | **P1** | Misconfigured deploy silently skips HMAC signing |
+| 4 | gateway/08 | Blanket InternalAuth for /internal/ | **P1** | Defense-in-depth gap on internal routes |
+| 5 | cross-cutting/11 | Migration Rollback Scripts | **P1** | No rollback path for bad migrations |
+| 6 | cross-cutting/12 | Container Resource Limits | **P2** | Runaway process can consume all host resources |
+| 7 | formula-api/08 | console.log → Structured Logger | **P2** | Production logging hygiene |
 
 ### Phase 1D (remaining) — Monetization
 
@@ -250,11 +271,11 @@ Must ship before merging the API key extraction branch.
 
 | Service | Planned | Idea | In-Progress | Completed | Total |
 |---------|---------|------|-------------|-----------|-------|
-| CMS | 14 | 0 | 0 | 19 | 33 |
+| CMS | 14 | 0 | 0 | 20 | 34 |
 | AI API | 3 | 0 | 0 | 8 | 11 |
-| Formula API | 0 | 0 | 0 | 7 | 7 |
+| Formula API | 1 | 0 | 0 | 7 | 8 |
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
-| Flow | 2 | 0 | 0 | 1 | 3 |
-| Gateway | 0 | 0 | 0 | 7 | 7 |
-| Cross-Cutting | 2 | 0 | 0 | 8 | 10 |
-| **Total** | **21** | **8** | **0** | **51** | **80** |
+| Flow | 3 | 0 | 0 | 1 | 4 |
+| Gateway | 1 | 0 | 0 | 7 | 8 |
+| Cross-Cutting | 5 | 0 | 0 | 8 | 13 |
+| **Total** | **27** | **8** | **0** | **52** | **87** |

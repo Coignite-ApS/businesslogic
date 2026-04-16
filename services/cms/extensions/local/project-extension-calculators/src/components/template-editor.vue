@@ -115,7 +115,7 @@ function createTagEl(type: string, name: string, value: string): HTMLSpanElement
 function renderEditor() {
 	const el = editorRef.value;
 	if (!el) return;
-	el.innerHTML = '';
+	el.replaceChildren();
 	const str = props.modelValue || '';
 	if (!str) return;
 
