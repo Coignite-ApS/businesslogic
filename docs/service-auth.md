@@ -10,10 +10,13 @@
 
 ```
 CMS Extension → Gateway /internal/{service}/* → Backend Service
+                  ↓ blanket InternalAuth (router-level, all /internal/ routes)
                   ↓ validates X-Internal-Secret
                   ↓ strips X-Internal-Secret
                   ↓ forwards request to backend
 ```
+
+**Blanket auth (defense-in-depth):** `InternalAuth` middleware is applied at the router level for ALL `/internal/` routes. No per-route opt-in is needed. Any new `/internal/` route is automatically protected — forgetting to add middleware cannot create an unauthenticated endpoint.
 
 **Headers:**
 - `X-Internal-Secret: ${GATEWAY_INTERNAL_SECRET}` — authenticates with gateway

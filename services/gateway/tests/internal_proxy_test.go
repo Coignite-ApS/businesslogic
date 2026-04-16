@@ -236,3 +236,56 @@ func TestInternalProxy_NoAdminTokenForNonFormula(t *testing.T) {
 		t.Error("X-Admin-Token should NOT be injected for non-formula routes")
 	}
 }
+
+// TestInternalProxy_BlanketAuth_UnknownRoute proves that ANY /internal/ path
+// requires InternalAuth even if no handler is explicitly registered for it.
+// This is the defense-in-depth guarantee: forgetting per-route middleware
+// cannot create an unauthenticated internal endpoint.
+func TestInternalProxy_BlanketAuth_UnknownRoute(t *testing.T) {
+	router, _ := setupInternalProxyRouter(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// A path under /internal/ that has no explicit handler registration
+	unknownPaths := []string{
+		"/internal/unknown-service/foo",
+		"/internal/new-route",
+		"/internal/debug/something",
+	}
+
+	for _, path := range unknownPaths {
+		t.Run("no secret "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected 401 for unauthenticated %s, got %d", path, rec.Code)
+			}
+		})
+
+		t.Run("wrong secret "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.Header.Set("X-Internal-Secret", "wrong-secret")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("expected 403 for bad secret on %s, got %d", path, rec.Code)
+			}
+		})
+
+		t.Run("valid secret "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.Header.Set("X-Internal-Secret", testInternalSecret)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			// With valid secret, request passes auth — gets 404 from mux (no handler)
+			// The key point: it does NOT get 401/403, proving auth passed
+			if rec.Code == http.StatusUnauthorized || rec.Code == http.StatusForbidden {
+				t.Errorf("expected auth to pass for valid secret on %s, got %d", path, rec.Code)
+			}
+		})
+	}
+}

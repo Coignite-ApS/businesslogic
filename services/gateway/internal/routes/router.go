@@ -237,11 +237,11 @@ func (r *Router) setupInternalRoutes() {
 		return
 	}
 
-	internalAuth := middleware.InternalAuth(r.internalSecret)
-	internalAudit := middleware.InternalAudit(r.auditFn)
+	// NOTE: InternalAuth + InternalAudit applied as blanket middleware in ServeHTTP.
+	// No per-route wrapping needed — defense-in-depth.
 
 	// API Key management
-	r.mux.Handle("/internal/api-keys/", internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.mux.HandleFunc("/internal/api-keys/", func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
 		switch req.Method {
@@ -270,10 +270,10 @@ func (r *Router) setupInternalRoutes() {
 		default:
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		}
-	}))))
+	})
 
 	// Cache invalidation
-	r.mux.Handle("/internal/cache/invalidate", internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.mux.HandleFunc("/internal/cache/invalidate", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			return
@@ -285,7 +285,7 @@ func (r *Router) setupInternalRoutes() {
 		// Invalidate all widget cache entries
 		r.responseCache.Invalidate(req.Context(), "gw:rc:*")
 		w.WriteHeader(http.StatusNoContent)
-	}))))
+	})
 }
 
 func (r *Router) setupInternalServiceProxy() {
@@ -293,8 +293,8 @@ func (r *Router) setupInternalServiceProxy() {
 		return
 	}
 
-	internalAuth := middleware.InternalAuth(r.internalSecret)
-	internalAudit := middleware.InternalAudit(r.auditFn)
+	// NOTE: InternalAuth + InternalAudit applied as blanket middleware in ServeHTTP.
+	// No per-route wrapping needed — defense-in-depth.
 
 	// /internal/formula/* → formula-api, /internal/ai/* → ai-api, /internal/flow/* → flow-trigger
 	internalRoutes := map[string]string{
@@ -311,7 +311,7 @@ func (r *Router) setupInternalServiceProxy() {
 		p := prefix
 		b := backend
 		bn := backendName
-		r.mux.Handle(p, internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		r.mux.HandleFunc(p, func(w http.ResponseWriter, req *http.Request) {
 			// Strip internal secret — don't leak to backend
 			req.Header.Del("X-Internal-Secret")
 			// Inject admin token for formula-api (P0-1)
@@ -321,7 +321,7 @@ func (r *Router) setupInternalServiceProxy() {
 			// Rewrite path: /internal/formula/foo → /foo
 			req.URL.Path = "/" + strings.TrimPrefix(req.URL.Path, p)
 			b.ServeHTTP(w, req)
-		}))))
+		})
 	}
 }
 
@@ -348,5 +348,14 @@ func rewritePath(path, prefix, backendName string) string {
 }
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// Blanket InternalAuth + InternalAudit for ALL /internal/ routes.
+	// Defense-in-depth: any new /internal/ route is automatically protected
+	// even if the handler forgets to apply per-route middleware.
+	if strings.HasPrefix(req.URL.Path, "/internal/") && r.internalSecret != "" {
+		internalAuth := middleware.InternalAuth(r.internalSecret)
+		internalAudit := middleware.InternalAudit(r.auditFn)
+		internalAuth(internalAudit(r.mux)).ServeHTTP(w, req)
+		return
+	}
 	r.mux.ServeHTTP(w, req)
 }
