@@ -70,7 +70,7 @@ export const config = {
   requestLogging: env.REQUEST_LOGGING === 'true' || env.REQUEST_LOGGING === '1',
 
   // Admin token (protects management endpoints: calculators CRUD, list, parse)
-  adminToken: env.ADMIN_TOKEN || null,
+  adminToken: env.FORMULA_API_ADMIN_TOKEN || env.ADMIN_TOKEN || null,
 
   // Direct PostgreSQL connection (replaces Admin API for data reads)
   databaseUrl: env.DATABASE_URL || null,

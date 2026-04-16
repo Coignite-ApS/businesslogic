@@ -25,7 +25,7 @@ function runValidation(env) {
 
 describe('formula-api startup secret validation', () => {
   it('exits with error when GATEWAY_SHARED_SECRET missing', () => {
-    const r = runValidation({ ADMIN_TOKEN: 'tok', GATEWAY_SHARED_SECRET: '', SKIP_SECRET_VALIDATION: '' });
+    const r = runValidation({ FORMULA_API_ADMIN_TOKEN: 'tok', GATEWAY_SHARED_SECRET: '', SKIP_SECRET_VALIDATION: '' });
     assert.notStrictEqual(r.exitCode, 0);
     assert.ok(r.stderr.includes('GATEWAY_SHARED_SECRET'));
   });
@@ -44,7 +44,7 @@ describe('formula-api startup secret validation', () => {
   });
 
   it('starts OK when all secrets provided', () => {
-    const r = runValidation({ GATEWAY_SHARED_SECRET: 'sec', ADMIN_TOKEN: 'tok' });
+    const r = runValidation({ GATEWAY_SHARED_SECRET: 'sec', FORMULA_API_ADMIN_TOKEN: 'tok' });
     assert.strictEqual(r.exitCode, 0);
     assert.ok(r.stdout.includes('STARTUP_OK'));
   });
@@ -53,5 +53,7 @@ describe('formula-api startup secret validation', () => {
     const r = runValidation({ GATEWAY_SHARED_SECRET: '', ADMIN_TOKEN: '', SKIP_SECRET_VALIDATION: 'true' });
     assert.strictEqual(r.exitCode, 0);
     assert.ok(r.stdout.includes('STARTUP_OK'));
+    const combined = r.stdout + r.stderr;
+    assert.ok(combined.includes('missing secrets ignored'), 'should log skip warning');
   });
 });

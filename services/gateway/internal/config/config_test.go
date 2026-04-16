@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -16,7 +17,7 @@ func TestValidate_MissingGatewaySharedSecret(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing GATEWAY_SHARED_SECRET")
 	}
-	if got := err.Error(); !contains(got, "GATEWAY_SHARED_SECRET") {
+	if got := err.Error(); !strings.Contains(got, "GATEWAY_SHARED_SECRET") {
 		t.Errorf("error should mention GATEWAY_SHARED_SECRET, got: %s", got)
 	}
 }
@@ -43,17 +44,4 @@ func TestValidate_SkipSecretValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error with SKIP_SECRET_VALIDATION=true, got: %v", err)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsImpl(s, substr))
-}
-
-func containsImpl(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
