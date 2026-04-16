@@ -141,7 +141,7 @@ export async function start() {
     loadBuiltinTemplates();
     app.log.info(`Widget cache initialized (${config.redisUrl ? 'L1+L2' : 'L1-only'})`);
     startCleanup();
-    if (config.databaseUrl) scheduleAggregation();
+    if (config.databaseUrl) scheduleAggregation(app.log);
     await app.listen({ port: config.port, host: config.host });
     app.log.info({ host: config.host, port: config.port }, 'bl-ai-api ready');
   } catch (err) {

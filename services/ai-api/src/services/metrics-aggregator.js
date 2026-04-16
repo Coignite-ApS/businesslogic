@@ -126,10 +126,10 @@ export async function aggregateDailyMetrics(targetDate) {
 
 let aggregationTimer = null;
 
-export function scheduleAggregation() {
+export function scheduleAggregation(log) {
   // Run immediately on start (catches yesterday if not yet aggregated)
   aggregateDailyMetrics().catch(err =>
-    console.error('[metrics-aggregator] initial run failed:', err.message),
+    (log || console).error({ err }, 'metrics-aggregator: initial run failed'),
   );
 
   // Then run daily at 01:00 UTC
@@ -145,7 +145,7 @@ export function scheduleAggregation() {
 
     aggregationTimer = setTimeout(() => {
       aggregateDailyMetrics().catch(err =>
-        console.error('[metrics-aggregator] daily run failed:', err.message),
+        (log || console).error({ err }, 'metrics-aggregator: daily run failed'),
       );
       runDaily(); // Schedule next
     }, delay);
