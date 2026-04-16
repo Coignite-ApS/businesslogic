@@ -351,7 +351,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Blanket InternalAuth + InternalAudit for ALL /internal/ routes.
 	// Defense-in-depth: any new /internal/ route is automatically protected
 	// even if the handler forgets to apply per-route middleware.
-	if strings.HasPrefix(req.URL.Path, "/internal/") && r.internalSecret != "" {
+	if strings.HasPrefix(req.URL.Path, "/internal/") {
 		internalAuth := middleware.InternalAuth(r.internalSecret)
 		internalAudit := middleware.InternalAudit(r.auditFn)
 		internalAuth(internalAudit(r.mux)).ServeHTTP(w, req)
