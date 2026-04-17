@@ -90,7 +90,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Knowledge Bases" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Knowledge Bases">
 				<div class="sidebar-info">
 					<p>Upload documents and search them with AI-powered semantic search. Get cited answers grounded in your content.</p>
 					<p><strong>Supported formats:</strong></p>
@@ -102,7 +102,7 @@
 					</ul>
 				</div>
 			</sidebar-detail>
-			<sidebar-detail v-if="currentKb" icon="info" title="Information" close>
+			<sidebar-detail v-if="currentKb" id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<div class="info-row">
 						<span class="info-label">Status</span>

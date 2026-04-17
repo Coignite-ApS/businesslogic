@@ -536,6 +536,50 @@ async function saveTestCase(accountId, input) {
   if (!input.name?.trim()) return { result: 'Test case name is required', isError: true };
   if (!input.input || typeof input.input !== 'object') return { result: 'Input values are required', isError: true };
   if (!input.expected_outputs || typeof input.expected_outputs !== 'object') return { result: 'Expected outputs are required', isError: true };
+  if (input.tolerance !== undefined && (typeof input.tolerance !== 'number' || input.tolerance < 0)) {
+    return { result: 'Tolerance must be a non-negative number (e.g. 0.01 for ±0.01 absolute difference)', isError: true };
+  }
+
+  // Fetch calculator config to validate input/output schema
+  const cfg = await queryOne(
+    'SELECT input AS input_schema, output AS output_schema FROM calculator_configs WHERE calculator = $1 AND test_environment = false',
+    [input.calculator_id],
+  );
+  if (!cfg) return { result: 'Calculator has no live configuration. Configure it first.', isError: true };
+
+  // Validate input keys against schema
+  const schemaProps = cfg.input_schema?.properties || {};
+  const inputKeys = Object.keys(input.input || {});
+  const schemaKeys = Object.keys(schemaProps);
+  const unknownKeys = inputKeys.filter(k => !schemaKeys.includes(k));
+  const missingRequired = (cfg.input_schema?.required || []).filter(k => !(k in (input.input || {})));
+
+  if (unknownKeys.length) return { result: `Unknown input fields: ${unknownKeys.join(', ')}. Valid: ${schemaKeys.join(', ')}`, isError: true };
+  if (missingRequired.length) return { result: `Missing required inputs: ${missingRequired.join(', ')}`, isError: true };
+
+  // Validate expected_outputs keys against output schema
+  const outputProps = cfg.output_schema?.properties || {};
+  const outputKeys = Object.keys(input.expected_outputs || {});
+  const validOutputKeys = Object.keys(outputProps);
+  const unknownOutputs = outputKeys.filter(k => !validOutputKeys.includes(k));
+  if (unknownOutputs.length) return { result: `Unknown output fields: ${unknownOutputs.join(', ')}. Valid: ${validOutputKeys.join(', ')}`, isError: true };
+
+  // Dry-run: execute calculator to verify inputs work
+  if (config.formulaApiUrl) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (config.formulaApiAdminToken) headers['X-Admin-Token'] = config.formulaApiAdminToken;
+      const execRes = await fetch(`${config.formulaApiUrl}/execute/calculator/${encodeURIComponent(input.calculator_id)}`, {
+        method: 'POST', headers, body: JSON.stringify(input.input),
+      });
+      if (!execRes.ok) {
+        const errData = await execRes.json().catch(() => ({}));
+        return { result: `Test case inputs failed dry-run execution: ${JSON.stringify(errData)}`, isError: true };
+      }
+    } catch (err) {
+      return { result: `Dry-run execution failed: ${err.message}`, isError: true };
+    }
+  }
 
   const id = randomUUID();
   await query(

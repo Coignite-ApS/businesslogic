@@ -18,8 +18,6 @@
 				:current-id="currentId"
 				:loading="loading"
 				:creating="saving"
-				:has-excel="hasExcel"
-				:has-config="hasConfigured"
 				current-view="configure"
 				@create="handleCreate"
 			/>
@@ -221,7 +219,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<p v-if="current">
 						Configure input parameters for <strong>{{ current.name }}</strong>.
@@ -248,6 +246,7 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
+import { useCreateCalculator } from '../composables/use-create-calculator';
 import { useUnsavedGuard } from '../composables/use-unsaved-guard';
 import CalculatorNavigation from '../components/navigation.vue';
 import InputParameters from '../components/input-parameters.vue';
@@ -263,9 +262,11 @@ const router = useRouter();
 
 const {
 	calculators, current, loading, saving,
-	fetchAll, fetchOne, create, update,
+	fetchOne, update,
 	createConfig, updateConfig,
 } = useCalculators(api);
+
+const { handleCreate } = useCreateCalculator(api);
 
 const activeTab = ref('input');
 const localInput = ref<Record<string, InputParameter>>({});
@@ -549,24 +550,6 @@ async function handleSave() {
 	}
 }
 
-async function handleCreate() {
-	const id = crypto.randomUUID();
-
-	let accountId: string | null = null;
-	try {
-		const { data } = await api.get('/items/account');
-		accountId = data.data?.id || null;
-	} catch {
-		// account may not exist yet
-	}
-
-	const created = await create({ id, name: null, account: accountId, onboarded: false });
-	if (created) {
-		router.push(`/calculators/${created.id}`);
-	}
-}
-
-fetchAll();
 
 watch(currentId, (id) => {
 	edits.value = {};

@@ -88,6 +88,7 @@ export interface CallRecord {
 	response_time_ms: number | null;
 	error_message: string | null;
 	test: boolean;
+	calculator?: string;
 }
 
 export interface CalculatorTemplate {

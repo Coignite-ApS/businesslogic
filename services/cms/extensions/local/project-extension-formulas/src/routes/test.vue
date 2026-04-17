@@ -320,7 +320,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Formulas" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Formulas">
 				<div class="sidebar-info">
 					<p>Evaluate Excel formulas via API. Single formulas, batches, or full spreadsheet models.</p>
 					<p><strong>Features:</strong></p>

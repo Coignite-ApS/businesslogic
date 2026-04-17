@@ -184,7 +184,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Cost & Budget" close>
+			<sidebar-detail id="info" icon="info" title="Cost & Budget">
 				<div class="sidebar-info">
 					<p>AI cost breakdown over the selected period. Includes per-model daily trends, conversation percentiles, budget utilization, and top-spending accounts.</p>
 				</div>

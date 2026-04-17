@@ -11,14 +11,25 @@
 # =============================================================================
 
 .PHONY: init update dev build stop clean check-updates reset-cache db-sync snapshot snapshot-pre snapshot-post snapshot-dryrun snapshot-forensic diff apply \
-       ext-build-all ext-build ext-calculators-build ext-calculators-watch \
+       ext-build-all ext-build \
+       ext-calculators-build ext-calculators-watch \
        ext-calculator-api-build ext-calculator-api-watch \
        ext-formulas-build ext-formulas-watch \
        ext-account-build ext-account-watch \
+       ext-account-api-build ext-account-api-watch \
        ext-admin-build ext-admin-watch \
        ext-stripe-build ext-stripe-watch \
        ext-ai-api-build ext-ai-api-watch \
        ext-ai-assistant-build ext-ai-assistant-watch \
+       ext-ai-observatory-build ext-ai-observatory-watch \
+       ext-flows-build ext-flows-watch \
+       ext-flow-hooks-build ext-flow-hooks-watch \
+       ext-knowledge-build ext-knowledge-watch \
+       ext-knowledge-api-build ext-knowledge-api-watch \
+       ext-feature-flags-build ext-feature-flags-watch \
+       ext-feature-gate-build ext-feature-gate-watch \
+       ext-layout-builder-build ext-layout-builder-watch \
+       ext-widget-api-build ext-widget-api-watch \
        build-no-cache logs
 
 # Initialize submodule and environment
@@ -202,3 +213,63 @@ ext-ai-assistant-build:
 
 ext-ai-assistant-watch:
 	@cd extensions/local/project-extension-ai-assistant && npm run dev
+
+ext-ai-observatory-build:
+	@cd extensions/local/project-extension-ai-observatory && npm run build
+
+ext-ai-observatory-watch:
+	@cd extensions/local/project-extension-ai-observatory && npm run dev
+
+ext-account-api-build:
+	@cd extensions/local/project-extension-account-api && npm run build
+
+ext-account-api-watch:
+	@cd extensions/local/project-extension-account-api && npm run dev
+
+ext-flows-build:
+	@cd extensions/local/project-extension-flows && npm run build
+
+ext-flows-watch:
+	@cd extensions/local/project-extension-flows && npm run dev
+
+ext-flow-hooks-build:
+	@cd extensions/local/project-extension-flow-hooks && npm run build
+
+ext-flow-hooks-watch:
+	@cd extensions/local/project-extension-flow-hooks && npm run dev
+
+ext-knowledge-build:
+	@cd extensions/local/project-extension-knowledge && npm run build
+
+ext-knowledge-watch:
+	@cd extensions/local/project-extension-knowledge && npm run dev
+
+ext-knowledge-api-build:
+	@cd extensions/local/project-extension-knowledge-api && npm run build
+
+ext-knowledge-api-watch:
+	@cd extensions/local/project-extension-knowledge-api && npm run dev
+
+ext-feature-flags-build:
+	@cd extensions/local/project-extension-feature-flags && npm run build
+
+ext-feature-flags-watch:
+	@cd extensions/local/project-extension-feature-flags && npm run dev
+
+ext-feature-gate-build:
+	@cd extensions/local/project-extension-feature-gate && npm run build
+
+ext-feature-gate-watch:
+	@cd extensions/local/project-extension-feature-gate && npm run dev
+
+ext-layout-builder-build:
+	@cd extensions/local/project-extension-layout-builder && npm run build
+
+ext-layout-builder-watch:
+	@cd extensions/local/project-extension-layout-builder && npm run dev
+
+ext-widget-api-build:
+	@cd extensions/local/project-extension-widget-api && npm run build
+
+ext-widget-api-watch:
+	@cd extensions/local/project-extension-widget-api && npm run dev

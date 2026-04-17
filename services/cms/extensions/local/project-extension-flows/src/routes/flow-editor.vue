@@ -152,7 +152,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="settings" title="Flow Settings" close>
+			<sidebar-detail id="settings" icon="settings" title="Flow Settings">
 				<div class="sidebar-settings">
 					<div class="field">
 						<label>Name</label>

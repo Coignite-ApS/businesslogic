@@ -209,6 +209,7 @@ businesslogic/
 │   ├── businesslogic-flow/      # Legacy flow engine (now services/flow)
 │   └── businesslogic-excel/     # Rust Excel engine (separate npm package)
 │
+├── Makefile                     # Root Makefile — THE entry point for all docker/ext/test/snapshot commands
 ├── docs/                        # Architecture docs, migration plans, ADRs
 ├── scripts/                     # Shared dev tooling
 └── .claude/                     # Claude Code config, commands, skills
@@ -240,23 +241,78 @@ const response = await bl.chat.send({ message: 'Hello' });
 const results = await bl.kb.search('revenue formula');
 ```
 
-## Quick Commands
+## Makefile — The Single Entry Point
+
+**ALWAYS use `make` targets from the root `Makefile` for Docker and extension commands. NEVER run raw `docker compose` or `npx directus-extension build` directly.** The CMS also has its own `services/cms/Makefile` for CMS-specific tasks (schema snapshots, init, dev).
+
+### Stack Management
 
 ```bash
-# Full local development stack
-docker compose -f infrastructure/docker/docker-compose.dev.yml up
+make up                  # Start full dev stack
+make down                # Stop everything
+make restart             # Restart all services
+make status              # Show running containers
+make health              # Health check all services
+make logs                # Tail all logs
+make db                  # Open psql shell
+```
 
-# Run specific service
-docker compose -f infrastructure/docker/docker-compose.dev.yml up bl-cms
+### Individual Services
 
-# Run migrations
-./scripts/migrate.sh --target local
+```bash
+make cms                 # Start CMS only
+make cms-restart         # Rebuild extensions + restart CMS
+make cms-logs            # Tail CMS logs
+make ai-api              # Start AI API
+make ai-api-restart      # Restart AI API
+make formula-api         # Start Formula API
+make gateway             # Start Gateway
+make flow                # Start Flow Engine
+# Pattern: <service>-restart, <service>-logs, <service>-stop
+```
 
-# Run all tests
-./scripts/test-all.sh
+### CMS Extension Building
 
-# Health check all services
-./scripts/health-check.sh
+```bash
+make ext                 # Build ALL extensions
+make ext-calculators     # Build single extension
+make cms-restart         # Build all + restart CMS (most common)
+# All extensions: ext-ai-api, ext-ai-assistant, ext-ai-observatory,
+#   ext-calculators, ext-calculator-api, ext-formulas, ext-account,
+#   ext-account-api, ext-admin, ext-stripe, ext-flows, ext-flow-hooks,
+#   ext-knowledge, ext-knowledge-api, ext-layout-builder,
+#   ext-feature-flags, ext-feature-gate, ext-widget-api
+```
+
+### Database & Snapshots
+
+```bash
+make snapshot                          # Routine PG dump
+make snapshot SLUG=my-feature          # PG dump with label
+make snapshot-pre SLUG=task-name       # Pre-task snapshot (db-admin)
+make snapshot-post SLUG=task-name      # Post-task snapshot (db-admin)
+make diff                              # Diff schema vs latest YAML snapshot
+make data-baseline TABLE=cms.account   # Row count + fingerprint
+make prune                             # Clean old artifacts
+```
+
+### Tests
+
+```bash
+make test                # Run all tests
+make test-quick          # Skip e2e/integration
+```
+
+### CMS-Specific (from `services/cms/`)
+
+```bash
+cd services/cms
+make init                # Initialize submodule + build all extensions
+make dev                 # Start local CMS dev environment
+make build               # Build Docker image
+make snapshot            # Directus schema snapshot (YAML)
+make diff                # Diff schema against snapshot
+make apply               # Apply schema snapshot to DB
 ```
 
 ## Key Architecture Rules
@@ -277,6 +333,8 @@ docker compose -f infrastructure/docker/docker-compose.dev.yml up bl-cms
 5. **Gateway for public traffic**: Client → Cloudflare → bl-gateway → service. Internal traffic goes direct (no gateway).
 
 6. **Directus is back-office only**: Directus handles admin UI, account management, and data CRUD. All compute (AI, formulas, flows) runs in dedicated services.
+
+7. **Always use Makefile targets**: NEVER run raw `docker compose`, `npx directus-extension build`, or other infrastructure commands directly. Use `make <target>` from the project root (or `services/cms/` for CMS-specific tasks). This ensures consistent compose files, build flags, and snapshot naming conventions.
 
 ## Directus CMS Structure (services/cms/)
 
@@ -313,7 +371,7 @@ services/cms/
 ├── config.dev.yaml              # Dev server config
 ├── config.live.yaml             # Production config
 ├── docker-compose.yml           # Full local stack
-├── Makefile                     # Build targets
+├── Makefile                     # CMS-specific targets (init, dev, schema snapshots, ext watch)
 ├── .env                         # Local secrets
 ├── snapshots/                   # Schema snapshots (YAML)
 └── email-templates/
@@ -540,8 +598,9 @@ gunzip -c infrastructure/db-snapshots/snapshot_XXXXX.sql.gz | \
 ## Working on This Project
 
 1. **Check current branch**: `git branch --show-current` — ensure you're on `dev` or a feature branch
-2. **Start services**: `docker compose -f infrastructure/docker/docker-compose.dev.yml up`
+2. **Start services**: `make up` (never raw docker compose)
 3. **Write tests first**, then implement changes in the appropriate `services/` directory
-4. **Run tests**: `./scripts/test-all.sh` (hooks also run tests on commit)
-5. **Commit**: hooks will block if tests fail or if you're on main
-6. **Run `/project-review`** after significant milestones
+4. **Build extensions**: `make ext` or `make ext-<name>` (never raw npx/npm in extension dirs)
+5. **Run tests**: `make test` (hooks also run tests on commit)
+6. **Commit**: hooks will block if tests fail or if you're on main
+7. **Run `/project-review`** after significant milestones

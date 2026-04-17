@@ -106,7 +106,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Admin Dashboard" close>
+			<sidebar-detail id="info" icon="info" title="Admin Dashboard">
 				<div class="sidebar-info">
 					<p>Platform overview with key revenue and health metrics. Data refreshes on page load.</p>
 				</div>

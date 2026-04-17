@@ -63,7 +63,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Flows" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Flows">
 				<div class="sidebar-info">
 					<p>Build visual workflows that chain calculators, APIs, and logic together. Drag-drop nodes, configure triggers, deploy.</p>
 					<p><strong>Features:</strong></p>
@@ -76,7 +76,7 @@
 					</ul>
 				</div>
 			</sidebar-detail>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<p>{{ flows.length }} flow(s)</p>
 				</div>

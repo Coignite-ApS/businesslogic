@@ -91,7 +91,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Integration" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Integration">
 				<div class="sidebar-info">
 					<p>Code snippets for integrating the Formula API into your application.</p>
 					<p>Replace the key placeholder with your full API key. Manage keys in <router-link to="/account">Account settings</router-link>.</p>

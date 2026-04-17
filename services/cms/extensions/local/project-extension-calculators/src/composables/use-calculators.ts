@@ -6,16 +6,21 @@ function calcId(calculatorId: string, isTest: boolean): string {
 	return isTest ? `${calculatorId}-test` : calculatorId;
 }
 
-export function useCalculators(api: any) {
-	const calculators = ref<Calculator[]>([]);
-	const current = ref<Calculator | null>(null);
-	const templates = ref<CalculatorTemplate[]>([]);
-	const testCases = ref<CalculatorTestCase[]>([]);
-	const loading = ref(false);
-	const saving = ref(false);
-	const error = ref<string | null>(null);
+// ── Module-scoped shared state ──
+const calculators = ref<Calculator[]>([]);
+const current = ref<Calculator | null>(null);
+const templates = ref<CalculatorTemplate[]>([]);
+const testCases = ref<CalculatorTestCase[]>([]);
+const loading = ref(false);
+const saving = ref(false);
+const error = ref<string | null>(null);
+let lastAccountId: string | null | undefined = undefined;
+let fetchedOnce = false;
 
-	async function fetchAll(accountId?: string | null) {
+export function useCalculators(api: any) {
+
+	async function fetchAll(accountId?: string | null, force = false) {
+		if (!force && fetchedOnce && accountId === lastAccountId) return;
 		loading.value = true;
 		error.value = null;
 		try {
@@ -28,6 +33,8 @@ export function useCalculators(api: any) {
 			}
 			const { data } = await api.get('/items/calculators', { params });
 			calculators.value = data.data;
+			lastAccountId = accountId;
+			fetchedOnce = true;
 		} catch (err: any) {
 			error.value = err.message;
 		} finally {
@@ -72,7 +79,7 @@ export function useCalculators(api: any) {
 		error.value = null;
 		try {
 			const { data: res } = await api.post('/items/calculators', data);
-			await fetchAll();
+			await fetchAll(lastAccountId, true);
 			return res.data;
 		} catch (err: any) {
 			error.value = err.message;
@@ -88,7 +95,7 @@ export function useCalculators(api: any) {
 		try {
 			await api.patch(`/items/calculators/${id}`, data);
 			const effectiveId = (data as any).id || id;
-			await fetchAll();
+			await fetchAll(lastAccountId, true);
 			await fetchOne(effectiveId);
 		} catch (err: any) {
 			error.value = err.message;
@@ -102,9 +109,11 @@ export function useCalculators(api: any) {
 		saving.value = true;
 		error.value = null;
 		try {
-			await api.delete(`/items/calculators/${id}`);
-			await fetchAll();
+			// Optimistically remove from list
+			calculators.value = calculators.value.filter((c) => c.id !== id);
 			current.value = null;
+			await api.delete(`/items/calculators/${id}`);
+			await fetchAll(lastAccountId, true);
 		} catch (err: any) {
 			error.value = err.message;
 			throw err;

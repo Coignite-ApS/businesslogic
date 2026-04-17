@@ -15,8 +15,6 @@
 				:current-id="currentId"
 				:loading="loading"
 				:creating="saving"
-				:has-excel="hasExcel"
-				:has-config="hasConfig"
 				current-view="dashboard"
 				@create="handleCreate"
 			/>
@@ -28,7 +26,7 @@
 			<v-chip v-else-if="currentId && current && isTestActive" small class="chip-test">Test {{ testVersion }}</v-chip>
 			<v-chip v-else-if="currentId && current && (testConfig || prodConfig)" small class="chip-inactive">Deactivated</v-chip>
 
-			<v-dialog v-if="currentId" v-model="confirmDelete" @esc="confirmDelete = false">
+			<v-dialog v-if="currentId" v-model="confirmDelete" @esc="closeDeleteDialog">
 				<template #activator="{ on }">
 					<v-button
 						v-tooltip.bottom="'Delete'"
@@ -43,10 +41,29 @@
 
 				<v-card>
 					<v-card-title>Delete "{{ current?.name || currentId }}"?</v-card-title>
-					<v-card-text>This will remove both test and live versions from the Formula API, delete all configurations, and cannot be undone.</v-card-text>
+					<v-card-text>
+						<p style="margin-bottom: 12px;">This will remove both test and live versions from the Formula API, delete all configurations, and cannot be undone.</p>
+						<div style="margin-bottom: 8px;">
+							<div class="field-label" style="margin-bottom: 4px;">Calculator ID</div>
+							<div style="display: flex; align-items: center; gap: 8px;">
+								<v-input :model-value="currentId" disabled />
+								<v-icon
+									name="content_copy"
+									small
+									clickable
+									v-tooltip.bottom="'Copy'"
+									@click="navigator.clipboard.writeText(currentId!)"
+								/>
+							</div>
+						</div>
+						<div>
+							<div class="field-label" style="margin-bottom: 4px;">Type the calculator ID to confirm</div>
+							<v-input v-model="deleteConfirmSlug" placeholder="Paste or type calculator ID" />
+						</div>
+					</v-card-text>
 					<v-card-actions>
-						<v-button secondary @click="confirmDelete = false">Cancel</v-button>
-						<v-button kind="danger" :loading="saving" @click="handleDelete">Delete</v-button>
+						<v-button secondary @click="closeDeleteDialog">Cancel</v-button>
+						<v-button kind="danger" :loading="saving" :disabled="deleteConfirmSlug !== currentId" @click="handleDelete">Delete</v-button>
 					</v-card-actions>
 				</v-card>
 			</v-dialog>
@@ -105,11 +122,11 @@
 			/>
 		</div>
 
-		<div v-else-if="!currentId" class="module-empty">
-			<v-info icon="calculate" title="Calculators" center>
-				Select a calculator from the sidebar or create a new one.
-			</v-info>
-		</div>
+		<calculator-dashboard
+			v-else-if="!currentId"
+			:calculators="calculators"
+			:api="api"
+		/>
 
 		<div v-else-if="loading" class="module-loading">
 			<v-progress-circular indeterminate />
@@ -117,7 +134,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Calculators" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Calculators">
 				<div class="sidebar-info">
 					<p>Turn Excel models into live APIs. Upload a spreadsheet, define inputs and outputs, test, then deploy.</p>
 					<p><strong>Features:</strong></p>
@@ -130,7 +147,7 @@
 					</ul>
 				</div>
 			</sidebar-detail>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info" v-if="current">
 					<div class="info-row">
 						<span class="info-label">ID</span>
@@ -194,6 +211,7 @@ import { useSubscription } from '../composables/use-subscription';
 import { useApiKeys } from '../composables/use-api-keys';
 import CalculatorNavigation from '../components/navigation.vue';
 import CalculatorDetail from '../components/calculator-detail.vue';
+import CalculatorDashboard from '../components/calculator-dashboard.vue';
 import type { Calculator, CalculatorConfig, CalculatorTemplate } from '../types';
 import { extractErrorMessage } from '../utils/error';
 
@@ -232,6 +250,7 @@ const pendingFileName = ref<string | null>(null);
 const uploadedFileName = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const confirmDelete = ref(false);
+const deleteConfirmSlug = ref('');
 const testResult = ref<unknown>(null);
 const testError = ref<string | null>(null);
 const testRunning = ref(false);
@@ -515,9 +534,14 @@ async function handleDownloadExcel(configId: string, filename: string) {
 	}
 }
 
+function closeDeleteDialog() {
+	confirmDelete.value = false;
+	deleteConfirmSlug.value = '';
+}
+
 async function handleDelete() {
 	if (!currentId.value) return;
-	confirmDelete.value = false;
+	closeDeleteDialog();
 
 	// Undeploy both configs from Formula API before deleting
 	const configs = current.value?.configs || [];
@@ -682,12 +706,19 @@ watch(currentId, (id) => {
 	padding-bottom: var(--content-padding-bottom);
 }
 
-.module-empty,
 .module-loading {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	height: 400px;
+}
+
+.field-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
 }
 
 .sidebar-info {

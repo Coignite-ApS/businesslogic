@@ -40,8 +40,6 @@
 				:current-id="currentId"
 				:loading="loading"
 				:creating="saving"
-				:has-excel="hasExcel"
-				:has-config="hasConfig"
 				current-view="integration"
 				@create="handleCreate"
 			/>
@@ -282,7 +280,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<p v-if="current">
 						Integration snippets for <strong>{{ current.name }}</strong>.
@@ -319,6 +317,7 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
+import { useCreateCalculator } from '../composables/use-create-calculator';
 import { useActiveAccount } from '../composables/use-active-account';
 import { useApiKeys } from '../composables/use-api-keys';
 import CalculatorNavigation from '../components/navigation.vue';
@@ -342,9 +341,11 @@ const router = useRouter();
 
 const {
 	calculators, current, loading, saving,
-	fetchAll, fetchOne, create, update: updateCalculator, updateConfig,
+	fetchAll, fetchOne, update: updateCalculator, updateConfig,
 	fetchFormulaApiUrl,
 } = useCalculators(api);
+
+const { handleCreate } = useCreateCalculator(api);
 
 const { activeAccountId, fetchActiveAccount } = useActiveAccount(api);
 
@@ -619,14 +620,6 @@ async function saveMcpLiveToggle() {
 	}
 }
 
-async function handleCreate() {
-	const id = crypto.randomUUID();
-	const accountId = activeAccountId.value || null;
-	const created = await create({ id, name: null, account: accountId, onboarded: false });
-	if (created) {
-		router.push(`/calculators/${created.id}`);
-	}
-}
 
 function handleDownloadSpec() {
 	if (!activeConfig.value || !current.value) return;

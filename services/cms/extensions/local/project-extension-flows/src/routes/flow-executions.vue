@@ -85,7 +85,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="bug_report" title="Execution Detail" close>
+			<sidebar-detail id="detail" icon="bug_report" title="Execution Detail">
 				<execution-detail :execution="selectedDetail" />
 			</sidebar-detail>
 		</template>
