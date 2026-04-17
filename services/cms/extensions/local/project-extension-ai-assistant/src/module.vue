@@ -10,7 +10,6 @@
 				:usage-percent="usagePercent"
 				:usage-level="usageLevel"
 				@new-chat="handleNewChat"
-				@select="handleSelectConversation"
 				@archive="handleArchive"
 				@upgrade="showUpgradeDialog = true"
 			/>
@@ -250,10 +249,6 @@ function handleNewChat() {
 	clearMessages();
 	pendingPromptId.value = null;
 	router.push('/ai-assistant');
-}
-
-async function handleSelectConversation(id: string) {
-	router.push(`/ai-assistant/${id}`);
 }
 
 async function handleArchive(id: string) {
