@@ -299,12 +299,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 			}
 		});
 
-		// GET /calc/my-ip — return requester's IP address
-		app.get('/calc/my-ip', requireAuth, (req: any, res: any) => {
-			const ip = req.ip?.replace(/^::ffff:/, '') || null;
-			return res.json({ ip });
-		});
-
 		// GET /calc/subscription-info — return calculator limit info for active account
 		app.get('/calc/subscription-info', requireAuth, async (req: any, res: any) => {
 			try {
@@ -586,28 +580,6 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 					throw err;
 				}
 			} catch (err) {
-				return handleFormulaApiError(err, res);
-			}
-		});
-
-		// PATCH /calc/access/:calcId — update allowedIps/allowedOrigins on Formula API
-		app.patch('/calc/access/:calcId', requireAuth, requireCalculatorAccess(db), async (req: any, res: any) => {
-			const { calcId } = req.params;
-			try {
-				const config = await getConfigByCalcId(db, calcId);
-				if (!config) {
-					return res.status(404).json({ errors: [{ message: 'Config not found' }] });
-				}
-
-				const allowedIps = config.allowed_ips?.length ? config.allowed_ips : null;
-				const allowedOrigins = config.allowed_origins?.length ? config.allowed_origins : null;
-
-				const result = await client.patchAllowlist(calcId, allowedIps, allowedOrigins);
-				return res.status(result.status).json(result.body);
-			} catch (err) {
-				if (err instanceof FormulaApiGoneError) {
-					return res.status(404).json({ errors: [{ message: 'Calculator not deployed' }] });
-				}
 				return handleFormulaApiError(err, res);
 			}
 		});

@@ -314,8 +314,7 @@ async function getMetadata(id) {
       version: calc.version ?? null,
       hasToken: !!calc.token,
       accountId: calc.accountId ?? null,
-      allowedIps: calc.allowedIps ?? null,
-      allowedOrigins: calc.allowedOrigins ?? null,
+
       input: calc.inputSchema,
       output: calc.outputSchema,
     };
@@ -344,8 +343,7 @@ async function getMetadata(id) {
     version: version ?? null,
     hasToken: !!token,
     accountId: accountId ?? null,
-    allowedIps: recipe.allowedIps ?? null,
-    allowedOrigins: recipe.allowedOrigins ?? null,
+
     input: inputSchema,
     output: outputSchema,
   };
@@ -572,8 +570,6 @@ export async function registerRoutes(app) {
         version: calc.version ?? null,
         hasToken: !!calc.token,
         accountId: calc.accountId ?? null,
-        allowedIps: calc.allowedIps ?? null,
-        allowedOrigins: calc.allowedOrigins ?? null,
         expiresAt: calc.expiresAt,
         source: 'memory',
       };
@@ -609,8 +605,7 @@ export async function registerRoutes(app) {
                 version: r.version ?? null,
                 hasToken: !!r.token,
                 accountId: r.accountId ?? null,
-                allowedIps: r.allowedIps ?? null,
-                allowedOrigins: r.allowedOrigins ?? null,
+
                 source: 'redis',
               };
               if (r.locale != null) item.locale = r.locale;
@@ -633,7 +628,7 @@ export async function registerRoutes(app) {
     const authErr = checkAdminToken(req);
     if (authErr) return reply.code(authErr.code).send(authErr.body);
 
-    const { sheets, formulas, input, output, locale, name, version, description, test, calculatorId, token, accountId, allowedIps, allowedOrigins, mcp, integration, expressions } = req.body || {};
+    const { sheets, formulas, input, output, locale, name, version, description, test, calculatorId, token, accountId, mcp, integration, expressions } = req.body || {};
 
     if (!token || typeof token !== 'string') {
       return reply.code(400).send({ error: 'token required (non-empty string)' });
@@ -871,7 +866,7 @@ export async function registerRoutes(app) {
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
     const body = req.body || {};
-    const { input, output, sheets, formulas, locale, name, version, description, test, token, allowedIps, allowedOrigins, mcp: mcpPatch, integration: integrationPatch, expressions } = body;
+    const { input, output, sheets, formulas, locale, name, version, description, test, token, mcp: mcpPatch, integration: integrationPatch, expressions } = body;
 
     // Validate MCP config if provided
     let newMcp = calc.mcp ?? null;

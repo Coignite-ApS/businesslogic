@@ -147,72 +147,6 @@
 				</p>
 				<code-block :code="previewJson" language="json" />
 			</div>
-			<!-- Access Control -->
-			<div v-if="hasExcel" class="access-control">
-				<div class="section-header">
-					<v-icon name="security" small />
-					<span>Access Control</span>
-				</div>
-				<p class="section-desc">
-					Restrict which IPs and origins can call this calculator. Leave empty to allow all.
-					Changes require a redeploy to take effect.
-				</p>
-
-				<div class="field field-full">
-					<div class="field-label-row">
-						<div class="field-label">Allowed IPs</div>
-						<button class="link-btn" :disabled="loadingMyIp" @click="addMyIp">
-							{{ loadingMyIp ? 'Detecting…' : 'Add my IP' }}
-						</button>
-					</div>
-					<div class="tag-input">
-						<div v-if="localAllowedIps.length" class="tag-list">
-							<v-chip
-								v-for="(ip, idx) in localAllowedIps"
-								:key="idx"
-								class="access-chip"
-								small
-								close
-								@close="localAllowedIps.splice(idx, 1)"
-							>
-								{{ ip }}
-							</v-chip>
-						</div>
-						<v-input
-							v-model="newIp"
-							placeholder="e.g. 192.168.1.1 or 203.0.113.0/24"
-							@update:model-value="ipError = ''"
-							@keydown.enter.prevent="addIp"
-						/>
-						<div v-if="ipError" class="tag-error">{{ ipError }}</div>
-					</div>
-				</div>
-
-				<div class="field field-full">
-					<div class="field-label">Allowed Origins</div>
-					<div class="tag-input">
-						<div v-if="localAllowedOrigins.length" class="tag-list">
-							<v-chip
-								v-for="(origin, idx) in localAllowedOrigins"
-								:key="idx"
-								class="access-chip"
-								small
-								close
-								@close="localAllowedOrigins.splice(idx, 1)"
-							>
-								{{ origin }}
-							</v-chip>
-						</div>
-						<v-input
-							v-model="newOrigin"
-							placeholder="e.g. https://app.example.com"
-							@update:model-value="originError = ''"
-							@keydown.enter.prevent="addOrigin"
-						/>
-						<div v-if="originError" class="tag-error">{{ originError }}</div>
-					</div>
-				</div>
-			</div>
 		</div>
 
 		<div v-else-if="loading" class="module-loading">
@@ -274,15 +208,6 @@ const localInput = ref<Record<string, InputParameter>>({});
 const localOutput = ref<Record<string, OutputParameter>>({});
 const edits = ref<Partial<Calculator>>({});
 const validationErrors = ref<ValidationError[]>([]);
-
-// Access control
-const localAllowedIps = ref<string[]>([]);
-const localAllowedOrigins = ref<string[]>([]);
-const newIp = ref('');
-const newOrigin = ref('');
-const ipError = ref('');
-const originError = ref('');
-const loadingMyIp = ref(false);
 
 const currentId = computed(() => (route.params.id as string) || null);
 
@@ -346,73 +271,11 @@ const hasParamChanges = computed(() =>
 	|| JSON.stringify(localOutput.value) !== JSON.stringify(originalOutput.value),
 );
 
-const hasAccessChanges = computed(() => {
-	const origIps = testConfig.value?.allowed_ips ?? null;
-	const origOrigins = testConfig.value?.allowed_origins ?? null;
-	const newIps = localAllowedIps.value.length ? localAllowedIps.value : null;
-	const newOrigins = localAllowedOrigins.value.length ? localAllowedOrigins.value : null;
-	return JSON.stringify(newIps) !== JSON.stringify(origIps)
-		|| JSON.stringify(newOrigins) !== JSON.stringify(origOrigins);
-});
-
-const hasChanges = computed(() => hasCalcEdits.value || hasParamChanges.value || hasAccessChanges.value);
+const hasChanges = computed(() => hasCalcEdits.value || hasParamChanges.value);
 
 // Unsaved changes navigation guard
 const { showDialog: showUnsavedDialog, confirmLeave, cancelLeave } = useUnsavedGuard(hasChanges);
 
-// IP validation: IPv4 with optional CIDR, or IPv6 (must contain : and be 3+ chars)
-const IP_V4_RE = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-const IP_V6_RE = /^([0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}(\/\d{1,3})?$/;
-function isValidIp(val: string): boolean {
-	if (IP_V4_RE.test(val)) {
-		// Validate each octet is 0-255
-		const octets = val.split('/')[0].split('.');
-		return octets.every((o) => Number(o) <= 255);
-	}
-	return IP_V6_RE.test(val);
-}
-
-// Origin validation: http(s)://, optional wildcard subdomain, domain, optional port
-const ORIGIN_RE = /^https?:\/\/(\*\.)?[a-zA-Z0-9][-a-zA-Z0-9.]*(:\d+)?\/?$/;
-function isValidOrigin(val: string): boolean {
-	return ORIGIN_RE.test(val);
-}
-
-function addIp() {
-	const val = newIp.value.trim();
-	if (!val) return;
-	if (!isValidIp(val)) { ipError.value = 'Invalid IP address'; return; }
-	if (localAllowedIps.value.includes(val)) { ipError.value = 'Duplicate'; return; }
-	ipError.value = '';
-	localAllowedIps.value.push(val);
-	newIp.value = '';
-}
-
-function addOrigin() {
-	const val = newOrigin.value.trim();
-	if (!val) return;
-	if (!isValidOrigin(val)) { originError.value = 'Must start with http:// or https://'; return; }
-	if (localAllowedOrigins.value.includes(val)) { originError.value = 'Duplicate'; return; }
-	originError.value = '';
-	localAllowedOrigins.value.push(val);
-	newOrigin.value = '';
-}
-
-async function addMyIp() {
-	loadingMyIp.value = true;
-	ipError.value = '';
-	try {
-		const { data } = await api.get('/calc/my-ip');
-		const ip = data?.ip;
-		if (!ip) { ipError.value = 'Could not detect IP'; return; }
-		if (localAllowedIps.value.includes(ip)) { ipError.value = 'Already added'; return; }
-		localAllowedIps.value.push(ip);
-	} catch {
-		ipError.value = 'Could not detect IP';
-	} finally {
-		loadingMyIp.value = false;
-	}
-}
 const canSave = computed(() => hasChanges.value);
 const canTest = computed(() => hasConfigured.value && !hasChanges.value);
 
@@ -420,8 +283,7 @@ function resetChanges() {
 	edits.value = {};
 	localInput.value = extractParams<InputParameter>(testConfig.value?.input as Record<string, unknown> | null);
 	localOutput.value = extractParams<OutputParameter>(testConfig.value?.output as Record<string, unknown> | null);
-	localAllowedIps.value = [...(testConfig.value?.allowed_ips || [])];
-	localAllowedOrigins.value = [...(testConfig.value?.allowed_origins || [])];
+
 }
 
 function exampleValue(type: string, defaultVal?: unknown): unknown {
@@ -478,75 +340,58 @@ async function handleSave() {
 		edits.value = {};
 	}
 
-	// Save parameter or access control changes
-	const accessChanged = hasAccessChanges.value;
-	const newAllowedIps = localAllowedIps.value.length ? localAllowedIps.value : null;
-	const newAllowedOrigins = localAllowedOrigins.value.length ? localAllowedOrigins.value : null;
-	if (hasParamChanges.value || accessChanged) {
-		const configPayload: Partial<CalculatorConfig> = {};
-
-		// Access control — always include when saving config
-		configPayload.allowed_ips = newAllowedIps;
-		configPayload.allowed_origins = newAllowedOrigins;
-
-		if (hasParamChanges.value) {
-			const inputResult: Record<string, InputParameter> = {};
-			for (const [key, param] of Object.entries(localInput.value)) {
-				inputResult[key] = toSchemaParam(generateOneOf(param, testConfig.value?.sheets || null));
-			}
-
-			const outputResult: Record<string, OutputParameter> = {};
-			for (const [key, param] of Object.entries(localOutput.value)) {
-				const converted = toSchemaParam(param);
-				if (converted.items?.properties) {
-					const subProps: Record<string, OutputArrayItem> = {};
-					for (const [sk, sv] of Object.entries(converted.items.properties)) {
-						subProps[sk] = toSchemaParam(sv);
-					}
-					converted.items = { ...converted.items, properties: subProps };
-				}
-				outputResult[key] = converted;
-			}
-
-			const sortedInput = Object.entries(inputResult).sort(([, a], [, b]) => (a.order ?? 999) - (b.order ?? 999));
-			const requiredKeys = sortedInput.filter(([_, p]) => p.required).map(([k]) => k);
-			const inputOrder = sortedInput.map(([k]) => k);
-			const input = wrapParams(inputResult, { required: requiredKeys, order: inputOrder });
-
-			const sortedOutput = Object.entries(outputResult).sort(([, a], [, b]) => (a.order ?? 999) - (b.order ?? 999));
-			const outputOrder = sortedOutput.map(([k]) => k);
-			const output = wrapParams(outputResult, { order: outputOrder });
-
-			// Validate schemas before saving
-			const inputErrors = validateSchema(input as Record<string, unknown>);
-			const outputErrors = validateSchema(output as Record<string, unknown>);
-			if (inputErrors.length || outputErrors.length) {
-				const msgs = [...inputErrors.map((e) => `Input: ${e}`), ...outputErrors.map((e) => `Output: ${e}`)];
-				console.error('Schema validation failed:', msgs);
-				return;
-			}
-
-			const prodConfig = current.value?.configs?.find((c) => !c.test_environment);
-			const prodCv = prodConfig?.config_version ? Number(prodConfig.config_version) : 0;
-			const config_version = prodCv + 1;
-
-			configPayload.input = input as any;
-			configPayload.output = output as any;
-			configPayload.config_version = String(config_version);
+	// Save parameter changes
+	if (hasParamChanges.value) {
+		const inputResult: Record<string, InputParameter> = {};
+		for (const [key, param] of Object.entries(localInput.value)) {
+			inputResult[key] = toSchemaParam(generateOneOf(param, testConfig.value?.sheets || null));
 		}
+
+		const outputResult: Record<string, OutputParameter> = {};
+		for (const [key, param] of Object.entries(localOutput.value)) {
+			const converted = toSchemaParam(param);
+			if (converted.items?.properties) {
+				const subProps: Record<string, OutputArrayItem> = {};
+				for (const [sk, sv] of Object.entries(converted.items.properties)) {
+					subProps[sk] = toSchemaParam(sv);
+				}
+				converted.items = { ...converted.items, properties: subProps };
+			}
+			outputResult[key] = converted;
+		}
+
+		const sortedInput = Object.entries(inputResult).sort(([, a], [, b]) => (a.order ?? 999) - (b.order ?? 999));
+		const requiredKeys = sortedInput.filter(([_, p]) => p.required).map(([k]) => k);
+		const inputOrder = sortedInput.map(([k]) => k);
+		const input = wrapParams(inputResult, { required: requiredKeys, order: inputOrder });
+
+		const sortedOutput = Object.entries(outputResult).sort(([, a], [, b]) => (a.order ?? 999) - (b.order ?? 999));
+		const outputOrder = sortedOutput.map(([k]) => k);
+		const output = wrapParams(outputResult, { order: outputOrder });
+
+		// Validate schemas before saving
+		const inputErrors = validateSchema(input as Record<string, unknown>);
+		const outputErrors = validateSchema(output as Record<string, unknown>);
+		if (inputErrors.length || outputErrors.length) {
+			const msgs = [...inputErrors.map((e) => `Input: ${e}`), ...outputErrors.map((e) => `Output: ${e}`)];
+			console.error('Schema validation failed:', msgs);
+			return;
+		}
+
+		const prodConfig = current.value?.configs?.find((c) => !c.test_environment);
+		const prodCv = prodConfig?.config_version ? Number(prodConfig.config_version) : 0;
+		const config_version = prodCv + 1;
+
+		const configPayload: Partial<CalculatorConfig> = {
+			input: input as any,
+			output: output as any,
+			config_version: String(config_version),
+		};
 
 		if (testConfig.value) {
 			await updateConfig(testConfig.value.id, currentId.value, configPayload);
 		} else {
 			await createConfig(currentId.value, { ...configPayload, test_environment: true });
-		}
-
-		// Always sync allowlist to Formula API after config save
-		const calcId = `${currentId.value}-test`;
-		try {
-			await api.patch(`/calc/access/${calcId}`);
-		} catch {
-			// Ignore — calculator may not be deployed yet
 		}
 	}
 }
@@ -566,8 +411,7 @@ watch([localInput, localOutput], () => {
 watch(testConfig, () => {
 	localInput.value = extractParams<InputParameter>(testConfig.value?.input as Record<string, unknown> | null);
 	localOutput.value = extractParams<OutputParameter>(testConfig.value?.output as Record<string, unknown> | null);
-	localAllowedIps.value = [...(testConfig.value?.allowed_ips || [])];
-	localAllowedOrigins.value = [...(testConfig.value?.allowed_origins || [])];
+
 }, { immediate: true });
 </script>
 
@@ -698,86 +542,6 @@ watch(testConfig, () => {
 .api-preview :deep(.code-block) {
 	border: var(--theme--border-width) solid var(--theme--border-color);
 	border-radius: var(--theme--border-radius);
-}
-
-/* Access Control */
-.access-control {
-	margin-top: 24px;
-	padding-top: 24px;
-	border-top: var(--theme--border-width) solid var(--theme--border-color);
-}
-
-.section-header {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-weight: 600;
-	font-size: 14px;
-	margin-bottom: 4px;
-}
-
-.section-desc {
-	margin: 0 0 16px;
-	font-size: 13px;
-	color: var(--theme--foreground-subdued);
-	line-height: 1.5;
-}
-
-.access-control .field {
-	margin-bottom: 16px;
-}
-
-.tag-input {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-}
-
-.tag-list {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.field-label-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	margin-bottom: 8px;
-}
-
-.field-label-row .field-label {
-	margin-bottom: 0;
-}
-
-.link-btn {
-	background: none;
-	border: none;
-	padding: 0;
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--theme--primary);
-	cursor: pointer;
-}
-
-.link-btn:hover:not(:disabled) {
-	text-decoration: underline;
-}
-
-.link-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.access-chip {
-	--v-chip-background-color: var(--theme--background-normal);
-	--v-chip-color: var(--theme--foreground);
-	--v-chip-close-color: var(--theme--foreground-subdued);
-}
-
-.tag-error {
-	font-size: 12px;
-	color: var(--theme--danger);
 }
 
 .validation-errors {

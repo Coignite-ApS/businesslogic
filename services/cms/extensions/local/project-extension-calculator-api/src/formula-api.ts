@@ -80,24 +80,6 @@ export class FormulaApiClient {
 		return { status: res.status, body: data };
 	}
 
-	async patchAllowlist(id: string, allowedIps: string[] | null, allowedOrigins: string[] | null): Promise<{ status: number; body: unknown }> {
-		const res = await fetch(`${this.baseUrl}/calculator/${encodeURIComponent(id)}`, {
-			method: 'PATCH',
-			headers: this.adminHeaders({ 'Content-Type': 'application/json' }),
-			body: JSON.stringify({ allowedIps, allowedOrigins }),
-		});
-
-		if (res.status === 410 || res.status === 404) {
-			throw new FormulaApiGoneError();
-		}
-
-		const data = await res.json().catch(() => null);
-		if (!res.ok) {
-			throw new FormulaApiError(res.status, data);
-		}
-		return { status: res.status, body: data };
-	}
-
 	async deleteCalculator(id: string): Promise<{ status: number; body: unknown }> {
 		const res = await fetch(`${this.baseUrl}/calculator/${encodeURIComponent(id)}`, {
 			method: 'DELETE',

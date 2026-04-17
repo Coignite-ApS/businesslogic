@@ -838,8 +838,6 @@ async function deployCalculator(
 		output: outputSchema,
 	};
 
-	if (config.allowed_ips?.length) payload.allowedIps = config.allowed_ips;
-	if (config.allowed_origins?.length) payload.allowedOrigins = config.allowed_origins;
 	if (config.expressions?.length) payload.expressions = config.expressions;
 
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };

@@ -162,8 +162,6 @@ export interface CalculatorConfig {
 	date_created: string | null;
 	user_updated: string | null;
 	date_updated: string | null;
-	allowed_ips: string[] | null;
-	allowed_origins: string[] | null;
 	mcp: McpConfig | null;
 	integration: IntegrationConfig | null;
 	expressions: { name: string; expression: string; scope?: string }[] | null;
