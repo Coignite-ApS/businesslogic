@@ -3,7 +3,6 @@
 		<template #navigation>
 			<conversation-nav
 				:conversations="conversations"
-				:current-id="currentConversationId"
 				:loading="convLoading"
 				:usage="usageData"
 				:is-unlimited="isUnlimited"

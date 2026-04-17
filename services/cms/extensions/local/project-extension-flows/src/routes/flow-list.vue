@@ -9,7 +9,6 @@
 		<template #navigation>
 			<flow-navigation
 				:flows="flows"
-				:current-id="null"
 				:loading="loading"
 				:creating="saving"
 				@create="handleCreate"

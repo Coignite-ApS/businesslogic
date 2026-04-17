@@ -33,7 +33,6 @@ import type { FlowItem } from '../types';
 
 defineProps<{
 	flows: FlowItem[];
-	currentId: string | null;
 	loading: boolean;
 	creating: boolean;
 }>();

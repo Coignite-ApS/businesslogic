@@ -63,7 +63,6 @@ import type { UsageData } from '../composables/use-usage';
 
 const props = defineProps<{
 	conversations: Conversation[];
-	currentId: string | null;
 	loading: boolean;
 	usage: UsageData | null;
 	isUnlimited: boolean;
