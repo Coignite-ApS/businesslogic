@@ -1,6 +1,13 @@
 <template>
-	<div class="kb-navigation">
+	<div class="nav-container">
 		<v-list nav>
+			<v-list-item to="/knowledge" :active="!currentId" clickable>
+				<v-list-item-icon><v-icon name="dashboard" /></v-list-item-icon>
+				<v-list-item-content><v-text-overflow text="Dashboard" /></v-list-item-content>
+			</v-list-item>
+
+			<v-divider />
+
 			<v-list-item
 				v-for="kb in knowledgeBases"
 				:key="kb.id"
@@ -19,12 +26,10 @@
 			</v-list-item>
 		</v-list>
 
-		<div class="nav-actions">
-			<v-button full-width :loading="creating" @click="$emit('create')">
-				<v-icon name="add" />
-				New Knowledge Base
-			</v-button>
-		</div>
+		<v-button full-width :loading="creating" @click="$emit('create')" class="create-button">
+			<v-icon name="add" left />
+			New Knowledge Base
+		</v-button>
 	</div>
 </template>
 
@@ -44,10 +49,21 @@ defineEmits<{
 </script>
 
 <style scoped>
-.kb-navigation {
+.nav-container {
+	padding: 12px;
+	height: 100%;
 	display: flex;
 	flex-direction: column;
-	height: 100%;
+}
+
+.nav-container :deep(.v-list) {
+	flex: 1;
+	overflow-y: auto;
+}
+
+.create-button {
+	margin-top: auto;
+	flex-shrink: 0;
 }
 
 .kb-name {
@@ -70,10 +86,5 @@ defineEmits<{
 	color: var(--theme--primary);
 	margin-left: 4px;
 	vertical-align: middle;
-}
-
-.nav-actions {
-	margin-top: auto;
-	padding: 12px;
 }
 </style>
