@@ -568,7 +568,7 @@ collections:
       hidden: true
       icon: query_stats
       item_duplication_fields: null
-      note: Query tracking for KB dashboard
+      note: KB query tracking for dashboard charts/KPIs
       preview_url: null
       singleton: false
       sort: null
@@ -12175,24 +12175,23 @@ fields:
     meta:
       collection: kb_queries
       conditions: null
-      display: null
+      display: related-values
       display_options: null
       field: knowledge_base
       group: null
       hidden: false
       interface: select-dropdown-m2o
-      note: null
+      note: FK to knowledge_bases
       options: null
       readonly: false
       required: false
       searchable: true
       sort: 2
-      special:
-        - m2o
+      special: null
       translations: null
       validation: null
       validation_message: null
-      width: half
+      width: full
     schema:
       name: knowledge_base
       table: kb_queries
@@ -12203,7 +12202,7 @@ fields:
       numeric_scale: null
       is_nullable: true
       is_unique: false
-      is_indexed: false
+      is_indexed: true
       is_primary_key: false
       is_generated: false
       generation_expression: null
@@ -12216,24 +12215,23 @@ fields:
     meta:
       collection: kb_queries
       conditions: null
-      display: null
+      display: related-values
       display_options: null
       field: account
       group: null
       hidden: false
       interface: select-dropdown-m2o
-      note: null
+      note: FK to account
       options: null
       readonly: false
       required: false
       searchable: true
       sort: 3
-      special:
-        - m2o
+      special: null
       translations: null
       validation: null
       validation_message: null
-      width: half
+      width: full
     schema:
       name: account
       table: kb_queries
@@ -12244,7 +12242,7 @@ fields:
       numeric_scale: null
       is_nullable: true
       is_unique: false
-      is_indexed: false
+      is_indexed: true
       is_primary_key: false
       is_generated: false
       generation_expression: null
@@ -12263,7 +12261,7 @@ fields:
       group: null
       hidden: false
       interface: input-multiline
-      note: null
+      note: Search/ask query text
       options: null
       readonly: false
       required: false
@@ -12297,19 +12295,14 @@ fields:
     meta:
       collection: kb_queries
       conditions: null
-      display: null
+      display: raw
       display_options: null
       field: type
       group: null
       hidden: false
       interface: select-dropdown
-      note: null
-      options:
-        choices:
-          - text: Search
-            value: search
-          - text: Ask
-            value: ask
+      note: search or ask
+      options: null
       readonly: false
       required: false
       searchable: true
@@ -12318,7 +12311,7 @@ fields:
       translations: null
       validation: null
       validation_message: null
-      width: half
+      width: full
     schema:
       name: type
       table: kb_queries
@@ -12382,7 +12375,7 @@ fields:
     meta:
       collection: kb_queries
       conditions: null
-      display: null
+      display: datetime
       display_options: null
       field: timestamp
       group: null
@@ -12422,7 +12415,7 @@ fields:
     meta:
       collection: kb_queries
       conditions: null
-      display: null
+      display: datetime
       display_options: null
       field: date_created
       group: null
@@ -12450,7 +12443,7 @@ fields:
       numeric_scale: null
       is_nullable: true
       is_unique: false
-      is_indexed: false
+      is_indexed: true
       is_primary_key: false
       is_generated: false
       generation_expression: null
@@ -16579,7 +16572,7 @@ relations:
       one_allowed_collections: null
       one_collection: knowledge_bases
       one_collection_field: null
-      one_deselect_action: delete
+      one_deselect_action: nullify
       one_field: null
       sort_field: null
     schema:

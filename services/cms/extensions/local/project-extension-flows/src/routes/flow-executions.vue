@@ -13,6 +13,7 @@
 		<template #navigation>
 			<flow-navigation
 				:flows="flows"
+				:current-id="flowId"
 				:loading="flowLoading"
 				:creating="false"
 				@create="() => {}"

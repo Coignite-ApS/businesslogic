@@ -105,6 +105,7 @@ defineEmits<{
 .conversation-list {
 	flex: 1;
 	overflow-y: auto;
+	margin-top: 8px;
 }
 
 .conv-delete {
