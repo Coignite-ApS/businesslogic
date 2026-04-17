@@ -55,7 +55,8 @@
 				:current-id="currentId"
 				:loading="loading"
 				:creating="saving"
-				current-view="test"
+				:has-excel="hasExcel"
+				:has-config="hasConfig"
 				@create="handleCreate"
 			/>
 		</template>

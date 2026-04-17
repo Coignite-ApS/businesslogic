@@ -15,7 +15,8 @@
 				:current-id="currentId"
 				:loading="loading"
 				:creating="saving"
-				current-view="dashboard"
+				:has-excel="hasExcel"
+				:has-config="hasConfig"
 				@create="handleCreate"
 			/>
 		</template>

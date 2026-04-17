@@ -40,7 +40,8 @@
 				:current-id="currentId"
 				:loading="loading"
 				:creating="saving"
-				current-view="integration"
+				:has-excel="hasExcel"
+				:has-config="hasConfig"
 				@create="handleCreate"
 			/>
 		</template>

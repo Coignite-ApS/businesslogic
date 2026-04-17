@@ -115,8 +115,12 @@ function statusDotClass(calc: Calculator): string {
 	margin-right: 8px;
 }
 
-.sub-item {
-	padding-left: 20px;
+.nav-container :deep(.v-list.nav .v-list-item.sub-item) {
+	padding-left: 28px !important;
+}
+
+.nav-container :deep(.sub-item .v-icon) {
+	--v-icon-size: 18px;
 }
 
 .status-dot {
