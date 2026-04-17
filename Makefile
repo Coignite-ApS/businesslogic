@@ -26,7 +26,7 @@ CMS_EXT := services/cms/extensions/local
         ext-admin ext-stripe ext-flows ext-flow-hooks \
         ext-knowledge ext-knowledge-api ext-layout-builder \
         ext-feature-flags ext-feature-gate ext-widget-api \
-        db snapshot
+        db snapshot snapshot-pre snapshot-post snapshot-dryrun snapshot-forensic data-baseline diff prune
 
 # ─── Full Stack ──────────────────────────────────────────────────
 
@@ -216,11 +216,66 @@ ext-widget-api:
 	@cd $(CMS_EXT)/project-extension-widget-api && npx directus-extension build
 
 # ─── Database ─────────────────────────────────────────────────────
+# Naming conventions (used by db-admin skill):
+#   snapshot_YYYYMMDD_HHMMSS[_slug].sql.gz  — routine baselines (rotated, keep last 5)
+#   pre_<slug>_YYYYMMDD_HHMMSS.sql.gz       — taken before a db-admin task
+#   post_<slug>_YYYYMMDD_HHMMSS.sql.gz      — taken after a db-admin task
 
+# Routine PG dump. Optional: SLUG=<branch-or-task> appends slug.
 snapshot:
-	@$(COMPOSE) exec -T postgres pg_dump -U directus -d directus --clean --if-exists | gzip > \
-		infrastructure/db-snapshots/snapshot_$$(date +%Y%m%d_%H%M%S).sql.gz
-	@echo "✓ Snapshot saved"
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	SUFFIX=$(if $(SLUG),_$(SLUG),); \
+	OUT="infrastructure/db-snapshots/snapshot_$${TS}$${SUFFIX}.sql.gz"; \
+	$(COMPOSE) exec -T postgres pg_dump -U directus -d directus --clean --if-exists | gzip > "$${OUT}"; \
+	echo "✓ PG dump: $${OUT}"
+
+# Pre-task PG dump (REQUIRES SLUG). Used by db-admin BEFORE applying any change.
+snapshot-pre:
+	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>  (e.g., make snapshot-pre SLUG=add-widget-collection)"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="infrastructure/db-snapshots/pre_$(SLUG)_$${TS}.sql.gz"; \
+	$(COMPOSE) exec -T postgres pg_dump -U directus -d directus --clean --if-exists | gzip > "$${OUT}"; \
+	echo "✓ Pre-task PG dump: $${OUT}"
+
+# Post-task PG dump (REQUIRES SLUG). Used by db-admin AFTER applying any change.
+snapshot-post:
+	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="infrastructure/db-snapshots/post_$(SLUG)_$${TS}.sql.gz"; \
+	$(COMPOSE) exec -T postgres pg_dump -U directus -d directus --clean --if-exists | gzip > "$${OUT}"; \
+	echo "✓ Post-task PG dump: $${OUT}"
+
+# Dryrun PG dump (REQUIRES PURPOSE). Use for exploratory snapshots NOT tied to a real applied change.
+# These are aggressively pruned by `make prune` (default: keep last 2).
+snapshot-dryrun:
+	@[ -n "$(PURPOSE)" ] || { echo "ERROR: pass PURPOSE=<short-purpose>  (e.g., make snapshot-dryrun PURPOSE=test-import)"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="infrastructure/db-snapshots/dryrun_$(PURPOSE)_$${TS}.sql.gz"; \
+	$(COMPOSE) exec -T postgres pg_dump -U directus -d directus --clean --if-exists | gzip > "$${OUT}"; \
+	echo "✓ Dryrun PG dump: $${OUT}  (will be pruned aggressively)"
+
+# Forensic PG dump (REQUIRES SLUG). Used by db-admin Phase 6.5 to capture a FAILED apply
+# state BEFORE rolling back, so the failure can be investigated. Grouped with the task slug.
+snapshot-forensic:
+	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="infrastructure/db-snapshots/forensic_$(SLUG)_$${TS}.sql.gz"; \
+	$(COMPOSE) exec -T postgres pg_dump -U directus -d directus --clean --if-exists | gzip > "$${OUT}"; \
+	echo "✓ Forensic PG dump (failed state): $${OUT}"
+
+# Capture row count + (optional) per-column fingerprint for one table.
+# Used by db-admin Phase 4.5 (baseline) and Phase 6.5 (post-apply check).
+data-baseline:
+	@[ -n "$(TABLE)" ] || { echo "ERROR: pass TABLE=<schema.table>  [COL=<column>] [ID_COL=<pk-column-default-id>]"; exit 1; }
+	@TABLE="$(TABLE)" COL="$(COL)" ID_COL="$(ID_COL)" ./scripts/db-baseline.sh
+
+# Diff current Directus schema against latest YAML snapshot (or specified one via SNAPSHOT=).
+diff:
+	@$(MAKE) -C services/cms diff $(if $(SNAPSHOT),SNAPSHOT=$(SNAPSHOT),)
+
+# Prune old artifacts. Override defaults via env: KEEP_ROUTINE, KEEP_TASK_DAYS, ARCHIVE_REPORTS_DAYS, DRY_RUN.
+prune:
+	@./scripts/prune-db-artifacts.sh
 
 db:
 	@$(COMPOSE) exec postgres psql -U directus -d directus
