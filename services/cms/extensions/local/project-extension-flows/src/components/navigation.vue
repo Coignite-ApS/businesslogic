@@ -5,13 +5,12 @@
 			New flow
 		</v-button>
 
-		<v-list v-if="flows.length > 0" class="flow-list">
+		<v-list v-if="flows.length > 0" nav class="flow-list">
 			<v-list-item
 				v-for="flow in flows"
 				:key="flow.id"
-				:active="flow.id === currentId"
+				:to="`/flows/${flow.id}`"
 				clickable
-				@click="$router.push(`/flows/${flow.id}`)"
 			>
 				<v-list-item-icon>
 					<v-icon name="account_tree" small />

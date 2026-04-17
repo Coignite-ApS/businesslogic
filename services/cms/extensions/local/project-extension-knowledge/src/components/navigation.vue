@@ -4,9 +4,8 @@
 			<v-list-item
 				v-for="kb in knowledgeBases"
 				:key="kb.id"
-				:active="kb.id === currentId"
+				:to="`/knowledge/${kb.id}`"
 				clickable
-				@click="$emit('select', kb.id)"
 			>
 				<v-list-item-icon><v-icon :name="kb.icon || 'menu_book'" /></v-list-item-icon>
 				<v-list-item-content>
@@ -40,7 +39,6 @@ defineProps<{
 }>();
 
 defineEmits<{
-	select: [id: string];
 	create: [];
 }>();
 </script>

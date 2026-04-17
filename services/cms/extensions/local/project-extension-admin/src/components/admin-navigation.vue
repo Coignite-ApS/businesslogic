@@ -4,9 +4,9 @@
 			<v-list-item
 				v-for="item in navItems"
 				:key="item.to"
+				:to="item.to"
 				:active="isActive(item.to)"
 				clickable
-				@click="$router.push(item.to)"
 			>
 				<v-list-item-icon><v-icon :name="item.icon" /></v-list-item-icon>
 				<v-list-item-content>{{ item.label }}</v-list-item-content>
