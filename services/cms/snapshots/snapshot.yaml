@@ -554,6 +554,30 @@ collections:
       versioning: false
     schema:
       name: kb_documents
+  - collection: kb_queries
+    meta:
+      accountability: all
+      archive_app_filter: true
+      archive_field: null
+      archive_value: null
+      collapse: open
+      collection: kb_queries
+      color: null
+      display_template: null
+      group: null
+      hidden: true
+      icon: query_stats
+      item_duplication_fields: null
+      note: Query tracking for KB dashboard
+      preview_url: null
+      singleton: false
+      sort: null
+      sort_field: null
+      translations: null
+      unarchive_value: null
+      versioning: false
+    schema:
+      name: kb_queries
   - collection: knowledge_bases
     meta:
       accountability: all
@@ -12104,6 +12128,335 @@ fields:
       has_auto_increment: false
       foreign_key_table: null
       foreign_key_column: null
+  - collection: kb_queries
+    field: id
+    type: uuid
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: id
+      group: null
+      hidden: true
+      interface: input
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 1
+      special:
+        - uuid
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: id
+      table: kb_queries
+      data_type: uuid
+      default_value: gen_random_uuid()
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: false
+      is_primary_key: true
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: kb_queries
+    field: knowledge_base
+    type: uuid
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: knowledge_base
+      group: null
+      hidden: false
+      interface: select-dropdown-m2o
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 2
+      special:
+        - m2o
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: knowledge_base
+      table: kb_queries
+      data_type: uuid
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: knowledge_bases
+      foreign_key_column: id
+  - collection: kb_queries
+    field: account
+    type: uuid
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: account
+      group: null
+      hidden: false
+      interface: select-dropdown-m2o
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 3
+      special:
+        - m2o
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: account
+      table: kb_queries
+      data_type: uuid
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: account
+      foreign_key_column: id
+  - collection: kb_queries
+    field: query
+    type: text
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: query
+      group: null
+      hidden: false
+      interface: input-multiline
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 4
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: query
+      table: kb_queries
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: kb_queries
+    field: type
+    type: string
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: type
+      group: null
+      hidden: false
+      interface: select-dropdown
+      note: null
+      options:
+        choices:
+          - text: Search
+            value: search
+          - text: Ask
+            value: ask
+      readonly: false
+      required: false
+      searchable: true
+      sort: 5
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: type
+      table: kb_queries
+      data_type: character varying
+      default_value: null
+      max_length: 255
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: kb_queries
+    field: result_count
+    type: integer
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: result_count
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 6
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: result_count
+      table: kb_queries
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: kb_queries
+    field: timestamp
+    type: timestamp
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: timestamp
+      group: null
+      hidden: false
+      interface: datetime
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 7
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: timestamp
+      table: kb_queries
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: kb_queries
+    field: date_created
+    type: timestamp
+    meta:
+      collection: kb_queries
+      conditions: null
+      display: null
+      display_options: null
+      field: date_created
+      group: null
+      hidden: true
+      interface: datetime
+      note: null
+      options: null
+      readonly: true
+      required: false
+      searchable: true
+      sort: 8
+      special:
+        - date-created
+      translations: null
+      validation: null
+      validation_message: null
+      width: half
+    schema:
+      name: date_created
+      table: kb_queries
+      data_type: timestamp with time zone
+      default_value: now()
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
   - collection: knowledge_bases
     field: id
     type: uuid
@@ -16214,6 +16567,48 @@ relations:
       foreign_key_table: directus_files
       foreign_key_column: id
       constraint_name: kb_documents_file_fkey
+      on_update: NO ACTION
+      on_delete: SET NULL
+  - collection: kb_queries
+    field: knowledge_base
+    related_collection: knowledge_bases
+    meta:
+      junction_field: null
+      many_collection: kb_queries
+      many_field: knowledge_base
+      one_allowed_collections: null
+      one_collection: knowledge_bases
+      one_collection_field: null
+      one_deselect_action: delete
+      one_field: null
+      sort_field: null
+    schema:
+      table: kb_queries
+      column: knowledge_base
+      foreign_key_table: knowledge_bases
+      foreign_key_column: id
+      constraint_name: kb_queries_knowledge_base_fkey
+      on_update: NO ACTION
+      on_delete: CASCADE
+  - collection: kb_queries
+    field: account
+    related_collection: account
+    meta:
+      junction_field: null
+      many_collection: kb_queries
+      many_field: account
+      one_allowed_collections: null
+      one_collection: account
+      one_collection_field: null
+      one_deselect_action: nullify
+      one_field: null
+      sort_field: null
+    schema:
+      table: kb_queries
+      column: account
+      foreign_key_table: account
+      foreign_key_column: id
+      constraint_name: kb_queries_account_fkey
       on_update: NO ACTION
       on_delete: SET NULL
   - collection: knowledge_bases
