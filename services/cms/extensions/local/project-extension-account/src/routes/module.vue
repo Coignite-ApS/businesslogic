@@ -7,16 +7,7 @@
 		</template>
 
 		<template #navigation>
-			<v-list nav>
-				<v-list-item to="/account" :active="!isSubscriptionRoute" clickable>
-					<v-list-item-icon><v-icon name="settings" /></v-list-item-icon>
-					<v-list-item-content>Account Settings</v-list-item-content>
-				</v-list-item>
-				<v-list-item to="/account/subscription" :active="isSubscriptionRoute" clickable>
-					<v-list-item-icon><v-icon name="credit_card" /></v-list-item-icon>
-					<v-list-item-content>Subscription</v-list-item-content>
-				</v-list-item>
-			</v-list>
+			<account-navigation />
 		</template>
 
 		<div class="module-content" v-if="activeAccountId">
@@ -278,15 +269,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
-import { useRoute } from 'vue-router';
 import { useAccount } from '../composables/use-account';
+import AccountNavigation from '../components/account-navigation.vue';
 import AccountSelector from '../components/account-selector.vue';
 import ResourcePicker from '../components/resource-picker.vue';
 import { buildPermissions, parsePermissions, summarizePermissions } from '../utils/permissions';
 import type { PermissionSelection } from '../utils/permissions';
 
 const api = useApi();
-const route = useRoute();
 
 const {
 	accounts, activeAccountId, subscription, loading, error,
@@ -321,8 +311,6 @@ const editOrigins = ref('');
 const editIPs = ref('');
 
 const GATEWAY_URL = 'https://api.businesslogic.online';
-
-const isSubscriptionRoute = computed(() => route.path.includes('/subscription'));
 
 const currentAccount = computed(() =>
 	accounts.value.find((a) => a.id === activeAccountId.value),

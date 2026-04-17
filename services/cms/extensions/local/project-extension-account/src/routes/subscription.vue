@@ -10,16 +10,7 @@
 		</template>
 
 		<template #navigation>
-			<v-list nav>
-				<v-list-item to="/account" clickable>
-					<v-list-item-icon><v-icon name="settings" /></v-list-item-icon>
-					<v-list-item-content>Account Settings</v-list-item-content>
-				</v-list-item>
-				<v-list-item to="/account/subscription" active clickable>
-					<v-list-item-icon><v-icon name="credit_card" /></v-list-item-icon>
-					<v-list-item-content>Subscription</v-list-item-content>
-				</v-list-item>
-			</v-list>
+			<account-navigation />
 		</template>
 
 		<div class="module-content" v-if="activeAccountId">
@@ -71,6 +62,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import { useAccount } from '../composables/use-account';
+import AccountNavigation from '../components/account-navigation.vue';
 import AccountSelector from '../components/account-selector.vue';
 import SubscriptionInfo from '../components/subscription-info.vue';
 import PlanCards from 'project-shared-ui/plan-cards.vue';
