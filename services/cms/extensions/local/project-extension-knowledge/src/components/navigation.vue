@@ -26,7 +26,11 @@
 			</v-list-item>
 		</v-list>
 
-		<v-button full-width :loading="creating" @click="$emit('create')" class="create-button">
+		<v-info v-if="!loading && knowledgeBases.length === 0" icon="menu_book" title="No Knowledge Bases">
+			Create your first knowledge base to get started.
+		</v-info>
+
+		<v-button full-width :disabled="creating" @click="$emit('create')" class="create-button">
 			<v-icon name="add" left />
 			New Knowledge Base
 		</v-button>
