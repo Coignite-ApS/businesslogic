@@ -26,7 +26,7 @@ export function useCalculators(api: any) {
 		try {
 			const params: any = {
 				sort: ['sort', 'name'],
-				fields: ['id', 'name', 'sort', 'date_updated', 'activated', 'onboarded', 'test_expires_at', 'over_limit', 'activation_expires_at', 'icon'],
+				fields: ['id', 'name', 'sort', 'date_updated', 'activated', 'onboarded', 'test_expires_at', 'over_limit', 'activation_expires_at'],
 			};
 			if (accountId) {
 				params.filter = { account: { _eq: accountId } };
