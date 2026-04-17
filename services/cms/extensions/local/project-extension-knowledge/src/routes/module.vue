@@ -12,7 +12,6 @@
 				:current-id="currentId"
 				:loading="kbLoading"
 				:creating="kbSaving"
-				@select="navigateTo"
 				@create="handleCreate"
 			/>
 		</template>
@@ -186,10 +185,6 @@ const viewTitle = computed(() => {
 	if (currentKb.value?.name) return currentKb.value.name;
 	return 'Knowledge Base';
 });
-
-function navigateTo(id: string) {
-	router.push(`/knowledge/${id}`);
-}
 
 async function handleCreate() {
 	const kb = await create({ name: 'New Knowledge Base' });

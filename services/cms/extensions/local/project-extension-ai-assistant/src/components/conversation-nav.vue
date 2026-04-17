@@ -9,20 +9,22 @@
 			<v-progress-circular indeterminate small />
 		</div>
 
-		<v-list v-else nav>
+		<v-list v-else nav class="conversation-list">
 			<v-list-item
 				v-for="conv in conversations"
 				:key="conv.id"
 				:to="`/ai-assistant/${conv.id}`"
-				:active="conv.id === currentId"
+				clickable
 			>
-				<v-list-item-icon><v-icon name="chat_bubble_outline" small /></v-list-item-icon>
+				<v-list-item-icon>
+					<v-icon name="chat_bubble_outline" small />
+				</v-list-item-icon>
 				<v-list-item-content>
 					<v-text-overflow :text="conv.title || 'New conversation'" />
 				</v-list-item-content>
 				<button
 					class="conv-delete"
-					@click.stop="$emit('archive', conv.id)"
+					@click.stop.prevent="$emit('archive', conv.id)"
 					title="Archive"
 				>
 					<v-icon name="close" x-small />
@@ -61,7 +63,6 @@ import type { UsageData } from '../composables/use-usage';
 
 const props = defineProps<{
 	conversations: Conversation[];
-	currentId: string | null;
 	loading: boolean;
 	usage: UsageData | null;
 	isUnlimited: boolean;
@@ -101,6 +102,11 @@ defineEmits<{
 	padding: 20px;
 }
 
+.conversation-list {
+	flex: 1;
+	overflow-y: auto;
+}
+
 .conv-delete {
 	opacity: 0;
 	background: none;
@@ -112,7 +118,7 @@ defineEmits<{
 	transition: opacity 0.1s;
 }
 
-.v-list-item:hover .conv-delete {
+.conversation-list :deep(.v-list-item:hover) .conv-delete {
 	opacity: 1;
 }
 

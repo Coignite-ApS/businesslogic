@@ -1,10 +1,10 @@
 <template>
 	<div class="formula-navigation">
-		<v-list class="nav-list">
+		<v-list nav class="nav-list">
 			<v-list-item
+				to="/formulas"
 				:active="currentView === 'test'"
 				clickable
-				@click="$router.push('/formulas')"
 			>
 				<v-list-item-icon>
 					<v-icon name="play_arrow" small />
@@ -15,9 +15,9 @@
 			</v-list-item>
 
 			<v-list-item
+				to="/formulas/integration"
 				:active="currentView === 'integration'"
 				clickable
-				@click="$router.push('/formulas/integration')"
 			>
 				<v-list-item-icon>
 					<v-icon name="integration_instructions" small />

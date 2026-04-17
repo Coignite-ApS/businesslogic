@@ -4,13 +4,12 @@
 			<v-list-item
 				v-for="kb in knowledgeBases"
 				:key="kb.id"
-				:active="kb.id === currentId"
+				:to="`/knowledge/${kb.id}`"
 				clickable
-				@click="$emit('select', kb.id)"
 			>
 				<v-list-item-icon><v-icon :name="kb.icon || 'menu_book'" /></v-list-item-icon>
 				<v-list-item-content>
-					<span class="kb-name">{{ kb.name }}</span>
+					<v-text-overflow :text="kb.name" class="kb-name" />
 					<span class="kb-meta">
 						{{ kb.document_count }} docs &middot; {{ kb.chunk_count }} chunks
 						<span v-if="kb.contextual_retrieval_enabled !== false" class="feature-badge" title="Contextual Retrieval">CR</span>
@@ -40,7 +39,6 @@ defineProps<{
 }>();
 
 defineEmits<{
-	select: [id: string];
 	create: [];
 }>();
 </script>
@@ -53,11 +51,7 @@ defineEmits<{
 }
 
 .kb-name {
-	display: block;
 	font-weight: 500;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .kb-meta {
