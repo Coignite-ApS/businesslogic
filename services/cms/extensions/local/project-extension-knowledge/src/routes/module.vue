@@ -78,11 +78,12 @@
 			/>
 		</div>
 
-		<div v-else-if="!currentId" class="module-empty">
-			<v-info icon="menu_book" title="Knowledge Bases" center>
-				Select a knowledge base from the sidebar or create a new one.
-			</v-info>
-		</div>
+		<kb-dashboard
+			v-else-if="!currentId"
+			:knowledge-bases="knowledgeBases"
+			:api="api"
+			@create="handleCreate"
+		/>
 
 		<div v-else-if="kbLoading" class="module-loading">
 			<v-progress-circular indeterminate />
@@ -146,6 +147,7 @@ import { useCuratedAnswers } from '../composables/use-curated-answers';
 import { useActiveAccount } from '../composables/use-active-account';
 import KbNavigation from '../components/navigation.vue';
 import KbDetail from '../components/kb-detail.vue';
+import KbDashboard from '../components/kb-dashboard.vue';
 
 const api = useApi();
 const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'ai.kb');
@@ -313,7 +315,6 @@ watch(currentId, (id) => {
 	padding-bottom: var(--content-padding-bottom);
 }
 
-.module-empty,
 .module-loading {
 	display: flex;
 	align-items: center;
