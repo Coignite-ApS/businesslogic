@@ -1,78 +1,65 @@
 <template>
 	<div class="calculator-navigation">
-		<v-button full-width @click="$emit('create')" :disabled="creating">
-			<v-icon name="add" left />
-			New calculator
-		</v-button>
+		<v-list nav>
+			<v-list-item to="/calculators" :active="!currentId" clickable>
+				<v-list-item-icon><v-icon name="dashboard" /></v-list-item-icon>
+				<v-list-item-content><v-text-overflow text="Dashboard" /></v-list-item-content>
+			</v-list-item>
 
-		<v-list v-if="calculators.length > 0" class="calculator-list">
-			<template v-for="calc in calculators" :key="calc.id">
-				<v-list-item
-					:active="calc.id === currentId && currentView === 'dashboard'"
-					clickable
-					@click="$router.push(`/calculators/${calc.id}`)"
-				>
-					<v-list-item-icon>
-						<v-icon :name="calc.icon || 'calculate'" small />
-					</v-list-item-icon>
-					<v-list-item-content>
-						<v-text-overflow :text="calc.name || 'New Calculator'" />
-					</v-list-item-content>
-					<span class="status-dot" :class="statusDotClass(calc)" />
-				</v-list-item>
+			<v-divider />
 
-				<template v-if="calc.id === currentId">
+			<template v-if="calculators.length > 0">
+				<v-list-group v-for="calc in calculators" :key="calc.id" :open="calc.id === currentId">
+					<template #activator>
+						<v-list-item-icon>
+							<v-icon :name="calc.icon || 'calculate'" />
+						</v-list-item-icon>
+						<v-list-item-content>
+							<v-text-overflow :text="calc.name || 'New Calculator'" />
+						</v-list-item-content>
+						<span class="status-dot" :class="statusDotClass(calc)" />
+					</template>
+
 					<v-list-item
 						v-if="hasExcel"
-						class="sub-item"
-						:active="currentView === 'configure'"
+						:to="`/calculators/${calc.id}/configure`"
 						clickable
-						@click="$router.push(`/calculators/${calc.id}/configure`)"
 					>
-						<v-list-item-icon>
-							<v-icon name="tune" small />
-						</v-list-item-icon>
-						<v-list-item-content>
-							<v-text-overflow text="Configure" />
-						</v-list-item-content>
+						<v-list-item-icon><v-icon name="tune" /></v-list-item-icon>
+						<v-list-item-content><v-text-overflow text="Configure" /></v-list-item-content>
 					</v-list-item>
 
 					<v-list-item
 						v-if="hasConfig"
-						class="sub-item"
-						:active="currentView === 'test'"
+						:to="`/calculators/${calc.id}/test`"
 						clickable
-						@click="$router.push(`/calculators/${calc.id}/test`)"
 					>
-						<v-list-item-icon>
-							<v-icon name="play_arrow" small />
-						</v-list-item-icon>
-						<v-list-item-content>
-							<v-text-overflow text="Test" />
-						</v-list-item-content>
+						<v-list-item-icon><v-icon name="play_arrow" /></v-list-item-icon>
+						<v-list-item-content><v-text-overflow text="Test" /></v-list-item-content>
 					</v-list-item>
 
 					<v-list-item
 						v-if="hasConfig"
-						class="sub-item"
-						:active="currentView === 'integration'"
+						:to="`/calculators/${calc.id}/integration`"
 						clickable
-						@click="$router.push(`/calculators/${calc.id}/integration`)"
 					>
-						<v-list-item-icon>
-							<v-icon name="integration_instructions" small />
-						</v-list-item-icon>
-						<v-list-item-content>
-							<v-text-overflow text="Integrate" />
-						</v-list-item-content>
+						<v-list-item-icon><v-icon name="integration_instructions" /></v-list-item-icon>
+						<v-list-item-content><v-text-overflow text="Integrate" /></v-list-item-content>
 					</v-list-item>
-				</template>
+				</v-list-group>
 			</template>
 		</v-list>
 
-		<v-info v-else-if="!loading" icon="calculate" title="No Calculators">
+		<v-info v-if="!loading && calculators.length === 0" icon="calculate" title="No Calculators">
 			Create your first calculator to get started.
 		</v-info>
+
+		<div class="nav-spacer" />
+
+		<v-button full-width :disabled="creating" @click="$emit('create')">
+			<v-icon name="add" left />
+			New calculator
+		</v-button>
 	</div>
 </template>
 
@@ -103,21 +90,21 @@ function statusDotClass(calc: Calculator): string {
 
 <style scoped>
 .calculator-navigation {
-	padding: 12px;
+	padding: 0 0 12px;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
 }
 
-.calculator-list {
-	margin-top: 12px;
-}
-
-.calculator-list :deep(.v-list-item-content) {
+.calculator-navigation :deep(.v-list-item-content) {
 	flex: 1;
 	min-width: 0;
 	margin-right: 8px;
 }
 
-.sub-item {
-	padding-left: 20px;
+.nav-spacer {
+	flex: 1;
+	min-height: 12px;
 }
 
 .status-dot {
