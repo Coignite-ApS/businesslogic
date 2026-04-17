@@ -8,6 +8,8 @@
 					<span class="toggle-sep">|</span>
 					<a :class="{ active: timeRange === '7d' }" @click="timeRange = '7d'">7 days</a>
 					<span class="toggle-sep">|</span>
+					<a :class="{ active: timeRange === '30d' }" @click="timeRange = '30d'">30 days</a>
+					<span class="toggle-sep">|</span>
 					<a :class="{ active: timeRange === '12m' }" @click="timeRange = '12m'">12 months</a>
 				</div>
 			</div>
@@ -87,7 +89,7 @@
 		</div>
 
 		<!-- Calculator cards: active first, then test, then inactive -->
-		<div v-if="sortedCalculators.length" class="calc-grid">
+		<div class="calc-grid">
 			<div
 				v-for="calc in sortedCalculators"
 				:key="calc.id"
@@ -108,11 +110,12 @@
 					/>
 				</div>
 			</div>
-		</div>
-		<div v-else class="no-calcs">
-			<v-info icon="calculate" title="No Calculators">
-				Create your first calculator to get started.
-			</v-info>
+			<div class="calc-card new-card" @click="$emit('create')">
+				<div class="new-card-content">
+					<v-icon name="add" x-large />
+					<span class="new-card-label">New Calculator</span>
+				</div>
+			</div>
 		</div>
 	</div>
 </template>
@@ -128,7 +131,11 @@ const props = defineProps<{
 	api: any;
 }>();
 
-const timeRange = ref<TimeRange>('7d');
+defineEmits<{ create: [] }>();
+
+const VALID_RANGES: TimeRange[] = ['today', '7d', '30d', '12m'];
+const stored = localStorage.getItem('bl_calc_timeRange') as TimeRange | null;
+const timeRange = ref<TimeRange>(stored && VALID_RANGES.includes(stored) ? stored : '7d');
 
 const {
 	liveRecords,
@@ -164,6 +171,7 @@ const cachedPct = computed(() => {
 const rangeLabel = computed(() => {
 	if (timeRange.value === 'today') return 'today';
 	if (timeRange.value === '7d') return '7d';
+	if (timeRange.value === '30d') return '30d';
 	return '12m';
 });
 
@@ -228,6 +236,12 @@ function rangeCutoff(range: TimeRange): number {
 		d.setHours(0, 0, 0, 0);
 		return d.getTime();
 	}
+	if (range === '30d') {
+		const d = new Date(now);
+		d.setDate(d.getDate() - 30);
+		d.setHours(0, 0, 0, 0);
+		return d.getTime();
+	}
 	const d = new Date(now);
 	d.setMonth(d.getMonth() - 12);
 	return d.getTime();
@@ -236,6 +250,8 @@ function rangeCutoff(range: TimeRange): number {
 function tsMs(ts: string): number {
 	return new Date(ts.endsWith('Z') ? ts : ts + 'Z').getTime();
 }
+
+watch(timeRange, (val) => localStorage.setItem('bl_calc_timeRange', val));
 
 watch(activatedIds, (ids) => {
 	fetchCallData(ids);
@@ -526,9 +542,34 @@ onBeforeUnmount(stopPolling);
 	opacity: 1;
 }
 
-.no-calcs {
+.new-card {
+	border: 2px dashed var(--theme--border-color);
+	background: transparent;
 	display: flex;
+	align-items: center;
 	justify-content: center;
-	padding: 48px 0;
+	min-height: 100px;
+	transition: border-color 0.15s;
+}
+
+.new-card:hover {
+	border-color: var(--theme--primary);
+}
+
+.new-card-content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	color: var(--theme--foreground-subdued);
+}
+
+.new-card:hover .new-card-content {
+	color: var(--theme--primary);
+}
+
+.new-card-label {
+	font-size: 13px;
+	font-weight: 600;
 }
 </style>

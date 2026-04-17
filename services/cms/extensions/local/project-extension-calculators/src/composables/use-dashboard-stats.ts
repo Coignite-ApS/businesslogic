@@ -3,7 +3,7 @@ import type { CallRecord } from '../types';
 
 const POLL_INTERVAL = 30_000;
 
-export type TimeRange = 'today' | '7d' | '12m';
+export type TimeRange = 'today' | '7d' | '30d' | '12m';
 
 export function useDashboardStats(api: any) {
 	const records = ref<CallRecord[]>([]);
@@ -64,6 +64,12 @@ export function useDashboardStats(api: any) {
 		if (range === '7d') {
 			const d = new Date(now);
 			d.setDate(d.getDate() - 7);
+			d.setHours(0, 0, 0, 0);
+			return d.getTime();
+		}
+		if (range === '30d') {
+			const d = new Date(now);
+			d.setDate(d.getDate() - 30);
 			d.setHours(0, 0, 0, 0);
 			return d.getTime();
 		}
@@ -139,6 +145,16 @@ export function useDashboardStats(api: any) {
 				const end = new Date(d);
 				end.setDate(end.getDate() + 1);
 				buckets.push({ start: d.getTime(), end: end.getTime(), label: dayLabels[d.getDay()] });
+			}
+		} else if (range === '30d') {
+			for (let i = 29; i >= 0; i--) {
+				const d = new Date(now);
+				d.setDate(d.getDate() - i);
+				d.setHours(0, 0, 0, 0);
+				const end = new Date(d);
+				end.setDate(end.getDate() + 1);
+				const label = `${d.getMonth() + 1}/${d.getDate()}`;
+				buckets.push({ start: d.getTime(), end: end.getTime(), label });
 			}
 		} else {
 			for (let i = 11; i >= 0; i--) {
