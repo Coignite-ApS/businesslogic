@@ -76,7 +76,7 @@ describe('AI_TOOLS definitions', () => {
 		expect(names).toContain('get_calculator_config');
 		expect(names).toContain('configure_calculator');
 		expect(names).toContain('deploy_calculator');
-		expect(AI_TOOLS.length).toBe(14);
+		expect(AI_TOOLS.length).toBe(15);
 	});
 
 	it('create_calculator requires id and name', () => {

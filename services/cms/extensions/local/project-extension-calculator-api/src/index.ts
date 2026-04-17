@@ -673,8 +673,8 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				// Execute each test case in sequence and collect results
 				const results = [];
 				for (const tc of rows) {
-					const input = tc.input || {};
-					const expected = tc.expected_outputs || {};
+					const input = typeof tc.input === 'string' ? JSON.parse(tc.input) : (tc.input || {});
+					const expected = typeof tc.expected_outputs === 'string' ? JSON.parse(tc.expected_outputs) : (tc.expected_outputs || {});
 					const tolerance = tc.tolerance ?? 0;
 					try {
 						const execResult = await client.executeCalculator(calcId, input);
@@ -690,7 +690,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 							actual: {},
 							diff: {},
 							error: err instanceof FormulaApiError
-								? `Formula API error ${err.status}`
+								? `Formula API error ${err.status}: ${JSON.stringify((err as FormulaApiError).body?.details || (err as FormulaApiError).body?.error || '')}`
 								: (err.message || 'Execution failed'),
 						});
 					}
@@ -727,8 +727,8 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 					return res.status(404).json({ errors: [{ message: 'Test case not found' }] });
 				}
 
-				const input = tc.input || {};
-				const expected = tc.expected_outputs || {};
+				const input = typeof tc.input === 'string' ? JSON.parse(tc.input) : (tc.input || {});
+				const expected = typeof tc.expected_outputs === 'string' ? JSON.parse(tc.expected_outputs) : (tc.expected_outputs || {});
 				const tolerance = tc.tolerance ?? 0;
 
 				try {
@@ -745,7 +745,7 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 						actual: {},
 						diff: {},
 						error: err instanceof FormulaApiError
-							? `Formula API error ${err.status}`
+							? `Formula API error ${err.status}: ${JSON.stringify((err as FormulaApiError).body?.details || (err as FormulaApiError).body?.error || '')}`
 							: (err.message || 'Execution failed'),
 					});
 				}

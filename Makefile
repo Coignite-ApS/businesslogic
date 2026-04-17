@@ -15,7 +15,7 @@
 COMPOSE := docker compose -f infrastructure/docker/docker-compose.dev.yml
 CMS_EXT := services/cms/extensions/local
 
-.PHONY: up down restart stop logs status health test \
+.PHONY: up down restart stop logs status health test validate-schema \
         cms cms-restart cms-logs cms-stop \
         ai-api ai-api-restart ai-api-logs ai-api-stop \
         formula-api formula-api-restart formula-api-logs formula-api-stop \
@@ -276,6 +276,9 @@ diff:
 # Prune old artifacts. Override defaults via env: KEEP_ROUTINE, KEEP_TASK_DAYS, ARCHIVE_REPORTS_DAYS, DRY_RUN.
 prune:
 	@./scripts/prune-db-artifacts.sh
+
+validate-schema:
+	@./scripts/validate-schema.sh
 
 db:
 	@$(COMPOSE) exec postgres psql -U directus -d directus

@@ -143,6 +143,11 @@
             "type": "command",
             "command": ".claude/hooks/pre-commit-docs-check.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-commit-schema-check.sh",
+            "timeout": 30
           }
         ]
       }

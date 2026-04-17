@@ -120,6 +120,15 @@ echo "Schema exported: $SNAPSHOT_DIR/schema_current.sql"
 
 Report: snapshot taken, rotation status, current schema saved.
 
+### 4d: Schema drift validation
+
+```bash
+# Validate snapshot.yaml matches DB state
+./scripts/validate-schema.sh
+```
+
+Report: drift status (PASS/FAIL), any mismatched fields or unmanaged columns.
+
 ## Step 5: Documentation Completeness
 
 Check that key documentation is up-to-date:

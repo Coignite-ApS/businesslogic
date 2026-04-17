@@ -3125,6 +3125,609 @@ fields:
       has_auto_increment: false
       foreign_key_table: null
       foreign_key_column: null
+  - collection: api_keys
+    field: account_id
+    type: uuid
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: account_id
+      group: null
+      hidden: true
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: account_id
+      table: api_keys
+      data_type: uuid
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: true
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: account
+      foreign_key_column: id
+  - collection: api_keys
+    field: allowed_ips
+    type: unknown
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: allowed_ips
+      group: null
+      hidden: false
+      interface: tags
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: allowed_ips
+      table: api_keys
+      data_type: text[]
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: allowed_origins
+    type: unknown
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: allowed_origins
+      group: null
+      hidden: false
+      interface: tags
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: allowed_origins
+      table: api_keys
+      data_type: text[]
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: created_at
+    type: timestamp
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: created_at
+      group: null
+      hidden: true
+      interface: datetime
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: created_at
+      table: api_keys
+      data_type: timestamp with time zone
+      default_value: now()
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: encrypted_key
+    type: text
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: encrypted_key
+      group: null
+      hidden: true
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: encrypted_key
+      table: api_keys
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: environment
+    type: text
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: environment
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: environment
+      table: api_keys
+      data_type: text
+      default_value: live
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: expires_at
+    type: timestamp
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: expires_at
+      group: null
+      hidden: false
+      interface: datetime
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: expires_at
+      table: api_keys
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: key_hash
+    type: text
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: key_hash
+      group: null
+      hidden: true
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: key_hash
+      table: api_keys
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: true
+      is_indexed: true
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: key_prefix
+    type: text
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: key_prefix
+      group: null
+      hidden: true
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: key_prefix
+      table: api_keys
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: last_used_at
+    type: timestamp
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: last_used_at
+      group: null
+      hidden: true
+      interface: datetime
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: last_used_at
+      table: api_keys
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: monthly_quota
+    type: integer
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: monthly_quota
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: monthly_quota
+      table: api_keys
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: name
+    type: text
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: name
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: name
+      table: api_keys
+      data_type: text
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: permissions
+    type: json
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: permissions
+      group: null
+      hidden: false
+      interface: input-code
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: permissions
+      table: api_keys
+      data_type: jsonb
+      default_value:
+        ai: true
+        calc: true
+        flow: false
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: false
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: rate_limit_rps
+    type: integer
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: rate_limit_rps
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: rate_limit_rps
+      table: api_keys
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: api_keys
+    field: revoked_at
+    type: timestamp
+    meta:
+      collection: api_keys
+      conditions: null
+      display: null
+      display_options: null
+      field: revoked_at
+      group: null
+      hidden: true
+      interface: datetime
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: revoked_at
+      table: api_keys
+      data_type: timestamp with time zone
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
   - collection: bl_flow_executions
     field: id
     type: uuid
@@ -5184,46 +5787,6 @@ fields:
       foreign_key_table: null
       foreign_key_column: null
   - collection: calculator_calls
-    field: type
-    type: string
-    meta:
-      collection: calculator_calls
-      conditions: null
-      display: null
-      display_options: null
-      field: type
-      group: null
-      hidden: true
-      interface: input
-      note: null
-      options: null
-      readonly: false
-      required: false
-      searchable: true
-      sort: 10
-      special: null
-      translations: null
-      validation: null
-      validation_message: null
-      width: full
-    schema:
-      name: type
-      table: calculator_calls
-      data_type: character varying
-      default_value: calculator
-      max_length: 255
-      numeric_precision: null
-      numeric_scale: null
-      is_nullable: true
-      is_unique: false
-      is_indexed: false
-      is_primary_key: false
-      is_generated: false
-      generation_expression: null
-      has_auto_increment: false
-      foreign_key_table: null
-      foreign_key_column: null
-  - collection: calculator_calls
     field: account
     type: uuid
     meta:
@@ -6029,6 +6592,206 @@ fields:
       name: mcp
       table: calculator_configs
       data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_configs
+    field: allowed_ips
+    type: json
+    meta:
+      collection: calculator_configs
+      conditions: null
+      display: null
+      display_options: null
+      field: allowed_ips
+      group: null
+      hidden: false
+      interface: tags
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: allowed_ips
+      table: calculator_configs
+      data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_configs
+    field: allowed_origins
+    type: json
+    meta:
+      collection: calculator_configs
+      conditions: null
+      display: null
+      display_options: null
+      field: allowed_origins
+      group: null
+      hidden: false
+      interface: tags
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: allowed_origins
+      table: calculator_configs
+      data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_configs
+    field: expressions
+    type: json
+    meta:
+      collection: calculator_configs
+      conditions: null
+      display: null
+      display_options: null
+      field: expressions
+      group: null
+      hidden: false
+      interface: input-code
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: expressions
+      table: calculator_configs
+      data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_configs
+    field: profile
+    type: json
+    meta:
+      collection: calculator_configs
+      conditions: null
+      display: null
+      display_options: null
+      field: profile
+      group: null
+      hidden: false
+      interface: input-code
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: profile
+      table: calculator_configs
+      data_type: json
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: calculator_configs
+    field: unresolved_functions
+    type: json
+    meta:
+      collection: calculator_configs
+      conditions: null
+      display: null
+      display_options: null
+      field: unresolved_functions
+      group: null
+      hidden: false
+      interface: input-code
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: unresolved_functions
+      table: calculator_configs
+      data_type: jsonb
       default_value: null
       max_length: null
       numeric_precision: null
@@ -7154,7 +7917,7 @@ fields:
       foreign_key_column: null
   - collection: calculator_test_cases
     field: input
-    type: string
+    type: json
     meta:
       collection: calculator_test_cases
       conditions: null
@@ -7165,12 +7928,14 @@ fields:
       hidden: false
       interface: input-code
       note: null
-      options: null
+      options:
+        language: json
       readonly: false
       required: false
       searchable: true
       sort: 2
-      special: null
+      special:
+        - cast-json
       translations: null
       validation: null
       validation_message: null
@@ -7178,9 +7943,9 @@ fields:
     schema:
       name: input
       table: calculator_test_cases
-      data_type: character varying
+      data_type: json
       default_value: null
-      max_length: 255
+      max_length: null
       numeric_precision: null
       numeric_scale: null
       is_nullable: true
@@ -7355,7 +8120,7 @@ fields:
       foreign_key_column: null
   - collection: calculator_test_cases
     field: tolerance
-    type: integer
+    type: float
     meta:
       collection: calculator_test_cases
       conditions: null
@@ -7379,10 +8144,10 @@ fields:
     schema:
       name: tolerance
       table: calculator_test_cases
-      data_type: numeric
+      data_type: real
       default_value: null
       max_length: null
-      numeric_precision: null
+      numeric_precision: 24
       numeric_scale: null
       is_nullable: true
       is_unique: false
@@ -12487,6 +13252,86 @@ fields:
       width: full
     schema:
       name: yearly_price
+      table: subscription_plans
+      data_type: integer
+      default_value: null
+      max_length: null
+      numeric_precision: 32
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: subscription_plans
+    field: ai_allowed_models
+    type: json
+    meta:
+      collection: subscription_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: ai_allowed_models
+      group: null
+      hidden: false
+      interface: tags
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: ai_allowed_models
+      table: subscription_plans
+      data_type: jsonb
+      default_value: null
+      max_length: null
+      numeric_precision: null
+      numeric_scale: null
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
+  - collection: subscription_plans
+    field: ai_queries_per_month
+    type: integer
+    meta:
+      collection: subscription_plans
+      conditions: null
+      display: null
+      display_options: null
+      field: ai_queries_per_month
+      group: null
+      hidden: false
+      interface: input
+      note: null
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: null
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: ai_queries_per_month
       table: subscription_plans
       data_type: integer
       default_value: null
