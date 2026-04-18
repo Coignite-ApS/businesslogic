@@ -1159,11 +1159,24 @@ export async function registerRoutes(app) {
     const meta = await loadCalculatorConfigMeta(calcId);
     if (!meta) return reply.code(404).send({ error: 'Calculator config not found' });
 
-    // When enabling always-on, check ao_allowance
+    // When enabling always-on, check ao_allowance against THIS calc's slots_consumed
+    // (not just ao_remaining > 0 — a large 8-slot calc needs 8 AO slots free)
     if (is_always_on) {
-      const quota = await checkAlwaysOnQuota(pool, meta.accountId);
-      if (!quota.ok) {
-        return reply.code(quota.statusCode).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+      const slotRow = await pool.query(
+        `SELECT slots_consumed, is_always_on FROM public.calculator_slots
+         WHERE calculator_config_id = $1`,
+        [meta.configId],
+      );
+      if (!slotRow.rows.length) {
+        return reply.code(404).send({ error: 'Calculator slot not found — upload calculator first' });
+      }
+      // If already on, this is a no-op — don't double-count against quota
+      if (!slotRow.rows[0].is_always_on) {
+        const slotsConsumed = parseInt(slotRow.rows[0].slots_consumed, 10);
+        const quota = await checkAlwaysOnQuota(pool, meta.accountId, slotsConsumed);
+        if (!quota.ok) {
+          return reply.code(quota.statusCode).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+        }
       }
     }
 

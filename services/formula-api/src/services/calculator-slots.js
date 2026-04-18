@@ -190,12 +190,16 @@ export async function checkUploadQuota(pool, accountId, slotsConsumed) {
 }
 
 /**
- * Check whether an account can toggle is_always_on = true for a calculator.
- * Validates against ao_allowance. No-op when toggling to false.
+ * Check whether an account can toggle is_always_on = true for a specific calculator.
+ * Validates that the calculator's slots_consumed fits within remaining ao_allowance.
+ * No-op when toggling to false.
  *
- * Returns { ok: true } or { ok: false, statusCode: 402, reason: string }.
+ * @param {object} pool
+ * @param {string} accountId
+ * @param {number} slotsConsumed - slots_consumed for the specific calc being toggled
+ * @returns {Promise<{ok: true} | {ok: false, statusCode: 402, reason: string}>}
  */
-export async function checkAlwaysOnQuota(pool, accountId) {
+export async function checkAlwaysOnQuota(pool, accountId, slotsConsumed) {
   const result = await pool.query(
     `WITH consumed AS (
        SELECT account_id,
@@ -216,12 +220,12 @@ export async function checkAlwaysOnQuota(pool, accountId) {
     return { ok: false, statusCode: 402, reason: 'Subscription required for calculators' };
   }
 
-  const { ao_remaining } = result.rows[0];
-  if (parseInt(ao_remaining, 10) <= 0) {
+  const remaining = parseInt(result.rows[0].ao_remaining, 10);
+  if (remaining < slotsConsumed) {
     return {
       ok: false,
       statusCode: 402,
-      reason: `Always-on quota exceeded: ${ao_remaining} always-on slots remaining`,
+      reason: `Always-on quota exceeded: ${remaining} always-on slots remaining, need ${slotsConsumed}`,
     };
   }
 

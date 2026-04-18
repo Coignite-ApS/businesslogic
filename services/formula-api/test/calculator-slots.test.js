@@ -393,7 +393,7 @@ describe('calculator-slots integration', () => {
         configVersion: 1,
       });
 
-      const quota = await checkAlwaysOnQuota(pool, accountId);
+      const quota = await checkAlwaysOnQuota(pool, accountId, 1);
       assert.equal(quota.ok, true);
 
       const row = await setAlwaysOn(pool, configId, true);
@@ -447,10 +447,35 @@ describe('calculator-slots integration', () => {
         configVersion: 1,
       });
 
-      const quota = await checkAlwaysOnQuota(pool, accountId);
+      const quota = await checkAlwaysOnQuota(pool, accountId, 1);
       assert.equal(quota.ok, false);
       assert.equal(quota.statusCode, 402);
       assert.ok(quota.reason.toLowerCase().includes('always-on') || quota.reason.toLowerCase().includes('ao'));
+    } finally {
+      const c = await pool.connect();
+      await cleanup(c, accountId);
+      c.release();
+    }
+  });
+
+  // ── 9b. AO quota respects per-calc slots_consumed (granularity) ──────────
+
+  it('checkAlwaysOnQuota: 402 when large calc slots_consumed exceeds ao_remaining', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    await createTestFeatureQuotas(client, accountId, 50, 5); // ao_allowance = 5, nothing used yet
+    client.release();
+
+    try {
+      // Large calc consumes 8 slots — can't fit in 5 AO slots even though ao_remaining > 0
+      const quota = await checkAlwaysOnQuota(pool, accountId, 8);
+      assert.equal(quota.ok, false);
+      assert.equal(quota.statusCode, 402);
+      assert.ok(quota.reason.includes('5') && quota.reason.includes('8'), 'reason must surface 5 remaining and 8 needed');
+
+      // Small calc (1 slot) fits
+      const quotaSmall = await checkAlwaysOnQuota(pool, accountId, 1);
+      assert.equal(quotaSmall.ok, true);
     } finally {
       const c = await pool.connect();
       await cleanup(c, accountId);
