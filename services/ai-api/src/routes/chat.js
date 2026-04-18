@@ -14,6 +14,7 @@ import { getAllowedKbIds } from '../utils/kb-access.js';
 import { checkBudget, recordCost, getConversationBudgetWarning, injectBudgetWarning } from '../services/budget.js';
 import { compressIfNeeded } from '../services/summarize.js';
 import { resolveWidget } from '../widgets/resolver.js';
+import { debitWallet } from '../hooks/wallet-debit.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -69,7 +70,7 @@ export async function registerRoutes(app) {
     if (!req.isAdmin) {
       quota = await checkAiQuota(accountId);
       if (!quota.allowed) {
-        return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+        return reply.code(402).send({ error: quota.reason, code: 'WALLET_EMPTY' });
       }
     }
 
@@ -398,6 +399,28 @@ export async function registerRoutes(app) {
           await recordCost(accountId, conversationId, costUsd);
         }
 
+        // Debit AI Wallet (skip for admins; best-effort — failure logged but doesn't block response)
+        if (!req.isAdmin && accountId) {
+          try {
+            const debit = await debitWallet({
+              accountId,
+              costUsd,
+              model,
+              module: 'kb',
+              eventKind: 'ai.message',
+              apiKeyId: req.apiKeyId || null,
+              metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
+            });
+            if (!debit.ok) {
+              req.log.warn({ accountId, reason: debit.reason }, 'wallet debit failed post-chat');
+            } else if (debit.autoReloadTriggered) {
+              req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+            }
+          } catch (err) {
+            req.log.error(`Wallet debit failed: ${err.message}`);
+          }
+        }
+
         // Note: cannot setHeader after writeHead() — usage data is in the done event payload
         const donePayload = {
           usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
@@ -477,7 +500,7 @@ export async function registerRoutes(app) {
     if (!req.isAdmin) {
       quota = await checkAiQuota(accountId);
       if (!quota.allowed) {
-        return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+        return reply.code(402).send({ error: quota.reason, code: 'WALLET_EMPTY' });
       }
     }
 
@@ -763,6 +786,28 @@ export async function registerRoutes(app) {
       // Record cost to Redis budget counters
       if (!req.isAdmin) {
         await recordCost(accountId, conversationId, costUsd);
+      }
+
+      // Debit AI Wallet (skip for admins; best-effort)
+      if (!req.isAdmin && accountId) {
+        try {
+          const debit = await debitWallet({
+            accountId,
+            costUsd,
+            model,
+            module: 'kb',
+            eventKind: 'ai.message',
+            apiKeyId: req.apiKeyId || null,
+            metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
+          });
+          if (!debit.ok) {
+            req.log.warn({ accountId, reason: debit.reason }, 'wallet debit failed post-chat/sync');
+          } else if (debit.autoReloadTriggered) {
+            req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+          }
+        } catch (err) {
+          req.log.error(`Wallet debit failed: ${err.message}`);
+        }
       }
 
       reply.header('X-AI-Cost', String(costUsd));

@@ -1,6 +1,6 @@
 # 18. Pricing v2 — ai_wallet atomic debit hook in ai-api
 
-**Status:** planned
+**Status:** completed
 **Severity:** HIGH (without this, AI wallet balance is decorative — no enforcement)
 **Source:** db-admin report `docs/reports/db-admin-2026-04-18-pricing-v2-schema-064122.md`
 
@@ -42,11 +42,21 @@ WHERE account_id = $1 AND entry_type = 'debit' AND occurred_at >= date_trunc('mo
 
 ## Key Tasks
 
-- [ ] Implement debit hook in `services/ai-api/src/hooks/wallet-debit.js` (new file)
-- [ ] Wire into chat / KB ask / embedding endpoints
-- [ ] Add 402 Payment Required handling to API responses
-- [ ] Add tests: insufficient balance, hard cap, auto-reload trigger
-- [ ] Document in `services/ai-api/README.md`
+- [x] Implement debit hook in `services/ai-api/src/hooks/wallet-debit.js` (new file)
+- [x] Wire into chat / KB ask / embedding endpoints
+- [x] Add 402 Payment Required handling to API responses
+- [x] Add tests: insufficient balance, hard cap, auto-reload trigger
+- [x] Document in `services/ai-api/README.md`
+
+## Implementation notes (2026-04-18)
+
+- Hook: `services/ai-api/src/hooks/wallet-debit.js` — `debitWallet(opts)` — single PG transaction with FOR UPDATE
+- Wired into: `POST /v1/ai/chat` (SSE), `POST /v1/ai/chat/sync`, `POST /v1/ai/kb/ask` — best-effort post-AI (failure logged, does not block response)
+- Pre-flight `checkAiQuota()` gates all three endpoints at 402 before Anthropic tokens are spent
+- `answer.js` updated to return `inputTokens`/`outputTokens` from `response.usage` for accurate KB ask billing
+- Auto-reload: flag returned by `debitWallet()`, logged by route handler — Stripe charge NOT triggered from ai-api (Stripe is in CMS extension). Transitional; see arch doc §7.
+- Currency: `AI_USD_TO_EUR_RATE` env (default `0.92`) converts USD cost to EUR
+- Tests: 7 real-DB scenarios, 7/7 passing (concurrent test verified FOR UPDATE)
 
 ## Acceptance
 

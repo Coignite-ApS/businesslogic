@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
-import { getActiveAccount } from '../utils/auth.js';
+import { getActiveAccount, checkAiQuota } from '../utils/auth.js';
 import { hybridSearch } from '../services/search.js';
 import { assertKbAccess, getAllowedKbIds } from '../utils/kb-access.js';
 import { createEmbeddingClientForKb, getModelDimensions, LOCAL_EMBEDDING_MODEL } from '../services/embedding-factory.js';
@@ -12,6 +12,8 @@ import { generateAnswer } from '../services/answer.js';
 import { logRetrievalQuality } from '../services/retrieval-logger.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
 import { triggerFlowIngest, isFlowIngestEnabled } from '../services/flow-ingest.js';
+import { debitWallet } from '../hooks/wallet-debit.js';
+import { calculateCost } from '../utils/cost.js';
 
 /** Check AI permission on gateway-forwarded requests */
 function checkAiPermission(req, reply) {
@@ -511,6 +513,14 @@ export async function registerRoutes(app) {
       return reply.code(503).send({ errors: [{ message: 'AI service not configured' }] });
     }
 
+    // Wallet balance pre-flight: block before any AI work (skip for admins)
+    if (!req.isAdmin) {
+      const quota = await checkAiQuota(accountId);
+      if (!quota.allowed) {
+        return reply.code(402).send({ errors: [{ message: quota.reason, code: 'WALLET_EMPTY' }] });
+      }
+    }
+
     // Resolve embedding client — use KB's locked model if kb_id provided
     let embedClient;
     let expectedDimensions;
@@ -560,6 +570,29 @@ export async function registerRoutes(app) {
     const answerModel = model || config.defaultModel;
     const result = await generateAnswer(config.anthropicApiKey, question.trim(), chunks, answerModel, curatedContext);
     const totalLatencyMs = Date.now() - searchStart;
+
+    // Debit AI Wallet for KB ask (skip for admins; best-effort)
+    if (!req.isAdmin && accountId && (result.inputTokens > 0 || result.outputTokens > 0)) {
+      const kbAskCostUsd = calculateCost(answerModel, result.inputTokens, result.outputTokens);
+      try {
+        const debit = await debitWallet({
+          accountId,
+          costUsd: kbAskCostUsd,
+          model: answerModel,
+          module: 'kb',
+          eventKind: 'kb.ask',
+          apiKeyId: req.apiKeyId || null,
+          metadata: { kb_id: kb_id || null, total_latency_ms: totalLatencyMs },
+        });
+        if (!debit.ok) {
+          req.log.warn({ accountId, reason: debit.reason }, 'wallet debit failed post-kb-ask');
+        } else if (debit.autoReloadTriggered) {
+          req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+        }
+      } catch (err) {
+        req.log.error(`Wallet debit failed (kb ask): ${err.message}`);
+      }
+    }
 
     // Calculate context utilization
     const chunksInjected = chunks.length;

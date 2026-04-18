@@ -16,6 +16,8 @@ export async function generateAnswer(apiKey, question, chunks, model = 'claude-s
       answer: "I couldn't find any relevant information in the knowledge base to answer this question.",
       sourceRefs: [],
       confidence: 'not_found',
+      inputTokens: 0,
+      outputTokens: 0,
     };
   }
 
@@ -79,5 +81,11 @@ export async function generateAnswer(apiKey, question, chunks, model = 'claude-s
     confidence = 'not_found';
   }
 
-  return { answer, sourceRefs: Array.from(sourceRefs), confidence };
+  return {
+    answer,
+    sourceRefs: Array.from(sourceRefs),
+    confidence,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+  };
 }
