@@ -16,24 +16,32 @@
 			</div>
 
 			<template v-else-if="overview">
-				<!-- Revenue KPIs -->
+				<!-- Revenue KPIs (v2: subscription MRR + wallet revenue separated) -->
 				<div class="kpi-grid">
 					<kpi-card
-						label="Monthly Revenue"
-						:value="overview.revenue.mrr / 100"
+						label="Subscription MRR"
+						:value="subscriptionMrrEur"
 						icon="payments"
-						prefix="$"
-						:icon-variant="overview.revenue.mrr > 0 ? 'success' : undefined"
-						:subtitle="'from ' + overview.revenue.active_subscriptions + ' paying customer' + (overview.revenue.active_subscriptions !== 1 ? 's' : '')"
+						prefix="€"
+						:icon-variant="subscriptionMrrEur > 0 ? 'success' : undefined"
+						:subtitle="'from ' + overview.revenue.active_subscriptions + ' module sub' + (overview.revenue.active_subscriptions !== 1 ? 's' : '')"
 						to="/admin-dashboard/accounts"
 					/>
 					<kpi-card
-						label="Churn"
-						:value="overview.revenue.churned_30d"
-						icon="trending_down"
-						:icon-variant="overview.revenue.churned_30d > 0 ? 'danger' : 'success'"
-						:subtitle="overview.revenue.churned_30d + ' canceled last 30 days'"
-						to="/admin-dashboard/accounts"
+						label="AI Wallet Revenue"
+						:value="walletRevenueEur"
+						icon="account_balance_wallet"
+						prefix="€"
+						:icon-variant="walletRevenueEur > 0 ? 'success' : undefined"
+						subtitle="one-time top-ups this month"
+					/>
+					<kpi-card
+						label="Total Revenue (mo)"
+						:value="totalRevenueEur"
+						icon="trending_up"
+						prefix="€"
+						:icon-variant="totalRevenueEur > 0 ? 'success' : undefined"
+						subtitle="subscription + wallet"
 					/>
 					<kpi-card
 						label="Trial Conversion"
@@ -42,6 +50,14 @@
 						suffix="%"
 						:icon-variant="conversionRate > 50 ? 'success' : conversionRate > 20 ? 'warning' : 'danger'"
 						:subtitle="overview.revenue.trial_converted + ' of ' + overview.revenue.trial_total + ' trials became paid'"
+					/>
+					<kpi-card
+						label="Churn"
+						:value="overview.revenue.churned_30d"
+						icon="trending_down"
+						:icon-variant="overview.revenue.churned_30d > 0 ? 'danger' : 'success'"
+						:subtitle="overview.revenue.churned_30d + ' canceled last 30 days'"
+						to="/admin-dashboard/accounts"
 					/>
 					<kpi-card
 						label="Error Rate"
@@ -54,21 +70,39 @@
 					/>
 				</div>
 
-				<!-- Subscription cards -->
+				<!-- Subscription matrix: rows = modules, cols = tiers -->
+				<div v-if="hasMatrix" class="matrix-section">
+					<h3 class="section-title">Subscriptions by module × tier</h3>
+					<div class="matrix-table">
+						<div class="matrix-header">
+							<div class="matrix-cell matrix-row-label">Module</div>
+							<div class="matrix-cell" v-for="t in tierColumns" :key="t">{{ tierLabel(t) }}</div>
+							<div class="matrix-cell matrix-totals-col">Total</div>
+						</div>
+						<div v-for="mod in moduleRows" :key="mod" class="matrix-row">
+							<div class="matrix-cell matrix-row-label">{{ moduleLabel(mod) }}</div>
+							<div class="matrix-cell" v-for="t in tierColumns" :key="t">
+								<template v-if="cellAt(mod, t)">
+									<div class="cell-count">{{ cellAt(mod, t)!.count }}</div>
+									<div class="cell-mrr">€{{ formatNum(cellAt(mod, t)!.mrr_eur) }}</div>
+								</template>
+								<span v-else class="cell-empty">—</span>
+							</div>
+							<div class="matrix-cell matrix-totals-col">
+								<div class="cell-count">{{ moduleTotal(mod).count }}</div>
+								<div class="cell-mrr">€{{ formatNum(moduleTotal(mod).mrr_eur) }}</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Trial chip on its own row (legacy single-card kept) -->
 				<div class="plan-grid">
 					<kpi-card
 						label="Trial"
 						:value="trialCount"
 						icon="hourglass_empty"
 						subtitle="active trials"
-					/>
-					<kpi-card
-						v-for="p in overview.subscriptions.by_plan"
-						:key="p.plan"
-						:label="p.plan"
-						:value="p.count"
-						icon="credit_card"
-						subtitle="paying customers"
 					/>
 				</div>
 
@@ -137,6 +171,76 @@ const conversionRate = computed(() => {
 	if (!overview.value?.revenue.trial_total) return 0;
 	return Math.round((overview.value.revenue.trial_converted / overview.value.revenue.trial_total) * 100);
 });
+
+// v2 Phase 5: revenue is now in EUR units (not cents). Fall back to legacy
+// /100 only when v2 fields are absent (older API responses).
+const subscriptionMrrEur = computed(() => {
+	if (!overview.value) return 0;
+	const v2 = overview.value.revenue.subscription_mrr_eur;
+	if (typeof v2 === 'number') return Math.round(v2 * 100) / 100;
+	return Math.round(((overview.value.revenue.mrr || 0) / 100) * 100) / 100;
+});
+
+const walletRevenueEur = computed(() => {
+	if (!overview.value) return 0;
+	return Math.round(((overview.value.revenue.wallet_revenue_month_eur || 0)) * 100) / 100;
+});
+
+const totalRevenueEur = computed(() => {
+	if (!overview.value) return 0;
+	const v2 = overview.value.revenue.total_revenue_month_eur;
+	if (typeof v2 === 'number') return Math.round(v2 * 100) / 100;
+	return subscriptionMrrEur.value + walletRevenueEur.value;
+});
+
+// (module, tier) matrix rendering helpers.
+const TIER_ORDER = ['starter', 'growth', 'scale', 'enterprise'] as const;
+const MODULE_ORDER = ['calculators', 'kb', 'flows'] as const;
+
+const matrix = computed(() => overview.value?.subscriptions.matrix || {});
+const hasMatrix = computed(() => Object.keys(matrix.value).length > 0);
+
+const moduleRows = computed(() =>
+	MODULE_ORDER.filter((m) => matrix.value[m] && Object.keys(matrix.value[m]).length > 0),
+);
+
+const tierColumns = computed(() => {
+	const seen = new Set<string>();
+	for (const mod of Object.keys(matrix.value)) {
+		for (const tier of Object.keys(matrix.value[mod])) seen.add(tier);
+	}
+	return TIER_ORDER.filter((t) => seen.has(t));
+});
+
+function cellAt(mod: string, tier: string): { count: number; mrr_eur: number } | null {
+	return matrix.value[mod]?.[tier] || null;
+}
+
+function moduleTotal(mod: string): { count: number; mrr_eur: number } {
+	const cells = matrix.value[mod] || {};
+	let count = 0;
+	let mrr = 0;
+	for (const tier of Object.keys(cells)) {
+		count += cells[tier].count;
+		mrr += cells[tier].mrr_eur;
+	}
+	return { count, mrr_eur: Math.round(mrr * 100) / 100 };
+}
+
+function moduleLabel(m: string): string {
+	if (m === 'calculators') return 'Calculators';
+	if (m === 'kb') return 'Knowledge Base';
+	if (m === 'flows') return 'Flows';
+	return m;
+}
+
+function tierLabel(t: string): string {
+	return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function formatNum(n: number): string {
+	return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 
 const churnRateLabel = computed(() => {
 	if (!overview.value) return '';
@@ -281,6 +385,76 @@ onMounted(async () => {
 	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	gap: 12px;
 	margin-bottom: 24px;
+}
+
+.matrix-section {
+	margin-bottom: 32px;
+}
+
+.matrix-table {
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	overflow: hidden;
+	background: var(--theme--background);
+}
+
+.matrix-header,
+.matrix-row {
+	display: grid;
+	grid-template-columns: 180px repeat(auto-fit, minmax(120px, 1fr)) 130px;
+	align-items: stretch;
+}
+
+.matrix-header {
+	background: var(--theme--background-subdued);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.matrix-row {
+	border-top: 1px solid var(--theme--border-color);
+}
+
+.matrix-cell {
+	padding: 12px 14px;
+	border-right: 1px solid var(--theme--border-color);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+.matrix-cell:last-child { border-right: none; }
+
+.matrix-row-label {
+	font-weight: 600;
+	color: var(--theme--foreground);
+	background: var(--theme--background-subdued);
+	font-size: 13px;
+}
+
+.matrix-totals-col {
+	background: var(--theme--background-subdued);
+	font-weight: 600;
+}
+
+.cell-count {
+	font-size: 18px;
+	font-weight: 700;
+	color: var(--theme--foreground);
+	line-height: 1;
+}
+
+.cell-mrr {
+	font-size: 11px;
+	color: var(--theme--foreground-subdued);
+	margin-top: 4px;
+}
+
+.cell-empty {
+	color: var(--theme--foreground-subdued);
+	font-size: 14px;
 }
 
 .dot-primary { background: var(--theme--primary); }

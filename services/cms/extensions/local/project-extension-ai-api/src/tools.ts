@@ -1,4 +1,5 @@
 import { createDecipheriv, randomUUID } from 'node:crypto';
+import { getActiveSubscription } from '../../_shared/v2-subscription.js';
 import type { ToolDefinition, DB } from './types.js';
 
 export const AI_TOOLS: ToolDefinition[] = [
@@ -509,24 +510,21 @@ async function createCalculator(db: DB, accountId: string, input: { id: string; 
 	const existing = await db('calculators').where('id', input.id).first('id');
 	if (existing) return { result: `Calculator "${input.id}" already exists.`, isError: true };
 
-	// Check subscription calculator limit
+	// v2: gate on the calculators-module slot allowance.
+	//   sp.calculator_limit → sp.slot_allowance (1 calc = 1 slot until task 19
+	//   ships size classification populating calculator_slots.slots_consumed).
 	const account = await db('account').where('id', accountId).select('exempt_from_subscription').first();
 	if (!account?.exempt_from_subscription) {
-		const sub = await db('subscriptions as s')
-			.join('subscription_plans as sp', 'sp.id', 's.plan')
-			.where('s.account', accountId)
-			.whereNotIn('s.status', ['canceled', 'expired'])
-			.select('sp.calculator_limit')
-			.first();
+		const sub = await getActiveSubscription(db, accountId, 'calculators');
 
-		if (sub?.calculator_limit !== null && sub?.calculator_limit !== undefined) {
+		if (sub?.slot_allowance !== null && sub?.slot_allowance !== undefined) {
 			const { count } = await db('calculators')
 				.where('account', accountId)
 				.count('* as count')
 				.first() as any;
 			const total = parseInt(count, 10) || 0;
-			if (total >= sub.calculator_limit) {
-				return { result: `Calculator limit reached (${sub.calculator_limit}). Upgrade your plan to create more.`, isError: true };
+			if (total >= sub.slot_allowance) {
+				return { result: `Calculator slot limit reached (${sub.slot_allowance}). Upgrade your Calculators plan to create more.`, isError: true };
 			}
 		}
 	}
@@ -760,17 +758,13 @@ async function deployCalculator(
 			test_expires_at: expiresAt.toISOString(),
 		});
 	} else {
-		// Live: check subscription limits
+		// Live: check calculators-module slot allowance.
+		//   sp.calculator_limit → sp.slot_allowance (1 active calc = 1 slot until task 19).
 		const account = await db('account').where('id', accountId).select('exempt_from_subscription').first();
 		if (!account?.exempt_from_subscription) {
-			const sub = await db('subscriptions as s')
-				.join('subscription_plans as sp', 'sp.id', 's.plan')
-				.where('s.account', accountId)
-				.whereNotIn('s.status', ['canceled', 'expired'])
-				.select('sp.calculator_limit')
-				.first();
+			const sub = await getActiveSubscription(db, accountId, 'calculators');
 
-			if (sub?.calculator_limit !== null && sub?.calculator_limit !== undefined) {
+			if (sub?.slot_allowance !== null && sub?.slot_allowance !== undefined) {
 				const { count } = await db('calculators')
 					.where('account', accountId)
 					.where('activated', true)
@@ -779,7 +773,7 @@ async function deployCalculator(
 					.first() as any;
 				const activeCount = parseInt(count, 10) || 0;
 
-				if (activeCount >= sub.calculator_limit) {
+				if (activeCount >= sub.slot_allowance) {
 					// Check if another over-limit calc exists
 					const existingOverLimit = await db('calculators')
 						.where('account', accountId)
@@ -1156,27 +1150,13 @@ function selectKbIcon(name: string, description?: string): string {
 async function createKnowledgeBase(db: DB, accountId: string, input: { name: string; description?: string }) {
 	if (!input.name?.trim()) return { result: 'Name is required.', isError: true };
 
-	// Check KB limit
-	const account = await db('account').where('id', accountId).select('exempt_from_subscription').first();
-	if (!account?.exempt_from_subscription) {
-		const sub = await db('subscriptions as s')
-			.join('subscription_plans as sp', 'sp.id', 's.plan')
-			.where('s.account', accountId)
-			.whereNotIn('s.status', ['canceled', 'expired'])
-			.select('sp.kb_limit')
-			.first();
-
-		if (sub?.kb_limit !== null && sub?.kb_limit !== undefined) {
-			const { count } = await db('knowledge_bases')
-				.where('account', accountId)
-				.count('* as count')
-				.first() as any;
-			const total = parseInt(count, 10) || 0;
-			if (total >= sub.kb_limit) {
-				return { result: `Knowledge base limit reached (${sub.kb_limit}). Upgrade your plan to create more.`, isError: true };
-			}
-		}
-	}
+	// v2: Knowledge Base count is no longer capped by the plan; only storage_mb
+	// and embed_tokens_m are enforced (see knowledge-api/src/metering.ts).
+	// The legacy `kb_limit` column does not exist in v2 — gate dropped.
+	// Storage gating still happens on each upload via checkKbStorage().
+	// Module activeness is asserted by knowledge-api routes; this AI tool
+	// path skips the active-sub check (the user can already create rows via the
+	// KB module UI, so adding a gate here would be inconsistent).
 
 	const icon = selectKbIcon(input.name, input.description);
 	const id = randomUUID();

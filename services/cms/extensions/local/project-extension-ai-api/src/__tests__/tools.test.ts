@@ -142,12 +142,12 @@ describe('create_calculator', () => {
 		setupDb(deps, [
 			{ table: 'calculators', result: null }, // uniqueness check — not found
 			{ table: 'account', result: { exempt_from_subscription: false } }, // account check
-			{ table: 'subscriptions', result: { calculator_limit: 2 } }, // sub limit
+			{ table: 'subscriptions', result: { slot_allowance: 2, tier: 'starter', status: 'active' } }, // v2: getActiveSubscription helper returns slot_allowance from joined subscription_plans
 			{ table: 'calculators', result: { count: '2' } }, // count
 		]);
 		const res = await executeTool('create_calculator', { id: 'my-calc', name: 'Test' }, deps);
 		expect(res.isError).toBe(true);
-		expect(res.result).toContain('limit reached');
+		expect(res.result).toContain('slot limit reached');
 	});
 
 	it('creates calculator and both configs on success', async () => {

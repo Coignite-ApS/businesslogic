@@ -1,6 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 
+// Skip secret validation BEFORE any imports that may trigger it
+process.env.SKIP_SECRET_VALIDATION = 'true';
+
 const PORT = process.env.PORT || 3200;
 const BASE = `http://localhost:${PORT}`;
 

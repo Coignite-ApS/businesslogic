@@ -5,6 +5,7 @@ import { handleFormulaApiError, buildPayload, buildRecipe, configIsComplete, toS
 import { registerAdminRoutes } from './admin-routes.js';
 import { encrypt, decrypt, isEncrypted } from './crypto.js';
 import { compareOutputs } from './test-runner.js';
+import { getActiveSubscription, rpsForTier } from '../../_shared/v2-subscription.js';
 import type { CalculatorConfig, DB } from './types.js';
 
 /** Strip internal fields from describe response (mapping, available_data) */
@@ -98,15 +99,15 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 					return res.status(404).json({ errors: [{ message: 'Account not found' }] });
 				}
 
-				// Fetch subscription plan limits
-				const sub = await db('subscriptions as s')
-					.join('subscription_plans as sp', 's.plan', 'sp.id')
-					.where('s.account', accountId)
-					.where('s.status', 'active')
-					.first('sp.calls_per_second', 'sp.calls_per_month');
+				// v2: fetch the calculators-module subscription joined with plan allowances.
+				// Field renames vs v1:
+				//   calls_per_month   → request_allowance
+				//   calls_per_second  → derived from tier (transitional; see rpsForTier)
+				const sub = await getActiveSubscription(db, accountId, 'calculators');
+				const isActive = sub?.status === 'active' || sub?.status === 'trialing';
 
-				const rateLimitRps = sub?.calls_per_second ?? null;
-				const rateLimitMonthly = sub?.calls_per_month ?? null;
+				const rateLimitRps = isActive ? rpsForTier(sub!.tier) : null;
+				const rateLimitMonthly = isActive ? (sub!.request_allowance ?? null) : null;
 
 				// Count calculator_calls this month for this account
 				const now = new Date();
@@ -1282,14 +1283,11 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				const acct = await db('account').where('id', accountId).select('exempt_from_subscription').first();
 				if (acct?.exempt_from_subscription) continue;
 
-				const sub = await db('subscriptions as s')
-					.join('subscription_plans as sp', 'sp.id', 's.plan')
-					.where('s.account', accountId)
-					.whereNotIn('s.status', ['canceled', 'expired'])
-					.select('sp.calculator_limit')
-					.first();
+				// v2: calculator_limit → slot_allowance (calculators module). 1 calc = 1 slot
+				// until task 19 ships size classification.
+				const sub = await getActiveSubscription(db, accountId, 'calculators');
 
-				const limit = sub?.calculator_limit;
+				const limit = sub?.slot_allowance;
 				if (!limit) continue;
 
 				const activeCount = parseInt(row.cnt as string, 10) || 0;

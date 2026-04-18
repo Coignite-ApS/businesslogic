@@ -44,7 +44,7 @@ function createMockDb(opts: {
 }) {
 	const chain: any = {};
 
-	const methods = ['where', 'join', 'select', 'first', 'count', 'andWhere'];
+	const methods = ['where', 'join', 'select', 'first', 'count', 'andWhere', 'whereNotIn', 'whereIn'];
 	for (const m of methods) {
 		chain[m] = vi.fn().mockReturnValue(chain);
 	}
@@ -68,10 +68,12 @@ function createMockDb(opts: {
 			return Promise.resolve(undefined);
 		});
 
-		// Make join/where/select/count/andWhere all chainable
+		// Make all chainable methods (incl. v2 helper's whereNotIn / whereIn)
 		queryChain.join = vi.fn().mockReturnValue(queryChain);
 		queryChain.where = vi.fn().mockReturnValue(queryChain);
 		queryChain.andWhere = vi.fn().mockReturnValue(queryChain);
+		queryChain.whereNotIn = vi.fn().mockReturnValue(queryChain);
+		queryChain.whereIn = vi.fn().mockReturnValue(queryChain);
 		queryChain.select = vi.fn().mockReturnValue(queryChain);
 		queryChain.count = vi.fn().mockReturnValue(queryChain);
 
@@ -151,7 +153,7 @@ describe('GET /accounts/:accountId', () => {
 	it('returns rate limits and usage for valid account', async () => {
 		const handler = await setupAccountsHandler({
 			account: { id: 'acc-1' },
-			subscription: { calls_per_second: 10, calls_per_month: 50000 },
+			subscription: { tier: 'growth', request_allowance: 50000, status: 'active' },
 			callCount: 1234,
 		});
 		const req = { params: { accountId: 'acc-1' }, accountability: { user: 'u1' } };
@@ -159,7 +161,7 @@ describe('GET /accounts/:accountId', () => {
 		await handler(req, res);
 
 		expect(res.json).toHaveBeenCalledWith({
-			rateLimitRps: 10,
+			rateLimitRps: 50, // v2: derived from tier (Growth=50)
 			rateLimitMonthly: 50000,
 			monthlyUsed: 1234,
 		});
@@ -185,7 +187,7 @@ describe('GET /accounts/:accountId', () => {
 	it('allows role-based auth (no user, but has role)', async () => {
 		const handler = await setupAccountsHandler({
 			account: { id: 'acc-1' },
-			subscription: { calls_per_second: 5, calls_per_month: 10000 },
+			subscription: { tier: 'starter', request_allowance: 10000, status: 'active' },
 			callCount: 42,
 		});
 		const req = { params: { accountId: 'acc-1' }, accountability: { role: 'formula-api-role' } };
@@ -193,7 +195,7 @@ describe('GET /accounts/:accountId', () => {
 		await handler(req, res);
 
 		expect(res.json).toHaveBeenCalledWith({
-			rateLimitRps: 5,
+			rateLimitRps: 10, // v2: derived from tier (Starter=10)
 			rateLimitMonthly: 10000,
 			monthlyUsed: 42,
 		});

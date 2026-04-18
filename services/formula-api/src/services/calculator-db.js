@@ -97,16 +97,39 @@ export async function loadMcpConfigFromDb(id) {
  * Load account rate limits from direct DB.
  * Returns same shape as Admin API GET /accounts/:accountId:
  *   { rateLimitRps, rateLimitMonthly, monthlyUsed }
+ *
+ * v2 NOTE: pricing_v2 schema renamed columns and scopes subscriptions per
+ * (account, module). For Formula API rate limiting we read the calculators-
+ * module subscription only.
+ *   v1 sp.calls_per_month   → v2 sp.request_allowance
+ *   v1 sp.calls_per_second  → derived from sp.tier (transitional; v2 spec
+ *                             hasn't decided whether RPS is per-tier or
+ *                             per-API-key; defaults below match the CMS-side
+ *                             rpsForTier() helper in _shared/v2-subscription.ts).
+ *   v1 s.account            → v2 s.account_id
+ *   v1 s.plan               → v2 s.subscription_plan_id
  */
+function rpsForTier(tier) {
+  // Keep in sync with services/cms/extensions/local/_shared/v2-subscription.ts.
+  switch (tier) {
+    case 'starter': return 10;
+    case 'growth': return 50;
+    case 'scale': return 200;
+    case 'enterprise': return null;
+    default: return null;
+  }
+}
+
 export async function loadAccountLimitsFromDb(accountId) {
-  // Fetch subscription plan limits
+  // Fetch the calculators-module subscription joined with its plan allowances.
   const sub = await queryOne(
-    `SELECT sp.calls_per_second AS "rateLimitRps",
-            sp.calls_per_month  AS "rateLimitMonthly"
+    `SELECT sp.request_allowance AS "rateLimitMonthly",
+            sp.tier              AS tier
      FROM subscriptions s
-     JOIN subscription_plans sp ON sp.id = s.plan
-     WHERE s.account = $1
-       AND s.status = 'active'
+     JOIN subscription_plans sp ON sp.id = s.subscription_plan_id
+     WHERE s.account_id = $1
+       AND s.module = 'calculators'
+       AND s.status NOT IN ('canceled', 'expired')
      ORDER BY s.date_created DESC
      LIMIT 1`,
     [accountId],
@@ -125,7 +148,7 @@ export async function loadAccountLimitsFromDb(accountId) {
   );
 
   return {
-    rateLimitRps: sub?.rateLimitRps ?? null,
+    rateLimitRps: sub ? rpsForTier(sub.tier) : null,
     rateLimitMonthly: sub?.rateLimitMonthly ?? null,
     monthlyUsed: parseInt(usageRow?.count ?? '0', 10),
   };

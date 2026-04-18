@@ -1,6 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 
+// Skip secret validation BEFORE any imports that may trigger it
+process.env.SKIP_SECRET_VALIDATION = 'true';
+
 const PORT = 3210;
 const BASE = `http://localhost:${PORT}`;
 const ADMIN_TOKEN = 'test-admin-token-public';
@@ -154,10 +157,10 @@ describe('Tool filtering by permissions', () => {
     assert.ok(names.includes('search_knowledge')); // KB still present
   });
 
-  it('admin gets all 14 tools', async () => {
+  it('admin gets all tools', async () => {
     const { AI_TOOLS, filterToolsByPermissions } = await import('../src/services/tools.js');
     const filtered = filterToolsByPermissions(AI_TOOLS, {}, false);
     assert.strictEqual(filtered.length, AI_TOOLS.length);
-    assert.strictEqual(filtered.length, 14);
+    assert.strictEqual(filtered.length, 15);
   });
 });

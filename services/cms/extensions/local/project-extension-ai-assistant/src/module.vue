@@ -98,38 +98,32 @@
 			</div>
 		</div>
 
-		<!-- Upgrade dialog -->
+		<!-- AI Wallet top-up dialog -->
 		<v-dialog v-model="showUpgradeDialog" @esc="showUpgradeDialog = false">
-			<v-card>
-				<v-card-title>Upgrade Your Plan</v-card-title>
+			<v-card class="wallet-dialog">
+				<v-card-title>AI Wallet</v-card-title>
 				<v-card-text>
-					<p style="margin-bottom: 16px;">Upgrade to get more AI queries per month.</p>
-					<div v-if="upgradePlans.length" class="upgrade-plans">
-						<div
-							v-for="plan in upgradePlans"
-							:key="plan.id"
-							class="upgrade-plan-card"
-							:class="{ current: plan.id === currentPlanId }"
-						>
-							<div class="plan-name">{{ plan.name }}</div>
-							<div class="plan-price">${{ (plan.monthly_price / 100).toFixed(0) }}<span>/mo</span></div>
-							<div class="plan-queries">
-								{{ plan.ai_queries_per_month === null ? 'Unlimited' : plan.ai_queries_per_month }} AI queries/mo
-							</div>
-							<v-button
-								v-if="plan.id !== currentPlanId"
-								small
-								full-width
-								@click="handleCheckout(plan.id)"
-								:loading="checkoutLoading"
-							>
-								{{ plan.sort > (currentPlanSort || 0) ? 'Upgrade' : 'Switch' }}
-							</v-button>
-							<v-button v-else small full-width disabled>Current Plan</v-button>
-						</div>
-					</div>
-					<div v-else-if="plansLoading" style="text-align: center; padding: 20px;">
+					<div v-if="walletLoading" style="text-align: center; padding: 20px;">
 						<v-progress-circular indeterminate />
+					</div>
+					<div v-else>
+						<div class="wallet-current">
+							<span class="wallet-label">Current balance</span>
+							<span class="wallet-balance" :class="{ low: isWalletLow }">{{ formatWalletEur(walletBalance) }}</span>
+						</div>
+						<v-notice v-if="isWalletLow" type="warning" style="margin-bottom: 12px;">
+							Your balance is low. AI calls will be blocked once it reaches €0.
+						</v-notice>
+						<p class="wallet-hint">AI usage is billed from your wallet at cost. Top up to keep going.</p>
+						<div class="topup-grid">
+							<v-button
+								v-for="amt in standardTopups"
+								:key="amt"
+								:loading="checkoutLoading === amt"
+								:disabled="checkoutLoading !== null && checkoutLoading !== amt"
+								@click="handleTopup(amt)"
+							>€{{ amt }}</v-button>
+						</div>
 					</div>
 				</v-card-text>
 				<v-card-actions>
@@ -142,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useFeatureGate } from '../../project-extension-feature-gate/src/use-feature-gate';
 import { useApi } from '@directus/extensions-sdk';
 import { useRoute, useRouter } from 'vue-router';
@@ -194,13 +188,12 @@ const messagesContainer = ref<HTMLElement | null>(null);
 const inputEl = ref<HTMLTextAreaElement | null>(null);
 const pendingPromptId = ref<string | null>(null);
 
-// Upgrade dialog state
+// Upgrade dialog state — v2: AI Wallet top-up (no per-month query plans).
 const showUpgradeDialog = ref(false);
-const upgradePlans = ref<any[]>([]);
-const currentPlanId = ref<string | null>(null);
-const currentPlanSort = ref<number | null>(null);
-const plansLoading = ref(false);
-const checkoutLoading = ref(false);
+const walletBalance = ref<number | string>(0);
+const walletLoading = ref(false);
+const checkoutLoading = ref<number | null>(null);
+const standardTopups = [20, 50, 200] as const;
 
 // Init
 onMounted(async () => {
@@ -315,56 +308,43 @@ async function handleSendFromWidget(text: string) {
 	await handleSend();
 }
 
-// Upgrade dialog
+// Wallet dialog — v2: top-up AI Wallet directly (no per-month query plans).
+const isWalletLow = computed(() => Number(walletBalance.value) < 1);
+
 watch(showUpgradeDialog, async (open) => {
-	if (open && upgradePlans.value.length === 0) {
-		await fetchUpgradeData();
+	if (open) {
+		await fetchWalletBalance();
 	}
 });
 
-async function fetchUpgradeData() {
-	plansLoading.value = true;
+async function fetchWalletBalance() {
+	walletLoading.value = true;
 	try {
-		const [plansRes, subRes] = await Promise.all([
-			api.get('/items/subscription_plans', {
-				params: {
-					filter: { status: { _eq: 'published' } },
-					sort: ['sort'],
-					fields: ['id', 'name', 'monthly_price', 'yearly_price', 'ai_queries_per_month', 'sort'],
-				},
-			}),
-			api.get('/items/subscriptions', {
-				params: {
-					filter: { account: { _eq: activeAccountId.value } },
-					fields: ['plan.id', 'plan.sort'],
-					limit: 1,
-				},
-			}),
-		]);
-		upgradePlans.value = plansRes.data.data || [];
-		const sub = subRes.data.data?.[0];
-		if (sub?.plan) {
-			currentPlanId.value = sub.plan.id || sub.plan;
-			currentPlanSort.value = sub.plan.sort ?? null;
-		}
+		const { data } = await api.get('/wallet/balance');
+		walletBalance.value = data.balance_eur ?? 0;
 	} catch {
-		upgradePlans.value = [];
+		walletBalance.value = 0;
 	} finally {
-		plansLoading.value = false;
+		walletLoading.value = false;
 	}
 }
 
-async function handleCheckout(planId: string) {
-	checkoutLoading.value = true;
+function formatWalletEur(n: number | string | null | undefined): string {
+	const v = Number(n || 0);
+	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(v);
+}
+
+async function handleTopup(amount: 20 | 50 | 200) {
+	checkoutLoading.value = amount;
 	try {
-		const { data } = await api.post('/stripe/checkout', { plan_id: planId });
-		if (data.url) {
-			window.location.href = data.url;
+		const { data } = await api.post('/stripe/wallet-topup', { amount_eur: amount });
+		if (data.checkout_url) {
+			window.location.href = data.checkout_url;
 		}
 	} catch {
-		// Checkout failed
+		// Top-up failed
 	} finally {
-		checkoutLoading.value = false;
+		checkoutLoading.value = null;
 	}
 }
 
@@ -498,47 +478,45 @@ function resetTextareaHeight() {
 	gap: 10px;
 }
 
-.upgrade-plans {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-	gap: 12px;
+.wallet-dialog {
+	min-width: 380px;
+	max-width: 480px;
 }
 
-.upgrade-plan-card {
-	padding: 16px;
-	border: 2px solid var(--theme--border-color);
-	border-radius: 8px;
-	text-align: center;
+.wallet-current {
 	display: flex;
-	flex-direction: column;
-	gap: 8px;
+	align-items: baseline;
+	justify-content: space-between;
+	margin-bottom: 12px;
 }
 
-.upgrade-plan-card.current {
-	border-color: var(--theme--primary);
+.wallet-label {
+	font-size: 13px;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
 }
 
-.plan-name {
-	font-weight: 600;
-	font-size: 16px;
-}
-
-.plan-price {
+.wallet-balance {
 	font-size: 28px;
 	font-weight: 700;
 	color: var(--theme--foreground);
 }
 
-.plan-price span {
-	font-size: 14px;
-	font-weight: 400;
-	color: var(--theme--foreground-subdued);
+.wallet-balance.low {
+	color: var(--theme--warning, #d8a04e);
 }
 
-.plan-queries {
+.wallet-hint {
 	font-size: 13px;
 	color: var(--theme--foreground-subdued);
-	margin-bottom: 8px;
+	margin-bottom: 14px;
+}
+
+.topup-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
 }
 .feature-gate-loading {
 	display: flex;

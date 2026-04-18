@@ -324,28 +324,61 @@ async function fetchUpgradeData() {
 	if (plansLoaded.value) return;
 	upgradeError.value = null;
 	try {
+		// v2: only show Calculators module plans (not KB / Flows). The picker
+		// is calculator-scoped because this card is on a calculator config page.
 		const [plansRes, userRes] = await Promise.all([
 			api.get('/items/subscription_plans', {
 				params: {
-					filter: { status: { _eq: 'published' } },
+					filter: {
+						status: { _eq: 'published' },
+						module: { _eq: 'calculators' },
+					},
 					sort: ['sort'],
-					fields: ['id', 'name', 'calculator_limit', 'calls_per_month', 'calls_per_second', 'monthly_price', 'yearly_price', 'sort'],
+					fields: [
+						'id', 'module', 'tier', 'name',
+						'slot_allowance', 'ao_allowance', 'request_allowance',
+						'price_eur_monthly', 'price_eur_annual', 'sort',
+					],
 				},
 			}),
 			api.get('/users/me', { params: { fields: ['active_account'] } }),
 		]);
-		plans.value = plansRes.data.data || [];
+		// Map v2 plan rows → PlanCards' PlanInfo shape until shared-ui catches up.
+		plans.value = (plansRes.data.data || []).map((p: any) => ({
+			id: p.id,
+			name: p.name,
+			// Slots ≈ calculator_limit (1 calc = 1 slot until task 19 splits the meaning)
+			calculator_limit: p.slot_allowance ?? null,
+			calls_per_month: p.request_allowance ?? null,
+			calls_per_second: null, // v2 dropped this column; PlanCards hides when null
+			// price_eur_* is in EUR (units), legacy was cents — multiply by 100.
+			monthly_price: p.price_eur_monthly != null ? Math.round(Number(p.price_eur_monthly) * 100) : null,
+			yearly_price: p.price_eur_annual != null ? Math.round(Number(p.price_eur_annual) * 100) : null,
+			sort: p.sort ?? 0,
+			// v2 extras for richer rendering once PlanCards supports them.
+			ao_allowance: p.ao_allowance ?? null,
+			tier: p.tier,
+		}));
 
 		const accountId = userRes.data.data?.active_account;
 		if (accountId) {
 			const subRes = await api.get('/items/subscriptions', {
 				params: {
-					filter: { account: { _eq: accountId } },
-					fields: ['plan.id', 'plan.sort'],
+					filter: {
+						account_id: { _eq: accountId },
+						module: { _eq: 'calculators' },
+						status: { _nin: ['canceled', 'expired'] },
+					},
+					fields: ['subscription_plan_id.id', 'subscription_plan_id.sort'],
 					limit: 1,
 				},
 			});
-			subscription.value = subRes.data.data?.[0] || null;
+			const sub = subRes.data.data?.[0];
+			if (sub?.subscription_plan_id && typeof sub.subscription_plan_id === 'object') {
+				subscription.value = { plan: { id: sub.subscription_plan_id.id, sort: sub.subscription_plan_id.sort ?? 0 } };
+			} else {
+				subscription.value = null;
+			}
 		}
 		plansLoaded.value = true;
 	} catch (err: any) {
@@ -364,7 +397,18 @@ async function handleCheckout(planId: string) {
 	checkingOut.value = planId;
 	upgradeError.value = null;
 	try {
-		const { data } = await api.post('/stripe/checkout', { plan_id: planId });
+		// Lookup the v2 module/tier from our locally cached plans list. This
+		// keeps the PlanCards component contract (planId only) intact while
+		// translating to the v2 checkout payload.
+		const plan = plans.value.find((p: any) => p.id === planId);
+		if (!plan) {
+			throw new Error('Plan not found');
+		}
+		const { data } = await api.post('/stripe/checkout', {
+			module: 'calculators',
+			tier: (plan as any).tier,
+			billing_cycle: 'monthly', // PlanCards toggles yearly/monthly visually but currently always sends monthly
+		});
 		if (data.url) {
 			window.location.href = data.url;
 		}
