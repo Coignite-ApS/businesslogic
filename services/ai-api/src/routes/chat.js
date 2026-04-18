@@ -412,12 +412,24 @@ export async function registerRoutes(app) {
               metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
             });
             if (!debit.ok) {
-              req.log.warn({ accountId, reason: debit.reason }, 'wallet debit failed post-chat');
-            } else if (debit.autoReloadTriggered) {
-              req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+              // User already got the answer, Anthropic already charged us — wallet
+              // was not debited. This is a silent accounting loss; log at error with
+              // full context so ops can reconstruct/backfill.
+              req.log.error(
+                { accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, reason: debit.reason },
+                'wallet debit failed post-chat — manual reconciliation required',
+              );
+            } else {
+              req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model }, 'wallet debit ok');
+              if (debit.autoReloadTriggered) {
+                req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+              }
             }
           } catch (err) {
-            req.log.error(`Wallet debit failed: ${err.message}`);
+            req.log.error(
+              { err, accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+              'wallet debit threw post-chat — manual reconciliation required',
+            );
           }
         }
 
@@ -801,12 +813,21 @@ export async function registerRoutes(app) {
             metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
           });
           if (!debit.ok) {
-            req.log.warn({ accountId, reason: debit.reason }, 'wallet debit failed post-chat/sync');
-          } else if (debit.autoReloadTriggered) {
-            req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+            req.log.error(
+              { accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, reason: debit.reason },
+              'wallet debit failed post-chat/sync — manual reconciliation required',
+            );
+          } else {
+            req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model }, 'wallet debit ok');
+            if (debit.autoReloadTriggered) {
+              req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+            }
           }
         } catch (err) {
-          req.log.error(`Wallet debit failed: ${err.message}`);
+          req.log.error(
+            { err, accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+            'wallet debit threw post-chat/sync — manual reconciliation required',
+          );
         }
       }
 

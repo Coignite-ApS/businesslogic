@@ -585,12 +585,21 @@ export async function registerRoutes(app) {
           metadata: { kb_id: kb_id || null, total_latency_ms: totalLatencyMs },
         });
         if (!debit.ok) {
-          req.log.warn({ accountId, reason: debit.reason }, 'wallet debit failed post-kb-ask');
-        } else if (debit.autoReloadTriggered) {
-          req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+          req.log.error(
+            { accountId, costUsd: kbAskCostUsd, model: answerModel, inputTokens: result.inputTokens, outputTokens: result.outputTokens, reason: debit.reason },
+            'wallet debit failed post-kb-ask — manual reconciliation required',
+          );
+        } else {
+          req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model: answerModel }, 'wallet debit ok');
+          if (debit.autoReloadTriggered) {
+            req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+          }
         }
       } catch (err) {
-        req.log.error(`Wallet debit failed (kb ask): ${err.message}`);
+        req.log.error(
+          { err, accountId, costUsd: kbAskCostUsd, model: answerModel, inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+          'wallet debit threw post-kb-ask — manual reconciliation required',
+        );
       }
     }
 

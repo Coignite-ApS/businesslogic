@@ -200,7 +200,7 @@ describe('wallet-debit hook', () => {
       // New cost = €0.02 → total = €0.06 > €0.05 cap → should reject
       const result = await debitWallet({
         accountId,
-        costUsd: 0.021,         // ~€0.02 at 0.95 rate
+        costUsd: 0.021,         // ~€0.0193 at 0.92 rate
         model: 'claude-sonnet-4-6',
         module: 'kb',
         eventKind: 'ai.message',
@@ -288,7 +288,7 @@ describe('wallet-debit hook', () => {
     client.release(); // done with setup client
 
     // Launch two concurrent debits, each costing ~€0.05
-    const costUsd = 0.053; // ~€0.05035 at 0.95 rate — just under €0.06 individually
+    const costUsd = 0.053; // ~€0.04876 at 0.92 rate — just under €0.06 individually
 
     const [r1, r2] = await Promise.all([
       debitWallet({
@@ -353,7 +353,7 @@ describe('wallet-debit hook', () => {
       // Debit €1.50 → balance drops to €0.50, below €5 threshold
       const result = await debitWallet({
         accountId,
-        costUsd: 1.578,         // ~€1.499 at 0.95 → balance becomes ~€0.50
+        costUsd: 1.578,         // ~€1.4518 at 0.92 → balance becomes ~€0.55
         model: 'claude-sonnet-4-6',
         module: 'kb',
         eventKind: 'ai.message',

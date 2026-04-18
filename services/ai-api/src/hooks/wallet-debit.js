@@ -22,7 +22,7 @@ const USD_TO_EUR = parseFloat(process.env.AI_USD_TO_EUR_RATE || '0.92');
  * Convert a USD cost to EUR using the configured exchange rate.
  * Returns a value rounded to 6 decimal places (matching numeric(12,6) column).
  */
-export function usdToEur(costUsd) {
+function usdToEur(costUsd) {
   return +(costUsd * USD_TO_EUR).toFixed(6);
 }
 
@@ -95,7 +95,7 @@ export async function debitWallet({ accountId, costUsd, model, module, eventKind
       return {
         ok: false,
         statusCode: 402,
-        reason: `Insufficient AI Wallet balance (€${balance.toFixed(4)} available, €${costEur.toFixed(6)} required). Top up to continue.`,
+        reason: `Insufficient AI Wallet balance (€${balance.toFixed(4)} available, €${costEur.toFixed(4)} required). Top up to continue.`,
       };
     }
 
@@ -116,7 +116,7 @@ export async function debitWallet({ accountId, costUsd, model, module, eventKind
         return {
           ok: false,
           statusCode: 402,
-          reason: `Monthly spending cap of €${cap.toFixed(2)} would be exceeded (€${monthlySpent.toFixed(4)} spent this month, €${costEur.toFixed(6)} requested).`,
+          reason: `Monthly spending cap of €${cap.toFixed(2)} would be exceeded (€${monthlySpent.toFixed(4)} spent this month, €${costEur.toFixed(4)} requested).`,
         };
       }
     }
