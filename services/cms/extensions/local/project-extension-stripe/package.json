@@ -12,6 +12,7 @@
   "scripts": {
     "build": "directus-extension build",
     "dev": "directus-extension build -w --no-minify",
+    "test": "vitest run",
     "stripe:create-v2-products": "tsx scripts/create-products-v2.ts"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@directus/extensions-sdk": "^17.0.11",
     "@types/node": "^25.5.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
   }
 }

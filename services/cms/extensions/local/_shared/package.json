@@ -1,0 +1,16 @@
+{
+  "name": "@businesslogic/cms-shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "knex": "^3.1.0",
+    "pg": "^8.13.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
