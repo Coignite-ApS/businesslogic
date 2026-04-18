@@ -55,8 +55,12 @@ describe('26.4 (real DB) — subscription partial unique index', () => {
 			await db.raw('SELECT 1');
 			run = true;
 		} catch {
-			console.warn('Postgres not reachable on :15432 — real-DB test will be soft-skipped');
-			return;
+			// Fail loud in CI; set TEST_ALLOW_SKIP=1 to skip locally.
+			if (process.env.TEST_ALLOW_SKIP === '1') {
+				console.warn('Postgres unreachable on :15432 — soft-skipped (TEST_ALLOW_SKIP=1)');
+				return;
+			}
+			throw new Error('Postgres unreachable on :15432 — start the dev stack or set TEST_ALLOW_SKIP=1');
 		}
 
 		const plan = await db('subscription_plans')
@@ -104,8 +108,9 @@ describe('26.4 (real DB) — subscription partial unique index', () => {
 
 		expect(err).toBeTruthy();
 		expect(err.code).toBe('23505');
-		// And the constraint name should be our partial unique index
-		expect(String(err.constraint ?? err.message)).toContain('subscriptions_unique_active_per_module');
+		// Must match the exact partial unique index name — prevents passing when a
+		// different 23505 (PK conflict, etc.) happens to have a similar message.
+		expect(err.constraint).toBe('subscriptions_unique_active_per_module');
 	});
 
 	it('partial unique index does not block canceled status (history preserved)', async () => {

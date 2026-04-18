@@ -71,7 +71,12 @@ describe('26.3 (real DB) — wallet flow invariants', () => {
 
 		run = await dbReachable();
 		if (!run) {
-			console.warn('Postgres not reachable on :15432 — real-DB tests will be soft-skipped');
+			// Fail loud in CI; set TEST_ALLOW_SKIP=1 to skip locally.
+			if (process.env.TEST_ALLOW_SKIP === '1') {
+				console.warn('Postgres unreachable on :15432 — soft-skipped (TEST_ALLOW_SKIP=1)');
+				return;
+			}
+			throw new Error('Postgres unreachable on :15432 — start the dev stack or set TEST_ALLOW_SKIP=1');
 		}
 	});
 

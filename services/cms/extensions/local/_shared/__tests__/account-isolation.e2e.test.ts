@@ -200,8 +200,13 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		// Gate on Directus reachability
 		const reachable = await directusReachable();
 		if (!reachable) {
-			console.warn('Directus not reachable on http://localhost:18055 — tests will be soft-skipped');
-			return;
+			// Fail loud in CI (default) so unreachable services can't silent-green the suite.
+			// Set TEST_ALLOW_SKIP=1 locally to skip when dev stack is down.
+			if (process.env.TEST_ALLOW_SKIP === '1') {
+				console.warn('Directus unreachable on http://localhost:18055 — soft-skipped (TEST_ALLOW_SKIP=1)');
+				return;
+			}
+			throw new Error('Directus unreachable on http://localhost:18055 — start the dev stack or set TEST_ALLOW_SKIP=1');
 		}
 		run = true;
 
