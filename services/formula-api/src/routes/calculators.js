@@ -532,11 +532,16 @@ export async function executeCalculatorCore(calc, calcId, inputData) {
 
 /**
  * Fastify preHandler: quota check before calculator upload.
- * Computes size class from the request body, then verifies the account has
- * enough slots in feature_quotas. Returns 402 if exceeded.
+ * Requires admin token — runs BEFORE DB queries to avoid unauthenticated
+ * probing of account quota state + avoid DB-load amplification from unauth
+ * traffic. Computes size class from the request body, then verifies the
+ * account has enough slots in feature_quotas. Returns 402 if exceeded.
  * No-op when pool is unavailable (graceful degradation).
  */
 async function checkSlotQuota(req, reply) {
+  const authErr = checkAdminToken(req);
+  if (authErr) return reply.code(authErr.code).send(authErr.body);
+
   const pool = getPool();
   if (!pool) return; // no DB — skip quota check (degraded mode)
 
