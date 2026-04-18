@@ -1,8 +1,13 @@
 # 26. Pricing v2 — test coverage hardening + account isolation E2E
 
-**Status:** planned
+**Status:** completed (partial — CI workflow pending)
 **Severity:** MEDIUM — must complete before any production cutover
 **Source:** Phase 5 sub-agent + db-admin Inv 1 reports
+
+## Follow-up tasks (not yet done)
+
+- Add GitHub Actions / Buddy CI workflow that invokes `scripts/test-all.sh` on every PR. Currently only pre-commit hooks enforce tests locally.
+- Fix ai_token_usage permission gap: add `{"account":{"_eq":"$CURRENT_USER.active_account"}}` filter to the AI KB Assistance policy row for `ai_token_usage` (currently `{}` = leaks all rows). Use `/db-admin`.
 
 ## Problem
 
