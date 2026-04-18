@@ -16,7 +16,9 @@ Improvements organized by service. Use `/improvements` to manage, or `/improveme
 
 ## 🎯 Pricing v2 — Where to start
 
-The modular pricing v2 implementation landed 2026-04-18 (commits `bb9670c..da8461d` on `dev`). To continue this work safely:
+Pricing v2 code landed in waves on `dev`:
+- **Wave 1 (2026-04-18)** — Stripe catalog + schema rebuild (tasks 14, 15, ai-api/19). Commits `bb9670c..da8461d`.
+- **Wave 2 (2026-04-18, Sprint 1)** — wallet debit hook + calculator_slots + isolation E2E (tasks 18, 19, 26). Commits `6d23d9c..9101118`.
 
 **Read these first** (in order):
 1. **`docs/reports/session-2026-04-18-pricing-v2.md`** — full session log: timeline, locked decisions with rationale, schema state verification, decision log
@@ -25,18 +27,26 @@ The modular pricing v2 implementation landed 2026-04-18 (commits `bb9670c..da846
 4. **`docs/pricing/businesslogic-api-pricing.md`** — operational spec (tier prices, slot rules, COGS, worked examples)
 5. **`docs/operations/stripe-production-setup.md`** — production deployment runbook (when ready to ship)
 
-**Sprint plan to ship v2 to production safely** (~7 working days total):
+**Sprint plan to ship v2 to production safely** (revised 2026-04-18 after Sprint 1 follow-ups surfaced):
 
-| Sprint | Tasks | Goal |
-|---|---|---|
-| **Sprint 1 — Make wallet actually work** (~3d) | task 18 (wallet debit hook) + task 19 (calculator slots) + task 26 (test coverage E2E) | Wallet depletes correctly on AI use; honest slot enforcement; isolation guarantee |
-| **Sprint 2 — Production launch** (~1.5d) | task 28 (production deployment) + task 37 (empty-trial onboarding wizard) | Real customers can sign up + activate modules + check out via Stripe live mode |
-| **Sprint 3 — Analytics + observability** (~3d, parallelizable) | task 17 (feature_quotas refresh) + task 20 (usage_events emitter) + task 21 (monthly_aggregates rollup) + task 27 (gateway sub-limits) | Per-key sub-limits enforced; usage events captured; admin reports accurate |
+| Sprint | Tasks | Goal | Status |
+|---|---|---|---|
+| **Sprint 1 — Make wallet actually work** | 18 wallet debit · 19 calc slots · 26 isolation E2E | Wallet depletes on AI use; honest slot enforcement; isolation guarantee | ✅ **shipped** |
+| **Sprint 2 — Wallet correctness + security** (~3d) | 36 permission fix · 31 auto-reload table · 33 failed-debit reconcile · 34 slot reconcile/race · 35 CI pipeline | Close Sprint 1's follow-up gaps; make tests actually run on PR; close cross-account read leak | **next — critical first** |
+| **Sprint 3 — Production launch** (~1.5d) | 28 production deployment + smoke test · cms/37 empty-trial onboarding wizard | Real customers sign up + activate + check out via Stripe live mode | planned |
+| **Sprint 4 — Analytics + observability** (~3d, parallelizable) | 17 feature_quotas refresh · 20 usage_events emitter · 21 monthly_aggregates rollup · 27 gateway sub-limits | Per-key sub-limits enforced; usage events captured; admin reports accurate | planned |
+
+**Sprint 2 ordering** (critical-first):
+1. **Task 36** (ai_token_usage permission) — SECURITY. Cross-account read leak. Small `/db-admin` fix. Do first.
+2. **Task 31** (wallet_auto_reload_pending) — REVENUE. Auto-reload doesn't fire Stripe today; flag is log-only.
+3. **Task 33** (failed-debit reconciliation) — ACCOUNTING. Silent loss window if DB hiccups after Anthropic responds.
+4. **Task 34** (calc slot reconcile + race) — QUOTA. Concurrent-upload bypass; crash-window loss.
+5. **Task 35** (CI pipeline) — CORRECTNESS. Otherwise Sprint 1 tests are dead weight.
 
 **Quality of life / tech debt** (parallelizable, any time):
-- task 16 (Makefile container-name) · task 22 (calls_per_month enforcement) · task 23 (bl_flow_executions FK) · task 24 (ledger partitioning, defer until 10M rows) · task 25 (counter table tracking, optional) · task 29 (per-tier RPS spec lock) · cms/36 (UI polish)
+- 16 Makefile container-name · 22 calls_per_month enforcement · 23 bl_flow_executions FK · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
 
-**Completed Pricing v2 tasks:** task 14 (Stripe + code refactor), task 15 (schema), ai-api/19 (token usage column fix)
+**Completed Pricing v2 tasks:** 14 (Stripe + code refactor), 15 (schema), 18 (wallet debit hook), 19 (calc slots), 26 (test coverage E2E — partial; CI pending), ai-api/19 (token usage column fix)
 
 ---
 
@@ -198,18 +208,26 @@ Infrastructure and multi-service concerns.
 | 15 | Pricing v2 — Directus Schema (DB Admin) | **completed (Inv 1 + Inv 2)** | [cross-cutting/15-pricing-v2-directus-schema.md](cross-cutting/15-pricing-v2-directus-schema.md) — see [Inv 1 report](../reports/db-admin-2026-04-18-pricing-v2-schema-064122.md) + [Inv 2 report](../reports/db-admin-2026-04-18-ai-token-usage-fk-fix-073027.md) |
 | 16 | Snapshot Makefile container-name fix | planned | [cross-cutting/16-snapshot-makefile-container-fix.md](cross-cutting/16-snapshot-makefile-container-fix.md) |
 | 17 | Pricing v2 — feature_quotas refresh job | planned | [cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md](cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md) |
-| 18 | Pricing v2 — ai_wallet atomic debit hook (ai-api) | planned | [cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md](cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md) |
-| 19 | Pricing v2 — calculator_slots compute on upload (formula-api) | planned | [cross-cutting/19-pricing-v2-calculator-slots-compute.md](cross-cutting/19-pricing-v2-calculator-slots-compute.md) |
+| 18 | Pricing v2 — ai_wallet atomic debit hook (ai-api) | **completed** (`6d23d9c` + `0823b8b`) | [cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md](cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md) |
+| 19 | Pricing v2 — calculator_slots compute on upload (formula-api) | **completed** (`272dd31` + `b70b07f` + `969f984`) | [cross-cutting/19-pricing-v2-calculator-slots-compute.md](cross-cutting/19-pricing-v2-calculator-slots-compute.md) |
 | 20 | Pricing v2 — usage_events emitter pipeline | planned | [cross-cutting/20-pricing-v2-usage-events-emitter.md](cross-cutting/20-pricing-v2-usage-events-emitter.md) |
 | 21 | Pricing v2 — monthly_aggregates rollup job | planned | [cross-cutting/21-pricing-v2-monthly-aggregates-job.md](cross-cutting/21-pricing-v2-monthly-aggregates-job.md) |
 | 22 | Pricing v2 — calls_per_month enforcement (formula-api) | planned | [cross-cutting/22-pricing-v2-calls-per-month-enforcement.md](cross-cutting/22-pricing-v2-calls-per-month-enforcement.md) |
 | 23 | bl_flow_executions account FK fix | planned | [cross-cutting/23-bl-flow-executions-account-fk.md](cross-cutting/23-bl-flow-executions-account-fk.md) |
 | 24 | Pricing v2 — ai_wallet_ledger partitioning (LOW, deferred) | planned | [cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md](cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md) |
 | 25 | Pricing v2 — counter tables Directus tracking (LOW, optional) | planned | [cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md](cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md) |
-| 26 | Pricing v2 — test coverage hardening + account isolation E2E | planned | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
+| 26 | Pricing v2 — test coverage hardening + account isolation E2E | **completed (partial — CI pending via 35)** (`24e1671` + `dd75873` + `9101118`) | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
 | 27 | Pricing v2 — Gateway per-API-key sub-limit enforcement | planned | [cross-cutting/27-pricing-v2-gateway-sublimits.md](cross-cutting/27-pricing-v2-gateway-sublimits.md) |
 | 28 | Pricing v2 — Production deployment + smoke test | planned | [cross-cutting/28-pricing-v2-production-deployment.md](cross-cutting/28-pricing-v2-production-deployment.md) |
 | 29 | Pricing v2 — Per-tier RPS spec lock + per-key RPS support | planned | [cross-cutting/29-pricing-v2-rps-spec.md](cross-cutting/29-pricing-v2-rps-spec.md) |
+| 30 | ai_wallet_ledger compound index for monthly cap query (LOW, defer until scale) | planned | [cross-cutting/30-ai-wallet-ledger-index.md](cross-cutting/30-ai-wallet-ledger-index.md) |
+| 31 | wallet_auto_reload_pending table + CMS Stripe consumer (Sprint 2 — revenue) | planned | [cross-cutting/31-wallet-auto-reload-pending.md](cross-cutting/31-wallet-auto-reload-pending.md) |
+| 32 | Extend module_kind enum to include 'chat' (analytics) | planned | [cross-cutting/32-module-kind-enum-chat.md](cross-cutting/32-module-kind-enum-chat.md) |
+| 33 | Failed-debit reconciliation queue (Sprint 2 — accounting) | planned | [cross-cutting/33-failed-debit-reconciliation.md](cross-cutting/33-failed-debit-reconciliation.md) |
+| 34 | calculator_slots reconcile + concurrent-upload race fix (Sprint 2 — quota) | planned | [cross-cutting/34-calculator-slots-reconcile-race.md](cross-cutting/34-calculator-slots-reconcile-race.md) |
+| 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | planned | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
+| 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY, do first) | planned | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
+| 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 
 ---
 
