@@ -54,6 +54,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 33 | Feature Flag Key Migration (calc → formula/calculator) | completed | [cms/33-feature-flag-key-migration.md](cms/33-feature-flag-key-migration.md) |
 | 34 | AI-API Extension: /internal/calc → /internal/formula | completed | [cms/34-ai-api-internal-calc-path-fix.md](cms/34-ai-api-internal-calc-path-fix.md) |
 | 35 | v-html Sanitization Audit (Round 2) | completed | [cms/35-v-html-sanitization-audit.md](cms/35-v-html-sanitization-audit.md) |
+| 36 | Pricing v2 UI polish (wallet auto-reload, low-balance banner, PlanCards rewrite) | planned | [cms/36-pricing-v2-ui-polish.md](cms/36-pricing-v2-ui-polish.md) |
 
 ---
 
@@ -81,6 +82,7 @@ AI chat, knowledge base backend, embeddings, public API.
 | 16 | Reranker Integration (Cohere Rerank) | completed | [ai-api/16-reranker-integration.md](ai-api/16-reranker-integration.md) |
 | 17 | Retrieval Quality Metrics Enhancement | completed | [ai-api/17-retrieval-quality-metrics.md](ai-api/17-retrieval-quality-metrics.md) |
 | 18 | KB Re-index Endpoint | completed | [ai-api/18-kb-reindex-endpoint.md](ai-api/18-kb-reindex-endpoint.md) |
+| 19 | AI Token Usage Column Mismatch (silent data loss) | planned | [ai-api/19-ai-token-usage-column-mismatch.md](ai-api/19-ai-token-usage-column-mismatch.md) |
 | 20 | API Key → KB Scoping (data isolation) | planned | [ai-api/20-api-key-kb-scoping.md](ai-api/20-api-key-kb-scoping.md) |
 
 ---
@@ -165,6 +167,19 @@ Infrastructure and multi-service concerns.
 | 11 | Migration Rollback Scripts | completed | [cross-cutting/11-migration-rollbacks.md](cross-cutting/11-migration-rollbacks.md) |
 | 12 | Container Resource Limits | planned | [cross-cutting/12-container-resource-limits.md](cross-cutting/12-container-resource-limits.md) |
 | 13 | Startup Secret Validation (Fail-Fast) | completed | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
+| 14 | Pricing v2 — Stripe Product Catalog | planned | [cross-cutting/14-pricing-v2-stripe-catalog.md](cross-cutting/14-pricing-v2-stripe-catalog.md) |
+| 15 | Pricing v2 — Directus Schema (DB Admin) | **completed (Inv 1 + Inv 2)** | [cross-cutting/15-pricing-v2-directus-schema.md](cross-cutting/15-pricing-v2-directus-schema.md) — see [Inv 1 report](../reports/db-admin-2026-04-18-pricing-v2-schema-064122.md) + [Inv 2 report](../reports/db-admin-2026-04-18-ai-token-usage-fk-fix-073027.md) |
+| 16 | Snapshot Makefile container-name fix | planned | [cross-cutting/16-snapshot-makefile-container-fix.md](cross-cutting/16-snapshot-makefile-container-fix.md) |
+| 17 | Pricing v2 — feature_quotas refresh job | planned | [cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md](cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md) |
+| 18 | Pricing v2 — ai_wallet atomic debit hook (ai-api) | planned | [cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md](cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md) |
+| 19 | Pricing v2 — calculator_slots compute on upload (formula-api) | planned | [cross-cutting/19-pricing-v2-calculator-slots-compute.md](cross-cutting/19-pricing-v2-calculator-slots-compute.md) |
+| 20 | Pricing v2 — usage_events emitter pipeline | planned | [cross-cutting/20-pricing-v2-usage-events-emitter.md](cross-cutting/20-pricing-v2-usage-events-emitter.md) |
+| 21 | Pricing v2 — monthly_aggregates rollup job | planned | [cross-cutting/21-pricing-v2-monthly-aggregates-job.md](cross-cutting/21-pricing-v2-monthly-aggregates-job.md) |
+| 22 | Pricing v2 — calls_per_month enforcement (formula-api) | planned | [cross-cutting/22-pricing-v2-calls-per-month-enforcement.md](cross-cutting/22-pricing-v2-calls-per-month-enforcement.md) |
+| 23 | bl_flow_executions account FK fix | planned | [cross-cutting/23-bl-flow-executions-account-fk.md](cross-cutting/23-bl-flow-executions-account-fk.md) |
+| 24 | Pricing v2 — ai_wallet_ledger partitioning (LOW, deferred) | planned | [cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md](cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md) |
+| 25 | Pricing v2 — counter tables Directus tracking (LOW, optional) | planned | [cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md](cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md) |
+| 26 | Pricing v2 — test coverage hardening + account isolation E2E | planned | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
 
 ---
 
