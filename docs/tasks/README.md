@@ -14,6 +14,32 @@ Improvements organized by service. Use `/improvements` to manage, or `/improveme
 
 ---
 
+## 🎯 Pricing v2 — Where to start
+
+The modular pricing v2 implementation landed 2026-04-18 (commits `bb9670c..da8461d` on `dev`). To continue this work safely:
+
+**Read these first** (in order):
+1. **`docs/reports/session-2026-04-18-pricing-v2.md`** — full session log: timeline, locked decisions with rationale, schema state verification, decision log
+2. **`docs/architecture/pricing-v2.md`** — system architecture: data model, Stripe sync flow, webhook routing, auth/quota enforcement, transitional patterns to refactor
+3. **`docs/strategy/pricing.md`** — strategic rationale + roadmap
+4. **`docs/pricing/businesslogic-api-pricing.md`** — operational spec (tier prices, slot rules, COGS, worked examples)
+5. **`docs/operations/stripe-production-setup.md`** — production deployment runbook (when ready to ship)
+
+**Sprint plan to ship v2 to production safely** (~7 working days total):
+
+| Sprint | Tasks | Goal |
+|---|---|---|
+| **Sprint 1 — Make wallet actually work** (~3d) | task 18 (wallet debit hook) + task 19 (calculator slots) + task 26 (test coverage E2E) | Wallet depletes correctly on AI use; honest slot enforcement; isolation guarantee |
+| **Sprint 2 — Production launch** (~1.5d) | task 28 (production deployment) + task 37 (empty-trial onboarding wizard) | Real customers can sign up + activate modules + check out via Stripe live mode |
+| **Sprint 3 — Analytics + observability** (~3d, parallelizable) | task 17 (feature_quotas refresh) + task 20 (usage_events emitter) + task 21 (monthly_aggregates rollup) + task 27 (gateway sub-limits) | Per-key sub-limits enforced; usage events captured; admin reports accurate |
+
+**Quality of life / tech debt** (parallelizable, any time):
+- task 16 (Makefile container-name) · task 22 (calls_per_month enforcement) · task 23 (bl_flow_executions FK) · task 24 (ledger partitioning, defer until 10M rows) · task 25 (counter table tracking, optional) · task 29 (per-tier RPS spec lock) · cms/36 (UI polish)
+
+**Completed Pricing v2 tasks:** task 14 (Stripe + code refactor), task 15 (schema), ai-api/19 (token usage column fix)
+
+---
+
 ## CMS (`services/cms/`)
 
 Back-office: admin UI, billing, Directus modules, widgets.
@@ -55,6 +81,7 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 34 | AI-API Extension: /internal/calc → /internal/formula | completed | [cms/34-ai-api-internal-calc-path-fix.md](cms/34-ai-api-internal-calc-path-fix.md) |
 | 35 | v-html Sanitization Audit (Round 2) | completed | [cms/35-v-html-sanitization-audit.md](cms/35-v-html-sanitization-audit.md) |
 | 36 | Pricing v2 UI polish (wallet auto-reload, low-balance banner, PlanCards rewrite) | planned | [cms/36-pricing-v2-ui-polish.md](cms/36-pricing-v2-ui-polish.md) |
+| 37 | Pricing v2 — Empty-trial onboarding wizard (post-signup module picker) | planned | [cms/37-pricing-v2-empty-trial-onboarding.md](cms/37-pricing-v2-empty-trial-onboarding.md) |
 
 ---
 
@@ -180,6 +207,9 @@ Infrastructure and multi-service concerns.
 | 24 | Pricing v2 — ai_wallet_ledger partitioning (LOW, deferred) | planned | [cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md](cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md) |
 | 25 | Pricing v2 — counter tables Directus tracking (LOW, optional) | planned | [cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md](cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md) |
 | 26 | Pricing v2 — test coverage hardening + account isolation E2E | planned | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
+| 27 | Pricing v2 — Gateway per-API-key sub-limit enforcement | planned | [cross-cutting/27-pricing-v2-gateway-sublimits.md](cross-cutting/27-pricing-v2-gateway-sublimits.md) |
+| 28 | Pricing v2 — Production deployment + smoke test | planned | [cross-cutting/28-pricing-v2-production-deployment.md](cross-cutting/28-pricing-v2-production-deployment.md) |
+| 29 | Pricing v2 — Per-tier RPS spec lock + per-key RPS support | planned | [cross-cutting/29-pricing-v2-rps-spec.md](cross-cutting/29-pricing-v2-rps-spec.md) |
 
 ---
 
