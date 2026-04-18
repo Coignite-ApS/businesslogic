@@ -14,7 +14,8 @@ import * as rateLimiter from '../services/rate-limiter.js';
 import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
 import { loadAccountLimits } from '../services/account-limits.js';
-import { loadRecipeFromDb, loadMcpConfigFromDb } from '../services/calculator-db.js';
+import { loadRecipeFromDb, loadMcpConfigFromDb, loadCalculatorConfigMeta } from '../services/calculator-db.js';
+import { computeAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
 import { getPool } from '../db.js';
 
 
@@ -529,6 +530,31 @@ export async function executeCalculatorCore(calc, calcId, inputData) {
   }
 }
 
+/**
+ * Fastify preHandler: quota check before calculator upload.
+ * Computes size class from the request body, then verifies the account has
+ * enough slots in feature_quotas. Returns 402 if exceeded.
+ * No-op when pool is unavailable (graceful degradation).
+ */
+async function checkSlotQuota(req, reply) {
+  const pool = getPool();
+  if (!pool) return; // no DB — skip quota check (degraded mode)
+
+  const { sheets, formulas, expressions, accountId, test } = req.body || {};
+  if (test) return; // test calculators don't consume quota
+
+  if (!accountId) return; // no account — gate handled elsewhere
+
+  const { sheetCount, expressionCount } = extractCounts(sheets, formulas, expressions);
+  const sizeClass = computeSizeClass(sheetCount, expressionCount);
+  const slotsConsumed = slotsForClass(sizeClass);
+
+  const quota = await checkUploadQuota(pool, accountId, slotsConsumed);
+  if (!quota.ok) {
+    return reply.code(quota.statusCode).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+  }
+}
+
 export async function registerRoutes(app) {
   log = app.log;
   const routeById = routeByCalcId('params');
@@ -624,7 +650,7 @@ export async function registerRoutes(app) {
   });
 
   // Create calculator
-  app.post('/calculator', { preHandler: routeByBody }, async (req, reply) => {
+  app.post('/calculator', { preHandler: [routeByBody, checkSlotQuota] }, async (req, reply) => {
     const authErr = checkAdminToken(req);
     if (authErr) return reply.code(authErr.code).send(authErr.body);
 
@@ -748,6 +774,26 @@ export async function registerRoutes(app) {
       saveToRedis(calculatorId, recipe);
 
       if (accountId) await loadAccountLimits(accountId, true);
+
+      // Compute size class + UPSERT calculator_slots (fire-and-forget on error)
+      if (accountId && !test && getPool()) {
+        try {
+          const meta = await loadCalculatorConfigMeta(calculatorId);
+          if (meta) {
+            await computeAndUpsertSlot(getPool(), {
+              calculatorConfigId: meta.configId,
+              accountId: meta.accountId ?? accountId,
+              sheets,
+              formulas,
+              expressions: expressions || null,
+              fileVersion: meta.fileVersion,
+              configVersion: meta.configVersion,
+            });
+          }
+        } catch (slotErr) {
+          (log || console).warn({ err: slotErr }, '[calculators] calculator_slots upsert failed (non-fatal)');
+        }
+      }
 
       const resp = {
         calculatorId,
@@ -989,6 +1035,26 @@ export async function registerRoutes(app) {
         };
         saveToRedis(req.params.id, recipe);
 
+        // Recompute slot size on data change (fire-and-forget on error)
+        if (calc.accountId && !newTest && getPool()) {
+          try {
+            const meta = await loadCalculatorConfigMeta(req.params.id);
+            if (meta) {
+              await computeAndUpsertSlot(getPool(), {
+                calculatorConfigId: meta.configId,
+                accountId: meta.accountId ?? calc.accountId,
+                sheets: newSheets,
+                formulas: newFormulas,
+                expressions: newExpressions,
+                fileVersion: meta.fileVersion,
+                configVersion: meta.configVersion,
+              });
+            }
+          } catch (slotErr) {
+            (log || console).warn({ err: slotErr }, '[calculators] calculator_slots upsert on patch failed (non-fatal)');
+          }
+        }
+
         const resp = {
           calculatorId: req.params.id,
           ttl: config.calculatorTtl,
@@ -1071,6 +1137,40 @@ export async function registerRoutes(app) {
     if (newMcp) resp.mcp = newMcp;
     if (newIntegration) resp.integration = newIntegration;
     return resp;
+  });
+
+  // Toggle is_always_on for a calculator slot (admin-only)
+  // PATCH /calculator/:id/always-on { is_always_on: true|false }
+  app.patch('/calculator/:id/always-on', { preHandler: routeById }, async (req, reply) => {
+    const authErr = checkAdminToken(req);
+    if (authErr) return reply.code(authErr.code).send(authErr.body);
+
+    const pool = getPool();
+    if (!pool) return reply.code(503).send({ error: 'Database unavailable' });
+
+    const { is_always_on } = req.body || {};
+    if (typeof is_always_on !== 'boolean') {
+      return reply.code(400).send({ error: 'is_always_on must be a boolean' });
+    }
+
+    const calcId = req.params.id;
+
+    // Look up config meta to get calculator_config_id and accountId
+    const meta = await loadCalculatorConfigMeta(calcId);
+    if (!meta) return reply.code(404).send({ error: 'Calculator config not found' });
+
+    // When enabling always-on, check ao_allowance
+    if (is_always_on) {
+      const quota = await checkAlwaysOnQuota(pool, meta.accountId);
+      if (!quota.ok) {
+        return reply.code(quota.statusCode).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+      }
+    }
+
+    const row = await setAlwaysOn(pool, meta.configId, is_always_on);
+    if (!row) return reply.code(404).send({ error: 'Calculator slot not found — upload calculator first' });
+
+    return { calculatorId: calcId, is_always_on: row.is_always_on };
   });
 
   // Delete calculator

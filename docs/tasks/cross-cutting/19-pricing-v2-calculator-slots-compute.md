@@ -1,6 +1,6 @@
 # 19. Pricing v2 — calculator_slots compute on upload
 
-**Status:** planned
+**Status:** completed
 **Severity:** HIGH (without this, calculator slot allowance is unenforceable)
 **Source:** db-admin report `docs/reports/db-admin-2026-04-18-pricing-v2-schema-064122.md`
 
@@ -49,12 +49,24 @@ If either is negative → 402 Payment Required.
 
 ## Key Tasks
 
-- [ ] Implement size-class heuristic in `services/formula-api/src/services/calculator-slots.js`
-- [ ] Wire into calculator upload endpoint
-- [ ] Wire into is_always_on toggle endpoint
-- [ ] Add quota check middleware for upload
-- [ ] Tests: upload small/medium/large calc → assert correct slots_consumed; quota exhaustion → 402
-- [ ] Document in `services/formula-api/README.md`
+- [x] Implement size-class heuristic in `services/formula-api/src/services/calculator-slots.js`
+- [x] Wire into calculator upload endpoint
+- [x] Wire into is_always_on toggle endpoint
+- [x] Add quota check middleware for upload
+- [x] Tests: upload small/medium/large calc → assert correct slots_consumed; quota exhaustion → 402
+- [x] Document in `services/formula-api/README.md`
+
+## Implementation notes
+
+- `calculator-slots.js`: pure service, takes `{ sheets, formulas, expressions }` as input
+- Thresholds + slot counts in named constants at top of file (auditable)
+- UPSERT conflict target: `calculator_config_id` (unique per config per migration 008)
+- `checkSlotQuota` Fastify preHandler on `POST /calculator` (skips test calculators, skips when no pool)
+- `PATCH /calculator/:id/always-on { is_always_on: boolean }` — new admin-only route
+- Slot compute fires after CMS creates `calculator_configs` row; looks up config UUID via `loadCalculatorConfigMeta(calculatorStringId)`
+- Recomputes on `PATCH /calculator/:id` data-change path
+- All slot errors are non-fatal (warn + continue) to avoid blocking formula execution
+- 22 tests (11 unit, 11 integration) — all pass against live DB
 
 ## Acceptance
 

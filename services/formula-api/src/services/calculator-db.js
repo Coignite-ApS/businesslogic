@@ -155,6 +155,35 @@ export async function loadAccountLimitsFromDb(accountId) {
 }
 
 /**
+ * Fetch calculator_configs row metadata needed to write to calculator_slots.
+ * Returns { configId, accountId, fileVersion, configVersion } or null.
+ *
+ * calculatorStringId is the VARCHAR PK of public.calculators (not the UUID).
+ */
+export async function loadCalculatorConfigMeta(calculatorStringId) {
+  const row = await queryOne(
+    `SELECT cc.id           AS config_id,
+            c.account       AS account_id,
+            cc.file_version,
+            cc.config_version
+     FROM calculator_configs cc
+     JOIN calculators c ON c.id = cc.calculator
+     WHERE c.id = $1
+       AND cc.test_environment = false
+     ORDER BY cc.date_created DESC
+     LIMIT 1`,
+    [calculatorStringId],
+  );
+  if (!row) return null;
+  return {
+    configId: row.config_id,
+    accountId: row.account_id,
+    fileVersion: row.file_version ?? null,
+    configVersion: row.config_version ?? null,
+  };
+}
+
+/**
  * List all published calculators with MCP config for a given account.
  * Used for Account MCP tool listing.
  */
