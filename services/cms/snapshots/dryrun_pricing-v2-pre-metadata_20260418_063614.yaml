@@ -146,78 +146,6 @@ collections:
       versioning: false
     schema:
       name: ai_token_usage
-  - collection: ai_wallet
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: ai_wallet
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: account_balance_wallet
-      item_duplication_fields: null
-      note: Pricing v2 — per-account AI wallet (balance/caps/auto-reload)
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: ai_wallet
-  - collection: ai_wallet_ledger
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: ai_wallet_ledger
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: receipt_long
-      item_duplication_fields: null
-      note: Pricing v2 — append-only credit/debit ledger
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: ai_wallet_ledger
-  - collection: ai_wallet_topup
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: ai_wallet_topup
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: add_card
-      item_duplication_fields: null
-      note: Pricing v2 — top-up purchases (12-month expiry)
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: ai_wallet_topup
   - collection: api_keys
     meta:
       accountability: all
@@ -410,30 +338,6 @@ collections:
       versioning: false
     schema:
       name: calculator_layouts
-  - collection: calculator_slots
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: calculator_slots
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: widgets
-      item_duplication_fields: null
-      note: Pricing v2 — per-calculator slot accounting (size/AO)
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: calculator_slots
   - collection: calculator_templates
     meta:
       accountability: all
@@ -506,30 +410,6 @@ collections:
       versioning: false
     schema:
       name: calculators
-  - collection: feature_quotas
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: feature_quotas
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: speed
-      item_duplication_fields: null
-      note: Pricing v2 — materialized per-account quotas (refreshed by job)
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: feature_quotas
   - collection: formula_examples
     meta:
       accountability: all
@@ -722,78 +602,6 @@ collections:
       versioning: false
     schema:
       name: knowledge_bases
-  - collection: subscription_addons
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: subscription_addons
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: add_circle
-      item_duplication_fields: null
-      note: Pricing v2 — recurring add-on packs (slots/AO/storage)
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: subscription_addons
-  - collection: subscription_plans
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: subscription_plans
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: local_offer
-      item_duplication_fields: null
-      note: Pricing v2 — modular catalog (one per module/tier)
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: subscription_plans
-  - collection: subscriptions
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: subscriptions
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: verified_user
-      item_duplication_fields: null
-      note: Pricing v2 — per-account-per-module subscriptions
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: subscriptions
   - collection: system_health_snapshots
     meta:
       accountability: all
@@ -818,30 +626,6 @@ collections:
       versioning: false
     schema:
       name: system_health_snapshots
-  - collection: usage_events
-    meta:
-      accountability: all
-      archive_app_filter: true
-      archive_field: null
-      archive_value: null
-      collapse: open
-      collection: usage_events
-      color: null
-      display_template: null
-      group: null
-      hidden: false
-      icon: event_note
-      item_duplication_fields: null
-      note: Pricing v2 — append-only billable event stream
-      preview_url: null
-      singleton: false
-      sort: null
-      sort_field: null
-      translations: null
-      unarchive_value: null
-      versioning: false
-    schema:
-      name: usage_events
   - collection: widget_components
     meta:
       accountability: all
