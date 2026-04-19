@@ -44,7 +44,7 @@ Pricing v2 code landed in waves on `dev`:
 5. ✅ **Task 35** (CI pipeline) — CORRECTNESS. Buddy pipeline + CONTRIBUTING.md. Shipped 2026-04-19 (`fefcfe9` + `5957bf8`).
 
 **Quality of life / tech debt** (parallelizable, any time):
-- 16 Makefile container-name · 22 calls_per_month enforcement · 23 bl_flow_executions FK · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
+- 16 Makefile container-name · 22 calls_per_month enforcement · ~~23 bl_flow_executions FK~~ (shipped 2026-04-19) · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
 
 **Completed Pricing v2 tasks:** 14 (Stripe + code refactor), 15 (schema), 18 (wallet debit hook), 19 (calc slots), 26 (test coverage E2E — partial; CI pending), ai-api/19 (token usage column fix)
 
@@ -213,7 +213,7 @@ Infrastructure and multi-service concerns.
 | 20 | Pricing v2 — usage_events emitter pipeline | planned | [cross-cutting/20-pricing-v2-usage-events-emitter.md](cross-cutting/20-pricing-v2-usage-events-emitter.md) |
 | 21 | Pricing v2 — monthly_aggregates rollup job | planned | [cross-cutting/21-pricing-v2-monthly-aggregates-job.md](cross-cutting/21-pricing-v2-monthly-aggregates-job.md) |
 | 22 | Pricing v2 — calls_per_month enforcement (formula-api) | planned | [cross-cutting/22-pricing-v2-calls-per-month-enforcement.md](cross-cutting/22-pricing-v2-calls-per-month-enforcement.md) |
-| 23 | bl_flow_executions account FK fix | planned | [cross-cutting/23-bl-flow-executions-account-fk.md](cross-cutting/23-bl-flow-executions-account-fk.md) |
+| 23 | bl_flow_executions account FK fix | **completed 2026-04-19** (`026_bl_flow_executions_account_fk.sql`) | [cross-cutting/23-bl-flow-executions-account-fk.md](cross-cutting/23-bl-flow-executions-account-fk.md) — see [report](../reports/db-admin-2026-04-19-bl-flow-executions-account-fk-154815.md) |
 | 24 | Pricing v2 — ai_wallet_ledger partitioning (LOW, deferred) | planned | [cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md](cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md) |
 | 25 | Pricing v2 — counter tables Directus tracking (LOW, optional) | planned | [cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md](cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md) |
 | 26 | Pricing v2 — test coverage hardening + account isolation E2E | **completed (partial — CI pending via 35)** (`24e1671` + `dd75873` + `9101118`) | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
@@ -341,5 +341,5 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 2 | 0 | 0 | 11 | 13 |
-| **Total** | **20** | **8** | **0** | **59** | **87** |
+| Cross-Cutting | 1 | 0 | 0 | 12 | 13 |
+| **Total** | **19** | **8** | **0** | **60** | **87** |
