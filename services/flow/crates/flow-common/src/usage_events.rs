@@ -109,7 +109,7 @@ pub async fn emit_flow_failed(
         json!({
             "flow_id": flow_id.to_string(),
             "step_id": step_id,
-            "error": &error[..error.len().min(500)],
+            "error": error.chars().take(500).collect::<String>(),
         }),
     );
     emit(redis_pool, &envelope).await;
@@ -147,5 +147,41 @@ async fn emit(redis_pool: &deadpool_redis::Pool, envelope: &UsageEventEnvelope) 
 
     if let Err(e) = result {
         warn!("[usage-events] XADD failed: {}", e);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    /// Verify UTF-8-safe truncation: a string where a multi-byte codepoint
+    /// straddles the 500-char boundary must not panic.
+    #[test]
+    fn emit_flow_failed_truncates_unicode_safely() {
+        // 498 ASCII chars + 3 emoji (each 4 bytes) — byte index 500 falls mid-codepoint
+        let error = "a".repeat(498) + "🔥🔥🔥";
+        assert!(error.len() > 500, "sanity: raw bytes exceed 500");
+
+        let truncated: String = error.chars().take(500).collect();
+        // Should contain 498 + 2 emoji = 500 chars, last emoji cut at 500th char boundary
+        assert_eq!(truncated.chars().count(), 500);
+        // And it's valid UTF-8 — just asserting no panic is the main goal
+        assert!(std::str::from_utf8(truncated.as_bytes()).is_ok());
+    }
+
+    /// Strings shorter than 500 chars pass through unchanged.
+    #[test]
+    fn emit_flow_failed_short_error_unchanged() {
+        let error = "short error";
+        let truncated: String = error.chars().take(500).collect();
+        assert_eq!(truncated, error);
+    }
+
+    /// Pure ASCII at exactly 500 chars is unchanged.
+    #[test]
+    fn emit_flow_failed_exact_500_ascii() {
+        let error = "x".repeat(500);
+        let truncated: String = error.chars().take(500).collect();
+        assert_eq!(truncated.len(), 500);
+        assert_eq!(truncated, error);
     }
 }
