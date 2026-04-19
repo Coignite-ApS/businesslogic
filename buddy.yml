@@ -9,22 +9,23 @@
 #        NPM_TOKEN                  — npm token for private @coignite packages
 #        ANTHROPIC_API_KEY          — Anthropic API key (required by ai-api tests)
 #        OPENAI_API_KEY             — OpenAI API key (required by KB embedding tests)
-#        DIRECTUS_SUBMODULE_SSH_KEY — SSH deploy key for coignite-directus-base submodule
 #        FORMULA_TEST_TOKEN         — token used by formula-api integration tests
 #        FORMULA_ADMIN_TOKEN        — admin token used by formula-api tests
-#   3. Connect the pipeline as a required check on dev and main in GitHub branch protection
+#   3. Add the coignite-directus-base deploy key as a workspace SSH key
+#      (Settings → SSH keys) and wire its numeric ID into the Checkout action below.
+#   4. Connect the pipeline as a required check on dev and main in GitHub branch protection
 #
 # Verify syntax: https://buddy.works/docs/yaml/yaml-schema
 # =============================================================================
 
 - pipeline: "Test on PR"
   # Trigger on pull-request events targeting dev or main.
-  # NOTE: in Buddy YAML, use `on: PULL_REQUEST` + `refs:` to scope branches.
-  # See https://buddy.works/docs/yaml/yaml-cli#pull-request-triggers
+  # For PULL_REQUEST triggers, Buddy expects `branches:` (target-branch filter),
+  # NOT `refs:` (which is push-only). See https://buddy.works/docs/yaml/yaml-schema
   on: PULL_REQUEST
-  refs:
-    - "refs/heads/dev"
-    - "refs/heads/main"
+  branches:
+    - "dev"
+    - "main"
 
   # Skip draft PRs — run full suite only when PR is ready for review.
   # Buddy evaluates trigger_conditions before starting the pipeline.
@@ -39,13 +40,12 @@
     # ── 1. Checkout + submodule init ──────────────────────────────────────────
     - action: "Checkout"
       type: BUILD
-      # Buddy's built-in checkout. Submodule SSH key injected via SSH_KEY_ID.
-      # Wire DIRECTUS_SUBMODULE_SSH_KEY to an SSH key in Buddy workspace and
-      # reference its numeric ID here, or use the shell step below instead.
       git_submodules: true
-      # If Buddy's native submodule checkout needs the SSH key explicitly,
-      # use the manual approach in the shell step below (comment out git_submodules
-      # above and uncomment the GIT_SSH_COMMAND lines).
+      # TODO (operator): Add the coignite-directus-base deploy key to the Buddy
+      # workspace (Settings → SSH keys) and set its numeric ID below. An env var
+      # (e.g. DIRECTUS_SUBMODULE_SSH_KEY) CANNOT be used here — Buddy YAML only
+      # accepts workspace SSH key IDs for submodule auth.
+      # ssh_key_id: 0
 
     # ── 2. Configure .env for CI stack ───────────────────────────────────────
     - action: "Write CI .env"
@@ -56,8 +56,11 @@
         # Copy the example env and patch values for the CI-spun Docker stack.
         # Service URLs use Docker Compose service names as hostnames.
         - cp infrastructure/docker/.env.example infrastructure/docker/.env
+        # Unquoted heredoc delimiter → shell expands $VAR into the env file.
+        # All lines below intentionally contain only literals + shell vars we
+        # want expanded — no bare `$` that needs escaping.
         - |
-          cat >> infrastructure/docker/.env <<'ENVEOF'
+          cat >> infrastructure/docker/.env <<ENVEOF
           # CI overrides — service hostnames inside the Docker network
           FORMULA_API_URL=http://bl-formula-api:3000
           AI_API_URL=http://bl-ai-api:3200
@@ -110,14 +113,17 @@
       # Buddy mounts the workspace into the compose context automatically
 
     # ── 5. Wait for services healthy ──────────────────────────────────────────
+    # Directus cold boot + migrations can take 60-120s; give the stack time.
+    # 5 retries x 30s = 150s max, plus the 15s warmup = ~165s total budget.
     - action: "Health check"
       type: BUILD
       docker_image_name: "library/node"
       docker_image_tag: "20-alpine"
-      retry_count: 2
+      retry_count: 5
       retry_interval: 30
       commands:
         - apk add --no-cache make curl
+        - sleep 15
         - make health
 
     # ── 6. Run full test suite ─────────────────────────────────────────────────
@@ -129,6 +135,7 @@
       retry_count: 1
       retry_interval: 15
       commands:
+        # TODO: prebuilt CI image with toolchains preinstalled would save ~2min
         # Install system deps for Rust (cargo) + Go tests if present
         - apk add --no-cache make bash curl cargo go
         - chmod +x scripts/test-all.sh
@@ -138,6 +145,11 @@
     - action: "Tear down stack"
       type: DOCKER_COMPOSE
       compose_file_path: "infrastructure/docker/docker-compose.dev.yml"
-      # Always runs, even on failure — ensures no zombie containers
-      trigger_conditions:
-        - trigger_condition: "ALWAYS"
+      # VERIFY on first pipeline run: confirm this teardown runs even when an
+      # earlier action (health check / tests) fails. Per Buddy docs the action
+      # field is `trigger_time`, NOT `trigger_conditions`, and valid values are
+      # ON_EVERY_EXECUTION / ON_FAILURE / ON_BACK_TO_SUCCESS / ON_WARNING /
+      # ON_WAIT_FOR_APPROVE. If this does not run after a prior failure, split
+      # into two teardown actions: one default + one with trigger_time: ON_FAILURE.
+      # See https://buddy.works/docs/yaml/yaml-actions
+      trigger_time: "ON_EVERY_EXECUTION"

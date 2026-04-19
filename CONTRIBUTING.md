@@ -47,9 +47,10 @@ Configure these in the Buddy pipeline's **Variables** tab (mark all as secret):
 | `NPM_TOKEN` | Access to private `@coignite` npm packages |
 | `ANTHROPIC_API_KEY` | Required by ai-api and KB embedding tests |
 | `OPENAI_API_KEY` | Required by KB embedding tests |
-| `DIRECTUS_SUBMODULE_SSH_KEY` | SSH deploy key for `coignite-directus-base` submodule |
 | `FORMULA_TEST_TOKEN` | Auth token for formula-api integration tests |
 | `FORMULA_ADMIN_TOKEN` | Admin token for formula-api tests |
+
+**Submodule SSH key (not an env var):** The `coignite-directus-base` submodule requires an SSH deploy key registered as a **Buddy workspace SSH key** (Settings → SSH keys), then referenced by its numeric ID in `buddy.yml` under the Checkout action (`ssh_key_id:`). Buddy YAML does not accept env-var-based SSH keys.
 
 ### `TEST_ALLOW_SKIP`
 
