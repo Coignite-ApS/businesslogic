@@ -91,7 +91,7 @@ Run inside a transaction; on failure, `aggregated_at` stays NULL → next run pi
 - C1: `fix(cms): migration 030 aggregate_usage_events PL/pgSQL function (task 21)` — 90983d5
 - C2: `feat(cms): monthly_aggregates hourly rollup cron (task 21)` — c8cc5bb
 - C3: `fix(cms): migration 031 aggregate_usage_events — concurrency lock + safe metadata casts, drop calc_unique_calculators (task 21)` — fa317f6
-- C4: `test(cms): expand cron.e2e.test.ts — all 12 counters + concurrency + malformed metadata regression (task 21)` — TBD (post-commit)
+- C4: `test(cms): expand cron.e2e.test.ts — all 12 counters + concurrency + malformed metadata regression (task 21)` — e7013b8
 
 **Code review fixes (2026-04-19 — migration 031):**
 
