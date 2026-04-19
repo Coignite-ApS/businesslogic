@@ -88,11 +88,40 @@ occurred_at timestamptz NOT NULL DEFAULT now()
 aggregated_at timestamptz  -- NULL until task 21 sets it
 ```
 
+## Monthly Aggregates Rollup (Task 21)
+
+`public.aggregate_usage_events()` — PL/pgSQL function (migration 030) called hourly by the CMS consumer hook.
+
+### Behavior
+1. Selects rows where `aggregated_at IS NULL`, groups by `(account_id, period_yyyymm)`.
+2. UPSERTs per-kind counters into `public.monthly_aggregates` (additive: `existing + EXCLUDED`).
+3. Sets `aggregated_at = NOW()` on processed rows — in the same transaction.
+4. Returns `jsonb { events_aggregated, accounts_touched, periods_touched, lag_seconds }`.
+
+### Schedule
+- Hourly cron: `0 * * * *` via `schedule()` in `project-extension-usage-consumer/src/index.ts`.
+- On-boot run via `app.after` init hook — avoids up-to-1h wait on restart.
+
+### Idempotency
+- `aggregated_at IS NULL` filter ensures already-processed rows are skipped.
+- Re-running the job when all rows are marked produces `events_aggregated=0`, no double-counts.
+
+### Monitoring
+Structured log line after each run:
+```
+[usage-consumer] monthly_aggregates rollup: done — events_aggregated=N accounts_touched=N periods_touched=N lag_seconds=N
+```
+`lag_seconds` = `NOW() - MIN(occurred_at)` of oldest unaggregated event before the run. Target: < 3600s (hourly schedule).
+
+### Schema reference
+`public.monthly_aggregates` composite PK `(account_id, period_yyyymm)` — 19 columns.
+Not tracked by Directus admin UI (composite PK limitation — see Task 25 follow-up).
+
 ## Cost Calculation
 
-`cost_eur = NULL` from all emitters. Task 21 (`monthly_aggregates` rollup job) reads
-unaggregated rows (`aggregated_at IS NULL`) and computes cost from `metadata` fields
-using per-model rates from `ai_model_config` and plan rates from `subscription_plans`.
+`cost_eur = NULL` from all emitters. The `aggregate_usage_events()` function sums `cost_eur`
+from event rows into `total_cost_eur` and `ai_cost_eur` in `monthly_aggregates`.
+Per-call cost is set by services when emitting (ai-api, formula-api) rather than by the aggregator.
 
 ## Build
 
@@ -105,8 +134,11 @@ make cms-restart           # build all + restart CMS
 ## Test
 
 ```bash
-# unit tests (consumer.ts pure functions)
+# unit tests (consumer.ts + cron.ts pure functions)
 cd services/cms/extensions/local/project-extension-usage-consumer && npm test
+
+# E2E cron test (aggregate_usage_events function + idempotency + lag)
+cd services/cms/extensions/local/project-extension-usage-consumer && npm run test:e2e:cron
 
 # bl-events package tests (emit + envelope shape contract)
 cd packages/bl-events && npm test

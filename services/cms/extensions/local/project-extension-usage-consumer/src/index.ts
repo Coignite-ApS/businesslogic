@@ -10,10 +10,11 @@
 import { defineHook } from '@directus/extensions-sdk';
 import Redis from 'ioredis';
 import { ensureConsumerGroup, processBatch } from './consumer.js';
+import { buildAggregateUsageEventsCron } from './cron.js';
 
 const RETRY_SLEEP_MS = 2000;
 
-export default defineHook(({ init }, { env, logger, database }) => {
+export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	const db = database;
 	const redisUrl = (env['REDIS_URL'] as string) || '';
 
@@ -52,6 +53,17 @@ export default defineHook(({ init }, { env, logger, database }) => {
 			logger.error(`[usage-consumer] startup failed: ${err?.message || err}`);
 		}
 	});
+
+	// ─── monthly_aggregates hourly rollup (task 21) ──────────────────────────
+	const runAggregation = buildAggregateUsageEventsCron(db, logger);
+
+	// On-boot run: don't wait up to an hour for the first aggregation
+	init('app.after', async () => {
+		await runAggregation();
+	});
+
+	// Hourly cron: 0 * * * * — keep quota view fresh for task 22 enforcement
+	schedule('0 * * * *', runAggregation);
 
 	// Graceful shutdown: attempt to stop the loop
 	process.on('SIGTERM', () => {

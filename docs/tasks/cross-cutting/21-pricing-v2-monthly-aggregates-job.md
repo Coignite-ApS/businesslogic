@@ -1,6 +1,6 @@
 # 21. Pricing v2 — monthly_aggregates rollup job
 
-**Status:** planned
+**Status:** completed
 **Severity:** HIGH (quota enforcement reads from aggregates; without job, all counters stay at 0)
 **Source:** db-admin report `docs/reports/db-admin-2026-04-18-pricing-v2-schema-064122.md`
 **Depends on:** task 20 (usage_events emitter)
@@ -61,14 +61,32 @@ Run inside a transaction; on failure, `aggregated_at` stays NULL → next run pi
 
 ## Key Tasks
 
-- [ ] Implement job in `services/cms/extensions/local/project-extension-usage-consumer/cron.ts` (or new extension)
-- [ ] Schedule via Directus extensions cron (or external systemd timer)
-- [ ] Tests: emit 100 events → run job → assert aggregates match; idempotency (re-run → no double-count)
-- [ ] Monitoring: emit metric on rows-aggregated and lag (last-aggregated `occurred_at` minus NOW)
+- [x] Implement job in `services/cms/extensions/local/project-extension-usage-consumer/src/cron.ts`
+- [x] Schedule via Directus extensions cron (`schedule('0 * * * *', ...)`) + on-boot `app.after` run
+- [x] Tests: emit 100 events → run job → assert aggregates match; idempotency (re-run → no double-count)
+- [x] Monitoring: structured log with `events_aggregated`, `accounts_touched`, `periods_touched`, `lag_seconds`
 
 ## Acceptance
 
-- After job runs, every event in the prior period has `aggregated_at` set
-- `monthly_aggregates` counters match raw event sums
-- Re-running the job is idempotent (no double-counts)
-- Lag P99 < 25 hours for nightly schedule
+- [x] After job runs, every event in the prior period has `aggregated_at` set
+- [x] `monthly_aggregates` counters match raw event sums
+- [x] Re-running the job is idempotent (no double-counts)
+- [x] Lag P99 < 25 hours — hourly schedule means P99 < 1h
+
+## Implementation (2026-04-19)
+
+**Migration 030:** `migrations/cms/030_aggregate_usage_events_fn.sql` — `CREATE OR REPLACE FUNCTION public.aggregate_usage_events() RETURNS jsonb`. Down: `030_aggregate_usage_events_fn_down.sql`.
+
+**Cron handler:** `services/cms/extensions/local/project-extension-usage-consumer/src/cron.ts`
+- `runAggregation(db)` — calls `SELECT public.aggregate_usage_events() AS stats`
+- `buildAggregateUsageEventsCron(db, logger)` — returns async cron handler with logging
+
+**Registration:** `src/index.ts` line 57 — `schedule('0 * * * *', runAggregation)` + `init('app.after', ...)` on-boot run
+
+**Tests:**
+- Unit: `__tests__/cron.test.ts` — 8 tests (mock DB, verifies SQL shape, error handling, log format)
+- E2E: `__tests__/cron.e2e.test.ts` — 3 tests (100 events → aggregation, idempotency, lag_seconds)
+
+**Commits:**
+- C1: `fix(cms): migration 030 aggregate_usage_events PL/pgSQL function (task 21)`
+- C2: `feat(cms): monthly_aggregates hourly rollup cron (task 21)`
