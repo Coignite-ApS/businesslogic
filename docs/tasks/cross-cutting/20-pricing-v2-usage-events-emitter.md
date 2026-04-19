@@ -99,7 +99,7 @@ Commits (branch `dm/sprint-b-pricing-v2`):
    - New unit test `test_emit_flow_step_no_panic_on_unavailable_redis` verifies fire-and-forget
    - `flow.step` is NOW wired — all 8 event kinds complete (8/8)
 
-7. *(issue 3 commit)* — `test(cms): usage-events E2E pipeline tests (task 20 issue 3)`
+7. `f142df4` — `test(cms): usage-events E2E pipeline tests + task 20 fix follow-up SHAs (task 20 issue 3)`
    - `services/cms/extensions/local/project-extension-usage-consumer/__tests__/consumer.e2e.test.ts`
    - 3 tests: calc.call lands, module=ai regression guard, batch 5 events distinct ids
    - `npm run test:e2e` gated — requires stack up; `npm test` (unit) excludes e2e files
