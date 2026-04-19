@@ -103,3 +103,4 @@ $$;
 - `services/cms/extensions/local/project-extension-stripe/__tests__/refresh-quotas.test.ts` — 10 unit tests (all green)
 - `services/cms/docs/schema.md` — new section documenting functions and trigger table
 - Commit: fefa83a
+- Fix follow-up commit (see below): migration 028 delete-then-insert + integration tests addressing spec review issues 1 & 2
