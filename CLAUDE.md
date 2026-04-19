@@ -64,8 +64,10 @@ Read these before making changes:
 | `.claude/skills/bizdev-strategy/SKILL.md` | Business development: market research, pricing, competitive analysis, opportunity discovery |
 | `.claude/skills/browser-qa/SKILL.md` | Browser-based QA: Chrome DevTools verification, screenshot evidence, pass/fail reports |
 | `.claude/skills/ux-tester/SKILL.md` | Persona-based UX testing: simulated users, journey flows, holistic scoring |
+| `.claude/skills/widget-designer/SKILL.md` | Design contextual widgets: ChatKit-compatible templates for AI assistant inline rendering |
 | `docs/ux-testing/` | UX testing framework: personas, flows, credentials, experience history |
 | `docs/strategy/` | Strategy documents maintained by BizDev agent (pricing, marketing, gaps, GTM) |
+| `docs/strategy/contextual-widgets.md` | Contextual widgets strategy: ChatKit adoption, template storage, phasing |
 
 ## Agent Model Policy
 
@@ -112,6 +114,7 @@ This project has four specialist agents that run as **independent sub-agents** (
 | When robo-sprint completes UI tasks | **Browser QA** | Auto-triggered in Phase 4.5 |
 | When evaluating end-to-end user experience | **UX Tester** | `/ux-tester` or `/ux-tester sarah calculator-builder` |
 | Before a release, for holistic UX assessment | **UX Tester** | `/ux-tester marcus first-login+calculator-builder+ai-assistant` |
+| When designing widget templates for the AI assistant | **Widget Designer** | `/widget-designer` or `/widget-designer execute_calculator` |
 | **ANY** Directus Postgres change (schema, fields, permissions, data migrations, raw SQL) | **DB Admin** | `/db-admin <task>` — never edit DB or `snapshot.yaml` directly |
 | Resume a paused DB task / approve proposal | **DB Admin** | `/db-admin continue <slug>` or `/db-admin <slug> approved` |
 | Rotate routine snapshots / drop oldest task slugs / clean dryruns (count-based, never time-based) | **DB Admin** | `/db-admin prune` (or `make prune`) — keeps last 10 routines + 20 task slugs + 2 dryruns; reports never auto-deleted; irregular filenames reported only |
