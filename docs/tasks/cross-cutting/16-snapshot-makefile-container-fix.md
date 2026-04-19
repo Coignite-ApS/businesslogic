@@ -1,8 +1,23 @@
 # 16. Fix snapshot Makefile container name (cms)
 
-**Status:** planned
+**Status:** completed
 **Severity:** MEDIUM
 **Source:** db-admin report `docs/reports/db-admin-2026-04-18-pricing-v2-schema-064122.md`
+**Completed:** 2026-04-19 — commit TBD
+
+## Resolution
+
+Approach chosen: **service-name fix + docker cp** (not the bind-mount option, which would have forced a container rebuild).
+
+- `services/cms/Makefile`: added `COMPOSE`, `CMS_SVC=bl-cms`, `CMS_CONTAINER=businesslogic-bl-cms-1` vars; all 5 snapshot targets now run via `$(COMPOSE) exec -T $(CMS_SVC)` then `docker cp` the YAML out and `rm` the in-container copy.
+- `services/cms/snapshots/diff-schema.sh`: rewritten — Directus 11's CLI removed the `schema diff` subcommand, so diff is now implemented as `schema snapshot` (temporary) + `diff -u` against target YAML. Cleans up the temp file on exit.
+- `services/cms/snapshots/apply-schema.sh`: updated to use the same compose path + `bl-cms` service name.
+- `infrastructure/docker/docker-compose.dev.yml`: **no change** — the bind-mount approach from the task spec was reverted because triggering a compose rebuild failed on build-extensions.sh. The docker-cp pattern works without any restart.
+
+### Verification (2026-04-19)
+- All 5 targets produce host-side YAML: `snapshot`, `snapshot` (with SLUG), `snapshot-pre`, `snapshot-post`, `snapshot-dryrun`, `snapshot-forensic` — all 378KB, valid YAML headers
+- In-container copies cleaned up after each run
+- `make diff` correctly showed the migration 026 diff (NOT NULL + FK) against the canonical snapshot.yaml
 
 ## Problem
 
@@ -53,12 +68,12 @@ Then `docker exec ... cli.js schema snapshot /directus/snapshots/...` writes dir
 
 ## Key Tasks
 
-- [ ] Decide approach (volume mount vs. service-name fix vs. both)
-- [ ] Update `services/cms/Makefile` snapshot targets
-- [ ] Update `services/cms/snapshots/diff-schema.sh` and `apply-schema.sh`
-- [ ] Update `infrastructure/docker/docker-compose.dev.yml` if mounting the snapshots dir
-- [ ] Test all 5 make snapshot targets
-- [ ] Update `.claude/skills/db-admin/SKILL.md` Quick Command Reference if commands change
+- [x] Decide approach — service-name fix + docker cp (bind-mount skipped; would require rebuild)
+- [x] Update `services/cms/Makefile` snapshot targets (COMPOSE var + `_take_snapshot` helper with docker cp + rm)
+- [x] Update `services/cms/snapshots/diff-schema.sh` and `apply-schema.sh`
+- [x] Update `infrastructure/docker/docker-compose.dev.yml` — N/A (bind mount not used)
+- [x] Test all 5 make snapshot targets — all pass, YAML on host, container clean
+- [x] Update `.claude/skills/db-admin/SKILL.md` Quick Command Reference — N/A, command signatures unchanged
 
 ## Notes
 

@@ -44,7 +44,7 @@ Pricing v2 code landed in waves on `dev`:
 5. ✅ **Task 35** (CI pipeline) — CORRECTNESS. Buddy pipeline + CONTRIBUTING.md. Shipped 2026-04-19 (`fefcfe9` + `5957bf8`).
 
 **Quality of life / tech debt** (parallelizable, any time):
-- 16 Makefile container-name · 22 calls_per_month enforcement · ~~23 bl_flow_executions FK~~ (shipped 2026-04-19) · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
+- ~~16 Makefile container-name~~ (shipped 2026-04-19) · 22 calls_per_month enforcement · ~~23 bl_flow_executions FK~~ (shipped 2026-04-19) · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
 
 **Completed Pricing v2 tasks:** 14 (Stripe + code refactor), 15 (schema), 18 (wallet debit hook), 19 (calc slots), 26 (test coverage E2E — partial; CI pending), ai-api/19 (token usage column fix)
 
@@ -206,7 +206,7 @@ Infrastructure and multi-service concerns.
 | 13 | Startup Secret Validation (Fail-Fast) | completed | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
 | 14 | Pricing v2 — Stripe Product Catalog | planned | [cross-cutting/14-pricing-v2-stripe-catalog.md](cross-cutting/14-pricing-v2-stripe-catalog.md) |
 | 15 | Pricing v2 — Directus Schema (DB Admin) | **completed (Inv 1 + Inv 2)** | [cross-cutting/15-pricing-v2-directus-schema.md](cross-cutting/15-pricing-v2-directus-schema.md) — see [Inv 1 report](../reports/db-admin-2026-04-18-pricing-v2-schema-064122.md) + [Inv 2 report](../reports/db-admin-2026-04-18-ai-token-usage-fk-fix-073027.md) |
-| 16 | Snapshot Makefile container-name fix | planned | [cross-cutting/16-snapshot-makefile-container-fix.md](cross-cutting/16-snapshot-makefile-container-fix.md) |
+| 16 | Snapshot Makefile container-name fix | completed | [cross-cutting/16-snapshot-makefile-container-fix.md](cross-cutting/16-snapshot-makefile-container-fix.md) |
 | 17 | Pricing v2 — feature_quotas refresh job | planned | [cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md](cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md) |
 | 18 | Pricing v2 — ai_wallet atomic debit hook (ai-api) | **completed** (`6d23d9c` + `0823b8b`) | [cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md](cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md) |
 | 19 | Pricing v2 — calculator_slots compute on upload (formula-api) | **completed** (`272dd31` + `b70b07f` + `969f984`) | [cross-cutting/19-pricing-v2-calculator-slots-compute.md](cross-cutting/19-pricing-v2-calculator-slots-compute.md) |
@@ -341,5 +341,5 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 1 | 0 | 0 | 12 | 13 |
-| **Total** | **19** | **8** | **0** | **60** | **87** |
+| Cross-Cutting | 0 | 0 | 0 | 13 | 13 |
+| **Total** | **18** | **8** | **0** | **61** | **87** |

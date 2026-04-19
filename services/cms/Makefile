@@ -10,6 +10,15 @@
 #   make update  # Update base submodule to latest
 # =============================================================================
 
+# Use the infrastructure dev compose file + bl-cms service (matches root Makefile convention).
+# Snapshots are written inside the container to /directus/snapshots, then copied to the host
+# via `docker cp` because /directus/snapshots/ is NOT a bind mount (it's baked into the image
+# by the base Dockerfile). Using docker cp avoids the rebuild a volume mount would require.
+COMPOSE := docker compose -f ../../infrastructure/docker/docker-compose.dev.yml
+CMS_SVC := bl-cms
+# Container name pattern: <project>-<service>-<instance>. Project = businesslogic.
+CMS_CONTAINER := businesslogic-bl-cms-1
+
 .PHONY: init update dev build stop clean check-updates reset-cache db-sync snapshot snapshot-pre snapshot-post snapshot-dryrun snapshot-forensic diff apply \
        ext-build-all ext-build \
        ext-calculators-build ext-calculators-watch \
@@ -94,12 +103,20 @@ logs:
 #   post_<slug>_YYYYMMDD_HHMMSS.yaml      — taken after a db-admin task
 #   snapshot.yaml                          — canonical schema, committed to git, NEVER pruned
 
+# Helper: take a snapshot inside the container, copy the YAML to the host, delete the in-container copy.
+# $(1) = output filename (no path)
+define _take_snapshot
+	$(COMPOSE) exec -T $(CMS_SVC) node /directus/cli.js schema snapshot "/directus/snapshots/$(1)" >/dev/null && \
+	docker cp "$(CMS_CONTAINER):/directus/snapshots/$(1)" "snapshots/$(1)" >/dev/null && \
+	$(COMPOSE) exec -T $(CMS_SVC) rm -f "/directus/snapshots/$(1)" >/dev/null
+endef
+
 # Routine schema snapshot. Optional: SLUG=<branch-or-task> appends slug.
 snapshot:
 	@TS=$$(date +%Y%m%d_%H%M%S); \
 	SUFFIX=$(if $(SLUG),_$(SLUG),); \
 	OUT="snapshot_$${TS}$${SUFFIX}.yaml"; \
-	docker compose exec directus node /directus/cli.js schema snapshot "/directus/snapshots/$${OUT}"; \
+	$(call _take_snapshot,$${OUT}); \
 	echo "Saved: snapshots/$${OUT}"
 
 # Pre-task schema snapshot (REQUIRES SLUG).
@@ -107,7 +124,7 @@ snapshot-pre:
 	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>  (e.g., make snapshot-pre SLUG=add-widget-collection)"; exit 1; }
 	@TS=$$(date +%Y%m%d_%H%M%S); \
 	OUT="pre_$(SLUG)_$${TS}.yaml"; \
-	docker compose exec directus node /directus/cli.js schema snapshot "/directus/snapshots/$${OUT}"; \
+	$(call _take_snapshot,$${OUT}); \
 	echo "Saved: snapshots/$${OUT}"
 
 # Post-task schema snapshot (REQUIRES SLUG).
@@ -115,7 +132,7 @@ snapshot-post:
 	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>"; exit 1; }
 	@TS=$$(date +%Y%m%d_%H%M%S); \
 	OUT="post_$(SLUG)_$${TS}.yaml"; \
-	docker compose exec directus node /directus/cli.js schema snapshot "/directus/snapshots/$${OUT}"; \
+	$(call _take_snapshot,$${OUT}); \
 	echo "Saved: snapshots/$${OUT}"
 
 # Dryrun schema snapshot (REQUIRES PURPOSE). Use for exploratory snapshots NOT tied to a real applied change.
@@ -124,7 +141,7 @@ snapshot-dryrun:
 	@[ -n "$(PURPOSE)" ] || { echo "ERROR: pass PURPOSE=<short-purpose>  (e.g., make snapshot-dryrun PURPOSE=test-rename)"; exit 1; }
 	@TS=$$(date +%Y%m%d_%H%M%S); \
 	OUT="dryrun_$(PURPOSE)_$${TS}.yaml"; \
-	docker compose exec directus node /directus/cli.js schema snapshot "/directus/snapshots/$${OUT}"; \
+	$(call _take_snapshot,$${OUT}); \
 	echo "Saved: snapshots/$${OUT}  (will be pruned aggressively)"
 
 # Forensic schema snapshot (REQUIRES SLUG). Used by db-admin Phase 6.5 to capture a FAILED
@@ -133,7 +150,7 @@ snapshot-forensic:
 	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>"; exit 1; }
 	@TS=$$(date +%Y%m%d_%H%M%S); \
 	OUT="forensic_$(SLUG)_$${TS}.yaml"; \
-	docker compose exec directus node /directus/cli.js schema snapshot "/directus/snapshots/$${OUT}"; \
+	$(call _take_snapshot,$${OUT}); \
 	echo "Saved: snapshots/$${OUT}  (failed state — preserved for investigation)"
 
 # Diff current schema against latest snapshot (or SNAPSHOT=<file.yaml>).
