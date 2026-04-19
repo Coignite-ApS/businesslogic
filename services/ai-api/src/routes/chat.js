@@ -15,6 +15,7 @@ import { checkBudget, recordCost, getConversationBudgetWarning, injectBudgetWarn
 import { compressIfNeeded } from '../services/summarize.js';
 import { resolveWidget } from '../widgets/resolver.js';
 import { debitWallet } from '../hooks/wallet-debit.js';
+import { recordFailedDebit } from '../hooks/wallet-failed-debits.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -413,12 +414,20 @@ export async function registerRoutes(app) {
             });
             if (!debit.ok) {
               // User already got the answer, Anthropic already charged us — wallet
-              // was not debited. This is a silent accounting loss; log at error with
-              // full context so ops can reconstruct/backfill.
+              // was not debited. Persist failure row so the reconciler can retry.
               req.log.error(
                 { accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, reason: debit.reason },
-                'wallet debit failed post-chat — manual reconciliation required',
+                'wallet debit failed post-chat — failure row queued',
               );
+              await recordFailedDebit({
+                accountId, costUsd, model,
+                inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+                eventKind: 'ai.message', module: 'kb',
+                apiKeyId: req.apiKeyId || null,
+                conversationId,
+                errorReason: 'debit_returned_not_ok',
+                errorDetail: debit.reason,
+              });
             } else {
               req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model }, 'wallet debit ok');
               if (debit.autoReloadTriggered) {
@@ -428,8 +437,17 @@ export async function registerRoutes(app) {
           } catch (err) {
             req.log.error(
               { err, accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
-              'wallet debit threw post-chat — manual reconciliation required',
+              'wallet debit threw post-chat — failure row queued',
             );
+            await recordFailedDebit({
+              accountId, costUsd, model,
+              inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+              eventKind: 'ai.message', module: 'kb',
+              apiKeyId: req.apiKeyId || null,
+              conversationId,
+              errorReason: 'debit_threw',
+              errorDetail: err?.stack || err?.message || String(err),
+            });
           }
         }
 
@@ -815,8 +833,17 @@ export async function registerRoutes(app) {
           if (!debit.ok) {
             req.log.error(
               { accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, reason: debit.reason },
-              'wallet debit failed post-chat/sync — manual reconciliation required',
+              'wallet debit failed post-chat/sync — failure row queued',
             );
+            await recordFailedDebit({
+              accountId, costUsd, model,
+              inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+              eventKind: 'ai.message', module: 'kb',
+              apiKeyId: req.apiKeyId || null,
+              conversationId,
+              errorReason: 'debit_returned_not_ok',
+              errorDetail: debit.reason,
+            });
           } else {
             req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model }, 'wallet debit ok');
             if (debit.autoReloadTriggered) {
@@ -826,8 +853,17 @@ export async function registerRoutes(app) {
         } catch (err) {
           req.log.error(
             { err, accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
-            'wallet debit threw post-chat/sync — manual reconciliation required',
+            'wallet debit threw post-chat/sync — failure row queued',
           );
+          await recordFailedDebit({
+            accountId, costUsd, model,
+            inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+            eventKind: 'ai.message', module: 'kb',
+            apiKeyId: req.apiKeyId || null,
+            conversationId,
+            errorReason: 'debit_threw',
+            errorDetail: err?.stack || err?.message || String(err),
+          });
         }
       }
 

@@ -13,6 +13,7 @@ import { logRetrievalQuality } from '../services/retrieval-logger.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
 import { triggerFlowIngest, isFlowIngestEnabled } from '../services/flow-ingest.js';
 import { debitWallet } from '../hooks/wallet-debit.js';
+import { recordFailedDebit } from '../hooks/wallet-failed-debits.js';
 import { calculateCost } from '../utils/cost.js';
 
 /** Check AI permission on gateway-forwarded requests */
@@ -587,8 +588,19 @@ export async function registerRoutes(app) {
         if (!debit.ok) {
           req.log.error(
             { accountId, costUsd: kbAskCostUsd, model: answerModel, inputTokens: result.inputTokens, outputTokens: result.outputTokens, reason: debit.reason },
-            'wallet debit failed post-kb-ask — manual reconciliation required',
+            'wallet debit failed post-kb-ask — failure row queued',
           );
+          await recordFailedDebit({
+            accountId,
+            costUsd: kbAskCostUsd,
+            model: answerModel,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            eventKind: 'kb.ask', module: 'kb',
+            apiKeyId: req.apiKeyId || null,
+            errorReason: 'debit_returned_not_ok',
+            errorDetail: debit.reason,
+          });
         } else {
           req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model: answerModel }, 'wallet debit ok');
           if (debit.autoReloadTriggered) {
@@ -598,8 +610,19 @@ export async function registerRoutes(app) {
       } catch (err) {
         req.log.error(
           { err, accountId, costUsd: kbAskCostUsd, model: answerModel, inputTokens: result.inputTokens, outputTokens: result.outputTokens },
-          'wallet debit threw post-kb-ask — manual reconciliation required',
+          'wallet debit threw post-kb-ask — failure row queued',
         );
+        await recordFailedDebit({
+          accountId,
+          costUsd: kbAskCostUsd,
+          model: answerModel,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          eventKind: 'kb.ask', module: 'kb',
+          apiKeyId: req.apiKeyId || null,
+          errorReason: 'debit_threw',
+          errorDetail: err?.stack || err?.message || String(err),
+        });
       }
     }
 

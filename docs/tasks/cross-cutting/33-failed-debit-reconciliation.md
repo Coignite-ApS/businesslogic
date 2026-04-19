@@ -1,8 +1,36 @@
 # 33. Failed-debit reconciliation queue
 
-**Status:** planned
+**Status:** completed (2026-04-19)
 **Severity:** HIGH — accounting correctness (silent loss window)
 **Source:** Task 18 code review (commit `0823b8b`) — issue I1
+
+## Implementation (2026-04-19)
+
+### DB piece
+
+- `migrations/cms/025_ai_wallet_failed_debits.sql` (+ `_down.sql`) — adds `public.ai_wallet_failed_debits` (18 cols, 2 CHECK, FK CASCADE, partial index on `status='pending'`, composite `(account_id, status)`).
+- Directus collection registered via surgical `INSERT INTO directus_collections` (icon=`error_outline`, admin-only). Matches Task 31 precedent — never invoked `make apply` (pre-existing snapshot drift would be destructively "corrected"). snapshot.yaml refreshed with +26 line additive diff.
+- Report: `docs/reports/db-admin-2026-04-19-task-33-failed-debits-table-113600.md`.
+
+### Code piece
+
+- `services/ai-api/src/hooks/wallet-failed-debits.js` — new module exporting:
+  - `recordFailedDebit(opts)` — best-effort INSERT. Never throws. Returns `{recorded, id?, reason?, error?}`. If pool unavailable OR INSERT fails, logs at `error` level with structured context (the "lost forever" path). Caller contract: always ignore the return value (record it and move on).
+  - `reconcileFailedDebits(opts)` — replays rows `status='pending'` AND `created_at < NOW() - 5 minutes`. Per row: acquires pg advisory lock on `hashtext(account_id)` to serialize vs live debits, calls `debitWallet` with stored context, transitions status → `reconciled` (method=`auto`) on success, `waived` on insufficient-balance 402, leaves `pending` on other transient failures.
+- `services/ai-api/src/routes/chat.js` (2 call sites — SSE stream + sync) and `services/ai-api/src/routes/kb.js` (1 call site — `kb.ask`) — both `!debit.ok` and `catch (err)` branches now call `recordFailedDebit` with full request context (accountId, tokens, model, conversationId, errorReason, errorDetail).
+- `services/ai-api/src/routes/health.js` — new `POST /v1/ai/admin/reconcile-failed-debits` endpoint. Admin-only (403 for non-admin via the same `req.isAdmin` gate used by the metrics aggregator). Body: `{ limit?, minAgeMinutes? }`. Returns `{ data: { scanned, reconciled, waived, failed } }`.
+- `infrastructure/docker/docker-compose.dev.yml` — added `GATEWAY_SHARED_SECRET` to bl-ai-api env block (was missing; ai-api config validator requires it — surfaced when the service rebuild crash-looped).
+
+### Tests
+
+- `services/ai-api/test/wallet-failed-debits.test.js` — 10 real-DB scenarios: recordFailedDebit happy path + derived cost_eur + error_detail truncation + no-pool + FK violation → never throws; reconcile happy path + insufficient-balance → waived + skip young rows (<5 min) + idempotent + multi-row batch.
+- Added `test/wallet-failed-debits.test.js` to the `test:all` npm script.
+
+### Known gaps / future work
+
+- Observability metrics (count of `pending`, daily EUR pending + waived) — not wired yet. Natural addition to the metrics-aggregator cron.
+- `ai.wallet.debit.lost_forever` OTel counter — not emitted yet (task spec mentions this). Currently only structured console.error. Plug into the existing OTel meter if desired.
+- No scheduled cron for auto-reconcile — for now it's admin-triggered via the endpoint. Can be wired into a `schedule(...)` in the CMS Stripe extension or ai-api startup once ops wants continuous reconciliation.
 
 ## Problem
 
