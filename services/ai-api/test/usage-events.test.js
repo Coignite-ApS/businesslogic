@@ -1,5 +1,5 @@
 // Tests for ai-api usage event emitters.
-// Verifies event shape via bl-events package directly.
+// Imports from the inlined local module — no external package.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -8,7 +8,7 @@ import {
   buildEvent,
   USAGE_STREAM_KEY,
   getDroppedEventCount,
-} from '../../../packages/bl-events/dist/index.js';
+} from '../src/services/usage-events.js';
 
 describe('ai-api usage events', () => {
   it('kb.search event shape is correct', async () => {

@@ -1,33 +1,19 @@
 // Tests for formula-api usage event emitter.
-// Mocks cache.js so no real Redis is needed.
-import { describe, it, mock, before, afterEach } from 'node:test';
+// Imports from the inlined local module — no external package.
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  buildEvent,
+  emitUsageEvent,
+  USAGE_STREAM_KEY,
+  getDroppedEventCount,
+} from '../src/services/usage-events.js';
+
 describe('emitCalcCall', () => {
-  let capturedXaddArgs = null;
-  let mockRedis;
+  afterEach(() => {});
 
-  before(async () => {
-    // Mock the cache module before importing usage-events
-    mockRedis = {
-      async xadd(...args) {
-        capturedXaddArgs = args;
-        return '1-0';
-      },
-    };
-
-    // Patch cache module via mock.module (Node 22+ supports this)
-    // For older Node, we test via the exported function behaviour
-  });
-
-  afterEach(() => {
-    capturedXaddArgs = null;
-  });
-
-  it('emitCalcCall builds correct event shape', async () => {
-    // Import the emit helper from bl-events directly to verify shape
-    const { buildEvent } = await import('../../packages/bl-events/dist/index.js');
-
+  it('buildEvent builds correct event shape', () => {
     const event = buildEvent({
       account_id: 'acc-abc',
       api_key_id: null,
@@ -53,8 +39,6 @@ describe('emitCalcCall', () => {
   });
 
   it('emitUsageEvent pushes to correct stream key', async () => {
-    const { emitUsageEvent, buildEvent, USAGE_STREAM_KEY } = await import('../../packages/bl-events/dist/index.js');
-
     const collected = [];
     const fakeRedis = {
       async xadd(...args) { collected.push(args); return '1-0'; },
@@ -79,7 +63,6 @@ describe('emitCalcCall', () => {
   });
 
   it('emitUsageEvent is silent when redis is null', async () => {
-    const { emitUsageEvent, buildEvent, getDroppedEventCount } = await import('../../packages/bl-events/dist/index.js');
     const before = getDroppedEventCount();
     const event = buildEvent({
       account_id: 'acc-2',
