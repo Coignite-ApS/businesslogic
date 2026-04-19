@@ -88,5 +88,25 @@ Run inside a transaction; on failure, `aggregated_at` stays NULL → next run pi
 - E2E: `__tests__/cron.e2e.test.ts` — 3 tests (100 events → aggregation, idempotency, lag_seconds)
 
 **Commits:**
-- C1: `fix(cms): migration 030 aggregate_usage_events PL/pgSQL function (task 21)`
-- C2: `feat(cms): monthly_aggregates hourly rollup cron (task 21)`
+- C1: `fix(cms): migration 030 aggregate_usage_events PL/pgSQL function (task 21)` — 90983d5
+- C2: `feat(cms): monthly_aggregates hourly rollup cron (task 21)` — c8cc5bb
+- C3: `fix(cms): migration 031 aggregate_usage_events — concurrency lock + safe metadata casts, drop calc_unique_calculators (task 21)` — fa317f6
+- C4: `test(cms): expand cron.e2e.test.ts — all 12 counters + concurrency + malformed metadata regression (task 21)` — TBD (post-commit)
+
+**Code review fixes (2026-04-19 — migration 031):**
+
+Issues C1, I1, I4 identified by code reviewer and fixed in migration 031:
+
+- **C1 fixed:** `calc_unique_calculators` removed from aggregator entirely (column preserved in table; aggregator leaves it NULL). Set-cardinality counts are not additively decomposable — hourly rollup would inflate counts across hours for the same calculator.
+- **I1 fixed:** `pg_advisory_xact_lock(hashtext('aggregate_usage_events'))` added as first statement in function body. Blocks concurrent invocations for the duration of the transaction; second caller waits, then aggregates zero rows (already marked), preventing double-count.
+- **I4 fixed:** Raw `(metadata->>'input_tokens')::bigint` replaced with safe CASE guard: `CASE WHEN metadata ? 'input_tokens' AND metadata->>'input_tokens' ~ '^[0-9]+$' THEN cast ELSE 0 END`. Same for `output_tokens`. Malformed metadata no longer crashes aggregator and permanently wedges it.
+
+**DB admin report:** `docs/reports/db-admin-2026-04-19-pricing-v2-aggregate-fn-fixes-204646.md`
+
+## Known follow-ups
+
+- **I2:** `accounts_touched`/`periods_touched` heuristic queries `monthly_aggregates` within a 5-second window — race condition; replace with CTE RETURNING counts from the upserted CTE for exact values
+- **I3:** No batch size protection — first run after an outage processes all backlogged events in a single query; O(N) memory spike risk; add `LIMIT` to new_events CTE with loop
+- **I5:** `init('app.after')` awaits aggregation before resolving — blocks CMS startup if aggregation is slow or DB is unavailable at boot time; run in background (detached promise with error log)
+- **calc_unique_calculators:** Column no longer populated by aggregator (C1 fix). Needs a side-table or on-demand computation (e.g., `COUNT(DISTINCT metadata->>'calculator_id')` at query time) if any UI/API reads it
+- **Alerting:** No Prometheus/metric sink for `lag_seconds` yet — aggregation lag is logged but not alertable; add Prometheus counter or emit to monitoring sink
