@@ -103,3 +103,25 @@ Commits (branch `dm/sprint-b-pricing-v2`):
    - `services/cms/extensions/local/project-extension-usage-consumer/__tests__/consumer.e2e.test.ts`
    - 3 tests: calc.call lands, module=ai regression guard, batch 5 events distinct ids
    - `npm run test:e2e` gated — requires stack up; `npm test` (unit) excludes e2e files
+
+## CTO Review Follow-up (task 20 C1/C2/I1)
+
+8. `5133b14` — `fix(services): inline usage-events emit helper (task 20 C1)`
+   - C1 (production-breaking): `packages/bl-events/dist/` was never inside Docker build context
+   - `services/formula-api/src/services/usage-events.js` — inlined `buildEvent`, `emitUsageEvent`, `USAGE_STREAM_KEY`, `getDroppedEventCount`
+   - `services/ai-api/src/services/usage-events.js` — same inline, retains Redis init/close
+   - Tests updated to import from local module (no `../../packages/bl-events/dist/`)
+   - `packages/bl-events/README.md` added — marks package as canonical schema reference only
+   - Container smoke: `docker exec bl-formula-api-1 node -e "import('./src/services/usage-events.js')..."` → "loaded ok"
+
+9. `903e85b` — `fix(flow): UTF-8-safe error truncation in emit_flow_failed (task 20 C2)`
+   - C2 (latent panic): `&error[..error.len().min(500)]` byte-slices UTF-8, panics on multi-byte codepoints
+   - Fixed: `error.chars().take(500).collect::<String>()`
+   - 3 new unit tests: unicode boundary, short string, exact 500 ASCII; all 5 flow-common tests pass
+
+10. `4e6e691` — `test(packages): cross-language envelope shape fixture + tests (task 20 I1)`
+    - I1 (cross-language drift): no contract test between TS types and Rust struct
+    - `packages/bl-events/test/fixtures/envelope-samples.json` — canonical fixture, all 8 event kinds
+    - `packages/bl-events/test/envelope-shape.test.js` — TS shape contract, 5 tests
+    - `services/flow/crates/flow-common/tests/envelope_shape.rs` — Rust integration test, 2 tests (reads same fixture via `include_str!`)
+    - `docs/architecture/usage-events.md` updated to reference fixture as canonical spec
