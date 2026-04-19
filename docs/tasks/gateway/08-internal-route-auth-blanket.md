@@ -1,6 +1,6 @@
 # 08. Blanket InternalAuth for /internal/ Routes
 
-**Status:** done
+**Status:** completed
 **Source:** CTO Review 2026-04-15 — F-009
 
 ---

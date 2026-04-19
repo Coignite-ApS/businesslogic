@@ -119,8 +119,8 @@ AI chat, knowledge base backend, embeddings, public API.
 | 16 | Reranker Integration (Cohere Rerank) | completed | [ai-api/16-reranker-integration.md](ai-api/16-reranker-integration.md) |
 | 17 | Retrieval Quality Metrics Enhancement | completed | [ai-api/17-retrieval-quality-metrics.md](ai-api/17-retrieval-quality-metrics.md) |
 | 18 | KB Re-index Endpoint | completed | [ai-api/18-kb-reindex-endpoint.md](ai-api/18-kb-reindex-endpoint.md) |
-| 19 | AI Token Usage Column Mismatch (silent data loss) | planned | [ai-api/19-ai-token-usage-column-mismatch.md](ai-api/19-ai-token-usage-column-mismatch.md) |
-| 20 | API Key → KB Scoping (data isolation) | planned | [ai-api/20-api-key-kb-scoping.md](ai-api/20-api-key-kb-scoping.md) |
+| 19 | AI Token Usage Column Mismatch (silent data loss) | completed | [ai-api/19-ai-token-usage-column-mismatch.md](ai-api/19-ai-token-usage-column-mismatch.md) |
+| 20 | API Key → KB Scoping (data isolation) | completed | [ai-api/20-api-key-kb-scoping.md](ai-api/20-api-key-kb-scoping.md) |
 
 ---
 
@@ -164,7 +164,7 @@ DAG workflow execution, triggers, workers.
 | 01 | Replace Production unwrap() with Error Handling | completed | [flow/01-unwrap-error-handling.md](flow/01-unwrap-error-handling.md) |
 | 02 | Agent Node — ReAct Loop | planned | [flow/02-agent-node.md](flow/02-agent-node.md) |
 | 03 | MCP Client Node — External Tool Integration | planned | [flow/03-mcp-client-node.md](flow/03-mcp-client-node.md) |
-| 04 | Flow Engine unwrap() Audit — Round 2 | planned | [flow/04-unwrap-audit-round2.md](flow/04-unwrap-audit-round2.md) |
+| 04 | Flow Engine unwrap() Audit — Round 2 | completed | [flow/04-unwrap-audit-round2.md](flow/04-unwrap-audit-round2.md) |
 
 ---
 
@@ -181,7 +181,7 @@ Auth, rate limiting, routing, CORS.
 | 05 | Request Logging & Audit Trail | completed | [gateway/05-internal-route-logging.md](gateway/05-internal-route-logging.md) |
 | 06 | Account MCP Route | completed | [gateway/06-account-mcp-route.md](gateway/06-account-mcp-route.md) |
 | 07 | Fix MCP Calculator Auth Bypass | completed | [gateway/07-mcp-auth-bypass-fix.md](gateway/07-mcp-auth-bypass-fix.md) |
-| 08 | Blanket InternalAuth for /internal/ Routes | planned | [gateway/08-internal-route-auth-blanket.md](gateway/08-internal-route-auth-blanket.md) |
+| 08 | Blanket InternalAuth for /internal/ Routes | completed | [gateway/08-internal-route-auth-blanket.md](gateway/08-internal-route-auth-blanket.md) |
 
 ---
 
@@ -228,7 +228,7 @@ Infrastructure and multi-service concerns.
 | 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | **completed 2026-04-19** | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
 | 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
-| 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | planned | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
+| 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | completed | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
 
 ---
 
@@ -336,10 +336,10 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Service | Planned | Idea | In-Progress | Completed | Total |
 |---------|---------|------|-------------|-----------|-------|
 | CMS | 14 | 0 | 0 | 20 | 34 |
-| AI API | 3 | 0 | 0 | 8 | 11 |
+| AI API | 1 | 0 | 0 | 10 | 11 |
 | Formula API | 1 | 0 | 0 | 7 | 8 |
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
-| Flow | 3 | 0 | 0 | 1 | 4 |
-| Gateway | 1 | 0 | 0 | 7 | 8 |
-| Cross-Cutting | 3 | 0 | 0 | 10 | 13 |
-| **Total** | **25** | **8** | **0** | **54** | **87** |
+| Flow | 2 | 0 | 0 | 2 | 4 |
+| Gateway | 0 | 0 | 0 | 8 | 8 |
+| Cross-Cutting | 2 | 0 | 0 | 11 | 13 |
+| **Total** | **20** | **8** | **0** | **59** | **87** |
