@@ -17,6 +17,7 @@
     "stripe:create-v2-products": "tsx scripts/create-products-v2.ts"
   },
   "dependencies": {
+    "ioredis": "^5.10.1",
     "stripe": "^20.4.1"
   },
   "devDependencies": {

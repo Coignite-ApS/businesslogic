@@ -28,6 +28,16 @@ for SRC_DIR in "$@"; do
     for ext_dir in "$SRC_DIR"/*/; do
         if [ -d "$ext_dir" ] && [ -f "$ext_dir/package.json" ]; then
             name=$(basename "$ext_dir")
+
+            # Directories without a directus:extension manifest are shared libraries.
+            # Copy them in-place (siblings to built extensions) so relative imports resolve,
+            # but do NOT try to build them with `directus-extension build`.
+            if ! grep -q '"directus:extension"' "$ext_dir/package.json"; then
+                echo "Copying $name (shared library — no directus:extension manifest)"
+                cp -r "$ext_dir" "/directus/extensions/$name"
+                continue
+            fi
+
             echo "----------------------------------------"
             echo "Building: $name"
             echo "----------------------------------------"
