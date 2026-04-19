@@ -33,7 +33,7 @@ Pricing v2 code landed in waves on `dev`:
 |---|---|---|---|
 | **Sprint 1 — Make wallet actually work** | 18 wallet debit · 19 calc slots · 26 isolation E2E | Wallet depletes on AI use; honest slot enforcement; isolation guarantee | ✅ **shipped** |
 | **Sprint 2 — Wallet correctness + security** (~3d) | 36 permission fix · 31 auto-reload table · 33 failed-debit reconcile · 34 slot reconcile/race · 35 CI pipeline | Close Sprint 1's follow-up gaps; make tests actually run on PR; close cross-account read leak | ✅ **shipped** (all 5) |
-| **Sprint 3 — Production launch** (~1.5d) | 28 production deployment + smoke test · cms/37 empty-trial onboarding wizard | Real customers sign up + activate + check out via Stripe live mode | planned |
+| **Sprint 3 — Production launch** (~1.5d) | 28 production deployment + smoke test · cms/37 empty-trial onboarding wizard | Real customers sign up + activate + check out via Stripe live mode | **deferred** — keep developing locally first, more testing before going to server |
 | **Sprint 4 — Analytics + observability** (~3d, parallelizable) | 17 feature_quotas refresh · 20 usage_events emitter · 21 monthly_aggregates rollup · 27 gateway sub-limits | Per-key sub-limits enforced; usage events captured; admin reports accurate | planned |
 
 **Sprint 2 ordering** (critical-first):
