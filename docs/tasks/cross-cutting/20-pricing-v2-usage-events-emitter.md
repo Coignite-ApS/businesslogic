@@ -79,8 +79,27 @@ Commits (branch `dm/sprint-b-pricing-v2`):
    - `services/flow/crates/flow-common/src/usage_events.rs` — Rust emit (flow.execution, flow.failed)
    - 5 ai-api tests pass; 299/299 ai-api tests pass; Rust build + 19 tests pass
 
-4. *(this commit)* — `feat(cms): project-extension-usage-consumer + usage-events architecture doc`
+4. `a0ebe8d` — `feat(cms): project-extension-usage-consumer + usage-events architecture doc`
    - New Directus hook extension with XREADGROUP consumer loop
    - `consumer.ts` pure functions tested with 9 vitest tests
    - `docs/architecture/usage-events.md` — full architecture reference
    - `make ext-usage-consumer` target added
+
+## Fix Follow-up (task 20 issues 1–3)
+
+5. `5633513` — `fix(cms): migration 029 adds 'ai' to module_kind enum (task 20 issue 1)`
+   - `migrations/cms/029_module_kind_add_ai.sql` — ALTER TYPE module_kind ADD VALUE 'ai'
+   - `migrations/cms/029_module_kind_add_ai_down.sql` — no-op stub (Postgres can't remove single enum values)
+   - Pre/post Directus schema snapshots in `services/cms/snapshots/`
+   - db-admin report: `docs/reports/db-admin-2026-04-19-pricing-v2-module-kind-add-ai-192638.md`
+
+6. `9353cbd` — `fix(flow): wire flow.step emit on successful node completion (task 20 issue 2)`
+   - `services/flow/crates/flow-engine/src/executor/mod.rs:409` — emit_flow_step after completed.insert
+   - Fires only on success arm; flow.failed covers failure path
+   - New unit test `test_emit_flow_step_no_panic_on_unavailable_redis` verifies fire-and-forget
+   - `flow.step` is NOW wired — all 8 event kinds complete (8/8)
+
+7. *(issue 3 commit)* — `test(cms): usage-events E2E pipeline tests (task 20 issue 3)`
+   - `services/cms/extensions/local/project-extension-usage-consumer/__tests__/consumer.e2e.test.ts`
+   - 3 tests: calc.call lands, module=ai regression guard, batch 5 events distinct ids
+   - `npm run test:e2e` gated — requires stack up; `npm test` (unit) excludes e2e files

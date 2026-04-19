@@ -12,11 +12,15 @@
   "scripts": {
     "build": "directus-extension build",
     "dev": "directus-extension build -w --no-minify",
-    "test": "vitest run"
+    "test": "vitest run --exclude '**/*.e2e.test.ts'",
+    "test:e2e": "vitest run __tests__/consumer.e2e.test.ts"
   },
   "devDependencies": {
     "@directus/extensions-sdk": "^17.0.11",
     "@types/node": "^25.5.0",
+    "@types/pg": "^8.20.0",
+    "ioredis": "^5.10.1",
+    "pg": "^8.20.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   }
