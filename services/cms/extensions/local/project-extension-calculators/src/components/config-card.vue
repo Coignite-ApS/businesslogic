@@ -175,7 +175,8 @@
 					</div>
 					<plan-cards
 						v-else
-						:plans="plans"
+						module="calculators"
+						:tiers="plans"
 						:current-plan-id="currentPlanId"
 						:current-plan-sort="currentPlanSort"
 						:checking-out="checkingOut"
@@ -197,7 +198,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import type { CalculatorConfig } from '../types';
 import PlanCards from 'project-shared-ui/plan-cards.vue';
-import type { PlanInfo } from 'project-shared-ui/plan-cards.vue';
+import type { ModulePlan } from 'project-shared-ui/plan-cards.vue';
 
 interface SubscriptionInfo {
 	plan: { id: string; sort: number | null };
@@ -312,7 +313,7 @@ function copyText(text: string) {
 // Upgrade plan dialog
 const upgradeVisible = ref(false);
 const plansLoaded = ref(false);
-const plans = ref<PlanInfo[]>([]);
+const plans = ref<ModulePlan[]>([]);
 const subscription = ref<SubscriptionInfo | null>(null);
 const checkingOut = ref<string | null>(null);
 const upgradeError = ref<string | null>(null);
@@ -324,8 +325,6 @@ async function fetchUpgradeData() {
 	if (plansLoaded.value) return;
 	upgradeError.value = null;
 	try {
-		// v2: only show Calculators module plans (not KB / Flows). The picker
-		// is calculator-scoped because this card is on a calculator config page.
 		const [plansRes, userRes] = await Promise.all([
 			api.get('/items/subscription_plans', {
 				params: {
@@ -343,21 +342,22 @@ async function fetchUpgradeData() {
 			}),
 			api.get('/users/me', { params: { fields: ['active_account'] } }),
 		]);
-		// Map v2 plan rows → PlanCards' PlanInfo shape until shared-ui catches up.
-		plans.value = (plansRes.data.data || []).map((p: any) => ({
+		// v2: pass rows directly — plan-cards.vue now accepts ModulePlan natively.
+		plans.value = (plansRes.data.data || []).map((p: any): ModulePlan => ({
 			id: p.id,
 			name: p.name,
-			// Slots ≈ calculator_limit (1 calc = 1 slot until task 19 splits the meaning)
-			calculator_limit: p.slot_allowance ?? null,
-			calls_per_month: p.request_allowance ?? null,
-			calls_per_second: null, // v2 dropped this column; PlanCards hides when null
-			// price_eur_* is in EUR (units), legacy was cents — multiply by 100.
-			monthly_price: p.price_eur_monthly != null ? Math.round(Number(p.price_eur_monthly) * 100) : null,
-			yearly_price: p.price_eur_annual != null ? Math.round(Number(p.price_eur_annual) * 100) : null,
-			sort: p.sort ?? 0,
-			// v2 extras for richer rendering once PlanCards supports them.
-			ao_allowance: p.ao_allowance ?? null,
+			module: 'calculators',
 			tier: p.tier,
+			price_eur_monthly: p.price_eur_monthly ?? null,
+			price_eur_annual: p.price_eur_annual ?? null,
+			sort: p.sort ?? 0,
+			slot_allowance: p.slot_allowance ?? null,
+			ao_allowance: p.ao_allowance ?? null,
+			request_allowance: p.request_allowance ?? null,
+			storage_mb: null,
+			embed_tokens_m: null,
+			executions: null,
+			concurrent_runs: null,
 		}));
 
 		const accountId = userRes.data.data?.active_account;
@@ -397,17 +397,14 @@ async function handleCheckout(planId: string) {
 	checkingOut.value = planId;
 	upgradeError.value = null;
 	try {
-		// Lookup the v2 module/tier from our locally cached plans list. This
-		// keeps the PlanCards component contract (planId only) intact while
-		// translating to the v2 checkout payload.
-		const plan = plans.value.find((p: any) => p.id === planId);
+		const plan = plans.value.find((p) => p.id === planId);
 		if (!plan) {
 			throw new Error('Plan not found');
 		}
 		const { data } = await api.post('/stripe/checkout', {
 			module: 'calculators',
-			tier: (plan as any).tier,
-			billing_cycle: 'monthly', // PlanCards toggles yearly/monthly visually but currently always sends monthly
+			tier: plan.tier,
+			billing_cycle: 'monthly',
 		});
 		if (data.url) {
 			window.location.href = data.url;

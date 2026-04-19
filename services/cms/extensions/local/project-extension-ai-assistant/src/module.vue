@@ -25,6 +25,12 @@
 		</div>
 		<template v-else>
 		<div class="ai-assistant">
+			<!-- Low-balance banner — slim warning above conversation area -->
+			<low-balance-banner
+				:balance-eur="walletBalance"
+				@topup="showUpgradeDialog = true"
+			/>
+
 			<!-- Empty state / prompt picker -->
 			<template v-if="!currentConversationId && !streaming">
 				<prompt-picker :prompts="prompts" @select="handlePromptSelect" />
@@ -145,6 +151,7 @@ import { useConversations } from './composables/use-conversations';
 import { useChat } from './composables/use-chat';
 import { useUsage } from './composables/use-usage';
 import ConversationNav from './components/conversation-nav.vue';
+import LowBalanceBanner from './components/low-balance-banner.vue';
 import PromptPicker from './components/prompt-picker.vue';
 import MessageBubble from './components/message-bubble.vue';
 
@@ -198,7 +205,7 @@ const standardTopups = [20, 50, 200] as const;
 // Init
 onMounted(async () => {
 	await fetchActiveAccount();
-	await Promise.all([fetchConversations(), fetchPrompts(), fetchUsage()]);
+	await Promise.all([fetchConversations(), fetchPrompts(), fetchUsage(), fetchWalletBalance()]);
 
 	// Load conversation from route param
 	const routeId = route.params.id as string;
