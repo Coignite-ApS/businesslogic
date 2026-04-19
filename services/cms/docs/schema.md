@@ -169,3 +169,34 @@ calculator_configs.excel_file ──→ directus_files  (on_delete: CASCADE)
    │ │  calculator_limit │
    │ └───────────────────┘
 ```
+
+## Pricing v2 — feature_quotas refresh functions
+
+Applied in migration `027_feature_quotas_refresh_fn.sql` (task 17).
+
+### Functions
+
+```sql
+-- Per-account upsert: joins subscriptions → subscription_plans → subscription_addons,
+-- aggregates base plan allowances + active addon deltas, upserts into feature_quotas.
+-- Idempotent via ON CONFLICT (account_id, module) DO UPDATE.
+public.refresh_feature_quotas(p_account_id uuid) RETURNS void
+
+-- Iterates all accounts with non-terminal subscriptions (status NOT IN ('canceled','expired')),
+-- calls refresh_feature_quotas for each. Returns count of accounts refreshed.
+public.refresh_all_feature_quotas() RETURNS integer
+```
+
+### When called
+
+| Trigger | Call |
+|---|---|
+| `subscriptions.items.create` | `refresh_feature_quotas(account_id)` |
+| `subscriptions.items.update` | `refresh_feature_quotas(account_id)` per key |
+| `subscriptions.items.delete` | `refresh_feature_quotas(account_id)` per key |
+| `subscription_addons.items.create` | `refresh_feature_quotas(account_id)` via parent sub |
+| `subscription_addons.items.update` | `refresh_feature_quotas(account_id)` per key |
+| `subscription_addons.items.delete` | `refresh_feature_quotas(account_id)` per key |
+| Nightly cron `0 3 * * *` | `refresh_all_feature_quotas()` |
+
+Hook is registered in `project-extension-stripe/src/hooks/refresh-quotas.ts` and wired in `src/index.ts`. Errors are caught and logged — hooks never block the underlying write.

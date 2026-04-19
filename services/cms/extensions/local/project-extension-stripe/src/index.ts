@@ -14,6 +14,7 @@ import {
 } from './webhook-handlers.js';
 import { registerWalletRoutes } from './wallet-handlers.js';
 import { processAutoReloadBatch } from './auto-reload-consumer.js';
+import { buildRefreshQuotasHooks, buildRefreshAllQuotasCron } from './hooks/refresh-quotas.js';
 import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
@@ -208,6 +209,25 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 			logger.error(`Trial expiry cron failed: ${err}`);
 		}
 	});
+
+	// ─── feature_quotas refresh hooks (task 17) ────────────
+	//
+	// On every subscription or subscription_addon write, call
+	// public.refresh_feature_quotas(account_id) to keep the materialized
+	// quota table consistent. Errors are caught — hooks NEVER block writes.
+
+	const quotaHooks = buildRefreshQuotasHooks(db, logger);
+	for (const [event, handler] of Object.entries(quotaHooks)) {
+		action(event as any, handler as any);
+	}
+
+	// ─── feature_quotas nightly full refresh (task 17) ──────
+	//
+	// Nightly catch-all at 3 AM: rebuilds all quota rows in case any
+	// webhook event was missed. public.refresh_all_feature_quotas()
+	// iterates accounts with non-terminal subscriptions.
+
+	schedule('0 3 * * *', buildRefreshAllQuotasCron(db, logger));
 
 	// ─── Stripe endpoints (require STRIPE_SECRET_KEY) ───────
 
