@@ -1,0 +1,21 @@
+-- Rollback: 029_module_kind_add_ai
+--
+-- CANNOT cleanly remove a single enum value in Postgres without dropping and
+-- recreating the type plus recasting all columns that use it. The full
+-- DROP-and-recreate pattern is:
+--
+--   1. ALTER TABLE ... ALTER COLUMN module TYPE text;   (for every table)
+--   2. DROP TYPE module_kind;
+--   3. CREATE TYPE module_kind AS ENUM ('calculators','kb','flows');
+--   4. ALTER TABLE ... ALTER COLUMN module TYPE module_kind USING module::module_kind;
+--
+-- This rollback is intentionally a no-op stub. If a rollback is truly needed,
+-- execute the above pattern manually against all affected tables:
+--   public.usage_events
+--   public.subscription_plans
+--   public.subscriptions
+--   public.subscription_addons
+--   public.feature_quotas
+--
+-- Reference: https://www.postgresql.org/docs/current/sql-altertype.html
+SELECT 'rollback of 029_module_kind_add_ai is a no-op — see file comments for manual steps' AS info;
