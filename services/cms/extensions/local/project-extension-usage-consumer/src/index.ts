@@ -55,7 +55,9 @@ export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	});
 
 	// ─── monthly_aggregates hourly rollup (task 21) ──────────────────────────
-	const runAggregation = buildAggregateUsageEventsCron(db, logger);
+	// Pass a getter so the cron captures the live redis reference (task 22).
+	// redis is assigned in app.before; by the time the cron fires it will be set.
+	const runAggregation = buildAggregateUsageEventsCron(db, logger, () => redis);
 
 	// On-boot run: don't wait up to an hour for the first aggregation
 	init('app.after', async () => {

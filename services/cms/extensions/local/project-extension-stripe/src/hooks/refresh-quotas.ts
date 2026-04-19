@@ -15,23 +15,28 @@
 
 type DB = any; // Knex instance provided by Directus context
 type Logger = { info: (m: string) => void; warn: (m: string) => void; error: (m: string) => void; debug: (m: string) => void };
+type RedisLike = { publish: (channel: string, message: string) => Promise<any> } | null;
 
 // ─── Internal helpers ────────────────────────────────────────
 
 /** Call public.refresh_feature_quotas for one account. Swallows errors. */
-async function refreshOne(db: DB, logger: Logger, accountId: string): Promise<void> {
+async function refreshOne(db: DB, logger: Logger, accountId: string, redis?: RedisLike): Promise<void> {
 	try {
 		await db.raw('SELECT public.refresh_feature_quotas(?)', [accountId]);
+		// Invalidate formula-api quota cache for this account
+		if (redis) {
+			redis.publish('bl:feature_quotas:invalidated', accountId).catch(() => {});
+		}
 	} catch (err) {
 		logger.error(`refresh_feature_quotas(${accountId}) failed: ${err}`);
 	}
 }
 
 /** Deduplicate and call refreshOne for each unique account. */
-async function refreshMany(db: DB, logger: Logger, accountIds: string[]): Promise<void> {
+async function refreshMany(db: DB, logger: Logger, accountIds: string[], redis?: RedisLike): Promise<void> {
 	const unique = [...new Set(accountIds.filter(Boolean))];
 	for (const id of unique) {
-		await refreshOne(db, logger, id);
+		await refreshOne(db, logger, id, redis);
 	}
 }
 
@@ -77,8 +82,9 @@ export type HookHandlerMap = Record<string, (event: HookPayload) => Promise<void
 /**
  * Build Directus action hook handlers for quota refresh.
  * Register via: Object.entries(buildRefreshQuotasHooks(...)).forEach(([event, fn]) => action(event, fn))
+ * Pass redis to publish cache invalidation messages to formula-api after each refresh.
  */
-export function buildRefreshQuotasHooks(db: DB, logger: Logger): HookHandlerMap {
+export function buildRefreshQuotasHooks(db: DB, logger: Logger, redis?: RedisLike): HookHandlerMap {
 	return {
 		// ── subscriptions ────────────────────────────────────
 
@@ -88,18 +94,18 @@ export function buildRefreshQuotasHooks(db: DB, logger: Logger): HookHandlerMap 
 				logger.warn('refresh-quotas: subscriptions.items.create — no account_id in payload, skipping');
 				return;
 			}
-			await refreshOne(db, logger, accountId);
+			await refreshOne(db, logger, accountId, redis);
 		},
 
 		'subscriptions.items.update': async ({ keys, payload }) => {
 			// If payload carries account_id directly (rare), use it. Otherwise re-fetch.
 			if (payload?.account_id && (!keys || keys.length === 0)) {
-				await refreshOne(db, logger, payload.account_id);
+				await refreshOne(db, logger, payload.account_id, redis);
 				return;
 			}
 			const allKeys = (keys ?? []).map(String);
 			const accountIds = await accountIdsForSubscriptionKeys(db, allKeys);
-			await refreshMany(db, logger, accountIds);
+			await refreshMany(db, logger, accountIds, redis);
 		},
 
 		'subscriptions.items.delete': async ({ keys }) => {
@@ -109,7 +115,7 @@ export function buildRefreshQuotasHooks(db: DB, logger: Logger): HookHandlerMap 
 			// The nightly cron will catch any orphaned quota rows.
 			const allKeys = (keys ?? []).map(String);
 			const accountIds = await accountIdsForSubscriptionKeys(db, allKeys);
-			await refreshMany(db, logger, accountIds);
+			await refreshMany(db, logger, accountIds, redis);
 		},
 
 		// ── subscription_addons ──────────────────────────────
@@ -129,23 +135,23 @@ export function buildRefreshQuotasHooks(db: DB, logger: Logger): HookHandlerMap 
 				logger.warn('refresh-quotas: subscription_addons.items.create — could not resolve account_id, skipping');
 				return;
 			}
-			await refreshOne(db, logger, accountId);
+			await refreshOne(db, logger, accountId, redis);
 		},
 
 		'subscription_addons.items.update': async ({ keys, payload }) => {
 			if (payload?.account_id && (!keys || keys.length === 0)) {
-				await refreshOne(db, logger, payload.account_id);
+				await refreshOne(db, logger, payload.account_id, redis);
 				return;
 			}
 			const allKeys = (keys ?? []).map(String);
 			const accountIds = await accountIdsForAddonKeys(db, allKeys);
-			await refreshMany(db, logger, accountIds);
+			await refreshMany(db, logger, accountIds, redis);
 		},
 
 		'subscription_addons.items.delete': async ({ keys }) => {
 			const allKeys = (keys ?? []).map(String);
 			const accountIds = await accountIdsForAddonKeys(db, allKeys);
-			await refreshMany(db, logger, accountIds);
+			await refreshMany(db, logger, accountIds, redis);
 		},
 	};
 }

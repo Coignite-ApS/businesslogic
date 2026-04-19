@@ -16,6 +16,8 @@ type Logger = {
 	warn: (m: string) => void;
 	error: (m: string) => void;
 };
+type RedisLike = { publish: (channel: string, message: string) => Promise<any> } | null;
+type RedisGetter = () => RedisLike;
 
 export interface AggregateResult {
 	events_aggregated: number;
@@ -39,8 +41,9 @@ export async function runAggregation(db: DB): Promise<AggregateResult> {
  * Register via: schedule('0 * * * *', buildAggregateUsageEventsCron(db, logger))
  *
  * Also invoke once on boot so the first run is not deferred up to an hour.
+ * Pass redis to publish bl:monthly_aggregates:invalidated when accounts were touched.
  */
-export function buildAggregateUsageEventsCron(db: DB, logger: Logger): () => Promise<void> {
+export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?: RedisGetter): () => Promise<void> {
 	return async () => {
 		logger.info('[usage-consumer] monthly_aggregates rollup: starting');
 		try {
@@ -52,6 +55,11 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger): () => Pro
 				`periods_touched=${stats.periods_touched} ` +
 				`lag_seconds=${Math.round(stats.lag_seconds)}`,
 			);
+			// Publish global cache invalidation so formula-api flushes fa:agg:* keys
+			const redis = getRedis ? getRedis() : null;
+			if (redis && stats.accounts_touched > 0) {
+				redis.publish('bl:monthly_aggregates:invalidated', 'ALL').catch(() => {});
+			}
 		} catch (err: any) {
 			logger.error(`[usage-consumer] monthly_aggregates rollup failed: ${err?.message || err}`);
 		}

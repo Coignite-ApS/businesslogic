@@ -23,6 +23,24 @@ const VALID_CYCLES: BillingCycle[] = ['monthly', 'annual'];
 export default defineHook(({ init, action, schedule }, { env, logger, database, services, getSchema }) => {
 	const db = database;
 
+	// Shared Redis client for cache invalidation publishes (task 22)
+	// Lazy — created once on startup; null if REDIS_URL not set.
+	let pubRedis: any = null;
+	const redisUrl = (env['REDIS_URL'] as string) || '';
+	if (redisUrl) {
+		import('ioredis').then(({ default: Redis }) => {
+			pubRedis = new Redis(redisUrl, {
+				maxRetriesPerRequest: 1,
+				enableOfflineQueue: false,
+				retryStrategy: (times: number) => (times > 5 ? null : Math.min(times * 200, 2000)),
+				lazyConnect: true,
+			});
+			return pubRedis.connect();
+		}).catch((err: any) => {
+			logger.warn(`[stripe] Redis pub client init failed: ${err?.message || err}`);
+		});
+	}
+
 	// ─── Registration endpoints (no Stripe dependency) ──────
 
 	init('routes.custom.before', ({ app }) => {
@@ -216,7 +234,7 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 	// public.refresh_feature_quotas(account_id) to keep the materialized
 	// quota table consistent. Errors are caught — hooks NEVER block writes.
 
-	const quotaHooks = buildRefreshQuotasHooks(db, logger);
+	const quotaHooks = buildRefreshQuotasHooks(db, logger, pubRedis);
 	for (const [event, handler] of Object.entries(quotaHooks)) {
 		action(event as any, handler as any);
 	}
