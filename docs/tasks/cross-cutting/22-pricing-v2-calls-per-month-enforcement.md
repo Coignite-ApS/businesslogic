@@ -1,6 +1,6 @@
 # 22. Pricing v2 — calls_per_month enforcement (formula-api)
 
-**Status:** planned
+**Status:** completed
 **Severity:** MEDIUM (becomes urgent once paying customers ship)
 **Source:** db-admin report `docs/reports/db-admin-2026-04-18-pricing-v2-schema-064122.md`
 **Depends on:** task 21 (monthly_aggregates job populating `calc_calls`)
@@ -28,12 +28,21 @@ Both `feature_quotas` + `monthly_aggregates` should be cached in Redis with shor
 
 ## Key Tasks
 
-- [ ] Implement quota lookup with Redis cache in `services/formula-api/src/middleware/quota.js`
-- [ ] Wire into `/calc` endpoint
-- [ ] Wire into MCP tool calls
-- [ ] Add 429 + Retry-After response logic
-- [ ] Tests: under quota → 200; at quota → 429; cache invalidation works
-- [ ] Doc usage limits in `docs/api/calculator-api.md` if exists
+- [x] Implement quota lookup with Redis cache in `services/formula-api/src/middleware/quota.js`
+- [x] Wire into `/calc` endpoint
+- [x] Wire into MCP tool calls (2 sites in mcp.js)
+- [x] Add 429 + Retry-After response logic
+- [x] Tests: under quota → 200; at quota → 429; cache invalidation works (16 tests)
+- [ ] Doc usage limits in `docs/api/calculator-api.md` (file does not exist, skipped)
+
+## Implementation Notes (2026-04-19)
+
+- Commits: `ee0b960` (middleware + routes + subscriber), `d147b8b` (CMS publish side)
+- Cache keys: `fa:quota:{account_id}:calculators` (60s), `fa:agg:{account_id}:{yyyymm}:calc_calls` (300s)
+- Redis pub/sub subscriber started in server.js on `bl:feature_quotas:invalidated` + `bl:monthly_aggregates:invalidated`
+- Write-through INCR in `emitCalcCall` post-emit
+- 402 returned when no feature_quotas row (no subscription); NULL allowance = unlimited
+- Cache invalidation smoke-tested: PUBLISH → key deleted within 1s confirmed
 
 ## Acceptance
 
