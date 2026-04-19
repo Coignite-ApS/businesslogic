@@ -102,4 +102,4 @@ $$;
 - `services/cms/extensions/local/project-extension-stripe/src/index.ts` — wires hooks + cron via `action()` / `schedule('0 3 * * *', ...)`
 - `services/cms/extensions/local/project-extension-stripe/__tests__/refresh-quotas.test.ts` — 10 unit tests (all green)
 - `services/cms/docs/schema.md` — new section documenting functions and trigger table
-- Commit: <commit-sha>
+- Commit: fefa83a
