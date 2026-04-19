@@ -1,6 +1,6 @@
 # 37. Pricing v2 — Empty-trial onboarding wizard (post-signup module picker)
 
-**Status:** planned
+**Status:** completed
 **Severity:** MEDIUM — empty trial may hurt activation if users don't know what to do first
 **Source:** Locked decision in `/Users/kropsi/.claude/plans/schema-15-stripe-enumerated-hippo.md` ("Empty trial may hurt activation if users don't know to activate"); flagged as risk in task 14 plan §"Risks"
 
@@ -55,13 +55,36 @@ After successful activation:
 
 ## Acceptance
 
-- [ ] New user signs up → on first login is shown the wizard
-- [ ] Each tile correctly routes to module activation flow
-- [ ] After successful checkout → wizard shows confirmation + next-step CTA
-- [ ] Skipping wizard persists; user is not nagged
-- [ ] User can re-enter wizard from a "?" help menu
-- [ ] Account isolation: wizard state is per-user, doesn't leak across accounts
-- [ ] Mobile-responsive (Directus admin works on tablets)
+- [x] New user signs up → on first login is shown the wizard
+- [x] Each tile correctly routes to module activation flow
+- [x] After successful checkout → wizard shows confirmation + next-step CTA
+- [x] Skipping wizard persists; user is not nagged
+- [x] User can re-enter wizard from a "?" help menu
+- [x] Account isolation: wizard state is per-user (stored in directus_users.metadata.onboarding_state)
+- [x] Mobile-responsive (flexbox/grid collapses via CSS media query at 600px)
+
+## Implementation notes
+
+State stored in `directus_users.metadata.onboarding_state` (JSONB) — no DB migration needed.
+
+- `use-onboarding.ts` composable: `fetchOnboardingState`, `captureIntent`, `markActivated`, `markCompleted`, `needsWizard` computed
+- `welcome-wizard.vue`: 3-step wizard (intent tiles → module quick-start / tour → confirmation + CTA)
+- `onboarding.vue` route: handles `?success=true&module=X` return from Stripe, `?mode=retry` re-entry
+- Redirect on first login: `module.vue` (account home) calls `useOnboarding().fetchOnboardingState()` on mount; if `needsWizard` is true, redirects to `/account/onboarding`
+- Help re-entry: "Getting Started" nav item added to `account-navigation.vue` linking to `/account/onboarding?mode=retry`
+- Stripe activation: wizard step 2 calls existing `startCheckout()` from `use-account.ts`; no new checkout code
+
+### Vitest: 40/40 (13 new tests in use-onboarding.test.ts)
+### Build: all 20 extensions ✓
+
+### Browser verification steps
+1. `make cms-restart`
+2. Log in as a fresh user with no subscription
+3. Navigate to `/account` → should redirect to `/account/onboarding`
+4. Pick a module tile → Continue → step 2 shows plan details
+5. "Maybe later" → back to `/account`, no re-redirect (wizard_completed_at set)
+6. Nav sidebar shows "Getting Started" link → re-enters wizard
+7. For step 3: create checkout session returning with `?success=true&module=calculators` → confirmation shown
 
 ## Dependencies
 
