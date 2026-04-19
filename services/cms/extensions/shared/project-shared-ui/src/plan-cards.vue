@@ -7,44 +7,71 @@
 
 		<div class="plans-grid">
 			<div
-				v-for="plan in plans"
-				:key="plan.id"
+				v-for="tier in tiers"
+				:key="tier.id"
 				class="plan-card"
-				:class="{ current: isCurrentPlan(plan.id) }"
+				:class="{ current: isCurrentPlan(tier.id) }"
 			>
-				<div class="plan-name">{{ plan.name }}</div>
-				<div class="plan-price" v-if="planPrice(plan)">
-					{{ formatPrice(yearly ? Math.round(planPrice(plan) / 12) : planPrice(plan)) }}<span class="price-period">/mo</span>
-					<span class="plan-billed">{{ yearly && planPrice(plan) ? `Billed ${formatPrice(planPrice(plan))}/yr` : '\u00A0' }}</span>
+				<div class="plan-name">{{ tier.name }}</div>
+				<div class="plan-price" v-if="planPrice(tier)">
+					{{ formatEur(yearly ? Math.round(planPrice(tier) / 12 * 100) / 100 : planPrice(tier)) }}<span class="price-period">/mo</span>
+					<span class="plan-billed">{{ yearly && planPrice(tier) ? `Billed ${formatEur(planPrice(tier))}/yr` : '\u00A0' }}</span>
 				</div>
+
 				<div class="plan-details">
-					<div class="plan-detail">
-						<v-icon name="calculate" small />
-						<span v-if="plan.calculator_limit">{{ plan.calculator_limit }} calculators</span>
-						<span v-else>Unlimited calculators</span>
-					</div>
-					<div class="plan-detail">
-						<v-icon name="trending_up" small />
-						<span v-if="plan.calls_per_month">{{ plan.calls_per_month.toLocaleString() }} calls/mo</span>
-						<span v-else>Unlimited calls</span>
-					</div>
-					<div class="plan-detail" v-if="plan.calls_per_second">
-						<v-icon name="speed" small />
-						<span>{{ plan.calls_per_second }} calls/sec</span>
-					</div>
+					<!-- Calculators allowances -->
+					<template v-if="module === 'calculators'">
+						<div class="plan-detail">
+							<v-icon name="calculate" small />
+							<span>{{ tier.slot_allowance != null ? `${tier.slot_allowance} slots` : 'Unlimited slots' }}</span>
+						</div>
+						<div class="plan-detail">
+							<v-icon name="bolt" small />
+							<span>{{ tier.ao_allowance != null ? `${tier.ao_allowance} always-on` : 'Unlimited always-on' }}</span>
+						</div>
+						<div class="plan-detail">
+							<v-icon name="trending_up" small />
+							<span>{{ tier.request_allowance != null ? `${tier.request_allowance.toLocaleString()} req/mo` : 'Unlimited requests' }}</span>
+						</div>
+					</template>
+
+					<!-- KB allowances -->
+					<template v-else-if="module === 'kb'">
+						<div class="plan-detail">
+							<v-icon name="storage" small />
+							<span>{{ tier.storage_mb != null ? `${tier.storage_mb.toLocaleString()} MB storage` : 'Unlimited storage' }}</span>
+						</div>
+						<div class="plan-detail">
+							<v-icon name="psychology" small />
+							<span>{{ tier.embed_tokens_m != null ? `${tier.embed_tokens_m}M embed tokens/mo` : 'Unlimited embed tokens' }}</span>
+						</div>
+					</template>
+
+					<!-- Flows allowances -->
+					<template v-else-if="module === 'flows'">
+						<div class="plan-detail">
+							<v-icon name="account_tree" small />
+							<span>{{ tier.executions != null ? `${tier.executions.toLocaleString()} executions/mo` : 'Unlimited executions' }}</span>
+						</div>
+						<div class="plan-detail">
+							<v-icon name="fork_right" small />
+							<span>{{ tier.concurrent_runs != null ? `${tier.concurrent_runs} concurrent runs` : 'Unlimited concurrent' }}</span>
+						</div>
+					</template>
 				</div>
+
 				<div class="plan-action">
-					<v-button v-if="isCurrentPlan(plan.id)" class="current-plan-btn" disabled full-width>
+					<v-button v-if="isCurrentPlan(tier.id)" class="current-plan-btn" disabled full-width>
 						Current Plan
 					</v-button>
 					<v-button
 						v-else
-						:secondary="isDowngrade(plan)"
+						:secondary="isDowngrade(tier)"
 						full-width
-						:loading="checkingOut === plan.id"
-						@click="$emit('checkout', plan.id)"
+						:loading="checkingOut === tier.id"
+						@click="$emit('checkout', tier.id)"
 					>
-						{{ isDowngrade(plan) ? 'Downgrade' : 'Upgrade' }}
+						{{ isDowngrade(tier) ? 'Downgrade' : 'Upgrade' }}
 					</v-button>
 				</div>
 			</div>
@@ -57,19 +84,34 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 
-export interface PlanInfo {
+export type PlanModule = 'calculators' | 'kb' | 'flows';
+
+export interface ModulePlan {
 	id: string;
 	name: string;
-	calculator_limit: number | null;
-	calls_per_month: number | null;
-	calls_per_second: number | null;
-	monthly_price?: number | null;
-	yearly_price?: number | null;
+	module: PlanModule;
+	tier: string;
+	price_eur_monthly: number | string | null;
+	price_eur_annual: number | string | null;
 	sort: number | null;
+
+	// calculators
+	slot_allowance: number | null;
+	ao_allowance: number | null;
+	request_allowance: number | null;
+
+	// kb
+	storage_mb: number | null;
+	embed_tokens_m: number | null;
+
+	// flows
+	executions: number | null;
+	concurrent_runs: number | null;
 }
 
 const props = defineProps<{
-	plans: PlanInfo[];
+	module: PlanModule;
+	tiers: ModulePlan[];
 	currentPlanId: string | null;
 	currentPlanSort: number | null;
 	checkingOut: string | null;
@@ -82,41 +124,46 @@ defineEmits<{
 
 const yearly = ref(false);
 
-const hasAnyPrice = computed(() => props.plans.some((p) => p.monthly_price || p.yearly_price));
+const hasAnyPrice = computed(() =>
+	props.tiers.some((t) => t.price_eur_monthly || t.price_eur_annual),
+);
 
-function planPrice(plan: PlanInfo): number {
-	return (yearly.value ? plan.yearly_price : plan.monthly_price) || 0;
+function planPrice(tier: ModulePlan): number {
+	if (yearly.value) {
+		return Number(tier.price_eur_annual || 0);
+	}
+	return Number(tier.price_eur_monthly || 0);
 }
 
-function formatPrice(cents: number): string {
-	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+function formatEur(n: number): string {
+	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(n);
 }
 
 function isCurrentPlan(planId: string): boolean {
 	return props.currentPlanId === planId;
 }
 
-function yearlySaving(plan: PlanInfo): number {
-	const monthly = plan.monthly_price || 0;
-	const yearlyPrice = plan.yearly_price || 0;
-	if (!monthly || !yearlyPrice) return 0;
+function yearlySaving(tier: ModulePlan): number {
+	const monthly = Number(tier.price_eur_monthly || 0);
+	const annual = Number(tier.price_eur_annual || 0);
+	if (!monthly || !annual) return 0;
 	const annualMonthly = monthly * 12;
-	const pct = Math.round(((annualMonthly - yearlyPrice) / annualMonthly) * 100);
+	const pct = Math.round(((annualMonthly - annual) / annualMonthly) * 100);
 	return pct > 0 ? pct : 0;
 }
 
 const maxYearlySaving = computed(() => {
 	let max = 0;
-	for (const p of props.plans) {
-		const s = yearlySaving(p);
+	for (const t of props.tiers) {
+		const s = yearlySaving(t);
 		if (s > max) max = s;
 	}
 	return max;
 });
 
-function isDowngrade(plan: PlanInfo): boolean {
+function isDowngrade(tier: ModulePlan): boolean {
 	if (props.currentPlanSort == null) return false;
-	return (plan.sort ?? 0) < props.currentPlanSort;
+	return (tier.sort ?? 0) < props.currentPlanSort;
 }
 </script>
 

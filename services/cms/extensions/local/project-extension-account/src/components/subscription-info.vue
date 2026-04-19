@@ -21,6 +21,10 @@
 					<v-icon name="add" left small />
 					Top up
 				</v-button>
+				<v-button small secondary @click="walletSettingsVisible = true">
+					<v-icon name="settings" left small />
+					Settings
+				</v-button>
 				<v-button v-if="wallet.recent_ledger.length" small secondary @click="ledgerVisible = !ledgerVisible">
 					<v-icon name="history" left small />
 					{{ ledgerVisible ? 'Hide' : 'View' }} transactions
@@ -48,6 +52,15 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Wallet auto-reload settings dialog -->
+		<wallet-settings-dialog
+			v-model="walletSettingsVisible"
+			:initial-config="walletConfig"
+			:saving="walletConfigSaving"
+			:save-error="walletConfigError"
+			@save="handleWalletConfigSave"
+		/>
 
 		<!-- Per-module subscription cards — one per module, in fixed order. -->
 		<div
@@ -118,7 +131,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useApi } from '@directus/extensions-sdk';
 import type { SubscriptionsByModule, AIWalletState, Module, Subscription, SubscriptionStatus } from '../types';
+import WalletSettingsDialog from './wallet-settings-dialog.vue';
 
 const props = defineProps<{
 	subscriptionsByModule: SubscriptionsByModule;
@@ -129,9 +144,40 @@ const props = defineProps<{
 const emit = defineEmits<{
 	topup: [];
 	activate: [module: Module];
+	walletUpdated: [];
 }>();
 
+const api = useApi();
 const ledgerVisible = ref(false);
+const walletSettingsVisible = ref(false);
+const walletConfigSaving = ref(false);
+const walletConfigError = ref<string | null>(null);
+
+const walletConfig = computed(() => ({
+	auto_reload_enabled: props.wallet.auto_reload_enabled,
+	auto_reload_threshold_eur: (props.wallet as any).auto_reload_threshold_eur ?? null,
+	auto_reload_amount_eur: (props.wallet as any).auto_reload_amount_eur ?? null,
+	monthly_cap_eur: props.wallet.monthly_cap_eur != null ? Number(props.wallet.monthly_cap_eur) : null,
+}));
+
+async function handleWalletConfigSave(config: {
+	auto_reload_enabled: boolean;
+	auto_reload_threshold_eur: number | null;
+	auto_reload_amount_eur: number | null;
+	monthly_cap_eur: number | null;
+}) {
+	walletConfigSaving.value = true;
+	walletConfigError.value = null;
+	try {
+		await api.post('/stripe/wallet-config', config);
+		walletSettingsVisible.value = false;
+		emit('walletUpdated');
+	} catch (err: any) {
+		walletConfigError.value = err?.response?.data?.errors?.[0]?.message || err.message || 'Failed to save settings';
+	} finally {
+		walletConfigSaving.value = false;
+	}
+}
 
 const moduleOrder: { key: Module; label: string; icon: string }[] = [
 	{ key: 'calculators', label: 'Calculators', icon: 'calculate' },

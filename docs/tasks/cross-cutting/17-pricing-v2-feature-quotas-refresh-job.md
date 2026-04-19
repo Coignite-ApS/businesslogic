@@ -1,6 +1,6 @@
 # 17. Pricing v2 — feature_quotas refresh job
 
-**Status:** planned
+**Status:** completed
 **Severity:** HIGH (blocks v2 rollout — quota enforcement returns stale data without it)
 **Source:** db-admin report `docs/reports/db-admin-2026-04-18-pricing-v2-schema-064122.md`
 **Blocks:** task 14 (Pricing v2 Stripe catalog) end-to-end test
@@ -81,14 +81,26 @@ $$;
 
 ## Key Tasks
 
-- [ ] Author SQL migration `migrations/cms/NNN_feature_quotas_refresh_fn.sql` with the function + paired down
-- [ ] Implement the Directus hook in `project-extension-stripe` (or new `project-extension-quotas-refresh`)
-- [ ] Implement nightly cron (existing `node-cron` extension or new)
-- [ ] Tests: insert sub → assert quota row appears; delete sub → assert quota row removed; addon → assert delta applied
-- [ ] Document in `services/cms/docs/schema.md`
+- [x] Author SQL migration `migrations/cms/NNN_feature_quotas_refresh_fn.sql` with the function + paired down
+- [x] Implement the Directus hook in `project-extension-stripe` (or new `project-extension-quotas-refresh`)
+- [x] Implement nightly cron (existing `node-cron` extension or new)
+- [x] Tests: insert sub → assert quota row appears; delete sub → assert quota row removed; addon → assert delta applied
+- [x] Document in `services/cms/docs/schema.md`
 
 ## Acceptance
 
-- After any subscription/addon write, the corresponding `feature_quotas` row reflects the new aggregated allowance within < 1s
-- Nightly job rebuilds all rows (idempotent)
-- Hot-path read returns the post-refresh value
+- [x] After any subscription/addon write, the corresponding `feature_quotas` row reflects the new aggregated allowance within < 1s
+- [x] Nightly job rebuilds all rows (idempotent)
+- [x] Hot-path read returns the post-refresh value
+
+## Implementation notes
+
+- `migrations/cms/027_feature_quotas_refresh_fn.sql` — creates both PL/pgSQL functions (applied by db-admin)
+- `migrations/cms/027_feature_quotas_refresh_fn_down.sql` — rollback (DROP FUNCTION × 2)
+- `docs/reports/db-admin-2026-04-19-pricing-v2-feature-quotas-refresh-fn-162503.md` — db-admin report
+- `services/cms/extensions/local/project-extension-stripe/src/hooks/refresh-quotas.ts` — hook factories
+- `services/cms/extensions/local/project-extension-stripe/src/index.ts` — wires hooks + cron via `action()` / `schedule('0 3 * * *', ...)`
+- `services/cms/extensions/local/project-extension-stripe/__tests__/refresh-quotas.test.ts` — 10 unit tests (all green)
+- `services/cms/docs/schema.md` — new section documenting functions and trigger table
+- Commit: fefa83a
+- Fix follow-up commit e1947ae: migration 028 delete-then-insert + integration tests addressing spec review issues 1 & 2

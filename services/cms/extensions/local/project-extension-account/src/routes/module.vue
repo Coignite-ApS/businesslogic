@@ -269,7 +269,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
+import { useRouter } from 'vue-router';
 import { useAccount } from '../composables/use-account';
+import { useOnboarding } from '../composables/use-onboarding';
 import AccountNavigation from '../components/account-navigation.vue';
 import AccountSelector from '../components/account-selector.vue';
 import ResourcePicker from '../components/resource-picker.vue';
@@ -277,12 +279,15 @@ import { buildPermissions, parsePermissions, summarizePermissions } from '../uti
 import type { PermissionSelection } from '../utils/permissions';
 
 const api = useApi();
+const router = useRouter();
 
 const {
 	accounts, activeAccountId, subscription, loading, error,
 	fetchAccounts, setActiveAccount, fetchSubscription, updateAccount,
 	apiKeys, fetchApiKeys, createApiKey, updateApiKey, revokeApiKey, rotateApiKey,
 } = useAccount(api);
+
+const { needsWizard, fetchOnboardingState } = useOnboarding(api);
 
 const accountName = ref('');
 const saving = ref(false);
@@ -459,9 +464,15 @@ watch(activeAccountId, () => {
 
 onMounted(async () => {
 	await fetchAccounts();
-	await fetchSubscription();
+	await Promise.all([fetchSubscription(), fetchOnboardingState()]);
 	await fetchUsageStats();
 	await fetchApiKeys();
+
+	// Redirect new users (no module activated, wizard not dismissed) to the wizard.
+	// Skip if already on the onboarding route to avoid redirect loops.
+	if (needsWizard.value && !router.currentRoute.value.path.includes('/onboarding')) {
+		router.push('/account/onboarding');
+	}
 });
 </script>
 

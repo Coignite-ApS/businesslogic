@@ -14,6 +14,25 @@ Improvements organized by service. Use `/improvements` to manage, or `/improveme
 
 ---
 
+## 🚨 What to do next (Sprint B shipped 2026-04-19)
+
+Sprint B shipped tasks 17, 20, 21, 22, 27, cms/36, cms/37 on branch `dm/sprint-b-pricing-v2` (40 commits, all signed). Two-stage review caught 8 real bugs before merge (full list in sprint summary). Five follow-ups are now prioritized:
+
+| Priority | # | Task | Why | Est. |
+|---|---|---|---|---|
+| ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes (build script skip, ioredis dep, Sprint B mounts) | Dev works — Sprint B browser QA of cms/36 + cms/37 can proceed now via dev. Full image rebuild split to task 44. | closed |
+| **🔴 P0 — BLOCKER** (for Sprint 3 deploy) | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | Pre-dates Sprint B; blocks production deploy (task 28). Fix via Docker Compose `additional_contexts` or vendor bl-widget dist. | 2-4h |
+| 🟠 P1 — before scale | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5 bundle) | Stats precision race · memory spike on backlog · non-blocking CMS boot | 2-3h |
+| 🟡 P2 — at 100+ accounts | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | Hourly flush of ALL accounts → thundering herd on DB; emit per-account instead | 1-2h |
+| 🟡 P2 — freshness | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | AI spend / KB search cap invalidation goes from 60s TTL to <100ms | 3-4h |
+| 🟢 P3 — product decision | [43](cross-cutting/43-flow-step-cost-rate.md) | `flow.step` cost rate | Pricing call needed (dm@coignite.dk): billable? flat? type-dependent? | 30min + impl |
+
+**Suggested order:** ~~39 (dev path shipped)~~ → 40 (harden) → 44 (production deploy prereq) → Sprint 3 → 41/42/43.
+
+**Sprint B branch ready for PR:** browser QA of cms/36+37 can proceed on dev NOW (task 39 dev-path shipped). Merge `dm/sprint-b-pricing-v2` → `dev` after browser smoke; task 44 (image rebuild) only blocks Sprint 3 production deploy, not the merge.
+
+---
+
 ## 🎯 Pricing v2 — Where to start
 
 Pricing v2 code landed in waves on `dev`:
@@ -33,8 +52,8 @@ Pricing v2 code landed in waves on `dev`:
 |---|---|---|---|
 | **Sprint 1 — Make wallet actually work** | 18 wallet debit · 19 calc slots · 26 isolation E2E | Wallet depletes on AI use; honest slot enforcement; isolation guarantee | ✅ **shipped** |
 | **Sprint 2 — Wallet correctness + security** (~3d) | 36 permission fix · 31 auto-reload table · 33 failed-debit reconcile · 34 slot reconcile/race · 35 CI pipeline | Close Sprint 1's follow-up gaps; make tests actually run on PR; close cross-account read leak | ✅ **shipped** (all 5) |
-| **Sprint 3 — Production launch** (~1.5d) | 28 production deployment + smoke test · cms/37 empty-trial onboarding wizard | Real customers sign up + activate + check out via Stripe live mode | **deferred** — keep developing locally first, more testing before going to server |
-| **Sprint 4 — Analytics + observability** (~3d, parallelizable) | 17 feature_quotas refresh · 20 usage_events emitter · 21 monthly_aggregates rollup · 27 gateway sub-limits | Per-key sub-limits enforced; usage events captured; admin reports accurate | planned |
+| **Sprint 3 — Production launch** (~1.5d) | 28 production deployment + smoke test | Real customers sign up + activate + check out via Stripe live mode | **deferred** — blocked by task 39 (CMS build collision) for browser verification |
+| **Sprint B — Pricing v2 completion** (shipped 2026-04-19) | 17 feature_quotas refresh · 20 usage_events emitter · 21 monthly_aggregates rollup · 22 calls_per_month enforcement · 27 gateway sub-limits · cms/36 UI polish · cms/37 empty-trial onboarding | Quota enforcement, billable events, admin reports accurate, wallet UX, first-login wizard | ✅ **shipped** on `dm/sprint-b-pricing-v2` (40 commits). See "What to do next" above for 5 follow-ups. |
 
 **Sprint 2 ordering** (critical-first):
 1. ✅ **Task 36** (ai_token_usage permission) — SECURITY. Cross-account read leak. Shipped 2026-04-19 (`a2c0388`).
@@ -44,9 +63,9 @@ Pricing v2 code landed in waves on `dev`:
 5. ✅ **Task 35** (CI pipeline) — CORRECTNESS. Buddy pipeline + CONTRIBUTING.md. Shipped 2026-04-19 (`fefcfe9` + `5957bf8`).
 
 **Quality of life / tech debt** (parallelizable, any time):
-- ~~16 Makefile container-name~~ (shipped 2026-04-19) · 22 calls_per_month enforcement · ~~23 bl_flow_executions FK~~ (shipped 2026-04-19) · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
+- ~~16 Makefile container-name~~ (shipped 2026-04-19) · ~~22 calls_per_month enforcement~~ (Sprint B) · ~~23 bl_flow_executions FK~~ (shipped 2026-04-19) · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · ~~cms/36 UI polish~~ (Sprint B)
 
-**Completed Pricing v2 tasks:** 14 (Stripe + code refactor), 15 (schema), 18 (wallet debit hook), 19 (calc slots), 26 (test coverage E2E — partial; CI pending), ai-api/19 (token usage column fix)
+**Completed Pricing v2 tasks:** 14 (Stripe + code refactor), 15 (schema), 17 (feature_quotas — Sprint B), 18 (wallet debit hook), 19 (calc slots), 20 (usage_events emitter — Sprint B), 21 (monthly_aggregates — Sprint B), 22 (calls_per_month — Sprint B), 26 (test coverage E2E — partial; CI pending), 27 (gateway sublimits — Sprint B), ai-api/19 (token usage column fix), cms/36 (UI polish — Sprint B), cms/37 (onboarding wizard — Sprint B)
 
 ---
 
@@ -90,8 +109,8 @@ Back-office: admin UI, billing, Directus modules, widgets.
 | 33 | Feature Flag Key Migration (calc → formula/calculator) | completed | [cms/33-feature-flag-key-migration.md](cms/33-feature-flag-key-migration.md) |
 | 34 | AI-API Extension: /internal/calc → /internal/formula | completed | [cms/34-ai-api-internal-calc-path-fix.md](cms/34-ai-api-internal-calc-path-fix.md) |
 | 35 | v-html Sanitization Audit (Round 2) | completed | [cms/35-v-html-sanitization-audit.md](cms/35-v-html-sanitization-audit.md) |
-| 36 | Pricing v2 UI polish (wallet auto-reload, low-balance banner, PlanCards rewrite) | planned | [cms/36-pricing-v2-ui-polish.md](cms/36-pricing-v2-ui-polish.md) |
-| 37 | Pricing v2 — Empty-trial onboarding wizard (post-signup module picker) | planned | [cms/37-pricing-v2-empty-trial-onboarding.md](cms/37-pricing-v2-empty-trial-onboarding.md) |
+| 36 | Pricing v2 UI polish (wallet auto-reload, low-balance banner, PlanCards rewrite) | **completed (Sprint B)** — browser-QA blocked by cross-cutting/39 | [cms/36-pricing-v2-ui-polish.md](cms/36-pricing-v2-ui-polish.md) |
+| 37 | Pricing v2 — Empty-trial onboarding wizard (post-signup module picker) | **completed (Sprint B)** — browser-QA blocked by cross-cutting/39 | [cms/37-pricing-v2-empty-trial-onboarding.md](cms/37-pricing-v2-empty-trial-onboarding.md) |
 
 ---
 
@@ -207,17 +226,17 @@ Infrastructure and multi-service concerns.
 | 14 | Pricing v2 — Stripe Product Catalog | planned | [cross-cutting/14-pricing-v2-stripe-catalog.md](cross-cutting/14-pricing-v2-stripe-catalog.md) |
 | 15 | Pricing v2 — Directus Schema (DB Admin) | **completed (Inv 1 + Inv 2)** | [cross-cutting/15-pricing-v2-directus-schema.md](cross-cutting/15-pricing-v2-directus-schema.md) — see [Inv 1 report](../reports/db-admin-2026-04-18-pricing-v2-schema-064122.md) + [Inv 2 report](../reports/db-admin-2026-04-18-ai-token-usage-fk-fix-073027.md) |
 | 16 | Snapshot Makefile container-name fix | completed | [cross-cutting/16-snapshot-makefile-container-fix.md](cross-cutting/16-snapshot-makefile-container-fix.md) |
-| 17 | Pricing v2 — feature_quotas refresh job | planned | [cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md](cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md) |
+| 17 | Pricing v2 — feature_quotas refresh job | **completed (Sprint B)** | [cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md](cross-cutting/17-pricing-v2-feature-quotas-refresh-job.md) |
 | 18 | Pricing v2 — ai_wallet atomic debit hook (ai-api) | **completed** (`6d23d9c` + `0823b8b`) | [cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md](cross-cutting/18-pricing-v2-ai-wallet-debit-trigger.md) |
 | 19 | Pricing v2 — calculator_slots compute on upload (formula-api) | **completed** (`272dd31` + `b70b07f` + `969f984`) | [cross-cutting/19-pricing-v2-calculator-slots-compute.md](cross-cutting/19-pricing-v2-calculator-slots-compute.md) |
-| 20 | Pricing v2 — usage_events emitter pipeline | planned | [cross-cutting/20-pricing-v2-usage-events-emitter.md](cross-cutting/20-pricing-v2-usage-events-emitter.md) |
-| 21 | Pricing v2 — monthly_aggregates rollup job | planned | [cross-cutting/21-pricing-v2-monthly-aggregates-job.md](cross-cutting/21-pricing-v2-monthly-aggregates-job.md) |
-| 22 | Pricing v2 — calls_per_month enforcement (formula-api) | planned | [cross-cutting/22-pricing-v2-calls-per-month-enforcement.md](cross-cutting/22-pricing-v2-calls-per-month-enforcement.md) |
+| 20 | Pricing v2 — usage_events emitter pipeline | **completed (Sprint B)** | [cross-cutting/20-pricing-v2-usage-events-emitter.md](cross-cutting/20-pricing-v2-usage-events-emitter.md) |
+| 21 | Pricing v2 — monthly_aggregates rollup job | **completed (Sprint B)** | [cross-cutting/21-pricing-v2-monthly-aggregates-job.md](cross-cutting/21-pricing-v2-monthly-aggregates-job.md) |
+| 22 | Pricing v2 — calls_per_month enforcement (formula-api) | **completed (Sprint B)** | [cross-cutting/22-pricing-v2-calls-per-month-enforcement.md](cross-cutting/22-pricing-v2-calls-per-month-enforcement.md) |
 | 23 | bl_flow_executions account FK fix | **completed 2026-04-19** (`026_bl_flow_executions_account_fk.sql`) | [cross-cutting/23-bl-flow-executions-account-fk.md](cross-cutting/23-bl-flow-executions-account-fk.md) — see [report](../reports/db-admin-2026-04-19-bl-flow-executions-account-fk-154815.md) |
 | 24 | Pricing v2 — ai_wallet_ledger partitioning (LOW, deferred) | planned | [cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md](cross-cutting/24-pricing-v2-ai-wallet-ledger-partitioning.md) |
 | 25 | Pricing v2 — counter tables Directus tracking (LOW, optional) | planned | [cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md](cross-cutting/25-pricing-v2-counter-tables-directus-tracking.md) |
 | 26 | Pricing v2 — test coverage hardening + account isolation E2E | **completed (partial — CI pending via 35)** (`24e1671` + `dd75873` + `9101118`) | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
-| 27 | Pricing v2 — Gateway per-API-key sub-limit enforcement | planned | [cross-cutting/27-pricing-v2-gateway-sublimits.md](cross-cutting/27-pricing-v2-gateway-sublimits.md) |
+| 27 | Pricing v2 — Gateway per-API-key sub-limit enforcement | **completed (Sprint B)** | [cross-cutting/27-pricing-v2-gateway-sublimits.md](cross-cutting/27-pricing-v2-gateway-sublimits.md) |
 | 28 | Pricing v2 — Production deployment + smoke test | planned | [cross-cutting/28-pricing-v2-production-deployment.md](cross-cutting/28-pricing-v2-production-deployment.md) |
 | 29 | Pricing v2 — Per-tier RPS spec lock + per-key RPS support | planned | [cross-cutting/29-pricing-v2-rps-spec.md](cross-cutting/29-pricing-v2-rps-spec.md) |
 | 30 | ai_wallet_ledger compound index for monthly cap query (LOW, defer until scale) | planned | [cross-cutting/30-ai-wallet-ledger-index.md](cross-cutting/30-ai-wallet-ledger-index.md) |
@@ -229,6 +248,12 @@ Infrastructure and multi-service concerns.
 | 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 | 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | completed | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
+| 39 | CMS dev extensions fixes (`_shared` skip, ioredis dep, Sprint B mounts) | **completed (dev path)** 2026-04-19 (`d3f9e8c` + `17ec8a5`) — image rebuild split to task 44 | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
+| 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | planned | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
+| 41 | 🟡 Per-account aggregate cache invalidation (replace `ALL` flush, P2 at scale) | planned | [cross-cutting/41-per-account-aggregate-cache-invalidation.md](cross-cutting/41-per-account-aggregate-cache-invalidation.md) |
+| 42 | 🟡 Gateway cache cross-service PUBLISH on wallet debit + usage events (P2 freshness) | planned | [cross-cutting/42-gateway-cache-cross-service-publish.md](cross-cutting/42-gateway-cache-cross-service-publish.md) |
+| 43 | 🟢 `flow.step` cost rate — pricing decision required (P3) | planned | [cross-cutting/43-flow-step-cost-rate.md](cross-cutting/43-flow-step-cost-rate.md) |
+| 44 | 🔴 **CMS Docker image rebuild** — `packages/bl-widget` outside build context (blocks Sprint 3) | planned | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
 
 ---
 
@@ -335,11 +360,13 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 
 | Service | Planned | Idea | In-Progress | Completed | Total |
 |---------|---------|------|-------------|-----------|-------|
-| CMS | 14 | 0 | 0 | 20 | 34 |
+| CMS | 12 | 0 | 0 | 22 | 34 |
 | AI API | 1 | 0 | 0 | 10 | 11 |
 | Formula API | 1 | 0 | 0 | 7 | 8 |
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 0 | 0 | 0 | 13 | 13 |
-| **Total** | **18** | **8** | **0** | **61** | **87** |
+| Cross-Cutting | 13 | 0 | 0 | 19 | 32 |
+| **Total** | **29** | **8** | **0** | **69** | **106** |
+
+> **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision

@@ -1,4 +1,5 @@
 import { defineHook } from '@directus/extensions-sdk';
+import Redis from 'ioredis';
 import { getStripe } from './stripe-client.js';
 import { getRegistrationPage } from './register.js';
 import {
@@ -14,6 +15,7 @@ import {
 } from './webhook-handlers.js';
 import { registerWalletRoutes } from './wallet-handlers.js';
 import { processAutoReloadBatch } from './auto-reload-consumer.js';
+import { buildRefreshQuotasHooks, buildRefreshAllQuotasCron } from './hooks/refresh-quotas.js';
 import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
@@ -21,6 +23,27 @@ const VALID_CYCLES: BillingCycle[] = ['monthly', 'annual'];
 
 export default defineHook(({ init, action, schedule }, { env, logger, database, services, getSchema }) => {
 	const db = database;
+
+	// Shared Redis client for cache invalidation publishes (task 22)
+	// Synchronous init — live instance available before any hooks are registered.
+	let pubRedis: Redis | null = null;
+	const redisUrl = (env['REDIS_URL'] as string) || '';
+	if (redisUrl) {
+		try {
+			pubRedis = new Redis(redisUrl, {
+				maxRetriesPerRequest: 1,
+				enableOfflineQueue: false,
+				retryStrategy: (times: number) => (times > 5 ? null : Math.min(times * 200, 2000)),
+				lazyConnect: true,
+			});
+			pubRedis.connect().catch((err: any) => {
+				logger.warn(`[stripe] Redis pub client connect failed: ${err?.message || err}`);
+			});
+		} catch (err: any) {
+			logger.warn(`[stripe] Redis pub client init failed: ${err?.message || err}`);
+			pubRedis = null;
+		}
+	}
 
 	// ─── Registration endpoints (no Stripe dependency) ──────
 
@@ -208,6 +231,25 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 			logger.error(`Trial expiry cron failed: ${err}`);
 		}
 	});
+
+	// ─── feature_quotas refresh hooks (task 17) ────────────
+	//
+	// On every subscription or subscription_addon write, call
+	// public.refresh_feature_quotas(account_id) to keep the materialized
+	// quota table consistent. Errors are caught — hooks NEVER block writes.
+
+	const quotaHooks = buildRefreshQuotasHooks(db, logger, pubRedis);
+	for (const [event, handler] of Object.entries(quotaHooks)) {
+		action(event as any, handler as any);
+	}
+
+	// ─── feature_quotas nightly full refresh (task 17) ──────
+	//
+	// Nightly catch-all at 3 AM: rebuilds all quota rows in case any
+	// webhook event was missed. public.refresh_all_feature_quotas()
+	// iterates accounts with non-terminal subscriptions.
+
+	schedule('0 3 * * *', buildRefreshAllQuotasCron(db, logger));
 
 	// ─── Stripe endpoints (require STRIPE_SECRET_KEY) ───────
 

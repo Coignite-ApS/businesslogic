@@ -6,6 +6,7 @@
 use chrono::Utc;
 use flow_common::flow::{FlowDef, FlowStatus, Priority};
 use flow_common::message::{ExecuteMessage, ExecutionEvent, ExecutionEventType};
+use flow_common::usage_events::{emit_flow_execution, emit_flow_failed};
 use flow_engine::executor::{ExecutionResult, ExecutionStatus};
 use flow_engine::nodes::NodeRegistry;
 #[allow(unused_imports)]
@@ -477,6 +478,38 @@ async fn execute_flow(state: &WorkerState, message: &ExecuteMessage) -> Result<b
             )
             .await;
 
+            // Emit usage events (fire-and-forget)
+            match exec_result.status {
+                ExecutionStatus::Completed => {
+                    emit_flow_execution(
+                        &state.redis_pool,
+                        message.account_id,
+                        message.flow_id,
+                        exec_result.duration_ms,
+                        "completed",
+                    ).await;
+                }
+                ExecutionStatus::Failed => {
+                    let err_str = exec_result.error.as_deref().unwrap_or("unknown");
+                    emit_flow_failed(
+                        &state.redis_pool,
+                        message.account_id,
+                        message.flow_id,
+                        None,
+                        err_str,
+                    ).await;
+                }
+                ExecutionStatus::TimedOut | ExecutionStatus::Cancelled => {
+                    emit_flow_failed(
+                        &state.redis_pool,
+                        message.account_id,
+                        message.flow_id,
+                        None,
+                        &format!("timed out after {}ms", exec_result.duration_ms),
+                    ).await;
+                }
+            }
+
             if exec_result.status == ExecutionStatus::Failed {
                 return Err(anyhow::anyhow!(
                     exec_result.error.unwrap_or_else(|| "execution failed".to_string())
@@ -499,6 +532,14 @@ async fn execute_flow(state: &WorkerState, message: &ExecuteMessage) -> Result<b
                 },
             )
             .await;
+            // Emit flow.failed usage event
+            emit_flow_failed(
+                &state.redis_pool,
+                message.account_id,
+                message.flow_id,
+                None,
+                &e.to_string(),
+            ).await;
             Err(e.into())
         }
     }

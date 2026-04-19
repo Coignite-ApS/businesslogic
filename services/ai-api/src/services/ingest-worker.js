@@ -9,6 +9,7 @@ import IORedis from 'ioredis';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { query, queryOne, queryAll } from '../db.js';
+import { emitEmbedTokens } from './usage-events.js';
 import { chunkDocument, chunkDocumentWithParents, estimateTokens } from './chunker.js';
 import { computeChunkHash, diffChunks } from './content-hash.js';
 import { createEmbeddingClientForKb } from './embedding-factory.js';
@@ -187,6 +188,22 @@ async function processIngestJob(job, logger) {
 
     // Calculate total token count
     const totalTokens = chunks.reduce((sum, c) => sum + c.tokenCount, 0);
+
+    // Emit embed.tokens usage event for newly embedded chunks only (fire-and-forget)
+    if (diff.toEmbed.length > 0 && accountId) {
+      const embedIndexSet = new Set(diff.toEmbed.map((c) => c.chunk_index));
+      const newEmbedTokens = chunks
+        .filter((c) => embedIndexSet.has(c.metadata.chunk_index))
+        .reduce((sum, c) => sum + (c.tokenCount || 0), 0);
+      emitEmbedTokens({
+        accountId,
+        apiKeyId: null, // ingest is always server-side
+        model: kbModel || config.embeddingModel,
+        kbId,
+        docId: documentId,
+        tokenCount: newEmbedTokens,
+      });
+    }
 
     // Update document status
     await query(

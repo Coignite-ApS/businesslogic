@@ -17,6 +17,8 @@ import { loadAccountLimits } from '../services/account-limits.js';
 import { loadRecipeFromDb, loadMcpConfigFromDb, loadCalculatorConfigMeta } from '../services/calculator-db.js';
 import { computeAndUpsertSlot, atomicCheckAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
 import { getPool } from '../db.js';
+import { emitCalcCall } from '../services/usage-events.js';
+import { enforceCalcQuota, currentPeriod, incrementAggCache } from '../middleware/quota.js';
 
 
 /** @type {import('pino').Logger | null} */
@@ -1303,14 +1305,35 @@ export async function registerRoutes(app) {
       return reply.code(429).send({ error: msg });
     }
 
+    // Monthly calls_per_month quota enforcement (task 22)
+    req.quotaContext = { accountId, isTest: !!calc.test };
+    const quotaReply = await enforceCalcQuota(req, reply);
+    if (quotaReply !== undefined) return quotaReply; // middleware sent a response
+
     refreshRedisTtl(calcId);
 
     const inputData = req.body || {};
 
     try {
+      const execStart = Date.now();
       const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+      const durationMs = Date.now() - execStart;
       reply.header('X-Cache', cached ? 'HIT' : 'MISS');
       stat({ cached, error: false });
+
+      // Emit usage event + write-through agg cache increment (fire-and-forget)
+      if (!calc.test) {
+        const _redis = isRedisReady() ? getRedisClient() : null;
+        emitCalcCall({
+          accountId: accountId,
+          apiKeyId: null, // formula-api doesn't receive api_key_id in this path
+          formulaId: calcId,
+          durationMs,
+          inputsSizeBytes: JSON.stringify(inputData).length,
+        });
+        incrementAggCache(_redis, accountId, currentPeriod()).catch(() => {});
+      }
+
       return result;
     } catch (err) {
       stat({ cached: false, error: true, errorMessage: err.body?.error || err.message?.slice(0, 200) });

@@ -14,3 +14,5 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 rmp-serde = { workspace = true }
 tokio-util = { workspace = true }
+redis = { workspace = true }
+deadpool-redis = { workspace = true }

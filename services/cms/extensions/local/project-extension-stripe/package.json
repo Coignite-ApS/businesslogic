@@ -13,9 +13,11 @@
     "build": "directus-extension build",
     "dev": "directus-extension build -w --no-minify",
     "test": "vitest run",
+    "test:integration": "vitest run __tests__/refresh-quotas.integration.test.ts",
     "stripe:create-v2-products": "tsx scripts/create-products-v2.ts"
   },
   "dependencies": {
+    "ioredis": "^5.10.1",
     "stripe": "^20.4.1"
   },
   "devDependencies": {

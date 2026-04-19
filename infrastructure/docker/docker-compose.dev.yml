@@ -144,6 +144,8 @@ services:
       - ../../services/cms/extensions/local/project-extension-widget-api:/directus/extensions/project-extension-widget-api
       - ../../services/cms/extensions/local/project-extension-feature-flags:/directus/extensions/project-extension-feature-flags
       - ../../services/cms/extensions/local/project-extension-layout-builder:/directus/extensions/project-extension-layout-builder
+      - ../../services/cms/extensions/local/project-extension-ai-observatory:/directus/extensions/project-extension-ai-observatory
+      - ../../services/cms/extensions/local/project-extension-usage-consumer:/directus/extensions/project-extension-usage-consumer
       - ../../services/cms/email-templates:/directus/email-templates:ro
     depends_on:
       postgres: { condition: service_healthy }

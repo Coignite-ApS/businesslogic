@@ -9,6 +9,7 @@ import { config, validateSecrets } from './config.js';
 import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
 import { initBudget, closeBudget } from './services/budget.js';
+import { initUsageEvents, closeUsageEvents } from './services/usage-events.js';
 import { initWidgetCache, closeWidgetCache } from './widgets/cache.js';
 import { loadBuiltinTemplates } from './widgets/resolver.js';
 import { startCleanup, stopCleanup } from './utils/rate-limit.js';
@@ -101,6 +102,7 @@ const shutdown = async (signal) => {
     stopCleanup();
     stopAggregation();
     await closeBudget();
+    await closeUsageEvents();
     await closeWidgetCache();
     await closeDb();
     await shutdownTelemetry();
@@ -134,6 +136,7 @@ export async function start() {
     if (config.redisUrl) {
       await initBudget(config.redisUrl);
       app.log.info('Budget Redis connected');
+      await initUsageEvents(config.redisUrl);
       initWidgetCache(config.redisUrl);
     } else {
       initWidgetCache(null);

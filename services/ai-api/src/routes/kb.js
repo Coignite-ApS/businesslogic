@@ -15,6 +15,7 @@ import { triggerFlowIngest, isFlowIngestEnabled } from '../services/flow-ingest.
 import { debitWallet } from '../hooks/wallet-debit.js';
 import { recordFailedDebit } from '../hooks/wallet-failed-debits.js';
 import { calculateCost } from '../utils/cost.js';
+import { emitKbSearch, emitKbAsk, emitEmbedTokens } from '../services/usage-events.js';
 
 /** Check AI permission on gateway-forwarded requests */
 function checkAiPermission(req, reply) {
@@ -491,6 +492,15 @@ export async function registerRoutes(app) {
       featuresActive,
     });
 
+    // Emit usage event (fire-and-forget)
+    emitKbSearch({
+      accountId,
+      apiKeyId: req.apiKeyId || null,
+      kbId: kb_id || null,
+      query: searchQuery.trim(),
+      resultsCount: results.length,
+    });
+
     return { data: results };
   });
 
@@ -625,6 +635,17 @@ export async function registerRoutes(app) {
         });
       }
     }
+
+    // Emit usage event for kb.ask (fire-and-forget)
+    emitKbAsk({
+      accountId,
+      apiKeyId: req.apiKeyId || null,
+      kbId: kb_id || null,
+      query: question.trim(),
+      model: answerModel,
+      inputTokens: result.inputTokens || 0,
+      outputTokens: result.outputTokens || 0,
+    });
 
     // Calculate context utilization
     const chunksInjected = chunks.length;

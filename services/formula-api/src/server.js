@@ -36,6 +36,7 @@ import * as stats from './services/stats.js';
 import * as healthPush from './services/health-push.js';
 import * as hashRing from './services/hash-ring.js';
 import { initDb, closeDb } from './db.js';
+import { buildQuotaCacheKey, buildAggCacheKey, currentPeriod } from './middleware/quota.js';
 
 const app = Fastify({
   logger: { level: config.logLevel },
@@ -134,6 +135,7 @@ const shutdown = async (signal) => {
     try { await stats.shutdown(); } catch { /* best-effort */ }
     try { pool.destroy(); } catch { /* best-effort */ }
     try { await closeDb(); } catch { /* best-effort */ }
+    try { if (quotaSubRedis) { quotaSubRedis.disconnect(); quotaSubRedis = null; } } catch { /* best-effort */ }
     try { await cache.close(); } catch { /* best-effort */ }
     try { await shutdownTelemetry(); } catch { /* best-effort */ }
     process.exit(0);
@@ -153,6 +155,72 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
+// ── Quota cache invalidation subscribers (task 22) ───────────────────────────
+
+let quotaSubRedis = null;
+
+async function startQuotaInvalidationSubscriber() {
+  if (!config.redisUrl) return;
+  try {
+    const { default: Redis } = await import('ioredis');
+    quotaSubRedis = new Redis(config.redisUrl, {
+      maxRetriesPerRequest: 1,
+      retryStrategy: (times) => Math.min(times * 200, 5000),
+      enableOfflineQueue: false,
+      lazyConnect: true,
+      ...(config.redisUrl.startsWith('rediss://') && { tls: { rejectUnauthorized: false } }),
+    });
+    quotaSubRedis.on('error', (err) => app.log.warn({ err }, '[quota-sub] Redis subscriber error'));
+
+    await quotaSubRedis.connect();
+    await quotaSubRedis.subscribe('bl:feature_quotas:invalidated', 'bl:monthly_aggregates:invalidated');
+
+    quotaSubRedis.on('message', async (channel, message) => {
+      if (!cache.isRedisReady()) return;
+      const redis = cache.getRedisClient();
+
+      if (channel === 'bl:feature_quotas:invalidated') {
+        // message = accountId or 'ALL'
+        if (message === 'ALL') {
+          app.log.info('[quota-sub] global feature_quotas invalidation — flushing all fa:quota:* keys');
+          try {
+            const keys = [];
+            const stream = redis.scanStream({ match: 'fa:quota:*', count: 100 });
+            for await (const batch of stream) keys.push(...batch);
+            if (keys.length > 0) await redis.del(...keys);
+          } catch (e) { app.log.warn({ err: e }, '[quota-sub] flush fa:quota:* failed'); }
+        } else {
+          const key = buildQuotaCacheKey(message);
+          app.log.debug(`[quota-sub] invalidating quota cache for account ${message}`);
+          redis.del(key).catch((e) => app.log.warn({ err: e }, '[quota-sub] del quota key failed'));
+        }
+      } else if (channel === 'bl:monthly_aggregates:invalidated') {
+        // message = accountId or 'ALL'
+        if (message === 'ALL') {
+          app.log.info('[quota-sub] global monthly_aggregates invalidation — flushing all fa:agg:* keys');
+          try {
+            const keys = [];
+            const stream = redis.scanStream({ match: 'fa:agg:*', count: 100 });
+            for await (const batch of stream) keys.push(...batch);
+            if (keys.length > 0) await redis.del(...keys);
+          } catch (e) { app.log.warn({ err: e }, '[quota-sub] flush fa:agg:* failed'); }
+        } else {
+          // Deterministic: only current period is active — compute the exact key
+          app.log.debug(`[quota-sub] invalidating agg cache for account ${message}`);
+          try {
+            const key = buildAggCacheKey(message, currentPeriod());
+            await redis.del(key);
+          } catch (e) { app.log.warn({ err: e }, '[quota-sub] del agg key failed'); }
+        }
+      }
+    });
+
+    app.log.info('[quota-sub] subscribed to bl:feature_quotas:invalidated + bl:monthly_aggregates:invalidated');
+  } catch (err) {
+    app.log.warn({ err }, '[quota-sub] subscriber startup failed (non-fatal)');
+  }
+}
+
 // Start
 const start = async () => {
   // Fail fast if critical secrets missing
@@ -167,6 +235,9 @@ const start = async () => {
     stats.start();
     healthPush.start();
     hashRing.start();
+    startQuotaInvalidationSubscriber().catch((e) => {
+      app.log.error({ err: e }, '[quota-sub] subscriber startup failed');
+    });
     await app.listen({ port: config.port, host: config.host });
     app.log.info({ host: config.host, port: config.port, poolSize: config.poolSize, maxQueue: pool.maxPending }, 'API ready');
   } catch (err) {

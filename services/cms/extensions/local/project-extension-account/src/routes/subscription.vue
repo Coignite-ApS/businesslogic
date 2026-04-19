@@ -24,6 +24,7 @@
 				:monthly-total-eur="monthlyTotalEur"
 				@topup="handleTopup"
 				@activate="handleActivate"
+				@wallet-updated="fetchWallet"
 			/>
 
 			<!-- Module activation dialog: show available tiers for the chosen module. -->

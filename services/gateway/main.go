@@ -79,6 +79,9 @@ func main() {
 	// Key service
 	keyService := service.NewKeyService(rdb, dbPool, cfg.KeyCacheTTL, cfg.NegativeCacheTTL)
 
+	// Sublimit checker (task 27)
+	sublimitChecker := service.NewSublimitChecker(dbPool, rdb)
+
 	// Response cache
 	responseCache := cache.New(rdb)
 
@@ -156,6 +159,7 @@ func main() {
 	h = middleware.GatewaySign(cfg.GatewaySharedSecret)(h)
 	h = middleware.CORS(h)
 	h = middleware.RateLimit(keyService)(h)
+	h = middleware.Sublimits(sublimitChecker)(h)
 	h = middleware.RequestLog(requestLogFn)(h)
 	h = middleware.Auth(keyService, rdb)(h)
 	h = middleware.Tracing(h)

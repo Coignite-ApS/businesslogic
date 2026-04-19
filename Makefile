@@ -25,7 +25,7 @@ CMS_EXT := services/cms/extensions/local
         ext-calculators ext-calculator-api ext-formulas ext-account ext-account-api \
         ext-admin ext-stripe ext-flows ext-flow-hooks \
         ext-knowledge ext-knowledge-api ext-layout-builder \
-        ext-feature-flags ext-feature-gate ext-widget-api \
+        ext-feature-flags ext-feature-gate ext-widget-api ext-usage-consumer \
         db snapshot snapshot-pre snapshot-post snapshot-dryrun snapshot-forensic data-baseline diff prune
 
 # ─── Full Stack ──────────────────────────────────────────────────
@@ -214,6 +214,9 @@ ext-feature-gate:
 
 ext-widget-api:
 	@cd $(CMS_EXT)/project-extension-widget-api && npx directus-extension build
+
+ext-usage-consumer:
+	@cd $(CMS_EXT)/project-extension-usage-consumer && npx directus-extension build
 
 # ─── Database ─────────────────────────────────────────────────────
 # Naming conventions (used by db-admin skill):
