@@ -58,6 +58,14 @@ async function getUsageEvents(client, accountId) {
   return r.rows;
 }
 
+async function getAutoReloadPending(client, accountId) {
+  const r = await client.query(
+    'SELECT * FROM public.wallet_auto_reload_pending WHERE account_id = $1 ORDER BY created_at',
+    [accountId],
+  );
+  return r.rows;
+}
+
 async function cleanup(client, accountId) {
   // CASCADE deletes wallet, ledger, usage_events
   await client.query('DELETE FROM public.account WHERE id = $1', [accountId]);
@@ -367,6 +375,150 @@ describe('wallet-debit hook', () => {
         'autoReloadTriggered should be true when balance < threshold',
       );
       assert.ok(result.autoReloadAmountEur > 0, 'autoReloadAmountEur should be set');
+    } finally {
+      await cleanup(client, accountId);
+      client.release();
+    }
+  });
+
+  // ── Scenario 8: auto-reload enqueues row in wallet_auto_reload_pending ─
+
+  it('auto-reload: INSERTs pending row with correct amount after debit COMMIT', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    await createWallet(client, accountId, 2.00);
+    await client.query(
+      `UPDATE public.ai_wallet
+         SET auto_reload_enabled = true, auto_reload_threshold_eur = 5.00, auto_reload_amount_eur = 10.00
+       WHERE account_id = $1`,
+      [accountId],
+    );
+
+    try {
+      const result = await debitWallet({
+        accountId,
+        costUsd: 1.578,
+        model: 'claude-sonnet-4-6',
+        module: 'kb',
+        eventKind: 'ai.message',
+        metadata: {},
+      });
+      assert.ok(result.ok);
+      assert.strictEqual(result.autoReloadTriggered, true);
+
+      const pending = await getAutoReloadPending(client, accountId);
+      assert.strictEqual(pending.length, 1, 'Exactly 1 pending row expected');
+      assert.strictEqual(pending[0].status, 'pending');
+      assert.strictEqual(parseFloat(pending[0].amount_eur), 10.00);
+      assert.strictEqual(pending[0].attempts, 0);
+      assert.strictEqual(pending[0].stripe_payment_intent_id, null);
+      assert.strictEqual(pending[0].processed_at, null);
+    } finally {
+      await cleanup(client, accountId);
+      client.release();
+    }
+  });
+
+  // ── Scenario 9: auto-reload below threshold on already-triggered account ──
+  //    Second qualifying debit must NOT create a second pending row — partial
+  //    UNIQUE index on (account_id) WHERE status IN ('pending','processing')
+  //    guards against runaway enqueue. The second INSERT must be silently
+  //    absorbed (ON CONFLICT DO NOTHING) — debit must still succeed.
+
+  it('auto-reload: second qualifying debit does NOT create a second pending row', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    await createWallet(client, accountId, 4.00);
+    await client.query(
+      `UPDATE public.ai_wallet
+         SET auto_reload_enabled = true, auto_reload_threshold_eur = 5.00, auto_reload_amount_eur = 10.00
+       WHERE account_id = $1`,
+      [accountId],
+    );
+
+    try {
+      // 1st qualifying debit: balance 4.00 → ~2.55
+      const r1 = await debitWallet({
+        accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
+        module: 'kb', eventKind: 'ai.message', metadata: {},
+      });
+      assert.ok(r1.ok);
+      assert.strictEqual(r1.autoReloadTriggered, true);
+
+      // 2nd qualifying debit: balance ~2.55 → ~1.10 — still below threshold
+      const r2 = await debitWallet({
+        accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
+        module: 'kb', eventKind: 'ai.message', metadata: {},
+      });
+      assert.ok(r2.ok, 'Debit must still succeed even when enqueue is a no-op');
+      assert.strictEqual(r2.autoReloadTriggered, true);
+
+      const pending = await getAutoReloadPending(client, accountId);
+      assert.strictEqual(pending.length, 1, 'Still exactly 1 pending row (partial UNIQUE holds)');
+    } finally {
+      await cleanup(client, accountId);
+      client.release();
+    }
+  });
+
+  // ── Scenario 10: auto-reload disabled → no row inserted ────────────────
+
+  it('auto-reload: disabled account → no pending row inserted even when low', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    await createWallet(client, accountId, 2.00);
+    // auto_reload_enabled stays false (default)
+
+    try {
+      const result = await debitWallet({
+        accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
+        module: 'kb', eventKind: 'ai.message', metadata: {},
+      });
+      assert.ok(result.ok);
+      assert.strictEqual(result.autoReloadTriggered, false);
+
+      const pending = await getAutoReloadPending(client, accountId);
+      assert.strictEqual(pending.length, 0);
+    } finally {
+      await cleanup(client, accountId);
+      client.release();
+    }
+  });
+
+  // ── Scenario 11: auto-reload threshold crossed but previous row succeeded ──
+  //    After a prior auto-reload completed (status='succeeded'), the partial
+  //    UNIQUE scope excludes it, so a new qualifying debit MUST create a new
+  //    row (business case: balance topped up, then drained again later).
+
+  it('auto-reload: new pending row after a previous succeeded one', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    await createWallet(client, accountId, 2.00);
+    await client.query(
+      `UPDATE public.ai_wallet
+         SET auto_reload_enabled = true, auto_reload_threshold_eur = 5.00, auto_reload_amount_eur = 10.00
+       WHERE account_id = $1`,
+      [accountId],
+    );
+    // Seed a prior succeeded row (as if a previous auto-reload cycle completed)
+    await client.query(
+      `INSERT INTO public.wallet_auto_reload_pending (account_id, amount_eur, status, processed_at)
+       VALUES ($1, 10.00, 'succeeded', NOW() - INTERVAL '1 hour')`,
+      [accountId],
+    );
+
+    try {
+      const result = await debitWallet({
+        accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
+        module: 'kb', eventKind: 'ai.message', metadata: {},
+      });
+      assert.ok(result.ok);
+      assert.strictEqual(result.autoReloadTriggered, true);
+
+      const pending = await getAutoReloadPending(client, accountId);
+      assert.strictEqual(pending.length, 2, '1 historical succeeded + 1 fresh pending');
+      const active = pending.filter(r => r.status === 'pending');
+      assert.strictEqual(active.length, 1);
     } finally {
       await cleanup(client, accountId);
       client.release();

@@ -478,6 +478,8 @@ async function processWalletTopupSucceeded(
 		? intent.latest_charge
 		: (intent.latest_charge as any)?.id ?? null;
 
+	const isAutoReload = meta.is_auto_reload === 'true';
+
 	await db.transaction(async (trx: DB) => {
 		// 1. Insert ai_wallet_topup; ON CONFLICT DO NOTHING for idempotency.
 		const insertedTopupRows = await trx.raw(
@@ -485,11 +487,11 @@ async function processWalletTopupSucceeded(
 				id, account_id, amount_eur, stripe_payment_intent_id, stripe_charge_id,
 				expires_at, is_auto_reload, status, date_created
 			) VALUES (
-				gen_random_uuid(), ?, ?, ?, ?, NOW() + INTERVAL '12 months', false, 'completed', NOW()
+				gen_random_uuid(), ?, ?, ?, ?, NOW() + INTERVAL '12 months', ?, 'completed', NOW()
 			)
 			ON CONFLICT (stripe_payment_intent_id) DO NOTHING
 			RETURNING id`,
-			[accountId, amountEur, intent.id, chargeId],
+			[accountId, amountEur, intent.id, chargeId, isAutoReload],
 		);
 
 		// Knex .raw returns either { rows } (pg) or [rows, fields].
@@ -537,9 +539,59 @@ async function processWalletTopupSucceeded(
 			metadata: JSON.stringify({
 				stripe_payment_intent_id: intent.id,
 				stripe_charge_id: chargeId,
+				...(isAutoReload ? { is_auto_reload: true } : {}),
 			}),
 		});
+
+		// 4. Mark matching wallet_auto_reload_pending row succeeded (if any).
+		//    Scoped to intent.id (the UNIQUE column), so we can't accidentally
+		//    succeed a different row.
+		if (isAutoReload) {
+			await trx('wallet_auto_reload_pending')
+				.where('stripe_payment_intent_id', intent.id)
+				.update({ status: 'succeeded', processed_at: new Date().toISOString(), last_error: null });
+		}
 	});
 
-	logger.info(`Wallet credited: account=${accountId} amount=€${amountEur.toFixed(2)} pi=${intent.id}`);
+	logger.info(`Wallet credited: account=${accountId} amount=€${amountEur.toFixed(2)} pi=${intent.id} auto_reload=${isAutoReload}`);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// payment_intent.payment_failed — auto-reload failure handler.
+// ────────────────────────────────────────────────────────────────────────────
+//
+// For non-auto-reload failures (manual top-ups from Checkout), there's nothing
+// for us to do — Stripe Checkout shows the error to the user directly.
+// For auto-reload failures, we flip the pending row to 'failed' so it surfaces
+// in ops dashboards. A subsequent debit that still crosses the threshold will
+// enqueue a fresh row (the partial UNIQUE scope excludes 'failed' rows).
+
+export async function handlePaymentIntentFailed(
+	intent: Stripe.PaymentIntent,
+	db: DB,
+	logger: any,
+): Promise<void> {
+	const meta = intent.metadata || {};
+	if (meta.is_auto_reload !== 'true') {
+		logger.debug?.(`payment_intent.payment_failed ${intent.id}: not an auto-reload, skipping`);
+		return;
+	}
+
+	const failureMessage = intent.last_payment_error?.message
+		|| intent.last_payment_error?.code
+		|| 'payment_failed';
+
+	const updated = await db('wallet_auto_reload_pending')
+		.where('stripe_payment_intent_id', intent.id)
+		.update({
+			status: 'failed',
+			processed_at: new Date().toISOString(),
+			last_error: String(failureMessage).slice(0, 1000),
+		});
+
+	if (updated === 0) {
+		logger.warn(`payment_intent.payment_failed ${intent.id}: no matching auto-reload row`);
+	} else {
+		logger.info(`Auto-reload PI ${intent.id} marked failed: ${failureMessage}`);
+	}
 }

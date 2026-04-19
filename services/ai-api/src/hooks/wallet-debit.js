@@ -175,11 +175,37 @@ export async function debitWallet({ accountId, costUsd, model, module, eventKind
         autoReloadAmountEur = wallet.auto_reload_amount_eur != null
           ? parseFloat(wallet.auto_reload_amount_eur)
           : null;
-        // Note: triggering the actual Stripe charge is intentionally NOT done here.
-        // ai-api does not have Stripe SDK access (Stripe lives in the CMS extension).
-        // The auto-reload flag is returned to the caller for logging/queueing.
-        // Future: emit to a queue/event that the stripe extension worker picks up.
-        // This is a known transitional pattern — see docs/architecture/pricing-v2.md §7.
+
+        // Enqueue durable auto-reload row for the CMS Stripe consumer to process.
+        // Must run in a NEW transaction AFTER the debit COMMIT — a failure here
+        // must never roll back the debit. Idempotency is enforced by the partial
+        // UNIQUE index idx_auto_reload_pending_active_per_account (scope:
+        // status IN ('pending','processing')), so concurrent debits on the same
+        // account collapse to a single enqueued row.
+        //
+        // If amount is missing (misconfigured wallet), skip enqueue but still
+        // return the flag so callers can surface the misconfiguration.
+        if (autoReloadAmountEur != null && autoReloadAmountEur > 0) {
+          try {
+            await pool.query(
+              `INSERT INTO public.wallet_auto_reload_pending (account_id, amount_eur)
+               VALUES ($1, $2)
+               ON CONFLICT (account_id) WHERE status IN ('pending','processing')
+               DO NOTHING`,
+              [accountId, autoReloadAmountEur],
+            );
+          } catch (enqueueErr) {
+            // Log at error level with context but never re-throw — the debit
+            // has already committed and must return success. A reconciliation
+            // job is expected to catch missed enqueues (see task 31 §Risks).
+            // eslint-disable-next-line no-console
+            console.error('[wallet-debit] auto-reload enqueue failed', {
+              accountId,
+              amountEur: autoReloadAmountEur,
+              error: enqueueErr?.message || String(enqueueErr),
+            });
+          }
+        }
       }
     }
 

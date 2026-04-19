@@ -1,8 +1,35 @@
 # 31. wallet_auto_reload_pending table + CMS Stripe consumer
 
-**Status:** planned
+**Status:** completed (2026-04-19)
 **Severity:** HIGH — revenue leak: auto-reload has no durable trigger
 **Source:** Task 18 code review (commit `0823b8b`) — issue I3
+
+## Implementation (2026-04-19)
+
+### DB piece (db-admin session, committed earlier)
+
+- `migrations/cms/024_wallet_auto_reload_pending.sql` (+ `_down.sql`) creates the table, indexes, constraints, FK CASCADE.
+- Directus collection registered via surgical INSERT (avoided `make apply` due to unrelated pre-existing snapshot drift).
+- Report: `docs/reports/db-admin-2026-04-19-task-31-wallet-auto-reload-pending-table-070257.md`.
+
+### Code piece
+
+- `services/ai-api/src/hooks/wallet-debit.js` — after the debit COMMIT, enqueues a row into `public.wallet_auto_reload_pending` in a **new short transaction** with `ON CONFLICT (account_id) WHERE status IN ('pending','processing') DO NOTHING`. Enqueue failures are logged at ERROR level and never re-thrown (debit must remain successful).
+- `services/cms/extensions/local/project-extension-stripe/src/auto-reload-consumer.ts` — `processAutoReloadBatch(stripe, db, logger)` claims up to 10 pending rows via `UPDATE ... FOR UPDATE SKIP LOCKED`, resolves the account's Stripe customer (subscriptions lookup → Stripe metadata search), reads the customer's `invoice_settings.default_payment_method`, and creates an off-session `PaymentIntent` with `confirm: true`. Metadata shaped to match the existing wallet_topup contract so the existing `processWalletTopupSucceeded` handler credits the wallet automatically.
+- `src/index.ts` — schedules the consumer every minute (finest cron granularity Directus supports) with an in-flight guard that skips overlapping ticks.
+- `src/webhook-handlers.ts` — on `payment_intent.succeeded` with `metadata.is_auto_reload='true'`, marks the pending row `succeeded` + threads the flag through to `ai_wallet_topup.is_auto_reload`. New `handlePaymentIntentFailed` marks the pending row `failed` with `last_error` from `intent.last_payment_error.message`.
+- Retry semantics: on PI creation failure, the consumer re-queues the row (`status='pending'`) while `attempts < MAX_ATTEMPTS (3)`; after that the row stays `failed` for manual ops review.
+
+### Tests
+
+- `services/ai-api/test/wallet-debit.test.js` — 4 new scenarios (scenarios 8–11): enqueue on threshold cross, partial UNIQUE prevents double-enqueue, auto-reload disabled → no enqueue, new enqueue after a prior `succeeded` row.
+- `services/cms/extensions/local/project-extension-stripe/__tests__/auto-reload-consumer.realdb.test.ts` — 9 scenarios covering happy path, retry, exhausted retries, missing default PM, concurrent SKIP LOCKED, webhook success mark, webhook failure mark, non-auto-reload no-op, and consumer idempotency.
+
+### Known gaps / future work
+
+- Observability metrics (count per status, oldest-pending age, alert if pending > 5min) — not yet wired. Can layer on top of the existing Directus admin dashboard pattern when needed.
+- Periodic reconcile job (scan wallets below threshold with no active pending row and enqueue one) — mitigates the narrow race window between debit COMMIT and enqueue INSERT. Low priority; the INSERT happens in the same process microseconds after COMMIT.
+- `payment_intent.payment_failed` retries: currently, a webhook-driven failure sets `status='failed'` directly. A subsequent debit that still crosses threshold will enqueue a new row (partial UNIQUE excludes `failed` rows). If the user wants automatic webhook-driven retries, extend `handlePaymentIntentFailed` to re-enqueue (status='pending', clear stripe_payment_intent_id) if `attempts < MAX_ATTEMPTS`.
 
 ## Problem
 

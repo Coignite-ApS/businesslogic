@@ -7,11 +7,13 @@ import {
 	handleSubscriptionDeleted,
 	handleInvoicePaymentFailed,
 	handlePaymentIntentSucceeded,
+	handlePaymentIntentFailed,
 	handleProductUpdated,
 	syncAllProducts,
 	withIdempotency,
 } from './webhook-handlers.js';
 import { registerWalletRoutes } from './wallet-handlers.js';
+import { processAutoReloadBatch } from './auto-reload-consumer.js';
 import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
@@ -218,6 +220,33 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 	}
 
 	const stripe = getStripe(stripeKey);
+
+	// ─── Auto-reload consumer (every minute) ────────────────
+	//
+	// Task 31: drains public.wallet_auto_reload_pending by creating off-session
+	// PaymentIntents. Runs at cron minute granularity (finest Directus supports).
+	// A single in-flight guard prevents overlapping ticks if one batch runs long.
+
+	let autoReloadInFlight = false;
+	schedule('* * * * *', async () => {
+		if (autoReloadInFlight) {
+			logger.debug('auto-reload consumer tick skipped: previous batch still running');
+			return;
+		}
+		autoReloadInFlight = true;
+		try {
+			const result = await processAutoReloadBatch(stripe, db, logger);
+			if (result.claimed > 0) {
+				logger.info(
+					`auto-reload batch: claimed=${result.claimed} succeeded=${result.succeeded} retried=${result.retried} failed=${result.failed}`,
+				);
+			}
+		} catch (err: any) {
+			logger.error(`auto-reload batch fatal: ${err?.message || err}`);
+		} finally {
+			autoReloadInFlight = false;
+		}
+	});
 
 	init('routes.custom.before', ({ app }) => {
 		const publicUrl = (env['PUBLIC_URL'] as string) || '';
@@ -426,6 +455,9 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 							break;
 						case 'payment_intent.succeeded':
 							await handlePaymentIntentSucceeded(event.data.object as any, db, logger);
+							break;
+						case 'payment_intent.payment_failed':
+							await handlePaymentIntentFailed(event.data.object as any, db, logger);
 							break;
 						default:
 							logger.debug(`Unhandled Stripe event: ${event.type}`);
