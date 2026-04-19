@@ -33,7 +33,8 @@ func Sublimits(checker *service.SublimitChecker) func(http.Handler) http.Handler
 			}
 
 			// 2. AI spend cap — cache-backed
-			if service.IsAIRoute(path) && checker != nil {
+			// KB Q&A (/v1/kb/*/ask) also triggers AI spend cap (calls an LLM).
+			if service.TriggersAISpendCap(path) && checker != nil {
 				if breach, allowed := checker.CheckAISpendCap(r.Context(), acct); !allowed {
 					w.Header().Set("X-RateLimit-Breached", breach)
 					http.Error(w, `{"error":"API key monthly AI spend cap reached"}`, http.StatusPaymentRequired)

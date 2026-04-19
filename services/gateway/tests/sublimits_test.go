@@ -313,6 +313,45 @@ func TestSublimits_NoAccountContext_PassesThrough(t *testing.T) {
 	}
 }
 
+// --- KB Q&A + AI spend cap ---
+
+// TestSublimits_KBQnA_TriggersAISpendCap verifies that /v1/kb/*/ask is subject
+// to the AI spend cap (KB Q&A calls an LLM).
+func TestSublimits_KBQnA_TriggersAISpendCap(t *testing.T) {
+	mr, rdb := miniRedis(t)
+	checker := service.NewSublimitChecker(nil, rdb)
+	acct := accountWithCaps(withAICap(10.0)) // no kb_search_cap set
+
+	mr.Set("gw:apikey:key-sublimit-test:ai_spend_month:"+ym(), "10.0")
+
+	h := middleware.Sublimits(checker)(okH())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, reqWithAcct(http.MethodPost, "/v1/kb/foo/ask", acct))
+
+	if rec.Code != http.StatusPaymentRequired {
+		t.Errorf("expected 402, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-RateLimit-Breached"); got != "ai_spend_cap" {
+		t.Errorf("expected X-RateLimit-Breached=ai_spend_cap, got %q", got)
+	}
+}
+
+// TestSublimits_KBQnA_ModuleAllowlistStillKB verifies that /v1/kb/*/ask is still
+// classified as "kb" for module allowlist purposes (not reclassified as "ai").
+func TestSublimits_KBQnA_ModuleAllowlistStillKB(t *testing.T) {
+	acct := accountWithCaps(withModuleAllowlist("calculators")) // kb not allowed
+	h := middleware.Sublimits(nil)(okH())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, reqWithAcct(http.MethodPost, "/v1/kb/foo/ask", acct))
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-RateLimit-Breached"); got != "module_allowlist" {
+		t.Errorf("expected X-RateLimit-Breached=module_allowlist, got %q", got)
+	}
+}
+
 // --- X-RateLimit-Breached header on each 4xx ---
 
 func TestSublimits_BreachHeaders(t *testing.T) {

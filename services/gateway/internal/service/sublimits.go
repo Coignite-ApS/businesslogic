@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -215,6 +216,17 @@ func kbSearchCacheKey(keyID string) string {
 
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// TriggersAISpendCap returns true for any path that consumes AI budget.
+// This includes direct AI routes AND KB Q&A (/v1/kb/*/ask), which calls an LLM.
+// Note: InferModule still returns "kb" for /v1/kb/*/ask — module allowlist unaffected.
+func TriggersAISpendCap(path string) bool {
+	if isAIRoute(path) {
+		return true
+	}
+	// KB Q&A calls an LLM → subject to AI spend cap
+	return strings.HasPrefix(path, "/v1/kb/") && strings.HasSuffix(path, "/ask")
 }
 
 // IsAIRoute and IsKBRoute exported for middleware use.

@@ -60,6 +60,12 @@ Cached at `gw:apikey:{id}:kb_search_month:{yyyymm}` (60s TTL).
 1. **Estimated cost pre-check** — spec says "sum + estimated-cost > cap → 402" but gateway doesn't know per-request AI cost before calling the model. Current impl blocks at `spend >= cap`. A future enhancement could pre-estimate cost from request token count.
 2. **Cache invalidation pub/sub** — task 18's wallet debit hook doesn't publish to Redis pub/sub. Current behavior: 60s TTL means at most one over-cap request after debit. To wire up instant invalidation: CMS debit hook should call `DELETE gw:apikey:{id}:ai_spend_month:*` via gateway's `/internal/cache/invalidate` endpoint (extend it).
 3. **KB cap invalidation** — same pattern; task 20's usage_events emit path doesn't notify gateway. 60s TTL is acceptable floor.
+4. **Flow routes with AI nodes not covered by AI spend cap** — spec mentions "AI in flows" but gateway cannot introspect flow node types at routing time. Route-level enforcement would require flow engine to expose a flag per-execution. Deferred; spec was unclear on route mapping.
+
+## Implementation notes
+
+- `a2ed941` — initial task 27 implementation
+- `[FIXSHA]` — KB Q&A now triggers AI spend cap (`TriggersAISpendCap` helper in `sublimits.go`; `middleware/sublimits.go` updated; 2 new tests)
 
 ## Required behavior (original spec)
 
