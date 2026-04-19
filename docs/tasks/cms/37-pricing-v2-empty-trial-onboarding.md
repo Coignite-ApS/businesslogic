@@ -77,7 +77,10 @@ State stored in `directus_users.metadata.onboarding_state` (JSONB) — no DB mig
 ### Vitest: 40/40 (13 new tests in use-onboarding.test.ts)
 ### Build: all 20 extensions ✓
 
-### Browser verification steps
+### Browser verification steps (PENDING — blocked)
+
+> **Blocked by [cross-cutting/39](../cross-cutting/39-cms-shared-extension-build-collision.md)**: Full end-to-end browser verification (signup → auto-redirect → wizard tiles → Stripe checkout → confirmation) deferred until CMS Docker image rebuild path is fixed. Code correctness verified via 13 new Vitest tests for the composable + existing 27 account-extension tests (40/40 green).
+
 1. `make cms-restart`
 2. Log in as a fresh user with no subscription
 3. Navigate to `/account` → should redirect to `/account/onboarding`

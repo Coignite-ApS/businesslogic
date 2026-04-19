@@ -284,7 +284,7 @@ make cms-restart         # Build all + restart CMS (most common)
 #   ext-calculators, ext-calculator-api, ext-formulas, ext-account,
 #   ext-account-api, ext-admin, ext-stripe, ext-flows, ext-flow-hooks,
 #   ext-knowledge, ext-knowledge-api, ext-layout-builder,
-#   ext-feature-flags, ext-feature-gate, ext-widget-api
+#   ext-feature-flags, ext-feature-gate, ext-widget-api, ext-usage-consumer
 ```
 
 ### Database & Snapshots
@@ -355,19 +355,27 @@ services/cms/
 │       └── entrypoint.sh        # Container startup
 │
 ├── extensions/
-│   ├── local/                   # Project-specific extensions (12 extensions)
+│   ├── local/                   # Project-specific extensions (18 extensions + 2 shared libs)
+│   │   ├── _shared/                            # Shared lib: v2-subscription helpers (not a Directus extension — skipped by build script)
 │   │   ├── project-extension-calculators/      # Module: calculator admin UI
 │   │   ├── project-extension-calculator-api/   # Hook: formula API proxy
 │   │   ├── project-extension-admin/            # Module: admin dashboard
 │   │   ├── project-extension-formulas/         # Module: formula execution UI
-│   │   ├── project-extension-account/          # Module: account management
+│   │   ├── project-extension-account/          # Module: account management + onboarding wizard
+│   │   ├── project-extension-account-api/      # Hook: account endpoints
 │   │   ├── project-extension-flows/            # Module: flow visual editor
 │   │   ├── project-extension-flow-hooks/       # Hook: flow engine proxy
 │   │   ├── project-extension-ai-api/           # Hook: AI assistant backend
 │   │   ├── project-extension-ai-assistant/     # Module: AI chat UI
+│   │   ├── project-extension-ai-observatory/   # Module: AI observability dashboard
 │   │   ├── project-extension-knowledge-api/    # Hook: KB backend
 │   │   ├── project-extension-knowledge/        # Module: KB management UI
-│   │   └── project-extension-stripe/           # Hook: billing
+│   │   ├── project-extension-layout-builder/   # Module: widget layout builder
+│   │   ├── project-extension-feature-flags/    # Hook: feature flag gating
+│   │   ├── project-extension-feature-gate/     # Shared lib: feature flag client (not a Directus extension)
+│   │   ├── project-extension-widget-api/       # Hook: widget endpoints
+│   │   ├── project-extension-usage-consumer/   # Hook: usage_events stream consumer + monthly_aggregates cron (Sprint B)
+│   │   └── project-extension-stripe/           # Hook: billing + wallet + quota refresh (Sprint B)
 │   └── package.json             # NPM extension dependencies
 │
 ├── config.local.yaml            # Local dev config
@@ -393,9 +401,15 @@ services/cms/
 | project-extension-flow-hooks | Hook | Proxies to flow engine |
 | project-extension-flows | Module | Frontend only |
 | project-extension-admin | Module | Reads from all schemas |
-| project-extension-account | Module | Account management |
+| project-extension-account | Module | Account management + onboarding wizard |
+| project-extension-account-api | Hook | Account endpoints |
 | project-extension-formulas | Module | Formula UI |
-| project-extension-stripe | Hook | Billing |
+| project-extension-stripe | Hook | Billing + wallet + feature_quotas refresh hook + nightly cron |
+| project-extension-ai-observatory | Module | AI observability dashboard |
+| project-extension-layout-builder | Module | Widget layout builder |
+| project-extension-feature-flags | Hook | Feature flag gating endpoints |
+| project-extension-widget-api | Hook | Widget endpoints |
+| project-extension-usage-consumer | Hook | Drains `bl:usage_events:in` Redis stream → `public.usage_events` INSERT; hourly `aggregate_usage_events()` rollup cron |
 
 ## Critical Data Collections (PostgreSQL)
 
@@ -418,6 +432,10 @@ services/cms/
 | `bl_flows` | flow | cms flow module (read) |
 | `bl_flow_executions` | flow | cms flow module (read) |
 | `bl_node_types` | flow | cms flow module (read) |
+| `feature_quotas` | public | gateway, ai-api, formula-api, flow (read quota — Sprint B) |
+| `usage_events` | public | usage-consumer (INSERT); aggregator reads unaggregated (Sprint B) |
+| `monthly_aggregates` | public | formula-api + gateway (read monthly counters); aggregator writes (Sprint B) |
+| `ai_wallet_ledger` | public | ai-api debit, gateway read for ai_spend_cap (Sprint B uses api_key_id join) |
 
 ## Environment Variables
 

@@ -89,7 +89,10 @@ Files: `services/cms/extensions/local/project-shared-ui/src/components/plan-card
 - `make ext`: all 20 extensions ✓ (account, ai-assistant, calculators + 17 others)
 - Vitest: account=27/27, ai-assistant=20/20, calculators=122/122
 
-### Browser smoke steps (for manual verification)
+### Browser smoke steps (for manual verification — PENDING, blocked)
+
+> **Blocked by [cross-cutting/39](../cross-cutting/39-cms-shared-extension-build-collision.md)**: CMS Docker image rebuild currently broken; running CMS uses a pre-Sprint-B image with host bind mounts. Manual browser QA deferred until task 39 completes. Code correctness verified via Vitest suites (64 tests across the three touched extensions) and host-side `make ext` build.
+
 1. Navigate to `/admin/account/subscription` → AI Wallet card should have "Settings" button
 2. Click Settings → dialog opens with toggle + threshold/amount inputs + monthly cap
 3. Enable auto-reload, set threshold=0 → Save button disabled (validation)

@@ -20,7 +20,7 @@ Sprint B shipped tasks 17, 20, 21, 22, 27, cms/36, cms/37 on branch `dm/sprint-b
 
 | Priority | # | Task | Why | Est. |
 |---|---|---|---|---|
-| **🔴 P0 — BLOCKER** | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS `_shared` extension build collision | Blocks `make cms-build` · blocks browser-QA of Sprint B UI (cms/36 + cms/37) · blocks Sprint 3 production deploy (task 28) | 1-2h |
+| **🔴 P0 — BLOCKER** (in-progress) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS Docker image rebuild broken — `_shared` + Sprint B extensions | Partial fix shipped `d3f9e8c` (build script skips shared libs, stripe+ioredis dep, usage-consumer+ai-observatory mounts). Still open: `ai-assistant` `npm error extraneous` blocks full image rebuild. | ~1.5h remaining |
 | 🟠 P1 — before scale | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5 bundle) | Stats precision race · memory spike on backlog · non-blocking CMS boot | 2-3h |
 | 🟡 P2 — at 100+ accounts | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | Hourly flush of ALL accounts → thundering herd on DB; emit per-account instead | 1-2h |
 | 🟡 P2 — freshness | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | AI spend / KB search cap invalidation goes from 60s TTL to <100ms | 3-4h |
@@ -247,7 +247,7 @@ Infrastructure and multi-service concerns.
 | 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 | 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | completed | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
-| 39 | 🔴 **CMS `_shared` extension build collision** (P0 — blocks Sprint B browser QA + Sprint 3 deploy) | planned | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
+| 39 | 🔴 **CMS Docker image rebuild broken** — `_shared` + Sprint B extensions (P0) | **in-progress** (partial fix `d3f9e8c`; `ai-assistant` npm error still open) | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
 | 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | planned | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
 | 41 | 🟡 Per-account aggregate cache invalidation (replace `ALL` flush, P2 at scale) | planned | [cross-cutting/41-per-account-aggregate-cache-invalidation.md](cross-cutting/41-per-account-aggregate-cache-invalidation.md) |
 | 42 | 🟡 Gateway cache cross-service PUBLISH on wallet debit + usage events (P2 freshness) | planned | [cross-cutting/42-gateway-cache-cross-service-publish.md](cross-cutting/42-gateway-cache-cross-service-publish.md) |
