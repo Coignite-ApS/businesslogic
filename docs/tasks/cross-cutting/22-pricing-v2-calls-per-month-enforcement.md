@@ -76,7 +76,7 @@ Commit: `7fdf158`
 
 ## Polish — ops-safety fixes (2026-04-19)
 
-Commit: `<pending — see note below>`
+Commit: `35fd9d6`
 
 - I-1 (SCAN not KEYS): replaced `redis.keys(...)` with `scanStream` for global ALL flushes (`fa:quota:*`, `fa:agg:*`); per-account agg flush now uses deterministic `buildAggCacheKey(accountId, currentPeriod())` + `redis.del` — no scan at all
 - I-3 (subscriber retry): removed 5-attempt cap; retryStrategy now `Math.min(times * 200, 5000)` — unbounded, backoff capped at 5s; ioredis auto-restores subscriptions on reconnect (uses `redis.subscribe()` API, not raw SUBSCRIBE)
