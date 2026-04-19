@@ -173,6 +173,51 @@ describe('refresh-quotas hook', () => {
 	});
 });
 
+// ── 7. Redis publish on refresh ─────────────────────────────
+
+describe('redis publish on quota refresh', () => {
+	it('publishes bl:feature_quotas:invalidated with account_id when redis is provided', async () => {
+		const db = makeDb();
+		const logger = makeLogger();
+		const redis = { publish: vi.fn().mockResolvedValue(1) };
+
+		const hooks = buildRefreshQuotasHooks(db, logger, redis);
+		await hooks['subscriptions.items.create']({ payload: { account_id: 'acc-pub' }, key: '1', collection: 'subscriptions' });
+
+		expect(redis.publish).toHaveBeenCalledTimes(1);
+		expect(redis.publish).toHaveBeenCalledWith('bl:feature_quotas:invalidated', 'acc-pub');
+	});
+
+	it('does NOT publish when redis is null (no-op, does not throw)', async () => {
+		const db = makeDb();
+		const logger = makeLogger();
+
+		// null redis — must not throw, must not publish
+		const hooks = buildRefreshQuotasHooks(db, logger, null);
+		await expect(
+			hooks['subscriptions.items.create']({ payload: { account_id: 'acc-null' }, key: '1', collection: 'subscriptions' })
+		).resolves.toBeUndefined();
+
+		// db.raw still called (quota refresh still happens)
+		expect(db.raw).toHaveBeenCalledWith('SELECT public.refresh_feature_quotas(?)', ['acc-null']);
+	});
+
+	it('publishes for each distinct account on multi-key update', async () => {
+		const accounts = ['acc-A', 'acc-B'];
+		let callIdx = 0;
+		const db = makeDb((_table, _id) => ({ account_id: accounts[callIdx++ % 2] }));
+		const logger = makeLogger();
+		const redis = { publish: vi.fn().mockResolvedValue(1) };
+
+		const hooks = buildRefreshQuotasHooks(db, logger, redis);
+		await hooks['subscriptions.items.update']({ keys: ['k1', 'k2'], payload: {}, collection: 'subscriptions' });
+
+		expect(redis.publish).toHaveBeenCalledTimes(2);
+		expect(redis.publish).toHaveBeenCalledWith('bl:feature_quotas:invalidated', 'acc-A');
+		expect(redis.publish).toHaveBeenCalledWith('bl:feature_quotas:invalidated', 'acc-B');
+	});
+});
+
 // ─── Cron ────────────────────────────────────────────────────
 
 describe('refresh_all_feature_quotas cron', () => {

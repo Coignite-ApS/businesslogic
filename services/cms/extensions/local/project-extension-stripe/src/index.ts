@@ -1,4 +1,5 @@
 import { defineHook } from '@directus/extensions-sdk';
+import Redis from 'ioredis';
 import { getStripe } from './stripe-client.js';
 import { getRegistrationPage } from './register.js';
 import {
@@ -24,21 +25,24 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 	const db = database;
 
 	// Shared Redis client for cache invalidation publishes (task 22)
-	// Lazy — created once on startup; null if REDIS_URL not set.
-	let pubRedis: any = null;
+	// Synchronous init — live instance available before any hooks are registered.
+	let pubRedis: Redis | null = null;
 	const redisUrl = (env['REDIS_URL'] as string) || '';
 	if (redisUrl) {
-		import('ioredis').then(({ default: Redis }) => {
+		try {
 			pubRedis = new Redis(redisUrl, {
 				maxRetriesPerRequest: 1,
 				enableOfflineQueue: false,
 				retryStrategy: (times: number) => (times > 5 ? null : Math.min(times * 200, 2000)),
 				lazyConnect: true,
 			});
-			return pubRedis.connect();
-		}).catch((err: any) => {
+			pubRedis.connect().catch((err: any) => {
+				logger.warn(`[stripe] Redis pub client connect failed: ${err?.message || err}`);
+			});
+		} catch (err: any) {
 			logger.warn(`[stripe] Redis pub client init failed: ${err?.message || err}`);
-		});
+			pubRedis = null;
+		}
 	}
 
 	// ─── Registration endpoints (no Stripe dependency) ──────
