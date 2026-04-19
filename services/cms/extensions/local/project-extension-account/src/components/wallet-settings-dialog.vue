@@ -6,7 +6,7 @@
 				<div class="settings-form">
 					<div class="field-row toggle-row">
 						<label class="field-label">Auto top-up</label>
-						<v-toggle v-model="localEnabled" />
+						<v-checkbox v-model="localEnabled" />
 					</div>
 
 					<template v-if="localEnabled">
