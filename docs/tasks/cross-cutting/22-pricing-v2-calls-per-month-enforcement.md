@@ -72,7 +72,7 @@ UPDATE subscriptions SET status='active' WHERE id='<test-id>';
 ```
 Result: PUBLISH seen on `bl:feature_quotas:invalidated` within <1s. Confirmed.
 
-Commit: TBD (updated after commit)
+Commit: `7fdf158`
 
 ## Acceptance
 
