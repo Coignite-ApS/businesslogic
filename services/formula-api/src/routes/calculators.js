@@ -18,6 +18,7 @@ import { loadRecipeFromDb, loadMcpConfigFromDb, loadCalculatorConfigMeta } from 
 import { computeAndUpsertSlot, atomicCheckAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
 import { getPool } from '../db.js';
 import { emitCalcCall } from '../services/usage-events.js';
+import { enforceCalcQuota, currentPeriod, incrementAggCache } from '../middleware/quota.js';
 
 
 /** @type {import('pino').Logger | null} */
@@ -1304,6 +1305,11 @@ export async function registerRoutes(app) {
       return reply.code(429).send({ error: msg });
     }
 
+    // Monthly calls_per_month quota enforcement (task 22)
+    req.quotaContext = { accountId, isTest: !!calc.test };
+    const quotaReply = await enforceCalcQuota(req, reply);
+    if (quotaReply !== undefined) return quotaReply; // middleware sent a response
+
     refreshRedisTtl(calcId);
 
     const inputData = req.body || {};
@@ -1315,8 +1321,9 @@ export async function registerRoutes(app) {
       reply.header('X-Cache', cached ? 'HIT' : 'MISS');
       stat({ cached, error: false });
 
-      // Emit usage event (fire-and-forget — never blocks response)
+      // Emit usage event + write-through agg cache increment (fire-and-forget)
       if (!calc.test) {
+        const _redis = isRedisReady() ? getRedisClient() : null;
         emitCalcCall({
           accountId: accountId,
           apiKeyId: null, // formula-api doesn't receive api_key_id in this path
@@ -1324,6 +1331,7 @@ export async function registerRoutes(app) {
           durationMs,
           inputsSizeBytes: JSON.stringify(inputData).length,
         });
+        incrementAggCache(_redis, accountId, currentPeriod()).catch(() => {});
       }
 
       return result;

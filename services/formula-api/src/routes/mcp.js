@@ -10,6 +10,7 @@ import { cleanInputSchemaForTools, resolveResponseTemplate } from '../utils/inte
 import { listAccountMcpCalculators } from '../services/calculator-db.js';
 import { getRedisClient, isRedisReady } from '../services/cache.js';
 import { redisWarn } from '../utils/redis-warn.js';
+import { enforceCalcQuota, currentPeriod, incrementAggCache } from '../middleware/quota.js';
 
 const MCP_PROTOCOL_VERSION = '2025-03-26';
 const SERVER_NAME = 'excel-formula-api';
@@ -201,6 +202,11 @@ export async function registerRoutes(app) {
           return reply.send(jsonRpcError(id, SERVER_ERROR_RETRYABLE, msg, { httpStatus: 429, retryable: true, retryAfterMs }));
         }
 
+        // Monthly calls_per_month quota enforcement (task 22)
+        req.quotaContext = { accountId, isTest: !!calc.test };
+        const mcpQuotaReply = await enforceCalcQuota(req, reply);
+        if (mcpQuotaReply !== undefined) return mcpQuotaReply;
+
         refreshRedisTtl(calcId);
 
         // Extract input from params.arguments (MCP spec)
@@ -212,8 +218,9 @@ export async function registerRoutes(app) {
           const mcpDurationMs = Date.now() - mcpExecStart;
           stat({ cached, error: false });
 
-          // Emit usage event (fire-and-forget)
+          // Emit usage event + write-through agg cache increment (fire-and-forget)
           if (!calc.test) {
+            const _redis = isRedisReady() ? getRedisClient() : null;
             emitCalcCall({
               accountId: calc.accountId,
               apiKeyId: null,
@@ -221,6 +228,7 @@ export async function registerRoutes(app) {
               durationMs: mcpDurationMs,
               inputsSizeBytes: JSON.stringify(inputData).length,
             });
+            incrementAggCache(_redis, calc.accountId, currentPeriod()).catch(() => {});
           }
 
           // Build MCP content
@@ -369,6 +377,11 @@ export async function registerRoutes(app) {
           return reply.send(jsonRpcError(id, SERVER_ERROR_PERMANENT, 'Calculator not found or expired', { httpStatus: 410, retryable: false }));
         }
 
+        // Monthly calls_per_month quota enforcement (task 22)
+        req.quotaContext = { accountId, isTest: !!calc.test };
+        const mcp2QuotaReply = await enforceCalcQuota(req, reply);
+        if (mcp2QuotaReply !== undefined) return mcp2QuotaReply;
+
         refreshRedisTtl(calcId);
 
         const inputData = params?.arguments || {};
@@ -380,8 +393,9 @@ export async function registerRoutes(app) {
           stat({ cached, error: false });
           rateLimiter.record(accountId);
 
-          // Emit usage event (fire-and-forget)
+          // Emit usage event + write-through agg cache increment (fire-and-forget)
           if (!calc.test) {
+            const _redis = isRedisReady() ? getRedisClient() : null;
             emitCalcCall({
               accountId: accountId || calc.accountId,
               apiKeyId: null,
@@ -389,6 +403,7 @@ export async function registerRoutes(app) {
               durationMs: mcp2DurationMs,
               inputsSizeBytes: JSON.stringify(inputData).length,
             });
+            incrementAggCache(_redis, accountId || calc.accountId, currentPeriod()).catch(() => {});
           }
 
           const content = [{ type: 'text', text: JSON.stringify(result) }];
