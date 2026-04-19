@@ -15,6 +15,7 @@ import {
   slotsForClass,
   extractCounts,
   computeAndUpsertSlot,
+  atomicCheckAndUpsertSlot,
   checkUploadQuota,
   checkAlwaysOnQuota,
   setAlwaysOn,
@@ -108,7 +109,7 @@ async function createTestAccount(client) {
   return id;
 }
 
-async function createTestCalculatorConfig(client, accountId) {
+async function createTestCalculatorConfig(client, accountId, { backdated = false } = {}) {
   // Create minimal calculators row (varchar PK)
   const calcStringId = `test-${randomUUID()}`;
   await client.query(
@@ -117,16 +118,31 @@ async function createTestCalculatorConfig(client, accountId) {
   );
   // Create minimal calculator_configs row
   const configId = randomUUID();
-  await client.query(
-    `INSERT INTO public.calculator_configs (id, calculator, test_environment, config_version, file_version,
-       input, output, sheets, formulas)
-     VALUES ($1, $2, false, 1, 1,
-       '{"type":"object","properties":{}}'::json,
-       '{"type":"object","properties":{}}'::json,
-       '{}'::json,
-       '[]'::json)`,
-    [configId, calcStringId],
-  );
+  if (backdated) {
+    // Simulate a config that was created before the grace window (orphan candidate)
+    await client.query(
+      `INSERT INTO public.calculator_configs (id, calculator, test_environment, config_version, file_version,
+         input, output, sheets, formulas, date_created)
+       VALUES ($1, $2, false, 1, 1,
+         '{"type":"object","properties":{}}'::json,
+         '{"type":"object","properties":{}}'::json,
+         '{}'::json,
+         '[]'::json,
+         NOW() - INTERVAL '5 minutes')`,
+      [configId, calcStringId],
+    );
+  } else {
+    await client.query(
+      `INSERT INTO public.calculator_configs (id, calculator, test_environment, config_version, file_version,
+         input, output, sheets, formulas)
+       VALUES ($1, $2, false, 1, 1,
+         '{"type":"object","properties":{}}'::json,
+         '{"type":"object","properties":{}}'::json,
+         '{}'::json,
+         '[]'::json)`,
+      [configId, calcStringId],
+    );
+  }
   return { calcStringId, configId };
 }
 
@@ -525,5 +541,116 @@ describe('calculator-slots integration', () => {
       [configId],
     );
     assert.equal(after.rows.length, 0);
+  });
+
+  // ── 12. I-2: orphan reconcile inside checkUploadQuota ─────────────────────
+
+  it('I-2 reconcile: orphaned calculator_configs materialised as slot rows on next quota check', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    await createTestFeatureQuotas(client, accountId, 10, 3);
+    // Backdated: simulates a config whose slot UPSERT crashed (older than grace window)
+    const { configId } = await createTestCalculatorConfig(client, accountId, { backdated: true });
+    client.release();
+
+    // Confirm no slot row exists yet
+    const before = await pool.query(
+      'SELECT id FROM public.calculator_slots WHERE calculator_config_id = $1',
+      [configId],
+    );
+    assert.equal(before.rows.length, 0, 'pre-condition: no slot row should exist');
+
+    try {
+      // Run quota check — this should trigger reconciliation
+      const result = await checkUploadQuota(pool, accountId, 1);
+      assert.equal(result.ok, true, 'quota check should succeed (10 slots available)');
+
+      // The orphaned config must now have a slot row
+      const after = await pool.query(
+        'SELECT id, slots_consumed FROM public.calculator_slots WHERE calculator_config_id = $1',
+        [configId],
+      );
+      assert.equal(after.rows.length, 1, 'slot row must be materialised by reconcile');
+      assert.ok(after.rows[0].slots_consumed >= 1, 'slots_consumed must be at least 1');
+    } finally {
+      const c = await pool.connect();
+      await cleanup(c, accountId);
+      c.release();
+    }
+  });
+
+  // ── 13. I-2: reconciled orphan counts against quota ───────────────────────
+
+  it('I-2 reconcile: orphaned slot counted against allowance after reconcile', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    // Allow exactly 1 slot; orphaned (backdated) config uses it
+    await createTestFeatureQuotas(client, accountId, 1, 3);
+    await createTestCalculatorConfig(client, accountId, { backdated: true }); // orphan (no slot row, old enough)
+    client.release();
+
+    try {
+      // The orphan should be reconciled (1 slot) and quota exhausted
+      const result = await checkUploadQuota(pool, accountId, 1);
+      assert.equal(result.ok, false, 'quota should be exhausted after orphan is counted');
+      assert.equal(result.statusCode, 402);
+    } finally {
+      const c = await pool.connect();
+      await cleanup(c, accountId);
+      c.release();
+    }
+  });
+
+  // ── 14. I-3: concurrent uploads serialise — exactly one wins at quota limit ─
+
+  it('I-3 concurrency: 5 concurrent uploads at quota boundary — exactly one wins', async () => {
+    const client = await pool.connect();
+    const accountId = await createTestAccount(client);
+    // Allow exactly 1 small slot
+    await createTestFeatureQuotas(client, accountId, 1, 3);
+
+    // Create 5 separate calculator configs (each would consume 1 slot = small)
+    const configs = [];
+    for (let i = 0; i < 5; i++) {
+      configs.push(await createTestCalculatorConfig(client, accountId));
+    }
+    client.release();
+
+    try {
+      // Fire all 5 atomicCheckAndUpsertSlot calls concurrently
+      const results = await Promise.all(
+        configs.map(({ configId }) =>
+          atomicCheckAndUpsertSlot(pool, {
+            calculatorConfigId: configId,
+            accountId,
+            sheets: { S: {} },
+            formulas: [],
+            expressions: null,
+            fileVersion: 1,
+            configVersion: 1,
+          }),
+        ),
+      );
+
+      const successes = results.filter((r) => r.ok === true || r.sizeClass !== undefined);
+      const failures = results.filter((r) => r.ok === false);
+
+      assert.equal(successes.length, 1, `exactly 1 upload must succeed, got ${successes.length}`);
+      assert.equal(failures.length, 4, `exactly 4 must be rejected with 402, got ${failures.length}`);
+      for (const f of failures) {
+        assert.equal(f.statusCode, 402);
+      }
+
+      // DB must also contain exactly 1 slot row for this account
+      const rows = await pool.query(
+        'SELECT id FROM public.calculator_slots WHERE account_id = $1',
+        [accountId],
+      );
+      assert.equal(rows.rows.length, 1, 'DB must have exactly 1 slot row for the account');
+    } finally {
+      const c = await pool.connect();
+      await cleanup(c, accountId);
+      c.release();
+    }
   });
 });

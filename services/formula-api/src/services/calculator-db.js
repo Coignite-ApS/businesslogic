@@ -159,9 +159,14 @@ export async function loadAccountLimitsFromDb(accountId) {
  * Returns { configId, accountId, fileVersion, configVersion } or null.
  *
  * calculatorStringId is the VARCHAR PK of public.calculators (not the UUID).
+ *
+ * Uniqueness invariant: there must be at most one non-test calculator_configs
+ * row per calculator. If multiple rows exist we throw loudly — this is a data
+ * integrity violation that should surface immediately rather than being masked
+ * by silent LIMIT 1 picking.
  */
 export async function loadCalculatorConfigMeta(calculatorStringId) {
-  const row = await queryOne(
+  const rows = await queryAll(
     `SELECT cc.id           AS config_id,
             c.account       AS account_id,
             cc.file_version,
@@ -170,11 +175,16 @@ export async function loadCalculatorConfigMeta(calculatorStringId) {
      JOIN calculators c ON c.id = cc.calculator
      WHERE c.id = $1
        AND cc.test_environment = false
-     ORDER BY cc.date_created DESC
-     LIMIT 1`,
+     ORDER BY cc.date_created DESC`,
     [calculatorStringId],
   );
-  if (!row) return null;
+  if (!rows || rows.length === 0) return null;
+  if (rows.length > 1) {
+    throw new Error(
+      `loadCalculatorConfigMeta: multiple non-test configs for calculator '${calculatorStringId}' (found ${rows.length}). Data integrity violation.`,
+    );
+  }
+  const row = rows[0];
   return {
     configId: row.config_id,
     accountId: row.account_id,

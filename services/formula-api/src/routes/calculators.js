@@ -15,7 +15,7 @@ import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
 import { loadAccountLimits } from '../services/account-limits.js';
 import { loadRecipeFromDb, loadMcpConfigFromDb, loadCalculatorConfigMeta } from '../services/calculator-db.js';
-import { computeAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
+import { computeAndUpsertSlot, atomicCheckAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
 import { getPool } from '../db.js';
 
 
@@ -780,12 +780,14 @@ export async function registerRoutes(app) {
 
       if (accountId) await loadAccountLimits(accountId, true);
 
-      // Compute size class + UPSERT calculator_slots (fire-and-forget on error)
+      // Atomic quota check + slot UPSERT inside an advisory-locked transaction.
+      // This is the authoritative gate against concurrent over-quota uploads (I-3).
+      // The preHandler checkSlotQuota is a cheap fast-fail only; this is definitive.
       if (accountId && !test && getPool()) {
         try {
           const meta = await loadCalculatorConfigMeta(calculatorId);
           if (meta) {
-            await computeAndUpsertSlot(getPool(), {
+            const slotResult = await atomicCheckAndUpsertSlot(getPool(), {
               calculatorConfigId: meta.configId,
               accountId: meta.accountId ?? accountId,
               sheets,
@@ -794,6 +796,9 @@ export async function registerRoutes(app) {
               fileVersion: meta.fileVersion,
               configVersion: meta.configVersion,
             });
+            if (!slotResult.ok) {
+              return reply.code(slotResult.statusCode).send({ error: slotResult.reason, code: 'QUOTA_EXCEEDED' });
+            }
           }
         } catch (slotErr) {
           (log || console).warn({ err: slotErr }, '[calculators] calculator_slots upsert failed (non-fatal)');
