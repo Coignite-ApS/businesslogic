@@ -17,6 +17,7 @@ import { loadAccountLimits } from '../services/account-limits.js';
 import { loadRecipeFromDb, loadMcpConfigFromDb, loadCalculatorConfigMeta } from '../services/calculator-db.js';
 import { computeAndUpsertSlot, atomicCheckAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
 import { getPool } from '../db.js';
+import { emitCalcCall } from '../services/usage-events.js';
 
 
 /** @type {import('pino').Logger | null} */
@@ -1308,9 +1309,23 @@ export async function registerRoutes(app) {
     const inputData = req.body || {};
 
     try {
+      const execStart = Date.now();
       const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+      const durationMs = Date.now() - execStart;
       reply.header('X-Cache', cached ? 'HIT' : 'MISS');
       stat({ cached, error: false });
+
+      // Emit usage event (fire-and-forget — never blocks response)
+      if (!calc.test) {
+        emitCalcCall({
+          accountId: accountId,
+          apiKeyId: null, // formula-api doesn't receive api_key_id in this path
+          formulaId: calcId,
+          durationMs,
+          inputsSizeBytes: JSON.stringify(inputData).length,
+        });
+      }
+
       return result;
     } catch (err) {
       stat({ cached: false, error: true, errorMessage: err.body?.error || err.message?.slice(0, 200) });

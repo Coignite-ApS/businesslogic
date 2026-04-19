@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { LRUCache } from 'lru-cache';
 import { getOrRebuild, executeCalculatorCore, loadAccountLimits, refreshRedisTtl } from './calculators.js';
 import { validateGatewayAuth } from '../utils/auth.js';
+import { emitCalcCall } from '../services/usage-events.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import * as stats from '../services/stats.js';
 import { routeByCalcId } from '../utils/routing.js';
@@ -206,8 +207,21 @@ export async function registerRoutes(app) {
         const inputData = params?.arguments || {};
 
         try {
+          const mcpExecStart = Date.now();
           const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+          const mcpDurationMs = Date.now() - mcpExecStart;
           stat({ cached, error: false });
+
+          // Emit usage event (fire-and-forget)
+          if (!calc.test) {
+            emitCalcCall({
+              accountId: calc.accountId,
+              apiKeyId: null,
+              formulaId: calcId,
+              durationMs: mcpDurationMs,
+              inputsSizeBytes: JSON.stringify(inputData).length,
+            });
+          }
 
           // Build MCP content
           const content = [{ type: 'text', text: JSON.stringify(result) }];
@@ -360,9 +374,22 @@ export async function registerRoutes(app) {
         const inputData = params?.arguments || {};
 
         try {
+          const mcp2ExecStart = Date.now();
           const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+          const mcp2DurationMs = Date.now() - mcp2ExecStart;
           stat({ cached, error: false });
           rateLimiter.record(accountId);
+
+          // Emit usage event (fire-and-forget)
+          if (!calc.test) {
+            emitCalcCall({
+              accountId: accountId || calc.accountId,
+              apiKeyId: null,
+              formulaId: calcId,
+              durationMs: mcp2DurationMs,
+              inputsSizeBytes: JSON.stringify(inputData).length,
+            });
+          }
 
           const content = [{ type: 'text', text: JSON.stringify(result) }];
 
