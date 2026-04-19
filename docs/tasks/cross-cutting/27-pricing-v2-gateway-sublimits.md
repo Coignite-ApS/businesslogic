@@ -65,7 +65,7 @@ Cached at `gw:apikey:{id}:kb_search_month:{yyyymm}` (60s TTL).
 ## Implementation notes
 
 - `a2ed941` — initial task 27 implementation
-- `[FIXSHA]` — KB Q&A now triggers AI spend cap (`TriggersAISpendCap` helper in `sublimits.go`; `middleware/sublimits.go` updated; 2 new tests)
+- `6cf142c` — KB Q&A now triggers AI spend cap (`TriggersAISpendCap` helper in `sublimits.go`; `middleware/sublimits.go` updated; 2 new tests)
 
 ## Required behavior (original spec)
 
