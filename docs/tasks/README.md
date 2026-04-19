@@ -32,7 +32,7 @@ Pricing v2 code landed in waves on `dev`:
 | Sprint | Tasks | Goal | Status |
 |---|---|---|---|
 | **Sprint 1 — Make wallet actually work** | 18 wallet debit · 19 calc slots · 26 isolation E2E | Wallet depletes on AI use; honest slot enforcement; isolation guarantee | ✅ **shipped** |
-| **Sprint 2 — Wallet correctness + security** (~3d) | 36 permission fix · 31 auto-reload table · 33 failed-debit reconcile · 34 slot reconcile/race · 35 CI pipeline | Close Sprint 1's follow-up gaps; make tests actually run on PR; close cross-account read leak | **3/5 shipped** (36, 31, 33 done · 34, 35 remain) |
+| **Sprint 2 — Wallet correctness + security** (~3d) | 36 permission fix · 31 auto-reload table · 33 failed-debit reconcile · 34 slot reconcile/race · 35 CI pipeline | Close Sprint 1's follow-up gaps; make tests actually run on PR; close cross-account read leak | ✅ **shipped** (all 5) |
 | **Sprint 3 — Production launch** (~1.5d) | 28 production deployment + smoke test · cms/37 empty-trial onboarding wizard | Real customers sign up + activate + check out via Stripe live mode | planned |
 | **Sprint 4 — Analytics + observability** (~3d, parallelizable) | 17 feature_quotas refresh · 20 usage_events emitter · 21 monthly_aggregates rollup · 27 gateway sub-limits | Per-key sub-limits enforced; usage events captured; admin reports accurate | planned |
 
@@ -40,8 +40,8 @@ Pricing v2 code landed in waves on `dev`:
 1. ✅ **Task 36** (ai_token_usage permission) — SECURITY. Cross-account read leak. Shipped 2026-04-19 (`a2c0388`).
 2. ✅ **Task 31** (wallet_auto_reload_pending) — REVENUE. DB queue + ai-api enqueue + stripe ext consumer. Shipped 2026-04-19 (`94b25d0`).
 3. ✅ **Task 33** (failed-debit reconciliation) — ACCOUNTING. DB queue + helper + 3 catch-branch wires + reconcile endpoint. Shipped 2026-04-19 (`51e14d0`).
-4. **Task 34** (calc slot reconcile + race) — QUOTA. Concurrent-upload bypass; crash-window loss. **next up**.
-5. **Task 35** (CI pipeline) — CORRECTNESS. Otherwise Sprint 1 tests are dead weight.
+4. ✅ **Task 34** (calc slot reconcile + race) — QUOTA. Advisory lock + orphan reconcile + uniqueness assertion. Shipped 2026-04-19 (`6dce523` + `b5abf3d`).
+5. ✅ **Task 35** (CI pipeline) — CORRECTNESS. Buddy pipeline + CONTRIBUTING.md. Shipped 2026-04-19 (`fefcfe9` + `5957bf8`).
 
 **Quality of life / tech debt** (parallelizable, any time):
 - 16 Makefile container-name · 22 calls_per_month enforcement · 23 bl_flow_executions FK · 24 ledger partitioning (defer until 10M rows) · 25 counter table tracking (optional) · 29 per-tier RPS spec · 30 ledger compound index (defer until 10k+ rows/month) · 32 module_kind enum for chat · 37 extract shared test helpers · cms/36 UI polish
@@ -224,8 +224,8 @@ Infrastructure and multi-service concerns.
 | 31 | wallet_auto_reload_pending table + CMS Stripe consumer (Sprint 2 — revenue) | **completed 2026-04-19** | [cross-cutting/31-wallet-auto-reload-pending.md](cross-cutting/31-wallet-auto-reload-pending.md) |
 | 32 | Extend module_kind enum to include 'chat' (analytics) | planned | [cross-cutting/32-module-kind-enum-chat.md](cross-cutting/32-module-kind-enum-chat.md) |
 | 33 | Failed-debit reconciliation queue (Sprint 2 — accounting) | **completed 2026-04-19** | [cross-cutting/33-failed-debit-reconciliation.md](cross-cutting/33-failed-debit-reconciliation.md) |
-| 34 | calculator_slots reconcile + concurrent-upload race fix (Sprint 2 — quota) | planned | [cross-cutting/34-calculator-slots-reconcile-race.md](cross-cutting/34-calculator-slots-reconcile-race.md) |
-| 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | planned | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
+| 34 | calculator_slots reconcile + concurrent-upload race fix (Sprint 2 — quota) | **completed 2026-04-19** | [cross-cutting/34-calculator-slots-reconcile-race.md](cross-cutting/34-calculator-slots-reconcile-race.md) |
+| 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | **completed 2026-04-19** | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
 | 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 | 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | planned | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |

@@ -1,8 +1,27 @@
 # 34. calculator_slots reconcile + concurrent-upload race fix
 
-**Status:** planned
+**Status:** completed 2026-04-19 (`6dce523` + `b5abf3d`)
 **Severity:** MEDIUM (single-customer) / HIGH (multi-customer GA) — quota bypass
 **Source:** Task 19 code review (commit `b70b07f`) — issues I2, I3, I4
+
+## Implementation (what shipped)
+
+- **I-2 (orphan reconcile):** New `reconcileOrphanedSlots(client, accountId)` in `services/formula-api/src/services/calculator-slots.js`. Detects `calculator_configs` rows for the account with no matching `calculator_slots` row, re-extracts counts from the stored config, and UPSERTs the missing slot row. Uses a `ORPHAN_GRACE_SECONDS = 30` constant (via `make_interval(secs => $2)`) so in-flight uploads aren't misclassified as orphans. Per-orphan errors are swallowed; outer SELECT failures propagate (so the caller's transaction aborts cleanly if the DB is unreachable). Called inside `checkUploadQuota` and `atomicCheckAndUpsertSlot`.
+- **I-3 (race fix):** New `atomicCheckAndUpsertSlot(pool, { ... })` wraps the quota check + slot UPSERT in a single transaction gated by `pg_advisory_xact_lock(hashtext('calc-slot-' || accountId))`. Concurrent uploads from the same account serialise on the lock; other accounts are unaffected. POST `/calculator` in `services/formula-api/src/routes/calculators.js` now calls this authoritative gate (returns 402 on quota violation). The preHandler-level `checkSlotQuota` is retained as a best-effort fast-fail (Option B from the task doc).
+- **I-4 (uniqueness assertion):** `loadCalculatorConfigMeta` in `services/formula-api/src/services/calculator-db.js` switched from `queryOne` + `LIMIT 1` to `queryAll` + throws `Error('loadCalculatorConfigMeta: multiple non-test configs for calculator X')` when >1 row exists. Fails loud on unexpected state rather than silently picking the newest.
+- **Refactor:** `upsertCalculatorSlot` now accepts an optional `opts.client`, so `atomicCheckAndUpsertSlot` can reuse it while holding the lock — eliminates duplicated INSERT SQL.
+
+## Tests (integration, real Postgres)
+
+- **Test 12 — orphan materialisation:** Insert `calculator_configs` row without slot row (backdated past the 30s grace window), call quota check → slot row materialised via reconcile.
+- **Test 13 — orphan counts toward quota:** Orphaned configs count against the account's slot_allowance after reconcile.
+- **Test 14 — 5-concurrent upload at quota boundary:** Dedicated `pg.Pool({ max: 10 })` (so the 5 callers contend on the advisory lock, not connection acquisition). Exactly 1 UPSERT succeeds; the other 4 return 402. Final `calculator_slots` row count == 1.
+
+All 74 tests pass (`npm run test:all`).
+
+## Known follow-up (out of scope for Task 34)
+
+PATCH `/calculator/:id` (line 1053 of `routes/calculators.js`) still uses the old fire-and-forget `computeAndUpsertSlot`. Size-class bumps on edit (small → large) can grow an account past quota. Log separately if needed.
 
 ## Problem (three related gaps)
 
