@@ -13,6 +13,7 @@ import { ensureConsumerGroup, processBatch } from './consumer.js';
 import { buildAggregateUsageEventsCron } from './cron.js';
 
 const RETRY_SLEEP_MS = 2000;
+const BOOT_DELAY_MS = 30_000;
 
 export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	const db = database;
@@ -59,9 +60,13 @@ export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	// redis is assigned in app.before; by the time the cron fires it will be set.
 	const runAggregation = buildAggregateUsageEventsCron(db, logger, () => redis);
 
-	// On-boot run: don't wait up to an hour for the first aggregation
-	init('app.after', async () => {
-		await runAggregation();
+	// On-boot run: deferred 30s so CMS becomes healthy immediately (I5 fix)
+	init('app.after', () => {
+		setTimeout(() => {
+			runAggregation().catch((err: any) => {
+				logger.error(`[usage-consumer] on-boot aggregation failed: ${err?.message || err}`);
+			});
+		}, BOOT_DELAY_MS);
 	});
 
 	// Hourly cron: 0 * * * * — keep quota view fresh for task 22 enforcement

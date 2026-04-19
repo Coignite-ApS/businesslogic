@@ -28,11 +28,14 @@ const PG_DSN = 'postgres://directus:directus@localhost:15432/directus';
 let pool: pg.Pool;
 let testAccountId: string;
 
-// Knex-compatible shim — only raw() needed for cron
+// Knex-compatible shim — only raw() needed for cron.
+// Converts Knex-style ? placeholders to pg-style $1/$2/... before forwarding to node-postgres.
 function makeDb(pgPool: pg.Pool): any {
 	return {
-		raw: async (sql: string, _bindings?: any[]) => {
-			const result = await pgPool.query(sql);
+		raw: async (sql: string, bindings?: any[]) => {
+			let idx = 0;
+			const pgSql = sql.replace(/\?/g, () => `$${++idx}`);
+			const result = await pgPool.query(pgSql, bindings);
 			return result;
 		},
 	};
@@ -393,4 +396,112 @@ describe('aggregate_usage_events() E2E', () => {
 			await pool2.end();
 		}
 	}, 60_000);
+
+	/**
+	 * Regression: Issue I3 — backlog larger than batch_size must drain across multiple calls.
+	 *
+	 * Insert 150 events, run with batchSize=100, verify:
+	 *   run 1 → events_aggregated=100
+	 *   run 2 → events_aggregated=50
+	 *   run 3 → events_aggregated=0 (fully drained)
+	 * Final aggregate counter reflects all 150.
+	 */
+	it('I3 regression: backlog > batch_size drains in multiple passes', async () => {
+		const marker = `cron-e2e-i3-${randomUUID()}`;
+		const period = currentPeriod();
+		const db = makeDb(pool);
+
+		await insertEvents(pool, {
+			account_id: testAccountId, module: 'calculators', event_kind: 'calc.call',
+			count: 150, test_marker: marker,
+		});
+
+		// Capture pre-run baseline
+		const { rows: pre } = await pool.query(
+			`SELECT COALESCE(calc_calls, 0) AS calc_calls
+			 FROM public.monthly_aggregates
+			 WHERE account_id = $1 AND period_yyyymm = $2`,
+			[testAccountId, period],
+		);
+		const calcBefore = Number(pre[0]?.calc_calls ?? 0);
+
+		const stats1 = await runAggregation(db, 100);
+		expect(stats1.events_aggregated).toBe(100);
+
+		const stats2 = await runAggregation(db, 100);
+		expect(stats2.events_aggregated).toBe(50);
+
+		const stats3 = await runAggregation(db, 100);
+		expect(stats3.events_aggregated).toBe(0);
+
+		// All 150 events must be marked aggregated
+		const { rows: unagg } = await pool.query(
+			`SELECT COUNT(*)::int AS n FROM public.usage_events
+			 WHERE metadata->>'test_marker' = $1
+			   AND aggregated_at IS NULL`,
+			[marker],
+		);
+		expect(unagg[0].n).toBe(0);
+
+		// Aggregate counter reflects all 150
+		const { rows: post } = await pool.query(
+			`SELECT COALESCE(calc_calls, 0) AS calc_calls
+			 FROM public.monthly_aggregates
+			 WHERE account_id = $1 AND period_yyyymm = $2`,
+			[testAccountId, period],
+		);
+		expect(Number(post[0]?.calc_calls)).toBe(calcBefore + 150);
+	}, 60_000);
+
+	/**
+	 * Regression: Issue I2 — CTE-RETURNING stats must be exact.
+	 *
+	 * Insert N events across 2 distinct periods for 1 account.
+	 * Run once and assert accounts_touched === 1, periods_touched === 2.
+	 */
+	it('I2 regression: CTE-RETURNING stats are exact (accounts_touched + periods_touched)', async () => {
+		const marker = `cron-e2e-i2-${randomUUID()}`;
+		const db = makeDb(pool);
+
+		// Two distinct months (current and next month's period)
+		const now = new Date();
+		const currentMonth = now.getFullYear() * 100 + (now.getMonth() + 1);
+
+		// Period 1: current month
+		const occurred1 = now.toISOString();
+		// Period 2: next month (override occurred_at directly)
+		const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+		// Insert 5 events in current month
+		await pool.query(
+			`INSERT INTO public.usage_events (account_id, module, event_kind, quantity, metadata, occurred_at)
+			 SELECT $1, 'calculators', 'calc.call', 1, $2::jsonb, $3
+			 FROM generate_series(1, 5)`,
+			[testAccountId, JSON.stringify({ test_marker: marker }), occurred1],
+		);
+
+		// Insert 3 events in next month
+		await pool.query(
+			`INSERT INTO public.usage_events (account_id, module, event_kind, quantity, metadata, occurred_at)
+			 SELECT $1, 'calculators', 'calc.call', 1, $2::jsonb, $3
+			 FROM generate_series(1, 3)`,
+			[testAccountId, JSON.stringify({ test_marker: marker }), nextMonth],
+		);
+
+		const stats = await runAggregation(db);
+
+		expect(stats.events_aggregated).toBeGreaterThanOrEqual(8);
+		// Exactly 1 distinct account, exactly 2 distinct periods
+		expect(stats.accounts_touched).toBe(1);
+		expect(stats.periods_touched).toBe(2);
+
+		// Verify all 8 events marked
+		const { rows: unagg } = await pool.query(
+			`SELECT COUNT(*)::int AS n FROM public.usage_events
+			 WHERE metadata->>'test_marker' = $1
+			   AND aggregated_at IS NULL`,
+			[marker],
+		);
+		expect(unagg[0].n).toBe(0);
+	}, 30_000);
 });

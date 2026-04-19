@@ -100,18 +100,30 @@ aggregated_at timestamptz  -- NULL until task 21 sets it
 
 ### Schedule
 - Hourly cron: `0 * * * *` via `schedule()` in `project-extension-usage-consumer/src/index.ts`.
-- On-boot run via `app.after` init hook — avoids up-to-1h wait on restart.
+- On-boot run: deferred 30s via `setTimeout` inside `app.after` — fire-and-forget so CMS becomes healthy immediately (I5 fix). Aggregation failure on boot is logged but does not block startup.
+
+### Batch size & backlog draining
+
+`aggregate_usage_events(p_batch_size int DEFAULT 100000)` — signature added in migration 033.
+
+- Default batch size: 100,000 events per invocation. Source rows are selected with `ORDER BY occurred_at LIMIT p_batch_size` before GROUP BY, keeping per-call memory bounded.
+- The cron handler loops until `events_aggregated === 0` or 50 iterations (`MAX_ITERATIONS`). This ensures a multi-day backlog after an outage is drained within one cron tick without a memory spike.
+- Guards against an infinite loop: after 50 iterations the handler exits and logs a final summary. The remaining backlog drains on the next hourly tick.
 
 ### Idempotency
 - `aggregated_at IS NULL` filter ensures already-processed rows are skipped.
 - Re-running the job when all rows are marked produces `events_aggregated=0`, no double-counts.
 
 ### Monitoring
-Structured log line after each run:
+Per-iteration log line (one per loop pass):
 ```
-[usage-consumer] monthly_aggregates rollup: done — events_aggregated=N accounts_touched=N periods_touched=N lag_seconds=N
+[usage-consumer] monthly_aggregates rollup: iteration=N events_aggregated=N accounts_touched=N periods_touched=N lag_seconds=N
 ```
-`lag_seconds` = `NOW() - MIN(occurred_at)` of oldest unaggregated event before the run. Target: < 3600s (hourly schedule).
+Final summary log line after loop exits:
+```
+[usage-consumer] monthly_aggregates rollup: done — total_events_aggregated=N total_accounts_touched=N total_periods_touched=N
+```
+`lag_seconds` = `NOW() - MIN(occurred_at)` of oldest unaggregated event before each batch. Target: < 3600s (hourly schedule).
 
 ### Schema reference
 `public.monthly_aggregates` composite PK `(account_id, period_yyyymm)` — 19 columns.

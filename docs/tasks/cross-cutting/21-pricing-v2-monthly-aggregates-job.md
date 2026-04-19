@@ -105,8 +105,8 @@ Issues C1, I1, I4 identified by code reviewer and fixed in migration 031:
 
 ## Known follow-ups
 
-- **I2:** `accounts_touched`/`periods_touched` heuristic queries `monthly_aggregates` within a 5-second window — race condition; replace with CTE RETURNING counts from the upserted CTE for exact values
-- **I3:** No batch size protection — first run after an outage processes all backlogged events in a single query; O(N) memory spike risk; add `LIMIT` to new_events CTE with loop
-- **I5:** `init('app.after')` awaits aggregation before resolving — blocks CMS startup if aggregation is slow or DB is unavailable at boot time; run in background (detached promise with error log)
+- **I2:** ✅ closed by task 40 (migration 033 + cron loop + boot deferral) — replaced 5-second window heuristic with CTE-RETURNING exact counts
+- **I3:** ✅ closed by task 40 (migration 033 + cron loop + boot deferral) — batch size cap added; cron loops until drained (max 50 iterations)
+- **I5:** ✅ closed by task 40 (migration 033 + cron loop + boot deferral) — on-boot run is now fire-and-forget with 30s delay via setTimeout
 - **calc_unique_calculators:** Column no longer populated by aggregator (C1 fix). Needs a side-table or on-demand computation (e.g., `COUNT(DISTINCT metadata->>'calculator_id')` at query time) if any UI/API reads it
 - **Alerting:** No Prometheus/metric sink for `lag_seconds` yet — aggregation lag is logged but not alertable; add Prometheus counter or emit to monitoring sink

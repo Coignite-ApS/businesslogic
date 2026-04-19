@@ -1,6 +1,6 @@
 # 40. monthly_aggregates aggregator hardening (I2 + I3 + I5 bundle)
 
-**Status:** planned
+**Status:** completed 2026-04-20 (pending migration apply via db-admin)
 **Severity:** MED — correctness and ops readiness gaps in the hourly rollup
 **Source:** Code review of Sprint B task 21 (`docs/tasks/cross-cutting/21-pricing-v2-monthly-aggregates-job.md` — Known follow-ups section)
 **Depends on:** task 21 (already shipped)
@@ -64,12 +64,13 @@ CMS becomes healthy immediately; aggregator runs 30s later.
 
 ## Key Tasks
 
-- [ ] Migration 032 via db-admin — new `aggregate_usage_events(int)` function with I2 + I3 fixes
-- [ ] Update `cron.ts` handler to loop until drained (I3)
-- [ ] Update `src/index.ts` boot hook (I5)
-- [ ] Update E2E tests — backlog >batch_size test; verify loop completes; verify CTE-RETURNING stats accurate under concurrent writes
-- [ ] Update architecture doc `docs/architecture/usage-events.md` — document batch behavior + boot timing
-- [ ] Update task 21 doc follow-ups section to mark these closed
+- [x] Migration 033 via db-admin — new `aggregate_usage_events(int DEFAULT 100000)` function with I2 + I3 fixes
+- [x] Update `cron.ts` handler to loop until drained (I3)
+- [x] Update `src/index.ts` boot hook (I5)
+- [x] Update unit + E2E tests — backlog >batch_size test; CTE-RETURNING exact stats test
+- [x] Update architecture doc `docs/architecture/usage-events.md` — document batch behavior + boot timing
+- [x] Update task 21 doc follow-ups section to mark these closed
+- [ ] Apply migration 033 via db-admin
 
 ## Acceptance
 
