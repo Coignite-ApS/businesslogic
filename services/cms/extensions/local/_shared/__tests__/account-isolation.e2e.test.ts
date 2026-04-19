@@ -15,7 +15,8 @@
  *    (via its policy) — distinguishes "permission denies" from "row missing"
  *  - CASCADE delete: removing account removes child rows
  *  - Permission audit: every pricing v2 collection has the account_id filter
- *    on its read permission (and flags ai_token_usage empty-filter gap)
+ *    on its read permission, plus a dedicated regression guard for Task 36's
+ *    ai_token_usage AI-KB-Assistance account filter.
  *
  * Requires:
  *  - Postgres running on port 15432 (businesslogic-postgres-1)
@@ -391,14 +392,21 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		expect(res.status).toBe(403);
 	});
 
-	// ── FINDING: ai_token_usage permission leaks (AI KB Assistance) ─
+	// ── Regression guard: ai_token_usage (AI KB Assistance) row filter ─
+	//
+	// Originally documented the bug (permissions = {}) as a failing-when-fixed
+	// marker. Task 36 closed the leak; this test now asserts the fixed state
+	// so any regression that re-empties the filter fails the suite.
+	// Ref: docs/tasks/cross-cutting/36-ai-token-usage-permission-fix.md
+	//      migrations/cms/019_ai_token_usage_kb_assist_permission.sql
 
-	it('FINDING: ai_token_usage AI KB Assistance policy has empty filter', async () => {
+	it('ai_token_usage AI KB Assistance policy has account filter (regression guard for Task 36)', async () => {
 		if (!run) return;
 		const perm = await db('directus_permissions as p')
 			.join('directus_policies as pol', 'pol.id', 'p.policy')
 			.where('p.collection', 'ai_token_usage')
 			.where('pol.name', 'AI KB Assistance')
+			.where('p.action', 'read')
 			.select('p.permissions')
 			.first();
 
@@ -406,14 +414,158 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		const parsed = typeof perm.permissions === 'string'
 			? JSON.parse(perm.permissions)
 			: (perm.permissions ?? {});
-		if (Object.keys(parsed).length === 0) {
-			console.warn(
-				'PERMISSION GAP: ai_token_usage (AI KB Assistance) has empty filter — ' +
-				'add {"account":{"_eq":"$CURRENT_USER.active_account"}} via /db-admin',
-			);
+
+		// Filter must exist (leak closed).
+		expect(Object.keys(parsed).length).toBeGreaterThan(0);
+
+		// FK column on this table is `account` (NOT `account_id`) — see
+		// pre-task snapshot and migration 015.
+		expect(parsed).toHaveProperty('account');
+		expect(parsed.account).toEqual({ _eq: '$CURRENT_USER.active_account' });
+	});
+
+	// ── Regression guards: Task 38 (AI KB Assistance policy {} filters) ──
+	//
+	// Closes the 7 remaining `{}` row filters under the AI KB Assistance
+	// policy. FK columns vary across tables by historical accident:
+	//   knowledge_bases.account, kb_documents.account, kb_chunks.account_id,
+	//   ai_conversations.account, account.id (PK), directus_files.uploaded_by
+	//     → directus_users.active_account.
+	// Each guard asserts the specific shape so a regression that re-empties
+	// or flips the FK column fails the suite.
+	// Ref: docs/tasks/cross-cutting/38-ai-kb-policy-filter-audit.md
+	//      migrations/cms/{020,021,022,023}_*.sql
+
+	const task38ReadGuards: Array<{
+		collection: string;
+		fkCol: string;
+		expectedShape: Record<string, any>;
+	}> = [
+		{
+			collection: 'knowledge_bases',
+			fkCol: 'account',
+			expectedShape: { account: { _eq: '$CURRENT_USER.active_account' } },
+		},
+		{
+			collection: 'kb_documents',
+			fkCol: 'account',
+			expectedShape: { account: { _eq: '$CURRENT_USER.active_account' } },
+		},
+		{
+			collection: 'kb_chunks',
+			fkCol: 'account_id',
+			expectedShape: { account_id: { _eq: '$CURRENT_USER.active_account' } },
+		},
+		{
+			collection: 'ai_conversations',
+			fkCol: 'account',
+			expectedShape: { account: { _eq: '$CURRENT_USER.active_account' } },
+		},
+		{
+			collection: 'account',
+			fkCol: 'id',
+			expectedShape: { id: { _eq: '$CURRENT_USER.active_account' } },
+		},
+	];
+
+	for (const { collection, fkCol, expectedShape } of task38ReadGuards) {
+		it(`${collection} AI KB Assistance READ has ${fkCol} filter (Task 38 regression guard)`, async () => {
+			if (!run) return;
+			const perm = await db('directus_permissions as p')
+				.join('directus_policies as pol', 'pol.id', 'p.policy')
+				.where('p.collection', collection)
+				.where('pol.name', 'AI KB Assistance')
+				.where('p.action', 'read')
+				.select('p.permissions')
+				.first();
+
+			expect(perm, `${collection} read permission under AI KB Assistance must exist`).toBeTruthy();
+			const parsed = typeof perm.permissions === 'string'
+				? JSON.parse(perm.permissions)
+				: (perm.permissions ?? {});
+
+			expect(
+				Object.keys(parsed).length,
+				`${collection} filter must NOT be empty (leak closed)`,
+			).toBeGreaterThan(0);
+			expect(parsed).toHaveProperty(fkCol);
+			expect(parsed).toEqual(expectedShape);
+		});
+	}
+
+	it('knowledge_bases AI KB Assistance CREATE has account validation filter (Task 38 regression guard)', async () => {
+		if (!run) return;
+		const perm = await db('directus_permissions as p')
+			.join('directus_policies as pol', 'pol.id', 'p.policy')
+			.where('p.collection', 'knowledge_bases')
+			.where('pol.name', 'AI KB Assistance')
+			.where('p.action', 'create')
+			.select('p.permissions')
+			.first();
+
+		expect(perm, 'knowledge_bases create permission under AI KB Assistance must exist').toBeTruthy();
+		const parsed = typeof perm.permissions === 'string'
+			? JSON.parse(perm.permissions)
+			: (perm.permissions ?? {});
+
+		expect(
+			Object.keys(parsed).length,
+			'knowledge_bases create validation filter must NOT be empty',
+		).toBeGreaterThan(0);
+		expect(parsed).toEqual({ account: { _eq: '$CURRENT_USER.active_account' } });
+	});
+
+	it('directus_files AI KB Assistance READ has uploaded_by.active_account chain filter (Task 38 regression guard)', async () => {
+		if (!run) return;
+		const perm = await db('directus_permissions as p')
+			.join('directus_policies as pol', 'pol.id', 'p.policy')
+			.where('p.collection', 'directus_files')
+			.where('pol.name', 'AI KB Assistance')
+			.where('p.action', 'read')
+			.select('p.permissions')
+			.first();
+
+		expect(perm, 'directus_files read permission under AI KB Assistance must exist').toBeTruthy();
+		const parsed = typeof perm.permissions === 'string'
+			? JSON.parse(perm.permissions)
+			: (perm.permissions ?? {});
+
+		expect(
+			Object.keys(parsed).length,
+			'directus_files filter must NOT be empty (leak closed)',
+		).toBeGreaterThan(0);
+		// Account scope via uploader's active_account (relation chain):
+		//   directus_files.uploaded_by → directus_users.id
+		//   directus_users.active_account → account.id
+		// Per user decision (2026-04-19) "managing KB is on account level".
+		expect(parsed).toEqual({
+			uploaded_by: { active_account: { _eq: '$CURRENT_USER.active_account' } },
+		});
+	});
+
+	it('AI KB Assistance legit-global rows remain unfiltered (ai_prompts, ai_model_config, subscription_plans)', async () => {
+		// Intentional: these are shared catalogs by design. This guard fails
+		// if a future change accidentally adds a filter to them, which would
+		// break the catalog-listing behavior the UI depends on.
+		if (!run) return;
+		const legitGlobal = ['ai_prompts', 'ai_model_config', 'subscription_plans'];
+		for (const collection of legitGlobal) {
+			const perm = await db('directus_permissions as p')
+				.join('directus_policies as pol', 'pol.id', 'p.policy')
+				.where('p.collection', collection)
+				.where('pol.name', 'AI KB Assistance')
+				.where('p.action', 'read')
+				.select('p.permissions')
+				.first();
+			expect(perm, `${collection} read permission under AI KB Assistance must exist`).toBeTruthy();
+			const parsed = typeof perm.permissions === 'string'
+				? JSON.parse(perm.permissions || '{}')
+				: (perm.permissions ?? {});
+			expect(
+				Object.keys(parsed).length,
+				`${collection} is an intentional global catalog; filter must remain {}`,
+			).toBe(0);
 		}
-		// Documents current state. Flipping to fail = signal gap was fixed.
-		expect(Object.keys(parsed).length).toBe(0);
 	});
 
 	// ── monthly_aggregates (service-internal, DB-level isolation) ──
@@ -563,7 +715,8 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		const apiKeysPerms = await db('directus_permissions').where('collection', 'api_keys');
 		const apiKeyUsagePerms = await db('directus_permissions').where('collection', 'api_key_usage');
 
-		// ai_token_usage: exists; gap is empty-filter in one policy (see FINDING above).
+		// ai_token_usage: permission rows exist. The AI KB Assistance row filter is
+		// asserted in detail by the Task-36 regression guard above.
 		expect(tokenUsagePerms.length).toBeGreaterThan(0);
 
 		// api_keys + api_key_usage: no Directus permissions (service-internal; gateway-only access).

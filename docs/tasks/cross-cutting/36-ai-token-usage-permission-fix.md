@@ -1,8 +1,10 @@
 # 36. Fix ai_token_usage Directus permission gap (AI KB Assistance)
 
-**Status:** planned
-**Severity:** CRITICAL — cross-account data leak
+**Status:** completed 2026-04-19
+**Severity:** CRITICAL — cross-account data leak (closed)
 **Source:** Task 26 account-isolation E2E (commit `dd75873`) + implementer FINDING
+**Report:** [docs/reports/db-admin-2026-04-19-task-36-ai-token-usage-perm-fix-055500.md](../../reports/db-admin-2026-04-19-task-36-ai-token-usage-perm-fix-055500.md)
+**Follow-up:** Task 38 — audit remaining `{}` filters on the same policy
 
 ## Problem
 

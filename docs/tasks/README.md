@@ -226,8 +226,9 @@ Infrastructure and multi-service concerns.
 | 33 | Failed-debit reconciliation queue (Sprint 2 — accounting) | planned | [cross-cutting/33-failed-debit-reconciliation.md](cross-cutting/33-failed-debit-reconciliation.md) |
 | 34 | calculator_slots reconcile + concurrent-upload race fix (Sprint 2 — quota) | planned | [cross-cutting/34-calculator-slots-reconcile-race.md](cross-cutting/34-calculator-slots-reconcile-race.md) |
 | 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | planned | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
-| 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY, do first) | planned | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
+| 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
+| 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | planned | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
 
 ---
 
