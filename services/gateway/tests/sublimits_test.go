@@ -352,6 +352,27 @@ func TestSublimits_KBQnA_ModuleAllowlistStillKB(t *testing.T) {
 	}
 }
 
+// --- TriggersAISpendCap ---
+
+func TestTriggersAISpendCap(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/v1/ai/chat", true},
+		{"/v1/mcp/ai/tool", true},
+		{"/v1/kb/foo/ask", true},
+		{"/v1/kb/foo/search", false},
+		{"/v1/calculator/x", false},
+		{"/health", false},
+	}
+	for _, c := range cases {
+		if got := service.TriggersAISpendCap(c.path); got != c.want {
+			t.Errorf("TriggersAISpendCap(%q) = %v, want %v", c.path, got, c.want)
+		}
+	}
+}
+
 // --- X-RateLimit-Breached header on each 4xx ---
 
 func TestSublimits_BreachHeaders(t *testing.T) {

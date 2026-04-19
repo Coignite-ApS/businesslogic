@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/coignite-aps/bl-gateway/internal/service"
+	"github.com/rs/zerolog/log"
 )
 
 // Sublimits enforces per-API-key v2 caps (task 27):
@@ -27,6 +28,12 @@ func Sublimits(checker *service.SublimitChecker) func(http.Handler) http.Handler
 
 			// 1. Module allowlist — zero DB cost
 			if module, allowed := service.CheckModuleAllowlist(acct, path); !allowed {
+				log.Info().
+					Str("key_id", acct.KeyID).
+					Str("breach", "module_allowlist").
+					Str("requested_module", module).
+					Strs("allowed", acct.ModuleAllowlist).
+					Msg("sublimit breach")
 				w.Header().Set("X-RateLimit-Breached", "module_allowlist")
 				http.Error(w, `{"error":"API key not permitted for module: `+module+`"}`, http.StatusForbidden)
 				return
@@ -35,7 +42,13 @@ func Sublimits(checker *service.SublimitChecker) func(http.Handler) http.Handler
 			// 2. AI spend cap — cache-backed
 			// KB Q&A (/v1/kb/*/ask) also triggers AI spend cap (calls an LLM).
 			if service.TriggersAISpendCap(path) && checker != nil {
-				if breach, allowed := checker.CheckAISpendCap(r.Context(), acct); !allowed {
+				if breach, allowed, spend, cap := checker.CheckAISpendCap(r.Context(), acct); !allowed {
+					log.Info().
+						Str("key_id", acct.KeyID).
+						Str("breach", "ai_spend_cap").
+						Float64("spend", spend).
+						Float64("cap", cap).
+						Msg("sublimit breach")
 					w.Header().Set("X-RateLimit-Breached", breach)
 					http.Error(w, `{"error":"API key monthly AI spend cap reached"}`, http.StatusPaymentRequired)
 					return
@@ -45,7 +58,13 @@ func Sublimits(checker *service.SublimitChecker) func(http.Handler) http.Handler
 			// 3. KB search cap — cache-backed
 			// KB Q&A (/v1/kb/*/ask) counts as BOTH kb (allowlist already checked above) AND kb search cap.
 			if service.IsKBRoute(path) && checker != nil {
-				if breach, allowed := checker.CheckKBSearchCap(r.Context(), acct); !allowed {
+				if breach, allowed, count, cap := checker.CheckKBSearchCap(r.Context(), acct); !allowed {
+					log.Info().
+						Str("key_id", acct.KeyID).
+						Str("breach", "kb_search_cap").
+						Int("count", count).
+						Int("cap", cap).
+						Msg("sublimit breach")
 					w.Header().Set("X-RateLimit-Breached", breach)
 					http.Error(w, `{"error":"API key monthly KB search cap reached"}`, http.StatusTooManyRequests)
 					return

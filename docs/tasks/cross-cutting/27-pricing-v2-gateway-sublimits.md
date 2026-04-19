@@ -66,6 +66,13 @@ Cached at `gw:apikey:{id}:kb_search_month:{yyyymm}` (60s TTL).
 
 - `a2ed941` — initial task 27 implementation
 - `6cf142c` — KB Q&A now triggers AI spend cap (`TriggersAISpendCap` helper in `sublimits.go`; `middleware/sublimits.go` updated; 2 new tests)
+- `TBD` — code review polish (task 27 I1/I2/I3 + M4/M5/M7):
+  - I1: `parseModuleAllowlist` now fails closed on corrupt JSONB (empty allowlist + Warn log with key_id)
+  - I2: structured `zerolog` breach log before each 4xx (module_allowlist: module+allowed; ai_spend_cap: spend+cap; kb_search_cap: count+cap)
+  - I3: deleted `InvalidateAISpendCache` / `InvalidateKBSearchCache` — cache invalidation deferred to TTL (60s); re-add when task 18/20 publish invalidation events
+  - M4: deleted unused `dbQuerier` interface
+  - M5: replaced custom `hasPrefix` helper with `strings.HasPrefix` (stdlib)
+  - M7: added `TestTriggersAISpendCap` table-driven test (6 cases); total tests now 22+
 
 ## Required behavior (original spec)
 

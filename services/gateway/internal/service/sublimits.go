@@ -13,11 +13,6 @@ import (
 
 const sublimitCacheTTL = 60 * time.Second
 
-// dbQuerier is the minimal interface needed for sublimit DB queries.
-type dbQuerier interface {
-	QueryRow(ctx context.Context, sql string, args ...any) interface{ Scan(dest ...any) error }
-}
-
 // SublimitChecker performs per-API-key sublimit enforcement (task 27).
 // All checks are fail-open: Redis down → DB; DB down → allow.
 type SublimitChecker struct {
@@ -53,13 +48,13 @@ func CheckModuleAllowlist(acct *AccountData, path string) (module string, allowe
 // Returns "" for unknown/unclassified routes.
 func InferModule(path string) string {
 	switch {
-	case hasPrefix(path, "/v1/ai/"), hasPrefix(path, "/v1/mcp/ai/"):
+	case strings.HasPrefix(path, "/v1/ai/"), strings.HasPrefix(path, "/v1/mcp/ai/"):
 		return "ai"
-	case hasPrefix(path, "/v1/kb/"), hasPrefix(path, "/v1/knowledge/"):
+	case strings.HasPrefix(path, "/v1/kb/"), strings.HasPrefix(path, "/v1/knowledge/"):
 		return "kb"
-	case hasPrefix(path, "/v1/calculator/"), hasPrefix(path, "/v1/mcp/calculator/"), hasPrefix(path, "/v1/mcp/formula/"), hasPrefix(path, "/v1/formula/"), hasPrefix(path, "/v1/widget/"):
+	case strings.HasPrefix(path, "/v1/calculator/"), strings.HasPrefix(path, "/v1/mcp/calculator/"), strings.HasPrefix(path, "/v1/mcp/formula/"), strings.HasPrefix(path, "/v1/formula/"), strings.HasPrefix(path, "/v1/widget/"):
 		return "calculators"
-	case hasPrefix(path, "/v1/flows/"), hasPrefix(path, "/v1/flow/"):
+	case strings.HasPrefix(path, "/v1/flows/"), strings.HasPrefix(path, "/v1/flow/"):
 		return "flows"
 	default:
 		return ""
@@ -78,45 +73,47 @@ func isKBRoute(path string) bool {
 }
 
 // CheckAISpendCap checks the per-key monthly AI spend cap.
-// Returns ("ai_spend_cap", false) when cap is exceeded, ("", true) otherwise.
+// Returns (breach, allowed, spend, cap); spend and cap are zero when allowed=true or on error.
 // Uses Redis cache (60s TTL); falls through to DB on cache miss or Redis down.
-func (sc *SublimitChecker) CheckAISpendCap(ctx context.Context, acct *AccountData) (breach string, allowed bool) {
+func (sc *SublimitChecker) CheckAISpendCap(ctx context.Context, acct *AccountData) (breach string, allowed bool, spend float64, capVal float64) {
 	if acct.AISpendCapMonthlyEUR == nil {
-		return "", true
+		return "", true, 0, 0
 	}
-	cap := *acct.AISpendCapMonthlyEUR
+	capVal = *acct.AISpendCapMonthlyEUR
 
-	spend, err := sc.getAISpend(ctx, acct.KeyID)
+	var err error
+	spend, err = sc.getAISpend(ctx, acct.KeyID)
 	if err != nil {
 		// DB down → fail-open
 		log.Warn().Err(err).Str("key_id", acct.KeyID).Msg("sublimit: AI spend check failed, fail-open")
-		return "", true
+		return "", true, 0, 0
 	}
 
-	if spend >= cap {
-		return "ai_spend_cap", false
+	if spend >= capVal {
+		return "ai_spend_cap", false, spend, capVal
 	}
-	return "", true
+	return "", true, 0, 0
 }
 
 // CheckKBSearchCap checks the per-key monthly KB search count cap.
-// Returns ("kb_search_cap", false) when cap is exceeded, ("", true) otherwise.
-func (sc *SublimitChecker) CheckKBSearchCap(ctx context.Context, acct *AccountData) (breach string, allowed bool) {
+// Returns (breach, allowed, count, cap); count and cap are zero when allowed=true or on error.
+func (sc *SublimitChecker) CheckKBSearchCap(ctx context.Context, acct *AccountData) (breach string, allowed bool, count int, capVal int) {
 	if acct.KBSearchCapMonthly == nil {
-		return "", true
+		return "", true, 0, 0
 	}
-	cap := *acct.KBSearchCapMonthly
+	capVal = *acct.KBSearchCapMonthly
 
-	count, err := sc.getKBSearchCount(ctx, acct.KeyID)
+	var err error
+	count, err = sc.getKBSearchCount(ctx, acct.KeyID)
 	if err != nil {
 		log.Warn().Err(err).Str("key_id", acct.KeyID).Msg("sublimit: KB search check failed, fail-open")
-		return "", true
+		return "", true, 0, 0
 	}
 
-	if count >= cap {
-		return "kb_search_cap", false
+	if count >= capVal {
+		return "kb_search_cap", false, count, capVal
 	}
-	return "", true
+	return "", true, 0, 0
 }
 
 // getAISpend returns the current-month AI spend for a key_id in EUR.
@@ -187,22 +184,8 @@ func (sc *SublimitChecker) getKBSearchCount(ctx context.Context, keyID string) (
 	return count, nil
 }
 
-// InvalidateAISpendCache deletes the cached AI spend for a key_id.
-// Called when a debit entry is written.
-func (sc *SublimitChecker) InvalidateAISpendCache(ctx context.Context, keyID string) {
-	if sc.redis == nil {
-		return
-	}
-	sc.redis.Del(ctx, aiSpendCacheKey(keyID))
-}
-
-// InvalidateKBSearchCache deletes the cached KB search count for a key_id.
-func (sc *SublimitChecker) InvalidateKBSearchCache(ctx context.Context, keyID string) {
-	if sc.redis == nil {
-		return
-	}
-	sc.redis.Del(ctx, kbSearchCacheKey(keyID))
-}
+// Cache invalidation (InvalidateAISpendCache / InvalidateKBSearchCache) is deferred to TTL (60s).
+// Re-add when the wallet-debit hook (task 18) and usage_events emit path (task 20) publish invalidation events.
 
 func aiSpendCacheKey(keyID string) string {
 	ym := time.Now().Format("200601")
@@ -212,10 +195,6 @@ func aiSpendCacheKey(keyID string) string {
 func kbSearchCacheKey(keyID string) string {
 	ym := time.Now().Format("200601")
 	return fmt.Sprintf("gw:apikey:%s:kb_search_month:%s", keyID, ym)
-}
-
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
 
 // TriggersAISpendCap returns true for any path that consumes AI budget.

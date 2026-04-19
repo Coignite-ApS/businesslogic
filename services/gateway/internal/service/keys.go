@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 )
 
 type AccountData struct {
@@ -216,6 +217,7 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 // parseModuleAllowlist decodes a JSONB module_allowlist column into AccountData.
 // nil JSON → ModuleAllowlistSet=false (no restriction).
 // valid JSON → ModuleAllowlistSet=true, ModuleAllowlist set to decoded slice.
+// corrupt JSON → ModuleAllowlistSet=true, ModuleAllowlist=[] (fail closed — empty allowlist blocks all modules).
 func parseModuleAllowlist(acct *AccountData, raw []byte) {
 	if len(raw) == 0 {
 		acct.ModuleAllowlistSet = false
@@ -223,10 +225,14 @@ func parseModuleAllowlist(acct *AccountData, raw []byte) {
 		return
 	}
 	var list []string
-	if err := json.Unmarshal(raw, &list); err == nil {
+	if err := json.Unmarshal(raw, &list); err != nil {
+		log.Warn().Err(err).Str("key_id", acct.KeyID).Msg("module_allowlist corrupt JSON — fail closed (empty allowlist)")
 		acct.ModuleAllowlistSet = true
-		acct.ModuleAllowlist = list
+		acct.ModuleAllowlist = []string{}
+		return
 	}
+	acct.ModuleAllowlistSet = true
+	acct.ModuleAllowlist = list
 }
 
 func (ks *KeyService) CheckRateLimit(ctx context.Context, accountID string, rpsLimit int) (allowed bool, remaining int, err error) {
