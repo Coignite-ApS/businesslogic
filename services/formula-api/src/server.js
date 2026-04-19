@@ -36,7 +36,7 @@ import * as stats from './services/stats.js';
 import * as healthPush from './services/health-push.js';
 import * as hashRing from './services/hash-ring.js';
 import { initDb, closeDb } from './db.js';
-import { buildQuotaCacheKey, buildAggCacheKey } from './middleware/quota.js';
+import { buildQuotaCacheKey, buildAggCacheKey, currentPeriod } from './middleware/quota.js';
 
 const app = Fastify({
   logger: { level: config.logLevel },
@@ -165,7 +165,7 @@ async function startQuotaInvalidationSubscriber() {
     const { default: Redis } = await import('ioredis');
     quotaSubRedis = new Redis(config.redisUrl, {
       maxRetriesPerRequest: 1,
-      retryStrategy: (times) => (times > 5 ? null : Math.min(times * 200, 2000)),
+      retryStrategy: (times) => Math.min(times * 200, 5000),
       enableOfflineQueue: false,
       lazyConnect: true,
       ...(config.redisUrl.startsWith('rediss://') && { tls: { rejectUnauthorized: false } }),
@@ -184,7 +184,9 @@ async function startQuotaInvalidationSubscriber() {
         if (message === 'ALL') {
           app.log.info('[quota-sub] global feature_quotas invalidation — flushing all fa:quota:* keys');
           try {
-            const keys = await redis.keys('fa:quota:*');
+            const keys = [];
+            const stream = redis.scanStream({ match: 'fa:quota:*', count: 100 });
+            for await (const batch of stream) keys.push(...batch);
             if (keys.length > 0) await redis.del(...keys);
           } catch (e) { app.log.warn({ err: e }, '[quota-sub] flush fa:quota:* failed'); }
         } else {
@@ -197,15 +199,18 @@ async function startQuotaInvalidationSubscriber() {
         if (message === 'ALL') {
           app.log.info('[quota-sub] global monthly_aggregates invalidation — flushing all fa:agg:* keys');
           try {
-            const keys = await redis.keys('fa:agg:*');
+            const keys = [];
+            const stream = redis.scanStream({ match: 'fa:agg:*', count: 100 });
+            for await (const batch of stream) keys.push(...batch);
             if (keys.length > 0) await redis.del(...keys);
           } catch (e) { app.log.warn({ err: e }, '[quota-sub] flush fa:agg:* failed'); }
         } else {
+          // Deterministic: only current period is active — compute the exact key
           app.log.debug(`[quota-sub] invalidating agg cache for account ${message}`);
           try {
-            const keys = await redis.keys(`fa:agg:${message}:*`);
-            if (keys.length > 0) await redis.del(...keys);
-          } catch (e) { app.log.warn({ err: e }, '[quota-sub] del agg keys failed'); }
+            const key = buildAggCacheKey(message, currentPeriod());
+            await redis.del(key);
+          } catch (e) { app.log.warn({ err: e }, '[quota-sub] del agg key failed'); }
         }
       }
     });

@@ -222,6 +222,12 @@ export async function enforceCalcQuota(req, reply) {
   }
 
   if (result.status === 429) {
+    req.log.info({
+      accountId: ctx.accountId,
+      used: result.body?.used,
+      allowance: result.body?.allowance,
+      retryAfter: result.retryAfter,
+    }, '[quota] 429 monthly calc calls exceeded');
     reply.header('Retry-After', String(result.retryAfter));
     return reply.code(429).send(result.body);
   }
