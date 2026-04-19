@@ -16,6 +16,7 @@ import { compressIfNeeded } from '../services/summarize.js';
 import { resolveWidget } from '../widgets/resolver.js';
 import { debitWallet } from '../hooks/wallet-debit.js';
 import { recordFailedDebit } from '../hooks/wallet-failed-debits.js';
+import { emitAiMessage } from '../services/usage-events.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -451,6 +452,18 @@ export async function registerRoutes(app) {
           }
         }
 
+        // Emit ai.message usage event (fire-and-forget)
+        if (accountId && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+          emitAiMessage({
+            accountId,
+            apiKeyId: req.apiKeyId || null,
+            model,
+            conversationId: conversationId || null,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+          });
+        }
+
         // Note: cannot setHeader after writeHead() — usage data is in the done event payload
         const donePayload = {
           usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
@@ -865,6 +878,18 @@ export async function registerRoutes(app) {
             errorDetail: err?.stack || err?.message || String(err),
           });
         }
+      }
+
+      // Emit ai.message usage event (fire-and-forget)
+      if (accountId && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+        emitAiMessage({
+          accountId,
+          apiKeyId: req.apiKeyId || null,
+          model,
+          conversationId: conversationId || null,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+        });
       }
 
       reply.header('X-AI-Cost', String(costUsd));

@@ -10,3 +10,4 @@ pub mod node;
 pub mod trigger;
 pub mod message;
 pub mod error;
+pub mod usage_events;
