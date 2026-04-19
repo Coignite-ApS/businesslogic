@@ -28,6 +28,11 @@ const SLOTS_FOR_CLASS = {
   large: 8,
 };
 
+// Grace window before a config-without-slot is treated as an orphan from a crashed
+// upload. Prevents the reconcile query from materialising an in-flight concurrent
+// upload's config (the upload itself will write the slot row within seconds).
+const ORPHAN_GRACE_SECONDS = 30;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -77,15 +82,19 @@ export function extractCounts(sheets, formulas, expressions) {
  * @param {number|null} opts.configVersion
  * @returns {Promise<object>} inserted/updated row
  */
-export async function upsertCalculatorSlot(pool, {
+export async function upsertCalculatorSlot(poolOrClient, {
   calculatorConfigId,
   accountId,
   slotsConsumed,
   sizeClass,
   fileVersion = null,
   configVersion = null,
-}) {
-  const result = await pool.query(
+}, opts = {}) {
+  // Accept an explicit client via opts.client to run inside an existing
+  // transaction (used by atomicCheckAndUpsertSlot to share the advisory lock).
+  // Otherwise use the pool's .query() directly.
+  const runner = opts.client ?? poolOrClient;
+  const result = await runner.query(
     `INSERT INTO public.calculator_slots
        (calculator_config_id, account_id, slots_consumed, size_class, file_version, config_version, computed_at, date_updated)
      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
@@ -151,8 +160,9 @@ export async function computeAndUpsertSlot(pool, {
  * and slot write). Re-materialises the slot row from stored config data so
  * the quota count stays accurate.
  *
- * Runs as a best-effort side-effect inside checkUploadQuota — errors are
- * logged but do NOT block the quota decision.
+ * Per-orphan errors (INSERT failures) are swallowed — a single bad row should
+ * not block the entire quota check. The outer orphan-SELECT, if it throws
+ * (e.g. lost connection), propagates and aborts the caller's transaction.
  *
  * @param {object} client - pg.PoolClient (must be within a transaction)
  * @param {string} accountId
@@ -160,9 +170,10 @@ export async function computeAndUpsertSlot(pool, {
 async function reconcileOrphanedSlots(client, accountId) {
   // Find calculator_configs rows for this account that have no slot row.
   // account is stored on calculators.account (not on calculator_configs directly).
-  // Grace window: only reconcile configs older than 30 seconds to avoid treating
-  // an in-flight concurrent upload as an orphan. A genuine crash leaves the config
-  // unresolved indefinitely; an in-flight upload completes within seconds.
+  // Grace window (ORPHAN_GRACE_SECONDS): only reconcile configs older than the
+  // window to avoid materialising an in-flight concurrent upload's config. A
+  // genuine crash leaves the config unresolved indefinitely; an in-flight
+  // upload completes within seconds.
   const orphans = await client.query(
     `SELECT cc.id           AS config_id,
             c.account       AS account_id,
@@ -175,12 +186,12 @@ async function reconcileOrphanedSlots(client, accountId) {
      JOIN public.calculators c ON c.id = cc.calculator
      WHERE c.account = $1
        AND cc.test_environment = false
-       AND cc.date_created < NOW() - INTERVAL '30 seconds'
+       AND cc.date_created < NOW() - make_interval(secs => $2)
        AND NOT EXISTS (
          SELECT 1 FROM public.calculator_slots s
          WHERE s.calculator_config_id = cc.id
        )`,
-    [accountId],
+    [accountId, ORPHAN_GRACE_SECONDS],
   );
 
   for (const row of orphans.rows) {
@@ -301,9 +312,11 @@ async function _quotaQuery(client, accountId, slotsConsumed) {
 /**
  * Atomic check + UPSERT for a new calculator upload.
  *
- * Wraps checkUploadQuota and upsertCalculatorSlot in a single advisory-locked
- * transaction so concurrent uploads from the same account cannot both pass the
- * quota check (I-3). The advisory lock is keyed on accountId.
+ * Orchestrates _quotaQuery and upsertCalculatorSlot inside a single
+ * advisory-locked transaction so concurrent uploads from the same account
+ * cannot both pass the quota check (I-3). The advisory lock is keyed on
+ * accountId, so other accounts are unaffected. Also triggers orphan
+ * reconciliation (I-2) before the authoritative check.
  *
  * Option A architecture: the preHandler (checkSlotQuota) still fires as a
  * cheap fast-fail for obvious violators (no DB round-trip wasted on clearly
@@ -312,7 +325,7 @@ async function _quotaQuery(client, accountId, slotsConsumed) {
  *
  * @param {import('pg').Pool} pool
  * @param {object} opts  – same shape as computeAndUpsertSlot
- * @returns {Promise<{sizeClass, slotsConsumed, row} | {ok: false, statusCode, reason}>}
+ * @returns {Promise<{ok: true, sizeClass, slotsConsumed, row} | {ok: false, statusCode, reason}>}
  */
 export async function atomicCheckAndUpsertSlot(pool, {
   calculatorConfigId,
@@ -342,25 +355,15 @@ export async function atomicCheckAndUpsertSlot(pool, {
       return quota; // { ok: false, statusCode, reason }
     }
 
-    // UPSERT the slot row.
-    const upsertResult = await client.query(
-      `INSERT INTO public.calculator_slots
-         (calculator_config_id, account_id, slots_consumed, size_class, file_version, config_version, computed_at, date_updated)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-       ON CONFLICT (calculator_config_id) DO UPDATE SET
-         account_id     = EXCLUDED.account_id,
-         slots_consumed = EXCLUDED.slots_consumed,
-         size_class     = EXCLUDED.size_class,
-         file_version   = EXCLUDED.file_version,
-         config_version = EXCLUDED.config_version,
-         computed_at    = NOW(),
-         date_updated   = NOW()
-       RETURNING *`,
-      [calculatorConfigId, accountId, slotsConsumed, sizeClass, fileVersion, configVersion],
+    // UPSERT the slot row on the same client (shares the advisory lock).
+    const row = await upsertCalculatorSlot(
+      null,
+      { calculatorConfigId, accountId, slotsConsumed, sizeClass, fileVersion, configVersion },
+      { client },
     );
 
     await client.query('COMMIT');
-    return { ok: true, sizeClass, slotsConsumed, row: upsertResult.rows[0] };
+    return { ok: true, sizeClass, slotsConsumed, row };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;

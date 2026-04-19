@@ -604,7 +604,13 @@ describe('calculator-slots integration', () => {
   // ── 14. I-3: concurrent uploads serialise — exactly one wins at quota limit ─
 
   it('I-3 concurrency: 5 concurrent uploads at quota boundary — exactly one wins', async () => {
-    const client = await pool.connect();
+    // Use a dedicated pool with max >= 5 so all 5 clients can actually acquire
+    // connections in parallel. A smaller pool would serialise them at connection
+    // acquisition and defeat the purpose of the test (we want them to contend on
+    // the pg_advisory_xact_lock, not on client availability).
+    const concurrencyPool = new pg.Pool({ connectionString: DATABASE_URL, max: 10 });
+
+    const client = await concurrencyPool.connect();
     const accountId = await createTestAccount(client);
     // Allow exactly 1 small slot
     await createTestFeatureQuotas(client, accountId, 1, 3);
@@ -620,7 +626,7 @@ describe('calculator-slots integration', () => {
       // Fire all 5 atomicCheckAndUpsertSlot calls concurrently
       const results = await Promise.all(
         configs.map(({ configId }) =>
-          atomicCheckAndUpsertSlot(pool, {
+          atomicCheckAndUpsertSlot(concurrencyPool, {
             calculatorConfigId: configId,
             accountId,
             sheets: { S: {} },
@@ -642,15 +648,16 @@ describe('calculator-slots integration', () => {
       }
 
       // DB must also contain exactly 1 slot row for this account
-      const rows = await pool.query(
+      const rows = await concurrencyPool.query(
         'SELECT id FROM public.calculator_slots WHERE account_id = $1',
         [accountId],
       );
       assert.equal(rows.rows.length, 1, 'DB must have exactly 1 slot row for the account');
     } finally {
-      const c = await pool.connect();
+      const c = await concurrencyPool.connect();
       await cleanup(c, accountId);
       c.release();
+      await concurrencyPool.end();
     }
   });
 });
