@@ -20,15 +20,16 @@ Sprint B shipped tasks 17, 20, 21, 22, 27, cms/36, cms/37 on branch `dm/sprint-b
 
 | Priority | # | Task | Why | Est. |
 |---|---|---|---|---|
-| **🔴 P0 — BLOCKER** (in-progress) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS Docker image rebuild broken — `_shared` + Sprint B extensions | Partial fix shipped `d3f9e8c` (build script skips shared libs, stripe+ioredis dep, usage-consumer+ai-observatory mounts). Still open: `ai-assistant` `npm error extraneous` blocks full image rebuild. | ~1.5h remaining |
+| ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes (build script skip, ioredis dep, Sprint B mounts) | Dev works — Sprint B browser QA of cms/36 + cms/37 can proceed now via dev. Full image rebuild split to task 44. | closed |
+| **🔴 P0 — BLOCKER** (for Sprint 3 deploy) | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | Pre-dates Sprint B; blocks production deploy (task 28). Fix via Docker Compose `additional_contexts` or vendor bl-widget dist. | 2-4h |
 | 🟠 P1 — before scale | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5 bundle) | Stats precision race · memory spike on backlog · non-blocking CMS boot | 2-3h |
 | 🟡 P2 — at 100+ accounts | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | Hourly flush of ALL accounts → thundering herd on DB; emit per-account instead | 1-2h |
 | 🟡 P2 — freshness | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | AI spend / KB search cap invalidation goes from 60s TTL to <100ms | 3-4h |
 | 🟢 P3 — product decision | [43](cross-cutting/43-flow-step-cost-rate.md) | `flow.step` cost rate | Pricing call needed (dm@coignite.dk): billable? flat? type-dependent? | 30min + impl |
 
-**Suggested order:** 39 (unblock) → 40 (harden) → resume Sprint 3 (production deploy) in parallel with 41/42/43.
+**Suggested order:** ~~39 (dev path shipped)~~ → 40 (harden) → 44 (production deploy prereq) → Sprint 3 → 41/42/43.
 
-**Sprint B branch ready for PR:** once task 39 unblocks browser-QA of cms/36+37, merge `dm/sprint-b-pricing-v2` → `dev`.
+**Sprint B branch ready for PR:** browser QA of cms/36+37 can proceed on dev NOW (task 39 dev-path shipped). Merge `dm/sprint-b-pricing-v2` → `dev` after browser smoke; task 44 (image rebuild) only blocks Sprint 3 production deploy, not the merge.
 
 ---
 
@@ -247,11 +248,12 @@ Infrastructure and multi-service concerns.
 | 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 | 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | completed | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
-| 39 | 🔴 **CMS Docker image rebuild broken** — `_shared` + Sprint B extensions (P0) | **in-progress** (partial fix `d3f9e8c`; `ai-assistant` npm error still open) | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
+| 39 | CMS dev extensions fixes (`_shared` skip, ioredis dep, Sprint B mounts) | **completed (dev path)** 2026-04-19 (`d3f9e8c` + `17ec8a5`) — image rebuild split to task 44 | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
 | 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | planned | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
 | 41 | 🟡 Per-account aggregate cache invalidation (replace `ALL` flush, P2 at scale) | planned | [cross-cutting/41-per-account-aggregate-cache-invalidation.md](cross-cutting/41-per-account-aggregate-cache-invalidation.md) |
 | 42 | 🟡 Gateway cache cross-service PUBLISH on wallet debit + usage events (P2 freshness) | planned | [cross-cutting/42-gateway-cache-cross-service-publish.md](cross-cutting/42-gateway-cache-cross-service-publish.md) |
 | 43 | 🟢 `flow.step` cost rate — pricing decision required (P3) | planned | [cross-cutting/43-flow-step-cost-rate.md](cross-cutting/43-flow-step-cost-rate.md) |
+| 44 | 🔴 **CMS Docker image rebuild** — `packages/bl-widget` outside build context (blocks Sprint 3) | planned | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
 
 ---
 
@@ -364,7 +366,7 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 13 | 0 | 0 | 18 | 31 |
-| **Total** | **29** | **8** | **0** | **68** | **105** |
+| Cross-Cutting | 13 | 0 | 0 | 19 | 32 |
+| **Total** | **29** | **8** | **0** | **69** | **106** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision

@@ -26,28 +26,53 @@ Additional Sprint B extensions surfaced their own issues once the first one was 
 - Docker **image rebuild still fails** at `ai-assistant` stage
 - Local `make ext` builds all 20 extensions cleanly on host (Sprint B dev workflow works)
 
-## Remaining open issue — ai-assistant npm install
+## Remaining open issue — ai-assistant `file:` dep escapes Docker build context (PRE-DATES Sprint B)
 
 Error during `build-extensions.sh` on `project-extension-ai-assistant`:
 
 ```
 npm error Cannot read properties of undefined (reading 'extraneous')
-npm error A complete log of this run can be found in: /home/node/.npm/_logs/...
 ```
 
-This is npm 10+ behavior — typically triggered by:
-- Lockfile inconsistency (lockfile references packages that don't exist in package.json)
-- Workspace misconfig (this isn't a workspace, so unlikely)
-- Phantom dep in `node_modules` that wasn't in lockfile
-- Mixed npm version lockfile (v1 vs v3)
+**Root cause identified:**
 
-Diagnostic steps for next session:
-1. `cd services/cms/extensions/local/project-extension-ai-assistant && npm install --include=dev` on host — reproduces inside container?
-2. Inspect `package-lock.json` vs `package.json` for drift
-3. Check if `node_modules/` contains extraneous packages not in lockfile: `npm ls --depth=0 2>&1 | grep extraneous`
-4. Try `npm ci --include=dev` instead of `npm install` — strict lockfile mode, may surface root cause
-5. Rebuild lockfile: `rm -rf node_modules package-lock.json && npm install --include=dev`
-6. Compare to other Sprint B-modified extensions (ai-assistant was touched by Task 36.2 low-balance banner + task 20 emitter wiring)
+`services/cms/extensions/local/project-extension-ai-assistant/package.json`:
+```json
+"dependencies": {
+  "@businesslogic/widget": "file:../../../../../packages/bl-widget",
+```
+
+The relative path goes UP 5 levels to the repo-root `packages/bl-widget/`. The Dockerfile build context is `services/cms/` — `packages/` is OUTSIDE that context and therefore not copied into the image. When `build-extensions.sh` runs `npm install` inside the container, the `file:` dep can't be resolved; npm throws the `extraneous` error.
+
+This breakage **pre-dates Sprint B** — it exists as soon as bl-widget was introduced. Dev works because host bind mounts expose the whole repo tree; image rebuild breaks because Docker context is restricted.
+
+Confirmed: only `project-extension-ai-assistant` has a `file:` dep pointing outside. Fixing ai-assistant unblocks the entire image rebuild path.
+
+**Fix options (ordered by surgical-ness):**
+
+1. **Change Dockerfile build context to repo root.** Update `infrastructure/docker/docker-compose.dev.yml` `build.context` from `../../services/cms` → `../../`, and update every `COPY` path in `services/cms/base/Dockerfile` to prefix with `services/cms/` where appropriate. Then add `COPY packages/bl-widget /packages/bl-widget/` (or similar) and symlink/copy into the extension's `node_modules` at build time. Risky — may regress other COPY paths.
+
+2. **Add `packages/bl-widget` as an additional build context** (Docker Compose 2.17+ `additional_contexts`). Less invasive. Then COPY from the named context inside the Dockerfile. Most modern option.
+
+3. **Pre-stage `packages/bl-widget` into `services/cms/` before build.** Either via symlink (won't work cross-OS in docker build) or a Make target that copies it. Extra build step but no Dockerfile changes.
+
+4. **Publish `@businesslogic/widget` to npm** (public or private registry). Change the dep from `file:...` → `"^0.1.0"`. Cleanest for production, but adds npm publishing pipeline.
+
+5. **Vendor `bl-widget/dist` into the extension.** Copy `packages/bl-widget/dist/` into `services/cms/extensions/local/project-extension-ai-assistant/vendor/` and adjust imports. Technical-debt but unblocks immediately.
+
+## Dev status (2026-04-19 23:45)
+
+- ✅ CMS container up + healthy (pre-Sprint-B image retagged)
+- ✅ All 21 extensions loaded (3 base + 18 project, including Sprint B's usage-consumer + ai-observatory via bind mount)
+- ✅ Sprint B functionality active in dev — browser QA of cms/36 + cms/37 can proceed **NOW** via dev environment
+- ❌ Docker image rebuild still fails (blocks Sprint 3 production deploy)
+
+## Recommended split
+
+This task was scoped as 1-2h. Reality: the pre-Sprint-B `file:` dep to outside build context is a Dockerfile architecture issue. Splitting:
+
+- **Task 39 (this one)** — close as shipped with the 3 layered fixes in `d3f9e8c` + Dockerfile partial fix. **Unblocks dev-based browser QA of Sprint B** (cms/36 + cms/37).
+- **New task 44** (to be filed) — "CMS Docker image rebuild: fix packages/ build context for bl-widget dep". 2-4h. Required before Sprint 3 production deploy. Use fix option (2) or (4).
 
 ## Acceptance
 
