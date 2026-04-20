@@ -92,6 +92,8 @@ services:
     build:
       context: ../../services/cms
       dockerfile: base/Dockerfile
+      additional_contexts:
+        packages: ../../packages
       args:
         DIRECTUS_VERSION: "11.16.1"
       secrets:

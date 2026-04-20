@@ -25,7 +25,7 @@ Sprint B shipped + merged to dev. UX test with Sarah persona (2026-04-20) expose
 | 🟠 P1 | [50](cross-cutting/50-onboarding-wizard-global-redirect.md) | Onboarding redirect only fires from Account module | >90% of new users land on `/admin/content/calculators` instead of wizard. | 2-4h |
 | 🟠 P1 | [51](cross-cutting/51-stripe-checkout-return-urls.md) | Stripe Checkout return URLs + no success page | Returns to `/admin/content/account` (raw Directus view) instead of subscription page with toast. | 1h |
 | 🟡 P1 bundle | [52](cross-cutting/52-ux-test-p1-cleanup-bundle.md) | UX polish (top-up inconsistency + AI perms + account crash + raw 403 copy) | 4 small items bundled from ux-test. | 3-4h |
-| **🔴 P0** (blocks deploy artifact) | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | Pre-dates Sprint B; blocks production image build. | 2-4h |
+| ✅ **completed 2026-04-20** | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | additional_contexts + Dockerfile fixes applied; 18 extensions built, /server/ping OK. | done |
 | ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes | Closed — image rebuild split to task 44. | closed |
 | ✅ shipped 2026-04-20 | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5) | Migration 033 applied via db-admin. | closed |
 | ✅ shipped 2026-04-20 | [47](cross-cutting/47-plan-cards-v2-live-render-verification.md) | plan-cards.vue v2 live render | Verified in browser QA (calculators module). | closed |
@@ -35,7 +35,7 @@ Sprint B shipped + merged to dev. UX test with Sarah persona (2026-04-20) expose
 | LOW QA | [45](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) | `/wallet/balance` echo auto_reload fields | Sprint B QA follow-up. | 30min |
 | LOW QA | [46](cross-cutting/46-wallet-dialog-a11y-labels.md) | Wallet dialog a11y labels | Sprint B QA follow-up. | 1h |
 
-**Suggested order:** 48 (P0 webhook) → 49 (P0 user role perm) → 50+51 (P1 activation funnel) → 52 (P1 polish bundle) → 44 (image rebuild) → Sprint 3 → 41/42/43/45/46.
+**Suggested order:** 48 (P0 webhook) → 49 (P0 user role perm) → 50+51 (P1 activation funnel) → 52 (P1 polish bundle) → Sprint 3 → 41/42/43/45/46. (Task 44 image rebuild: ✅ done)
 
 **Sprint B branch ready for PR:** browser QA of cms/36+37 can proceed on dev NOW (task 39 dev-path shipped). Merge `dm/sprint-b-pricing-v2` → `dev` after browser smoke; task 44 (image rebuild) only blocks Sprint 3 production deploy, not the merge.
 
@@ -257,11 +257,11 @@ Infrastructure and multi-service concerns.
 | 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 | 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | completed | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
 | 39 | CMS dev extensions fixes (`_shared` skip, ioredis dep, Sprint B mounts) | **completed (dev path)** 2026-04-19 (`d3f9e8c` + `17ec8a5`) — image rebuild split to task 44 | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
-| 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | planned | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
+| 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | **completed 2026-04-20** (migration 033 applied via db-admin) | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
 | 41 | 🟡 Per-account aggregate cache invalidation (replace `ALL` flush, P2 at scale) | planned | [cross-cutting/41-per-account-aggregate-cache-invalidation.md](cross-cutting/41-per-account-aggregate-cache-invalidation.md) |
 | 42 | 🟡 Gateway cache cross-service PUBLISH on wallet debit + usage events (P2 freshness) | planned | [cross-cutting/42-gateway-cache-cross-service-publish.md](cross-cutting/42-gateway-cache-cross-service-publish.md) |
 | 43 | 🟢 `flow.step` cost rate — pricing decision required (P3) | planned | [cross-cutting/43-flow-step-cost-rate.md](cross-cutting/43-flow-step-cost-rate.md) |
-| 44 | 🔴 **CMS Docker image rebuild** — `packages/bl-widget` outside build context (blocks Sprint 3) | planned | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
+| 44 | CMS Docker image rebuild — `packages/bl-widget` outside build context | **completed 2026-04-20** | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
 | 45 | `/wallet/balance` response echo auto_reload fields (Sprint B QA follow-up — LOW) | planned | [cross-cutting/45-wallet-balance-response-auto-reload-fields.md](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) |
 | 46 | Wallet settings dialog a11y labels (Sprint B QA follow-up — LOW) | planned | [cross-cutting/46-wallet-dialog-a11y-labels.md](cross-cutting/46-wallet-dialog-a11y-labels.md) |
 | 47 | plan-cards.vue v2 live render verification (needs subscribed test account — LOW) | **completed 2026-04-20** | [cross-cutting/47-plan-cards-v2-live-render-verification.md](cross-cutting/47-plan-cards-v2-live-render-verification.md) |
