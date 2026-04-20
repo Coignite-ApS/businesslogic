@@ -585,9 +585,17 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		const res = await getItems(tokenA, 'api_keys');
 		// 200 expected — Task D (structure-cleanup Phase 3) added a User Access READ
 		// permission with account_id = $CURRENT_USER.active_account filter.
-		// Sensitive fields (key_hash, encrypted_key, key_prefix) are NOT in the allowed
-		// field list; only safe config fields are exposed.
 		expect(res.status).toBe(200);
+
+		// Sensitive fields MUST NOT leak into the response — the permission's `fields`
+		// allowlist excludes them. Regression guard: if someone ever widens the
+		// allowlist to `*` (or adds these fields individually) this test will fail.
+		if (res.data && res.data.length > 0) {
+			const keys = Object.keys(res.data[0] as Record<string, unknown>);
+			expect(keys).not.toContain('key_hash');
+			expect(keys).not.toContain('encrypted_key');
+			expect(keys).not.toContain('key_prefix');
+		}
 	});
 
 	it('api_keys: DB-level account filter isolates rows', async () => {
