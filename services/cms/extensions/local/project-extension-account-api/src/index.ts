@@ -2,7 +2,45 @@ import { defineHook } from '@directus/extensions-sdk';
 
 const ALLOWED_ONBOARDING_KEYS = new Set(['intent_captured', 'first_module_activated_at', 'wizard_completed_at']);
 
-export default defineHook(({ init }, { env, logger, database: db }) => {
+/** True when the user has not completed onboarding (no module activated AND wizard not dismissed). */
+function needsWizard(metadata: any): boolean {
+    const state = metadata?.onboarding_state;
+    return !state?.first_module_activated_at && !state?.wizard_completed_at;
+}
+
+export default defineHook(({ init, filter }, { env, logger, database: db }) => {
+    // ── Onboarding login redirect ────────────────────────────────────────────
+    // On every login, if the user still needs the wizard, overwrite their
+    // last_page to /account/onboarding so Directus auto-navigates them there
+    // after the /users/me response (Directus frontend reads last_page on login).
+    // Uses filter (blocking) so the DB write completes before /users/me is fetched.
+    filter('auth.login', async (_payload: any, meta: any) => {
+        const userId: string | undefined = meta?.user;
+        if (!userId) return _payload;
+        try {
+            const user = await db('directus_users')
+                .where('id', userId)
+                .select('metadata', 'last_page')
+                .first();
+            if (!user) return _payload;
+
+            const metadata = (user.metadata && typeof user.metadata === 'object')
+                ? user.metadata
+                : {};
+
+            if (needsWizard(metadata)) {
+                await db('directus_users')
+                    .where('id', userId)
+                    .update({ last_page: '/account/onboarding' });
+                logger.debug(`[account-api] set last_page=/account/onboarding for user ${userId}`);
+            }
+        } catch (err: any) {
+            // Non-fatal — worst case user lands on default page instead of wizard
+            logger.warn(`[account-api] auth.login onboarding redirect check failed: ${err.message}`);
+        }
+        return _payload;
+    });
+
     const gatewayUrl = ((env['GATEWAY_URL'] as string) || '').replace(/\/+$/, '');
     const gatewayInternalSecret = (env['GATEWAY_INTERNAL_SECRET'] as string) || '';
 

@@ -16,10 +16,11 @@ describe('account-api hook', () => {
         const hookFn = mod.default as any;
 
         const initFn = vi.fn();
+        const filterFn = vi.fn();
         const warn = vi.fn();
 
         hookFn(
-            { init: initFn },
+            { init: initFn, filter: filterFn },
             { env: {}, logger: { warn }, database: vi.fn() },
         );
 
@@ -27,6 +28,8 @@ describe('account-api hook', () => {
             expect.stringContaining('GATEWAY_URL or GATEWAY_INTERNAL_SECRET not set'),
         );
         expect(initFn).not.toHaveBeenCalled();
+        // filter(auth.login) is registered regardless of gateway env vars
+        expect(filterFn).toHaveBeenCalledWith('auth.login', expect.any(Function));
     });
 
     it('registers routes when env vars present', async () => {
@@ -34,9 +37,10 @@ describe('account-api hook', () => {
         const hookFn = mod.default as any;
 
         const initFn = vi.fn();
+        const filterFn = vi.fn();
 
         hookFn(
-            { init: initFn },
+            { init: initFn, filter: filterFn },
             {
                 env: { GATEWAY_URL: 'http://localhost:8080', GATEWAY_INTERNAL_SECRET: 'secret' },
                 logger: { warn: vi.fn() },
@@ -45,5 +49,6 @@ describe('account-api hook', () => {
         );
 
         expect(initFn).toHaveBeenCalledWith('routes.custom.before', expect.any(Function));
+        expect(filterFn).toHaveBeenCalledWith('auth.login', expect.any(Function));
     });
 });

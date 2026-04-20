@@ -57,6 +57,7 @@ describe('POST /account/onboarding/state', () => {
     function registerRoutes(dbUser: any) {
         const hookFn = mod.default as any;
         const routes: Record<string, Function[]> = {};
+        const filters: Record<string, Function> = {};
         const dbQueryChain = {
             where: vi.fn().mockReturnThis(),
             select: vi.fn().mockReturnThis(),
@@ -67,6 +68,7 @@ describe('POST /account/onboarding/state', () => {
 
         hookFn(
             {
+                filter: (event: string, fn: Function) => { filters[event] = fn; },
                 init: (_event: string, fn: Function) => {
                     fn({
                         app: {
@@ -85,7 +87,7 @@ describe('POST /account/onboarding/state', () => {
             },
         );
 
-        return { routes, db, dbQueryChain };
+        return { routes, filters, db, dbQueryChain };
     }
 
     it('401 when unauthenticated', async () => {
@@ -149,6 +151,7 @@ describe('POST /account/onboarding/state', () => {
 
         hookFn(
             {
+                filter: (_event: string, _fn: Function) => { /* noop for these tests */ },
                 init: (_event: string, fn: Function) => {
                     fn({
                         app: {
@@ -203,6 +206,7 @@ describe('POST /account/onboarding/state', () => {
 
         hookFn(
             {
+                filter: (_event: string, _fn: Function) => { /* noop for these tests */ },
                 init: (_event: string, fn: Function) => {
                     fn({
                         app: {
@@ -253,6 +257,7 @@ describe('POST /account/onboarding/state', () => {
 
         hookFn(
             {
+                filter: (_event: string, _fn: Function) => { /* noop for these tests */ },
                 init: (_event: string, fn: Function) => {
                     fn({
                         app: {
@@ -294,4 +299,103 @@ describe('POST /account/onboarding/state', () => {
     // remain governed by Directus's default permissions — User role has no
     // directus_users.update permission outside of this endpoint. Path (b) was chosen
     // specifically to avoid touching directus_permissions at all.
+});
+
+// ─── auth.login filter — onboarding last_page redirect ────────────────────────
+
+describe('filter(auth.login) — onboarding last_page', () => {
+    let mod: any;
+
+    beforeEach(async () => {
+        vi.resetModules();
+        mod = await import('../index');
+    });
+
+    function buildHook(dbUser: any) {
+        const hookFn = mod.default as any;
+        const filters: Record<string, Function> = {};
+        const dbQueryChain = {
+            where: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            first: vi.fn().mockResolvedValue(dbUser),
+            update: vi.fn().mockResolvedValue(1),
+        };
+        const db = vi.fn().mockReturnValue(dbQueryChain);
+        const logger = { warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+        hookFn(
+            {
+                filter: (event: string, fn: Function) => { filters[event] = fn; },
+                init: (_event: string, fn: Function) => {
+                    fn({
+                        app: {
+                            get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn(),
+                        },
+                    });
+                },
+            },
+            {
+                env: { GATEWAY_URL: 'http://localhost:8080', GATEWAY_INTERNAL_SECRET: 'secret' },
+                logger,
+                database: db,
+            },
+        );
+
+        return { filters, db, dbQueryChain, logger };
+    }
+
+    it('registers auth.login filter', () => {
+        const { filters } = buildHook(null);
+        expect(typeof filters['auth.login']).toBe('function');
+    });
+
+    it('sets last_page when user has no wizard state (null metadata)', async () => {
+        const { filters, dbQueryChain } = buildHook({ metadata: null, last_page: null });
+        const payload = { email: 'user@example.com', password: 'x' };
+        await filters['auth.login'](payload, { user: 'user-uuid' });
+        expect(dbQueryChain.update).toHaveBeenCalledWith({ last_page: '/account/onboarding' });
+    });
+
+    it('sets last_page when onboarding_state is empty object', async () => {
+        const { filters, dbQueryChain } = buildHook({
+            metadata: { onboarding_state: {} },
+            last_page: null,
+        });
+        const payload = { email: 'user@example.com' };
+        await filters['auth.login'](payload, { user: 'user-uuid' });
+        expect(dbQueryChain.update).toHaveBeenCalledWith({ last_page: '/account/onboarding' });
+    });
+
+    it('does NOT set last_page when wizard_completed_at is set', async () => {
+        const { filters, dbQueryChain } = buildHook({
+            metadata: {
+                onboarding_state: { wizard_completed_at: '2026-04-20T00:00:00.000Z' },
+            },
+        });
+        await filters['auth.login']({}, { user: 'user-uuid' });
+        expect(dbQueryChain.update).not.toHaveBeenCalled();
+    });
+
+    it('does NOT set last_page when first_module_activated_at is set', async () => {
+        const { filters, dbQueryChain } = buildHook({
+            metadata: {
+                onboarding_state: { first_module_activated_at: '2026-04-20T00:00:00.000Z' },
+            },
+        });
+        await filters['auth.login']({}, { user: 'user-uuid' });
+        expect(dbQueryChain.update).not.toHaveBeenCalled();
+    });
+
+    it('skips gracefully when userId is undefined', async () => {
+        const { filters, dbQueryChain } = buildHook(null);
+        await filters['auth.login']({}, { user: undefined });
+        expect(dbQueryChain.update).not.toHaveBeenCalled();
+    });
+
+    it('returns payload unchanged in all cases', async () => {
+        const { filters } = buildHook({ metadata: null });
+        const payload = { email: 'user@example.com', password: 'secret' };
+        const result = await filters['auth.login'](payload, { user: 'user-uuid' });
+        expect(result).toEqual(payload);
+    });
 });

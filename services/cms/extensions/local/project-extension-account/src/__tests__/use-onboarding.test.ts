@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useOnboarding } from '../composables/use-onboarding';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ref } from 'vue';
+import { useOnboarding, registerOnboardingGuard } from '../composables/use-onboarding';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -173,5 +174,80 @@ describe('useOnboarding: markCompleted', () => {
 		const { needsWizard, markCompleted } = useOnboarding(api);
 		await markCompleted();
 		expect(needsWizard.value).toBe(false);
+	});
+});
+
+// ─── registerOnboardingGuard ───────────────────────────────────────────────────
+
+describe('registerOnboardingGuard', () => {
+	function makeRouter() {
+		const removeGuard = vi.fn();
+		const router: any = {
+			beforeEach: vi.fn().mockReturnValue(removeGuard),
+		};
+		return { router, removeGuard };
+	}
+
+	it('registers a beforeEach guard', () => {
+		const { router } = makeRouter();
+		const needsWizard = ref(false);
+		registerOnboardingGuard(router, needsWizard);
+		expect(router.beforeEach).toHaveBeenCalledOnce();
+	});
+
+	it('redirects to /account/onboarding when needsWizard is true', () => {
+		const { router } = makeRouter();
+		const needsWizard = ref(true);
+		registerOnboardingGuard(router, needsWizard);
+		const guard = router.beforeEach.mock.calls[0][0];
+
+		const next = vi.fn();
+		guard({ path: '/calculators' }, {}, next);
+		expect(next).toHaveBeenCalledWith('/account/onboarding');
+	});
+
+	it('does NOT redirect when needsWizard is false', () => {
+		const { router } = makeRouter();
+		const needsWizard = ref(false);
+		registerOnboardingGuard(router, needsWizard);
+		const guard = router.beforeEach.mock.calls[0][0];
+
+		const next = vi.fn();
+		guard({ path: '/calculators' }, {}, next);
+		expect(next).toHaveBeenCalledWith();
+	});
+
+	it('does NOT redirect when already on /account/onboarding', () => {
+		const { router } = makeRouter();
+		const needsWizard = ref(true);
+		registerOnboardingGuard(router, needsWizard);
+		const guard = router.beforeEach.mock.calls[0][0];
+
+		const next = vi.fn();
+		guard({ path: '/account/onboarding' }, {}, next);
+		expect(next).toHaveBeenCalledWith();
+	});
+
+	it('does NOT redirect on auth routes', () => {
+		const { router } = makeRouter();
+		const needsWizard = ref(true);
+		registerOnboardingGuard(router, needsWizard);
+		const guard = router.beforeEach.mock.calls[0][0];
+
+		const next = vi.fn();
+		guard({ path: '/auth/login' }, {}, next);
+		expect(next).toHaveBeenCalledWith();
+	});
+
+	it('removes old guard before registering new one (no stacking)', () => {
+		const removeA = vi.fn();
+		const routerA: any = { beforeEach: vi.fn().mockReturnValue(removeA) };
+		const routerB: any = { beforeEach: vi.fn().mockReturnValue(vi.fn()) };
+
+		const needsWizard = ref(true);
+		registerOnboardingGuard(routerA, needsWizard);
+		// Second call should remove the first guard
+		registerOnboardingGuard(routerB, needsWizard);
+		expect(removeA).toHaveBeenCalledOnce();
 	});
 });

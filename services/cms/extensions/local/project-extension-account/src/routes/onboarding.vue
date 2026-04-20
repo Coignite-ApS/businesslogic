@@ -23,15 +23,29 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useApi } from '@directus/extensions-sdk';
 import AccountNavigation from '../components/account-navigation.vue';
 import WelcomeWizard from '../components/welcome-wizard.vue';
+import { useOnboarding, registerOnboardingGuard } from '../composables/use-onboarding';
 import type { OnboardingIntent } from '../composables/use-onboarding';
 import type { Module } from '../types';
 
+const api = useApi();
 const route = useRoute();
 const router = useRouter();
+const { needsWizard, fetchOnboardingState } = useOnboarding(api);
+
+// ── Global session guard ─────────────────────────────────────────────────────
+// Registered here because this is the page users actually land on after fresh
+// login (server sets last_page=/account/onboarding on login).  Once registered,
+// the guard persists for the entire app session.  registerOnboardingGuard
+// ensures at most one guard is active at a time.
+onMounted(async () => {
+	await fetchOnboardingState();
+	registerOnboardingGuard(router, needsWizard);
+});
 
 // ?mode=retry — skip the needsWizard check, just show the wizard again.
 // (Handled upstream in the redirect logic; here we just render unconditionally.)
