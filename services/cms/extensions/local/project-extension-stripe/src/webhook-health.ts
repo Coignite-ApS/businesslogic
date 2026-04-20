@@ -53,7 +53,6 @@ export async function computeWebhookHealth(
 	db: DB,
 	now: Date = new Date(),
 ): Promise<WebhookHealth> {
-	const nowIso = now.toISOString();
 	const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 	const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -139,9 +138,6 @@ export async function computeWebhookHealth(
 		},
 		banner,
 	};
-
-	// Silence unused-var lint for `nowIso` (kept for future audit-log fields).
-	void nowIso;
 }
 
 /**

@@ -2,17 +2,19 @@
  * Task 56 — Stripe webhook route handler unit tests.
  *
  * Covers all 4+ required code paths per the acceptance criteria:
- *   1. 400_signature — stripe.webhooks.constructEvent throws with "signature"
- *   2. 400_parse     — constructEvent throws with a non-signature message
+ *   1. 400_signature — StripeSignatureVerificationError (by type or constructor name)
+ *   2. 400_parse     — any other error (SyntaxError, generic Error, etc.)
  *   3. 500 (handler) — processEvent throws; HTTP is still 200 but log row is '500'
  *   4. 200 (success) — full happy path
  *   + extra: missing webhook secret → 500 + log row
  *   + extra: response_ms is populated from injected clock
  *   + extra: source_ip is captured from X-Forwarded-For
+ *   + classifyStripeVerifyError: timestamp-drift, missing payload → 400_signature;
+ *     SyntaxError → 400_parse
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createWebhookRouteHandler } from '../src/webhook-route.js';
+import { createWebhookRouteHandler, classifyStripeVerifyError } from '../src/webhook-route.js';
 
 function makeDb() {
 	const insert = vi.fn(async () => [1]);
@@ -66,6 +68,7 @@ describe('createWebhookRouteHandler — signature failure', () => {
 		const logger = makeLogger();
 		const processEvent = vi.fn();
 
+		// classifyVerifyError injected: always signature (plain Error, not real Stripe class)
 		const handler = createWebhookRouteHandler({
 			db,
 			logger,
@@ -74,6 +77,7 @@ describe('createWebhookRouteHandler — signature failure', () => {
 				throw new Error('No signatures found matching the expected signature for payload');
 			},
 			processEvent,
+			classifyVerifyError: () => '400_signature',
 		});
 
 		const res = makeRes();
@@ -96,6 +100,7 @@ describe('createWebhookRouteHandler — signature failure', () => {
 		const db = makeDb();
 		const logger = makeLogger();
 
+		// classifyVerifyError injected: always signature (plain Error, not real Stripe class)
 		const handler = createWebhookRouteHandler({
 			db,
 			logger,
@@ -104,6 +109,7 @@ describe('createWebhookRouteHandler — signature failure', () => {
 				throw new Error('Webhook signature verification failed');
 			},
 			processEvent: vi.fn(),
+			classifyVerifyError: () => '400_signature',
 		});
 
 		const res = makeRes();
@@ -315,6 +321,32 @@ describe('createWebhookRouteHandler — missing secret at runtime', () => {
 				error_message: expect.stringContaining('Webhook secret'),
 			}),
 		);
+	});
+});
+
+describe('classifyStripeVerifyError', () => {
+	it('classifies StripeSignatureVerificationError by .type field → 400_signature', () => {
+		// Simulate the real Stripe SDK error shape without importing the SDK
+		const err = Object.assign(new Error('Timestamp outside the tolerance zone'), {
+			type: 'StripeSignatureVerificationError',
+		});
+		expect(classifyStripeVerifyError(err)).toBe('400_signature');
+	});
+
+	it('classifies StripeSignatureVerificationError by constructor.name → 400_signature', () => {
+		// Simulate an SDK version where .type may not be on the instance
+		function StripeSignatureVerificationError(this: any, msg: string) {
+			this.message = msg;
+		}
+		const err = new (StripeSignatureVerificationError as any)(
+			'No webhook payload was provided.',
+		);
+		expect(classifyStripeVerifyError(err)).toBe('400_signature');
+	});
+
+	it('classifies a generic SyntaxError → 400_parse', () => {
+		const err = new SyntaxError('Unexpected token in JSON at position 0');
+		expect(classifyStripeVerifyError(err)).toBe('400_parse');
 	});
 });
 

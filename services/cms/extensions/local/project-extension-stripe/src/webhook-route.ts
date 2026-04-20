@@ -31,10 +31,35 @@ export interface WebhookRouteDeps {
 	processEvent: (event: { id: string; type: string; data: { object: any } }) => Promise<void>;
 	/** Injectable for deterministic tests. Defaults to Date.now. */
 	now?: () => number;
+	/**
+	 * Classifies a caught verifySignature error as a signature verification
+	 * failure or a payload parse failure. Injectable so tests can drive
+	 * classification without depending on the real Stripe SDK class hierarchy.
+	 * Defaults to `classifyStripeVerifyError`.
+	 */
+	classifyVerifyError?: (err: unknown) => '400_signature' | '400_parse';
+}
+
+/**
+ * Default classifier. Uses the Stripe SDK's `type` field (present on all
+ * StripeError subclasses) and falls back to the constructor name so both
+ * the real Stripe SDK instance and plain objects with { type } set work.
+ *
+ * Crucially this matches errors like "Timestamp outside the tolerance zone"
+ * whose message text contains no word "signature".
+ */
+export function classifyStripeVerifyError(err: unknown): '400_signature' | '400_parse' {
+	if (err && typeof err === 'object') {
+		const e = err as { type?: string; constructor?: { name?: string } };
+		if (e.type === 'StripeSignatureVerificationError') return '400_signature';
+		if (e.constructor?.name === 'StripeSignatureVerificationError') return '400_signature';
+	}
+	return '400_parse';
 }
 
 export function createWebhookRouteHandler(deps: WebhookRouteDeps) {
 	const nowFn = deps.now ?? (() => Date.now());
+	const classifyErr = deps.classifyVerifyError ?? classifyStripeVerifyError;
 
 	return async function handle(req: any, res: any): Promise<void> {
 		const startMs = nowFn();
@@ -64,8 +89,8 @@ export function createWebhookRouteHandler(deps: WebhookRouteDeps) {
 			event = deps.verifySignature(rawBody, sig, webhookSecret);
 		} catch (err: any) {
 			const errMsg = err?.message ?? String(err);
-			const isSignature = /signature/i.test(errMsg);
-			const status = isSignature ? '400_signature' : '400_parse';
+			const status = classifyErr(err);
+			const isSignature = status === '400_signature';
 			deps.logger.warn(`Webhook ${status}: ${errMsg}`);
 			await recordWebhookLog(deps.db, deps.logger, {
 				event_id: null,

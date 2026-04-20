@@ -44,6 +44,12 @@
 			</div>
 
 			<template v-else-if="data">
+				<!-- Stale-data ribbon: shown when a poll error occurs after the first successful fetch -->
+				<div v-if="error" class="stale-ribbon">
+					<v-icon name="warning" class="stale-ribbon-icon" />
+					<span>Last refresh failed — showing data from {{ staleMessage }}</span>
+				</div>
+
 				<!-- KPI Row: 24h counters -->
 				<div class="kpi-grid">
 					<div class="kpi-card">
@@ -165,13 +171,17 @@ import ObservatoryNavigation from '../components/observatory-navigation.vue';
 const api = useApi();
 const { loading, error, fetchWebhookHealth } = useObservatoryApi(api);
 const data = ref<WebhookHealth | null>(null);
+const lastSuccessfulFetch = ref<Date | null>(null);
 
 const POLL_MS = 60_000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 async function refresh() {
 	const next = await fetchWebhookHealth();
-	if (next) data.value = next;
+	if (next) {
+		data.value = next;
+		lastSuccessfulFetch.value = new Date();
+	}
 }
 
 onMounted(async () => {
@@ -212,6 +222,11 @@ const bannerTitle = computed(() => {
 	if (state === 'red') return 'Action required';
 	if (state === 'green') return 'Healthy';
 	return 'Quiet';
+});
+
+const staleMessage = computed(() => {
+	if (!lastSuccessfulFetch.value) return 'unknown time ago';
+	return timeAgo(lastSuccessfulFetch.value.toISOString());
 });
 
 // ─── Formatters ─────────────────────────────────────
@@ -329,6 +344,25 @@ function timeAgo(iso: string): string {
 	color: var(--theme--foreground-subdued);
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
+}
+
+/* Stale-data ribbon */
+.stale-ribbon {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	margin-bottom: 16px;
+	border: 1px solid var(--theme--warning, #d4a017);
+	border-radius: var(--theme--border-radius);
+	background: rgba(212, 160, 23, 0.08);
+	color: var(--theme--warning, #d4a017);
+	font-size: 13px;
+}
+
+.stale-ribbon-icon {
+	--v-icon-size: 18px;
+	flex-shrink: 0;
 }
 
 /* KPI */
