@@ -12,6 +12,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 source "$(dirname "$0")/_directus-common.sh"
+[[ "${DRY_RUN:-0}" == "1" ]] || confirm_target_db || exit 1
 
 MANIFEST=$(cat <<'CSV'
 many_collection,many_field,one_collection

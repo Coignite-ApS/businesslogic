@@ -4,6 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+source "$(dirname "$0")/_directus-common.sh"
+confirm_target_db || exit 1
+
 echo "=== Phase 1: add m2o relations ==="
 bash scripts/add-missing-relations.sh
 echo ""

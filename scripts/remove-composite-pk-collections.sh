@@ -12,6 +12,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 source "$(dirname "$0")/_directus-common.sh"
+[[ "${DRY_RUN:-0}" == "1" ]] || confirm_target_db || exit 1
 
 TARGETS=(monthly_aggregates api_key_usage)
 

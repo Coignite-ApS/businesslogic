@@ -12,6 +12,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 source "$(dirname "$0")/_directus-common.sh"
+[[ "${DRY_RUN:-0}" == "1" ]] || confirm_target_db || exit 1
 
 mkdir -p "$(dirname "$LOG")"
 label=""; [[ "$DRY_RUN" == "1" ]] && label=" (DRY-RUN)"
@@ -54,6 +55,18 @@ for coll in api_keys platform_features; do
     fi
   done
   echo "  $coll: all $(echo "$expected_fields" | wc -l | tr -d ' ') fields verified in PG" | tee -a "$LOG"
+done
+
+# -------- Preflight — verify $CURRENT_USER.<field> refs resolve to real directus_users columns --------
+echo "--- preflight: verify filter variables resolve to real directus_users columns ---" | tee -a "$LOG"
+for row in "${ROWS[@]}"; do
+  IFS='|' read -r coll perm fields <<< "$row"
+  if [[ "$perm" == *'$CURRENT_USER.'* ]]; then
+    preflight_filter_var "$perm" || exit 1
+    echo "  $coll: filter vars resolve ✓" | tee -a "$LOG"
+  else
+    echo "  $coll: filter has no \$CURRENT_USER refs — skip" | tee -a "$LOG"
+  fi
 done
 
 # -------- Preflight — verify platform_features has 'enabled' column for the filter --------
