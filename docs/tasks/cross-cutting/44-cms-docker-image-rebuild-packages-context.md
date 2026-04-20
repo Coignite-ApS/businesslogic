@@ -1,6 +1,6 @@
 # 44. CMS Docker image rebuild — fix `packages/bl-widget` outside build context
 
-**Status:** completed 2026-04-20 — Option A applied (additional_contexts + Dockerfile COPY --from=packages). Local build verified at next commit on dm/sprint-b-pricing-v2.
+**Status:** completed 2026-04-20 — Option A applied (additional_contexts + Dockerfile COPY --from=packages). Local build verified at commit `d90082b` on `dev`.
 **Severity:** HIGH (required before Sprint 3 production deploy; dev unaffected)
 **Source:** Split from [cross-cutting/39](./39-cms-shared-extension-build-collision.md) investigation 2026-04-19
 **Blocks:** Sprint 3 (production deploy)
