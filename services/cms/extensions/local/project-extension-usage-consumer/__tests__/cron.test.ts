@@ -29,11 +29,13 @@ function makeLogger() {
 
 describe('runAggregation', () => {
 	it('calls aggregate_usage_events() with default batchSize and returns parsed stats', async () => {
+		const uuid1 = 'cccccccc-0000-0000-0000-000000000001';
 		const expected: AggregateResult = {
 			events_aggregated: 100,
 			accounts_touched: 3,
 			periods_touched: 2,
 			lag_seconds: 3600,
+			touched_accounts: [uuid1],
 		};
 		const db = makeDb(expected);
 
@@ -47,6 +49,7 @@ describe('runAggregation', () => {
 		expect(result.accounts_touched).toBe(3);
 		expect(result.periods_touched).toBe(2);
 		expect(result.lag_seconds).toBe(3600);
+		expect(result.touched_accounts).toEqual([uuid1]);
 	});
 
 	it('passes custom batchSize into the SQL binding', async () => {
@@ -189,9 +192,14 @@ describe('buildAggregateUsageEventsCron', () => {
 		expect(logger.error.mock.calls[0][0]).toContain('timeout');
 	});
 
-	it('publishes Redis invalidation exactly once at end, not per iteration', async () => {
-		const nonZero = { events_aggregated: 100, accounts_touched: 2, periods_touched: 1, lag_seconds: 0 };
-		const zero    = { events_aggregated: 0,   accounts_touched: 0, periods_touched: 0, lag_seconds: 0 };
+	it('publishes one message per touched account (not global ALL)', async () => {
+		const uuid1 = 'aaaaaaaa-0000-0000-0000-000000000001';
+		const uuid2 = 'aaaaaaaa-0000-0000-0000-000000000002';
+		const nonZero = {
+			events_aggregated: 100, accounts_touched: 2, periods_touched: 2, lag_seconds: 0,
+			touched_accounts: [uuid1, uuid2],
+		};
+		const zero = { events_aggregated: 0, accounts_touched: 0, periods_touched: 0, lag_seconds: 0, touched_accounts: [] };
 		const db = {
 			raw: vi.fn()
 				.mockResolvedValueOnce({ rows: [{ stats: nonZero }] })
@@ -204,9 +212,45 @@ describe('buildAggregateUsageEventsCron', () => {
 		const handler = buildAggregateUsageEventsCron(db, logger, () => mockRedis);
 		await handler();
 
-		// Two DB calls (one real, one drain), but publish fires exactly once
-		expect(mockPublish).toHaveBeenCalledTimes(1);
-		expect(mockPublish).toHaveBeenCalledWith('bl:monthly_aggregates:invalidated', 'ALL');
+		// Exactly one publish per touched account; no 'ALL' global flush
+		expect(mockPublish).toHaveBeenCalledTimes(2);
+		expect(mockPublish).toHaveBeenCalledWith('bl:monthly_aggregates:invalidated', uuid1);
+		expect(mockPublish).toHaveBeenCalledWith('bl:monthly_aggregates:invalidated', uuid2);
+		expect(mockPublish).not.toHaveBeenCalledWith('bl:monthly_aggregates:invalidated', 'ALL');
+	});
+
+	it('deduplicates accounts touched across multiple iterations', async () => {
+		const uuid1 = 'bbbbbbbb-0000-0000-0000-000000000001';
+		const uuid2 = 'bbbbbbbb-0000-0000-0000-000000000002';
+		// uuid1 appears in both iteration 1 and 2 — must be published only once
+		const iter1 = {
+			events_aggregated: 50, accounts_touched: 2, periods_touched: 2, lag_seconds: 0,
+			touched_accounts: [uuid1, uuid2],
+		};
+		const iter2 = {
+			events_aggregated: 30, accounts_touched: 1, periods_touched: 1, lag_seconds: 0,
+			touched_accounts: [uuid1],
+		};
+		const zero = { events_aggregated: 0, accounts_touched: 0, periods_touched: 0, lag_seconds: 0, touched_accounts: [] };
+		const db = {
+			raw: vi.fn()
+				.mockResolvedValueOnce({ rows: [{ stats: iter1 }] })
+				.mockResolvedValueOnce({ rows: [{ stats: iter2 }] })
+				.mockResolvedValueOnce({ rows: [{ stats: zero }] }),
+		};
+		const logger = makeLogger();
+		const mockPublish = vi.fn().mockResolvedValue(1);
+		const mockRedis = { publish: mockPublish };
+
+		const handler = buildAggregateUsageEventsCron(db, logger, () => mockRedis);
+		await handler();
+
+		// uuid1 appears in both iterations but should only be published once
+		expect(mockPublish).toHaveBeenCalledTimes(2);
+		const calls = mockPublish.mock.calls.map(([, msg]) => msg);
+		expect(calls).toContain(uuid1);
+		expect(calls).toContain(uuid2);
+		expect(calls.filter((id) => id === uuid1)).toHaveLength(1);
 	});
 
 	it('does not publish Redis when cumulative account touches is 0', async () => {

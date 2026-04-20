@@ -188,6 +188,9 @@ describe('aggregate_usage_events() E2E', () => {
 		expect(stats.accounts_touched).toBeGreaterThanOrEqual(1);
 		expect(stats.periods_touched).toBeGreaterThanOrEqual(1);
 		expect(stats.lag_seconds).toBeGreaterThanOrEqual(0);
+		// Migration 036: touched_accounts must include the test account
+		expect(Array.isArray(stats.touched_accounts)).toBe(true);
+		expect(stats.touched_accounts).toContain(testAccountId);
 
 		const { rows } = await pool.query(
 			`SELECT
@@ -494,6 +497,10 @@ describe('aggregate_usage_events() E2E', () => {
 		// Exactly 1 distinct account, exactly 2 distinct periods
 		expect(stats.accounts_touched).toBe(1);
 		expect(stats.periods_touched).toBe(2);
+		// Migration 036: touched_accounts must contain the one test account UUID
+		expect(Array.isArray(stats.touched_accounts)).toBe(true);
+		expect(stats.touched_accounts).toHaveLength(1);
+		expect(stats.touched_accounts![0]).toBe(testAccountId);
 
 		// Verify all 8 events marked
 		const { rows: unagg } = await pool.query(
