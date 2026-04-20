@@ -270,6 +270,7 @@ Infrastructure and multi-service concerns.
 | 50 | 🟠 **P1: Onboarding redirect only fires from Account module** (from ux-test) | planned | [cross-cutting/50-onboarding-wizard-global-redirect.md](cross-cutting/50-onboarding-wizard-global-redirect.md) |
 | 51 | 🟠 **P1: Stripe Checkout return URLs wrong + no success page** (from ux-test) | planned | [cross-cutting/51-stripe-checkout-return-urls.md](cross-cutting/51-stripe-checkout-return-urls.md) |
 | 52 | 🟡 **P1: UX polish bundle** — top-up entry + AI perms + account crash + 403 copy (from ux-test) | planned | [cross-cutting/52-ux-test-p1-cleanup-bundle.md](cross-cutting/52-ux-test-p1-cleanup-bundle.md) |
+| 53 | CMS Dockerfile follow-ups (I2 double-copy guard + I3 file: dep CI check + M6 smoke test) — LOW hygiene | planned | [cross-cutting/53-cms-dockerfile-followups.md](cross-cutting/53-cms-dockerfile-followups.md) |
 
 ---
 
