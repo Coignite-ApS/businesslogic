@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
-import type { Ref } from 'vue';
 import type { Router } from 'vue-router';
 import { formatApiError } from '../utils/format-api-error';
+import { needsOnboardingWizard } from '../utils/onboarding-needed';
 
 export type OnboardingIntent = 'calculators' | 'kb' | 'flows' | 'unsure';
 
@@ -27,14 +27,20 @@ let _removeGuard: (() => void) | null = null;
 
 /**
  * Register a router.beforeEach guard that redirects to /account/onboarding
- * whenever needsWizard is true.  Idempotent — removes the previous guard first.
+ * whenever shouldRedirect() returns true.  Idempotent — removes the previous
+ * guard first.
+ *
+ * Accepts a getter (() => boolean) instead of a Ref so the guard always
+ * evaluates live state at navigation time rather than capturing a specific
+ * user's ref.  On logout → re-login the caller re-registers with a fresh
+ * getter bound to the new user; the old closure is dropped.
  *
  * Loop prevention:
  *   - Skips if destination is /account/onboarding (already there)
  *   - Skips auth/login routes (unauthenticated paths)
- *   - Only fires when needsWizard is true (reactive; auto-clears after completion)
+ *   - Only fires when shouldRedirect() returns true
  */
-export function registerOnboardingGuard(router: Router, needsWizard: Ref<boolean>): void {
+export function registerOnboardingGuard(router: Router, shouldRedirect: () => boolean): void {
 	// Remove previous guard if any (prevents stacking on re-mount)
 	if (_removeGuard) {
 		_removeGuard();
@@ -43,7 +49,7 @@ export function registerOnboardingGuard(router: Router, needsWizard: Ref<boolean
 	_removeGuard = router.beforeEach((to, _from, next) => {
 		const isOnboardingRoute = to.path.includes('/account/onboarding');
 		const isAuthRoute = to.path.startsWith('/auth') || to.path.startsWith('/login');
-		if (needsWizard.value && !isOnboardingRoute && !isAuthRoute) {
+		if (shouldRedirect() && !isOnboardingRoute && !isAuthRoute) {
 			next('/account/onboarding');
 		} else {
 			next();
@@ -57,9 +63,7 @@ export function useOnboarding(api: any) {
 	const error = ref<string | null>(null);
 
 	// needsWizard: true if no module activated AND wizard not explicitly completed
-	const needsWizard = computed(() =>
-		!state.value.first_module_activated_at && !state.value.wizard_completed_at,
-	);
+	const needsWizard = computed(() => needsOnboardingWizard(state.value));
 
 	async function fetchOnboardingState(): Promise<void> {
 		loading.value = true;

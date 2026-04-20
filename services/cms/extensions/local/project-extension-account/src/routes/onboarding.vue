@@ -44,7 +44,7 @@ const { needsWizard, fetchOnboardingState } = useOnboarding(api);
 // ensures at most one guard is active at a time.
 onMounted(async () => {
 	await fetchOnboardingState();
-	registerOnboardingGuard(router, needsWizard);
+	registerOnboardingGuard(router, () => needsWizard.value);
 });
 
 // ?mode=retry — skip the needsWizard check, just show the wizard again.

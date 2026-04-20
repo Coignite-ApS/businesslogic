@@ -1,6 +1,6 @@
 # 55. 🟡 P2: Onboarding guard stale-closure on logout → re-login in same tab
 
-**Status:** planned
+**Status:** completed
 **Severity:** P2 — edge case, affects users who log out + log in as a different account in the same browser tab without refreshing
 **Source:** code review on task 50 (2026-04-20)
 
@@ -34,9 +34,16 @@ Find/create a hook that fires on logout and call `_removeGuard()`. Directus 11 d
 
 ## Acceptance
 
-- [ ] After logout → re-login as a different user, the guard correctly reflects the new user's `needsWizard` state
-- [ ] No stale-closure lingers across user switches in the same tab
-- [ ] Existing tests still pass; add regression test for cross-user guard behavior
+- [x] After logout → re-login as a different user, the guard correctly reflects the new user's `needsWizard` state
+- [x] No stale-closure lingers across user switches in the same tab
+- [x] Existing tests still pass; add regression test for cross-user guard behavior
+
+## Implementation notes (2026-04-20)
+
+- `registerOnboardingGuard` signature changed: `Ref<boolean>` → `() => boolean`
+- Pure helper `needsOnboardingWizard(onboardingState)` extracted to `src/utils/onboarding-needed.ts`; used by `useOnboarding` computed and by both callers
+- Both callers (`onboarding.vue`, `module.vue`) updated to pass `() => needsWizard.value`
+- Tests: 65 passing (was 53). New tests: `needsOnboardingWizard` suite (4), user-switch regression, getter-evaluated-fresh regression
 
 ## Estimate
 

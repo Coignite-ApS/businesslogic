@@ -479,7 +479,7 @@ onMounted(async () => {
 	// Register a router.beforeEach guard so that any navigation away from the
 	// wizard is intercepted and redirected back.  registerOnboardingGuard
 	// ensures at most one guard is active at a time.
-	registerOnboardingGuard(router, needsWizard);
+	registerOnboardingGuard(router, () => needsWizard.value);
 });
 </script>
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref } from 'vue';
 import { useOnboarding, registerOnboardingGuard } from '../composables/use-onboarding';
+import { needsOnboardingWizard } from '../utils/onboarding-needed';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,27 @@ function makeApi(overrides: { getMeta?: any; postFn?: any } = {}) {
 	const getFn = vi.fn().mockResolvedValue(makeMeta(getMeta));
 	return { api: { get: getFn, post: postFn }, getFn, postFn };
 }
+
+// ─── needsOnboardingWizard (pure helper) ──────────────────────────────────────
+
+describe('needsOnboardingWizard', () => {
+	it('true when both fields null', () => {
+		expect(needsOnboardingWizard({ first_module_activated_at: null, wizard_completed_at: null })).toBe(true);
+	});
+
+	it('false when first_module_activated_at set', () => {
+		expect(needsOnboardingWizard({ first_module_activated_at: '2026-01-01T00:00:00Z', wizard_completed_at: null })).toBe(false);
+	});
+
+	it('false when wizard_completed_at set', () => {
+		expect(needsOnboardingWizard({ first_module_activated_at: null, wizard_completed_at: '2026-01-01T00:00:00Z' })).toBe(false);
+	});
+
+	it('true when null/undefined passed', () => {
+		expect(needsOnboardingWizard(null)).toBe(true);
+		expect(needsOnboardingWizard(undefined)).toBe(true);
+	});
+});
 
 // ─── needsWizard ──────────────────────────────────────────────────────────────
 
@@ -190,15 +212,13 @@ describe('registerOnboardingGuard', () => {
 
 	it('registers a beforeEach guard', () => {
 		const { router } = makeRouter();
-		const needsWizard = ref(false);
-		registerOnboardingGuard(router, needsWizard);
+		registerOnboardingGuard(router, () => false);
 		expect(router.beforeEach).toHaveBeenCalledOnce();
 	});
 
-	it('redirects to /account/onboarding when needsWizard is true', () => {
+	it('redirects to /account/onboarding when shouldRedirect returns true', () => {
 		const { router } = makeRouter();
-		const needsWizard = ref(true);
-		registerOnboardingGuard(router, needsWizard);
+		registerOnboardingGuard(router, () => true);
 		const guard = router.beforeEach.mock.calls[0][0];
 
 		const next = vi.fn();
@@ -206,10 +226,9 @@ describe('registerOnboardingGuard', () => {
 		expect(next).toHaveBeenCalledWith('/account/onboarding');
 	});
 
-	it('does NOT redirect when needsWizard is false', () => {
+	it('does NOT redirect when shouldRedirect returns false', () => {
 		const { router } = makeRouter();
-		const needsWizard = ref(false);
-		registerOnboardingGuard(router, needsWizard);
+		registerOnboardingGuard(router, () => false);
 		const guard = router.beforeEach.mock.calls[0][0];
 
 		const next = vi.fn();
@@ -219,8 +238,7 @@ describe('registerOnboardingGuard', () => {
 
 	it('does NOT redirect when already on /account/onboarding', () => {
 		const { router } = makeRouter();
-		const needsWizard = ref(true);
-		registerOnboardingGuard(router, needsWizard);
+		registerOnboardingGuard(router, () => true);
 		const guard = router.beforeEach.mock.calls[0][0];
 
 		const next = vi.fn();
@@ -230,8 +248,7 @@ describe('registerOnboardingGuard', () => {
 
 	it('does NOT redirect on auth routes', () => {
 		const { router } = makeRouter();
-		const needsWizard = ref(true);
-		registerOnboardingGuard(router, needsWizard);
+		registerOnboardingGuard(router, () => true);
 		const guard = router.beforeEach.mock.calls[0][0];
 
 		const next = vi.fn();
@@ -244,10 +261,63 @@ describe('registerOnboardingGuard', () => {
 		const routerA: any = { beforeEach: vi.fn().mockReturnValue(removeA) };
 		const routerB: any = { beforeEach: vi.fn().mockReturnValue(vi.fn()) };
 
-		const needsWizard = ref(true);
-		registerOnboardingGuard(routerA, needsWizard);
+		registerOnboardingGuard(routerA, () => true);
 		// Second call should remove the first guard
-		registerOnboardingGuard(routerB, needsWizard);
+		registerOnboardingGuard(routerB, () => true);
 		expect(removeA).toHaveBeenCalledOnce();
+	});
+
+	// ── Regression: logout → re-login stale-closure ───────────────────────────
+	// Guard must always invoke the LATEST registered getter, not a captured ref
+	// from a previous user's session.
+	it('user-switch: re-registering with new getter reflects new user state', () => {
+		const { router } = makeRouter();
+
+		// User A: wizard completed (needsWizard = false)
+		const userANeedsWizard = ref(false);
+		registerOnboardingGuard(router, () => userANeedsWizard.value);
+
+		const guardA = router.beforeEach.mock.calls[0][0];
+		const nextA = vi.fn();
+		guardA({ path: '/calculators' }, {}, nextA);
+		// User A should NOT be redirected
+		expect(nextA).toHaveBeenCalledWith();
+
+		// User B logs in, mounts their component → re-registers with their getter
+		// (needsWizard = true for User B)
+		const userBNeedsWizard = ref(true);
+		registerOnboardingGuard(router, () => userBNeedsWizard.value);
+
+		const guardB = router.beforeEach.mock.calls[1][0];
+		const nextB = vi.fn();
+		guardB({ path: '/calculators' }, {}, nextB);
+		// User B SHOULD be redirected to onboarding
+		expect(nextB).toHaveBeenCalledWith('/account/onboarding');
+
+		// Verify that stale User A closure is no longer used — only guardB exists
+		// (guardA is the old closure; the singleton now holds guardB)
+		const nextBAfterWizard = vi.fn();
+		userBNeedsWizard.value = false; // User B completes wizard
+		guardB({ path: '/calculators' }, {}, nextBAfterWizard);
+		expect(nextBAfterWizard).toHaveBeenCalledWith(); // no redirect after completion
+	});
+
+	it('getter is evaluated fresh on every navigation (not captured at registration)', () => {
+		const { router } = makeRouter();
+		const needsWizard = ref(true);
+
+		registerOnboardingGuard(router, () => needsWizard.value);
+		const guard = router.beforeEach.mock.calls[0][0];
+
+		// First navigation: needs wizard
+		const next1 = vi.fn();
+		guard({ path: '/calculators' }, {}, next1);
+		expect(next1).toHaveBeenCalledWith('/account/onboarding');
+
+		// Wizard completed → same guard, same getter, but getter now returns false
+		needsWizard.value = false;
+		const next2 = vi.fn();
+		guard({ path: '/calculators' }, {}, next2);
+		expect(next2).toHaveBeenCalledWith(); // no redirect
 	});
 });
