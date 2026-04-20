@@ -74,11 +74,10 @@ RUN /directus/docker/build-extensions.sh /tmp/base-extensions && \
 # 3b. Copy shared packages from the repo root (for file: dependencies)
 # -----------------------------------------------------------------------------
 # project-extension-ai-assistant's package.json has "file:../../../../../packages/bl-widget".
-# npm resolves that path at install time; it must exist before build-extensions.sh runs.
-COPY --from=packages --chown=node:node bl-widget /packages/bl-widget
-# Strip node_modules from the copied package — npm install manages its own deps;
-# leaving host node_modules confuses npm's "extraneous" check.
-RUN rm -rf /packages/bl-widget/node_modules
+# We need only package.json (for install resolution) and dist/ (for imports) —
+# copying the full dir pulls host node_modules (~77MB) that rm can't reclaim later.
+COPY --from=packages --chown=node:node bl-widget/package.json /packages/bl-widget/package.json
+COPY --from=packages --chown=node:node bl-widget/dist /packages/bl-widget/dist
 
 # -----------------------------------------------------------------------------
 # 4. Build project-specific local extensions

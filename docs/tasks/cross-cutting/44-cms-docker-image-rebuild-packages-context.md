@@ -21,7 +21,7 @@ This pre-dates Sprint B. Task 39's partial fix got past `_shared` but hit this n
 
 ## Required behavior
 
-`docker compose -f infrastructure/docker/docker-compose.dev.yml build --no-cache bl-cms` must succeed and produce a container that boots healthy with all 21 extensions loaded.
+`docker compose -f infrastructure/docker/docker-compose.dev.yml build --no-cache bl-cms` must succeed and produce a container that boots healthy with all 18 Directus extensions + 2 shared libs loaded (build log: `OK Built 18 local extension(s)`).
 
 ## Fix options (pick one)
 
@@ -82,13 +82,13 @@ If not: **Option D** as interim + file a cleanup task to move to Option A or C l
 3. Add `COPY --from=packages --chown=node:node bl-widget /packages/bl-widget` in Dockerfile BEFORE the `RUN /directus/docker/build-extensions.sh /tmp/project-extensions` step
 4. Add a final cleanup `RUN rm -rf /packages` after all extensions built (optional — it's tiny)
 5. Test: `docker compose -f infrastructure/docker/docker-compose.dev.yml build --no-cache bl-cms`
-6. Verify: container boots healthy, 21 extensions loaded, curl /server/ping returns 200
+6. Verify: container boots healthy, 18 Directus extensions + 2 shared libs loaded, curl /server/ping returns 200
 
 ## Acceptance
 
 - `docker compose build --no-cache bl-cms` succeeds
 - Rebuilt image boots healthy
-- All 21 extensions loaded (check `Loaded extensions:` log line)
+- All 18 Directus extensions + 2 shared libs loaded (build log: `OK Built 18 local extension(s)`)
 - Sprint B dev functionality unchanged
 - Browser QA of cms/36 + cms/37 completes against the rebuilt image
 - Sprint 3 production deploy path unblocked
