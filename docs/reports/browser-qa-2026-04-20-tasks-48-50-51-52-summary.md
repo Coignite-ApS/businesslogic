@@ -139,3 +139,90 @@ Test checkout sessions created during this run:
 - Subscription via subscription page (completed — no webhook → no DB row)
 - Wallet top-up €50 (cancelled)
 - Wallet top-up €20 (completed — no webhook → no ledger credit)
+
+---
+
+## Task 48 re-verification (post STRIPE_WEBHOOK_SECRET rotation)
+
+**Re-run:** 2026-04-20 ~14:17 local
+**Context:** User claimed Stripe CLI was running with fresh `whsec_...` copied into `infrastructure/docker/.env`, CMS restarted via `make restart`. Endpoint probe with unsigned body returned `400 "Invalid signature"` (signature verification active).
+
+### Environment baseline
+
+- Sarah test account: `sarah-uxtest-1776658880@coignite.dk` / `TestPass123!` (account_id `e84f7866-dca1-4e14-891a-4d221c13ccd0`)
+- Sarah's subscriptions before test: 0 rows (clean)
+- Sarah's wallet ledger before: 1 credit €5 promo + 1 debit €4.50 adjustment (pre-existing)
+- `STRIPE_WEBHOOK_SECRET` inside CMS container: `whsec_cb983ec14e5a1556fdba5bc395bdb2ca53f4454e3586d167eb0210e8451d96b3`
+- `STRIPE_SECRET_KEY` inside CMS: `sk_test_51T66pLRfGjysVTdN...` → Stripe account `acct_1T66pLRfGjysVTdN` ("Businesslogic")
+- Local Stripe CLI default profile: account `acct_1C2b12DtMOoQtGrr` ("Coignite") — `sk_test_51C2b12DtMOoQtGrr...`
+
+### Test 1: Subscription Checkout (Calculators Starter monthly trial)
+
+1. Logged in as Sarah, opened `/admin/account/subscription`.
+2. Clicked Activate on Calculators tile → dialog with Starter/Growth/Scale, clicked "Activate Monthly" on Starter.
+3. Stripe Checkout loaded (sandbox, €19/mo, 14 days free, starting 4 May 2026).
+4. Filled `4242 4242 4242 4242`, `12/30`, `123`, "Sarah UXTest". Clicked Start trial.
+5. Redirected to `http://localhost:18055/admin/account/subscription?activated=calculators` — correct URL (task 51 fix holds) ✅
+6. Green success banner shown: "Your Calculators subscription is active" ✅
+7. **BUT** the CALCULATORS card still showed "Not active" / "No active subscription for this module" ❌
+
+### Evidence
+
+- Checkout session `cs_test_a1IDjNBeCJnV7LN5yBOcrTEk9r7vosR5aAAcueP8VnkXPGmYYSCIPZqVHo` verified with CMS-account key: `status=complete`, `payment_status=paid`, `subscription=sub_1TOGlnRfGjysVTdN0QAHRO7I`, `mode=subscription`, customer_email matches Sarah, metadata present.
+- Stripe did fire event `evt_1TOGlqRfGjysVTdNQRU7R85P` (`checkout.session.completed`) at epoch 1776687466 on CMS's account `acct_1T66pLRfGjysVTdN`.
+- CMS logs since Checkout: only `POST /stripe/checkout 200` (session create) + `GET /admin/account/subscription?activated=calculators 304`. **No `POST /stripe/webhook 200`** arrived. The two 400 entries (12:15, 12:16) are unsigned probes from before the Checkout attempt.
+- DB after: `subscriptions` where `account_id=e84f7866-...` → 0 rows (unchanged).
+- `stripe_webhook_events` table contents: 1 row only — `evt_1TO9u4DtMOoQtGrrWcBE69q4` from the earlier Sprint B fix verification. No new row for Sarah's event.
+
+### Root cause of re-verification failure
+
+**Stripe CLI is authenticated to the wrong account.** `stripe config --list` shows `account_id = 'acct_1C2b12DtMOoQtGrr'` (Coignite). The CMS uses `acct_1T66pLRfGjysVTdN` (Businesslogic). The CLI's `stripe listen` is subscribed to events on the Coignite account, but Sarah's Checkout session was created on the Businesslogic account, so the Coignite CLI listener never sees the event. Result: nothing is forwarded to `localhost:18055/stripe/webhook`.
+
+Confirmation:
+- `stripe checkout sessions retrieve cs_test_...ZqVHo` (no api-key) → `"No such checkout.session"`.
+- Same command with explicit `--api-key sk_test_51T66pLRfGjysVTdN...` → full session returned.
+- `stripe events list --limit 5` (default) → newest event is `evt_1TO9u4DtMOoQtGrrWcBE69q4`, epoch 1776661068 (~7h stale). Same command with CMS api-key → `evt_1TOGlqRfGjysVTdNQRU7R85P` at epoch 1776687466 (Sarah's event, present).
+
+### Test 2: Wallet top-up — skipped
+
+Did not run — same CLI mismatch would block it. No new `ai_wallet_ledger` rows would be created until the CLI is corrected.
+
+### Sub-acceptance outcomes
+
+- [ ] Fresh Checkout completion with real account metadata creates `subscriptions` row — **BLOCKED (not yet verifiable; code path unblocked the moment CLI is fixed)**.
+- [ ] Wallet top-up Checkout creates `ai_wallet_ledger` credit — **BLOCKED (not retested; same blocker)**.
+- [ ] UI reflects new subscription after navigating back to `/admin/account/subscription` — **BLOCKED (no DB row → UI cannot reflect it)**.
+
+### What the user needs to do
+
+Restart Stripe CLI pointing at the **Businesslogic** test account:
+```bash
+# Kill any running stripe listen
+pkill -f "stripe listen"
+
+# Either: switch CLI default account
+stripe login --api-key sk_test_REDACTED
+
+# Or: pass api-key per-invocation
+stripe listen \
+  --api-key sk_test_REDACTED \
+  --forward-to http://localhost:18055/stripe/webhook
+```
+
+The new listener will print a **new** `whsec_...` — that must replace `STRIPE_WEBHOOK_SECRET` in `infrastructure/docker/.env` and CMS restarted.
+
+Then: resend the existing completed event to avoid re-doing the checkout:
+```bash
+stripe events resend evt_1TOGlqRfGjysVTdNQRU7R85P \
+  --api-key sk_test_REDACTED
+```
+The listener should forward to the CMS and produce a `subscriptions` row for Sarah tied to `sub_1TOGlnRfGjysVTdN0QAHRO7I`.
+
+### Files referenced
+
+- Screenshots: `docs/reports/screenshots/browser-qa-2026-04-20-task48-e2e-01-sub-page-before.png`, `...-02-activate-dialog.png`, `...-03-post-checkout-return.png`, `...-04-no-sub-after-checkout.png`
+- Code (no changes needed): `services/cms/extensions/local/project-extension-stripe/src/index.ts`, `src/webhook-handlers.ts`
+
+### Overall status
+
+🟠 — the webhook pipeline code itself is not demonstrably broken; signature verification is active, Checkout session creation returns correct URLs, UI handles return correctly. But the end-to-end path cannot be proven green until the Stripe CLI is re-authenticated against the Businesslogic test account. No code regressions found.
