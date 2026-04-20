@@ -101,7 +101,7 @@ describe('POST /account/onboarding/state', () => {
     });
 
     it('400 on unknown field in body (privilege escalation guard)', async () => {
-        const { routes } = registerRoutes({ metadata: null });
+        const { routes, db, dbQueryChain } = registerRoutes({ metadata: null });
         const handlers = routes['POST:/account/onboarding/state'];
 
         const req = {
@@ -113,10 +113,13 @@ describe('POST /account/onboarding/state', () => {
 
         expect(res._status).toBe(400);
         expect(JSON.stringify(res._body)).toContain('unknown');
+        // Defensive: validation must run BEFORE any DB access — no read, no write
+        expect(db).not.toHaveBeenCalled();
+        expect(dbQueryChain.update).not.toHaveBeenCalled();
     });
 
     it('400 when body contains both valid and unknown keys', async () => {
-        const { routes } = registerRoutes({ metadata: null });
+        const { routes, db, dbQueryChain } = registerRoutes({ metadata: null });
         const handlers = routes['POST:/account/onboarding/state'];
 
         const req = {
@@ -127,6 +130,9 @@ describe('POST /account/onboarding/state', () => {
         await runHandlers(handlers, req, res);
 
         expect(res._status).toBe(400);
+        // Defensive: presence of a valid field must not trigger a partial write
+        expect(db).not.toHaveBeenCalled();
+        expect(dbQueryChain.update).not.toHaveBeenCalled();
     });
 
     it('200 with wizard_completed_at — merges with empty metadata', async () => {

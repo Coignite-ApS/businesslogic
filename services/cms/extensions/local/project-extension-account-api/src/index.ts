@@ -124,6 +124,9 @@ export default defineHook(({ init }, { env, logger, database: db }) => {
             }
 
             try {
+                // Note: read-modify-write is not transactional. Acceptable for the wizard's
+                // 3-write sequence (intent → activation → completion); collisions only lose
+                // other onboarding_state keys and the UI re-fetches on next mount.
                 const user = await db('directus_users').where('id', userId).select('metadata').first();
                 const existingMeta = (user?.metadata && typeof user.metadata === 'object') ? user.metadata : {};
                 const existingOnboarding = (existingMeta?.onboarding_state && typeof existingMeta.onboarding_state === 'object')
