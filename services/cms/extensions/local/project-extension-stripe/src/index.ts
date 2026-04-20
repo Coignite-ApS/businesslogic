@@ -16,6 +16,9 @@ import {
 import { registerWalletRoutes } from './wallet-handlers.js';
 import { processAutoReloadBatch } from './auto-reload-consumer.js';
 import { buildRefreshQuotasHooks, buildRefreshAllQuotasCron } from './hooks/refresh-quotas.js';
+import { registerWebhookHealthRoute } from './webhook-health.js';
+import { validateWebhookSecret } from './startup-validation.js';
+import { createWebhookRouteHandler } from './webhook-route.js';
 import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
@@ -298,6 +301,14 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 		return;
 	}
 
+	// ─── Task 56: Stripe webhook secret startup validation ──
+	//
+	// Fail-fast on missing/malformed STRIPE_WEBHOOK_SECRET. The alternative
+	// (log+skip) hides production misconfigs for hours until a real payment
+	// fails. If STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is not,
+	// the billing pipeline is not complete — refuse to boot.
+	validateWebhookSecret({ webhookSecret, logger });
+
 	const stripe = getStripe(stripeKey);
 
 	// ─── Auto-reload consumer (every minute) ────────────────
@@ -498,28 +509,25 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 		});
 
 		// POST /stripe/webhook — handle Stripe events
-		app.post('/stripe/webhook', async (req: any, res: any) => {
-			if (!webhookSecret) {
-				return res.status(500).json({ errors: [{ message: 'Webhook secret not configured' }] });
-			}
-
-			// Directus pre-reads the body via express.json() verify callback, storing
-			// the raw buffer in req.rawBody. The stream is already consumed by the time
-			// this handler runs — reading it again via for await yields nothing and
-			// causes signature verification to fail with empty body.
-			const rawBody: Buffer = req.rawBody;
-			const sig = req.headers['stripe-signature'];
-
-			let event;
-			try {
-				event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-			} catch (err: any) {
-				logger.warn(`Webhook signature verification failed: ${err.message}`);
-				return res.status(400).json({ error: 'Invalid signature' });
-			}
-
-			try {
-				await withIdempotency(db, event, logger, async () => {
+		//
+		// Task 56: every code path (signature fail / parse fail / handler error /
+		// success) writes a row to `public.stripe_webhook_log` so ops can see
+		// misconfigurations in the Billing Health panel rather than docker logs.
+		// The handler body lives in webhook-route.ts so it can be unit-tested
+		// without booting Directus.
+		//
+		// Directus pre-reads the body via express.json() verify callback, storing
+		// the raw buffer in req.rawBody. The stream is already consumed by the time
+		// this handler runs — reading it again via for await yields nothing and
+		// causes signature verification to fail with empty body.
+		const webhookHandler = createWebhookRouteHandler({
+			db,
+			logger,
+			getWebhookSecret: () => webhookSecret,
+			verifySignature: (rawBody, sig, secret) =>
+				stripe.webhooks.constructEvent(rawBody, sig as any, secret) as any,
+			processEvent: async (event) => {
+				await withIdempotency(db, event as any, logger, async () => {
 					switch (event.type) {
 						case 'checkout.session.completed':
 							await handleCheckoutCompleted(event.data.object as any, stripe, db, logger);
@@ -546,12 +554,13 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 							logger.debug(`Unhandled Stripe event: ${event.type}`);
 					}
 				});
-			} catch (err) {
-				logger.error(`Webhook handler error for ${event.type}: ${err}`);
-			}
-
-			return res.json({ received: true });
+			},
 		});
+		app.post('/stripe/webhook', webhookHandler);
+
+		// Task 56: admin-scoped webhook-health endpoint (powers the
+		// Billing Health panel in the AI Observatory module).
+		registerWebhookHealthRoute(app, db, logger);
 
 		logger.info('Stripe billing routes registered');
 
