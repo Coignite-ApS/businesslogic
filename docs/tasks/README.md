@@ -29,7 +29,7 @@ Sprint B shipped + merged to dev. UX test with Sarah persona (2026-04-20) expose
 | ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes | Closed — image rebuild split to task 44. | closed |
 | ✅ shipped 2026-04-20 | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5) | Migration 033 applied via db-admin. | closed |
 | ✅ shipped 2026-04-20 | [47](cross-cutting/47-plan-cards-v2-live-render-verification.md) | plan-cards.vue v2 live render | Verified in browser QA (calculators module). | closed |
-| 🟠 P1 | [56](cross-cutting/56-stripe-webhook-observability.md) | Stripe webhook observability + billing-health panel | Stale webhook secret currently silent until a paid customer notices. | 4-6h |
+| ✅ shipped 2026-04-20 | [56](cross-cutting/56-stripe-webhook-observability.md) | Stripe webhook observability + billing-health panel | stripe_webhook_log + per-path log writes + /stripe/webhook-health endpoint + Billing Health Vue panel + startup validation. 59 new unit tests + live red-banner verification. | closed |
 | 🟡 P2 | [57](cross-cutting/57-stripe-reconciliation-cron.md) | Stripe reconciliation cron | Defense-in-depth for missed webhooks (retry exhaustion, CMS downtime). | 3-4h |
 | 🟡 P2 | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | At scale (100+ accounts). | 1-2h |
 | 🟡 P2 | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | AI spend / KB search cap freshness. | 3-4h |
@@ -277,7 +277,7 @@ Infrastructure and multi-service concerns.
 | 53 | CMS Dockerfile follow-ups (I2 **superseded by 54**; I3 file: dep CI check + M6 smoke test remain) — LOW hygiene | planned | [cross-cutting/53-cms-dockerfile-followups.md](cross-cutting/53-cms-dockerfile-followups.md) |
 | 54 | 🔴 **P0: Shared-libs break entire hook layer** (Directus 11 Zod manifest strict-fail) | **completed 2026-04-20** (`0386f64` + `640c64b` + `12b8314` + `8510283`) | [cross-cutting/54-shared-libs-break-extension-load.md](cross-cutting/54-shared-libs-break-extension-load.md) |
 | 55 | 🟡 Onboarding guard stale-closure on logout→re-login in same tab (P2, follow-up to 50) | **completed 2026-04-20** (`321431c`) | [cross-cutting/55-onboarding-guard-logout-reentry.md](cross-cutting/55-onboarding-guard-logout-reentry.md) |
-| 56 | 🟠 **P1: Stripe webhook observability** — persist every hit + admin "Billing Health" panel + startup validation (from task 48 dev-session drift) | planned | [cross-cutting/56-stripe-webhook-observability.md](cross-cutting/56-stripe-webhook-observability.md) |
+| 56 | 🟠 **P1: Stripe webhook observability** — persist every hit + admin "Billing Health" panel + startup validation (from task 48 dev-session drift) | **completed 2026-04-20** | [cross-cutting/56-stripe-webhook-observability.md](cross-cutting/56-stripe-webhook-observability.md) |
 | 57 | 🟡 P2: Stripe reconciliation cron — defense-in-depth for missed webhooks | planned | [cross-cutting/57-stripe-reconciliation-cron.md](cross-cutting/57-stripe-reconciliation-cron.md) |
 
 ---

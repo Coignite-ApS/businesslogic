@@ -20,5 +20,9 @@
 			<v-list-item-icon><v-icon name="compare_arrows" /></v-list-item-icon>
 			<v-list-item-content>Model Performance</v-list-item-content>
 		</v-list-item>
+		<v-list-item to="/ai-observatory/billing-health" :active="$route.path.includes('/billing-health')">
+			<v-list-item-icon><v-icon name="health_and_safety" /></v-list-item-icon>
+			<v-list-item-content>Billing Health</v-list-item-content>
+		</v-list-item>
 	</v-list>
 </template>
