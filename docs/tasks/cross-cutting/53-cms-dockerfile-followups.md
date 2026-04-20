@@ -1,21 +1,21 @@
 # 53. CMS Dockerfile follow-ups (task 44 code review leftovers)
 
-**Status:** planned
+**Status:** planned (I2 **superseded by task 54**; I3 + M6 still open)
 **Severity:** LOW — latent foot-guns + hygiene; no current breakage
 **Source:** Task 44 code quality review 2026-04-20 (items I2, I3, M6)
 **Depends on:** task 44 (shipped `d90082b`+`13fae8e`)
 
 ## Three separate items bundled for cheap parallel fixes
 
-### I2 — `_shared` / shared-lib double-copy foot-gun
+### I2 — `_shared` / shared-lib double-copy foot-gun — **SUPERSEDED by task 54**
 
-`services/cms/base/Dockerfile:99-105` (pre-seed loop) and `services/cms/base/docker/build-extensions.sh:35-39` BOTH run `cp -r "$d" "/directus/extensions/$name"` for shared libs. Second `cp -r` into an existing dir-tree succeeds silently — no `-n` / clobber guard. Works today (content is identical), but latent: if either path ever modifies shared-lib files mid-build, the second copy wins without warning.
+Original concern: pre-seed loop and `build-extensions.sh` both `cp -r` shared libs into `/directus/extensions/`, silently double-copying.
 
-**Fix options:**
-- (A) Make pre-seed skip if `/directus/extensions/$name` already exists: `[ -d "/directus/extensions/$name" ] || cp -r ...`
-- (B) Make `build-extensions.sh` skip the shared-lib copy when the dir is already populated.
+**Status:** moot. Task 54 is a P0 fix for a much worse symptom of the same underlying structural issue — Directus 11.16 strict-fails when ANY `/directus/extensions/*` dir lacks `directus:extension` manifest, silently disabling ALL hook extensions. Task 54's recommended Option A (add no-op `directus:extension` manifests to `_shared` + `feature-gate`) converts both dirs to real Directus extensions, which makes the double-copy concern irrelevant (they'd no longer be special-cased).
 
-Pick A (Dockerfile-side) — keeps the shell script generic.
+If task 54 ships with Option B/C (moving shared libs out of `/directus/extensions/` entirely, or post-build cleanup), I2 also becomes moot because the pre-seed loop would be removed or refactored.
+
+→ Close I2 when task 54 ships. No independent work needed.
 
 ### I3 — Hardcoded `bl-widget`; other `file:packages/*` deps silently fail
 
@@ -43,7 +43,7 @@ Wire into CI (Buddy pipeline from task 35) so image breakage surfaces on PR, not
 
 ## Key Tasks
 
-- [ ] I2: `[ -d "/directus/extensions/$name" ] || cp -r ...` guard in Dockerfile pre-seed loop
+- [x] ~~I2: `[ -d "/directus/extensions/$name" ] || cp -r ...` guard~~ — superseded by task 54
 - [ ] I3: Makefile/CI grep for `file:../../../../../packages/` in extension package.json, cross-check against Dockerfile COPY list
 - [ ] I3: Add convention doc paragraph in `CLAUDE.md` under "Directus CMS Structure"
 - [ ] M6: `make verify-cms-image` + wire into Buddy CI
