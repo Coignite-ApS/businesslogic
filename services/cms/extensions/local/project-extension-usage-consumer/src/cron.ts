@@ -52,19 +52,31 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?:
 		logger.info('[usage-consumer] monthly_aggregates rollup: starting');
 
 		let totalEventsAggregated = 0;
-		let totalAccountsTouched = 0;
-		let totalPeriodsTouched = 0;
+		// Sum across iterations; same account touched in N iterations counts N times — see task 40 code review.
+		// SQL function returns counts only (not IDs), so true distinct dedup is not possible without
+		// schema change. Field names below use *_touches (cumulative) vs *_touched (per-call).
+		let totalAccountTouches = 0;
+		let totalPeriodTouches = 0;
+		let firstIterationLag = 0;
+		let iterations = 0;
+		let lastEventsAggregated = 0;
 
 		try {
 			for (let i = 0; i < MAX_ITERATIONS; i++) {
 				const stats = await runAggregation(db);
+				iterations = i + 1;
+				lastEventsAggregated = stats.events_aggregated;
+
+				if (i === 0) {
+					firstIterationLag = stats.lag_seconds;
+				}
 
 				totalEventsAggregated += stats.events_aggregated;
-				totalAccountsTouched += stats.accounts_touched;
-				totalPeriodsTouched += stats.periods_touched;
+				totalAccountTouches += stats.accounts_touched;
+				totalPeriodTouches += stats.periods_touched;
 
 				logger.info(
-					`[usage-consumer] monthly_aggregates rollup: iteration=${i + 1} ` +
+					`[usage-consumer] monthly_aggregates rollup: iteration=${iterations} ` +
 					`events_aggregated=${stats.events_aggregated} ` +
 					`accounts_touched=${stats.accounts_touched} ` +
 					`periods_touched=${stats.periods_touched} ` +
@@ -79,13 +91,20 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?:
 			logger.info(
 				`[usage-consumer] monthly_aggregates rollup: done — ` +
 				`total_events_aggregated=${totalEventsAggregated} ` +
-				`total_accounts_touched=${totalAccountsTouched} ` +
-				`total_periods_touched=${totalPeriodsTouched}`,
+				`total_account_touches=${totalAccountTouches} ` +
+				`total_period_touches=${totalPeriodTouches} ` +
+				`starting_lag_seconds=${Math.round(firstIterationLag)}`,
 			);
+
+			if (iterations === MAX_ITERATIONS && lastEventsAggregated > 0) {
+				logger.warn(
+					'[usage-consumer] monthly_aggregates rollup: MAX_ITERATIONS reached — backlog still draining, will resume next tick',
+				);
+			}
 
 			// Publish global cache invalidation once at end — formula-api flushes fa:agg:* keys
 			const redis = getRedis ? getRedis() : null;
-			if (redis && totalAccountsTouched > 0) {
+			if (redis && totalAccountTouches > 0) {
 				redis.publish('bl:monthly_aggregates:invalidated', 'ALL').catch(() => {});
 			}
 		} catch (err: any) {

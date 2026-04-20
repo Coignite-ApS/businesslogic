@@ -35,9 +35,6 @@ BEGIN
   END IF;
 
   -- I3: Limit source rows before GROUP BY to cap memory per batch
-  -- I2: Stats come from RETURNING clauses — exact, not time-window heuristic
-  -- C1: calc_unique_calculators NOT populated (not additively decomposable)
-  -- I4: Safe-cast CASE expressions for input_tokens / output_tokens
   WITH events_to_agg AS (
     SELECT id, account_id, occurred_at, event_kind, quantity, cost_eur, metadata
     FROM public.usage_events
@@ -127,9 +124,9 @@ BEGIN
     RETURNING id
   )
   SELECT
-    COALESCE((SELECT COUNT(*) FROM marked), 0),
-    COALESCE((SELECT COUNT(DISTINCT account_id) FROM upserted), 0),
-    COALESCE((SELECT COUNT(*) FROM upserted), 0)
+    (SELECT COUNT(*) FROM marked),
+    (SELECT COUNT(DISTINCT account_id) FROM upserted),
+    (SELECT COUNT(*) FROM upserted)
   INTO v_events_aggregated, v_accounts_touched, v_periods_touched;
 
   RETURN jsonb_build_object(

@@ -1,6 +1,6 @@
 # 39. CMS Docker image rebuild broken — `_shared` extension + Sprint B extensions
 
-**Status:** in-progress (partial fix shipped `d3f9e8c`; rebuild still broken on `ai-assistant`)
+**Status:** completed (dev path) 2026-04-19 — image rebuild split to [task 44](./44-cms-docker-image-rebuild-packages-context.md)
 **Severity:** HIGH — blocks full CMS rebuild + browser verification of all Sprint B UI work (cms/36, cms/37) and any future CMS image ship
 **Source:** Surfaced while verifying Sprint B tasks 36 + 37 (impl-37 report 2026-04-19); expanded scope during task-39 investigation 2026-04-19
 **Blocks:** browser-QA of Sprint B, Sprint 3 production deploy (task 28)

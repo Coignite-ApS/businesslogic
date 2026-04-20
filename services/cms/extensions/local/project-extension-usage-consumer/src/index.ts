@@ -27,6 +27,7 @@ export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	let redis: Redis | null = null;
 	let running = false;
 	let stopRequested = false;
+	let bootTimer: NodeJS.Timeout | null = null;
 
 	init('app.before', async () => {
 		try {
@@ -62,7 +63,8 @@ export default defineHook(({ init, schedule }, { env, logger, database }) => {
 
 	// On-boot run: deferred 30s so CMS becomes healthy immediately (I5 fix)
 	init('app.after', () => {
-		setTimeout(() => {
+		bootTimer = setTimeout(() => {
+			bootTimer = null;
 			runAggregation().catch((err: any) => {
 				logger.error(`[usage-consumer] on-boot aggregation failed: ${err?.message || err}`);
 			});
@@ -72,11 +74,13 @@ export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	// Hourly cron: 0 * * * * — keep quota view fresh for task 22 enforcement
 	schedule('0 * * * *', runAggregation);
 
-	// Graceful shutdown: attempt to stop the loop
+	// Graceful shutdown: attempt to stop the loop and cancel pending boot timer
 	process.on('SIGTERM', () => {
+		if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
 		stopRequested = true;
 	});
 	process.on('SIGINT', () => {
+		if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
 		stopRequested = true;
 	});
 
