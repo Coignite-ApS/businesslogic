@@ -39,7 +39,8 @@ CSV
 )
 
 mkdir -p "$(dirname "$LOG")"
-echo "# add-missing-relations @ $(date -u +%FT%TZ)" | tee -a "$LOG"
+label=""; [[ "$DRY_RUN" == "1" ]] && label=" (DRY-RUN)"
+echo "# add-missing-relations @ $(date -u +%FT%TZ)${label}" | tee -a "$LOG"
 echo "# path: SQL INSERT into directus_relations (Directus 11.16.1 POST/PATCH bugs out when FK already exists)" | tee -a "$LOG"
 
 MANIFEST_LINES=$(printf '%s\n' "$MANIFEST" | tail -n +2 | wc -l | tr -d ' ')

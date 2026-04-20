@@ -16,7 +16,8 @@ source "$(dirname "$0")/_directus-common.sh"
 TARGETS=(monthly_aggregates api_key_usage)
 
 mkdir -p "$(dirname "$LOG")"
-echo "# remove-composite-pk-collections @ $(date -u +%FT%TZ)${DRY_RUN:+ (DRY-RUN)}" | tee -a "$LOG"
+label=""; [[ "$DRY_RUN" == "1" ]] && label=" (DRY-RUN)"
+echo "# remove-composite-pk-collections @ $(date -u +%FT%TZ)${label}" | tee -a "$LOG"
 
 # =============================================================================
 # PREFLIGHT SAFETY GATES — abort on any deviation
