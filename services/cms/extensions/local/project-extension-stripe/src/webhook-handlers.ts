@@ -184,6 +184,7 @@ export async function syncAllProducts(
 
 export async function handleCheckoutCompleted(
 	session: Stripe.Checkout.Session,
+	stripe: Stripe,
 	db: DB,
 	logger: any,
 ): Promise<void> {
@@ -203,6 +204,22 @@ export async function handleCheckoutCompleted(
 		return;
 	}
 
+	// Fetch the Stripe subscription to get accurate status, period dates, and trial dates.
+	// The checkout.session.completed event only has the subscription ID, not the full object.
+	let stripeSub: Stripe.Subscription;
+	try {
+		stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+	} catch (err: any) {
+		logger.error(`checkout.session.completed: failed to retrieve Stripe subscription ${subscriptionId}: ${err.message}`);
+		return;
+	}
+
+	const subStatus = STATUS_MAP[stripeSub.status] || stripeSub.status;
+	const periodStart = new Date(stripeSub.current_period_start * 1000).toISOString();
+	const periodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
+	const trialStart = stripeSub.trial_start ? new Date(stripeSub.trial_start * 1000).toISOString() : null;
+	const trialEnd = stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null;
+
 	// Lookup target plan by (module, tier, status='published')
 	const plan = await db('subscription_plans')
 		.where('module', module)
@@ -215,9 +232,9 @@ export async function handleCheckoutCompleted(
 		return;
 	}
 
-	// Single transaction: cancel any other non-terminal subs for this (account,module)
-	// then upsert the active one. The partial unique index
-	// `subscriptions_unique_active_per_module` enforces invariant.
+	// Single transaction: upsert the subscription row.
+	// The partial unique index `subscriptions_unique_active_per_module`
+	// enforces at most one non-terminal sub per (account, module).
 	await db.transaction(async (trx: DB) => {
 		const existing = await trx('subscriptions')
 			.where('account_id', accountId)
@@ -229,10 +246,14 @@ export async function handleCheckoutCompleted(
 		const baseUpdate: Record<string, any> = {
 			subscription_plan_id: plan.id,
 			tier,
-			status: 'active',
+			status: subStatus,
 			billing_cycle: billingCycle,
 			stripe_customer_id: customerId,
 			stripe_subscription_id: subscriptionId,
+			current_period_start: periodStart,
+			current_period_end: periodEnd,
+			trial_start: trialStart,
+			trial_end: trialEnd,
 			date_updated: nowIso,
 		};
 
@@ -246,17 +267,26 @@ export async function handleCheckoutCompleted(
 			const [row] = await trx.raw(
 				`INSERT INTO public.subscriptions (
 					id, account_id, subscription_plan_id, module, tier, status, billing_cycle,
-					stripe_customer_id, stripe_subscription_id, date_created, date_updated
+					stripe_customer_id, stripe_subscription_id,
+					current_period_start, current_period_end, trial_start, trial_end,
+					date_created, date_updated
 				) VALUES (
-					gen_random_uuid(), ?, ?, ?, ?, 'active', ?, ?, ?, now(), ?
+					gen_random_uuid(), ?, ?, ?, ?, ?, ?,
+					?, ?, ?, ?, ?, ?,
+					now(), ?
 				) RETURNING id`,
-				[accountId, plan.id, module, tier, billingCycle, customerId, subscriptionId, nowIso],
+				[
+					accountId, plan.id, module, tier, subStatus, billingCycle,
+					customerId, subscriptionId,
+					periodStart, periodEnd, trialStart, trialEnd,
+					nowIso,
+				],
 			).then((r: any) => r.rows ?? r[0]?.rows ?? r);
-			logger.info(`Created subscription row ${row?.id ?? '<id>'} for account=${accountId} module=${module} tier=${tier}`);
+			logger.info(`Created subscription row ${row?.id ?? '<id>'} for account=${accountId} module=${module} tier=${tier} status=${subStatus}`);
 		}
 	});
 
-	logger.info(`Subscription activated for account=${accountId} module=${module} tier=${tier} stripe_sub=${subscriptionId}`);
+	logger.info(`Subscription activated for account=${accountId} module=${module} tier=${tier} stripe_sub=${subscriptionId} status=${subStatus}`);
 }
 
 // ────────────────────────────────────────────────────────────────────────────

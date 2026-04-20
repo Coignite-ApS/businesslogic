@@ -461,12 +461,11 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 				return res.status(500).json({ errors: [{ message: 'Webhook secret not configured' }] });
 			}
 
-			// Collect raw body for signature verification
-			const chunks: Buffer[] = [];
-			for await (const chunk of req) {
-				chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-			}
-			const rawBody = Buffer.concat(chunks);
+			// Directus pre-reads the body via express.json() verify callback, storing
+			// the raw buffer in req.rawBody. The stream is already consumed by the time
+			// this handler runs — reading it again via for await yields nothing and
+			// causes signature verification to fail with empty body.
+			const rawBody: Buffer = req.rawBody;
 			const sig = req.headers['stripe-signature'];
 
 			let event;
@@ -481,7 +480,7 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 				await withIdempotency(db, event, logger, async () => {
 					switch (event.type) {
 						case 'checkout.session.completed':
-							await handleCheckoutCompleted(event.data.object as any, db, logger);
+							await handleCheckoutCompleted(event.data.object as any, stripe, db, logger);
 							break;
 						case 'customer.subscription.updated':
 							await handleSubscriptionUpdated(event.data.object as any, db, logger);

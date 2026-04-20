@@ -5,12 +5,13 @@
  * webhook-handlers.ts by calling them directly with a controlled mock DB.
  *
  * Covers:
- *  1. checkout.session.completed for calculators/growth → 1 subscriptions row
+ *  1. checkout.session.completed for calculators/growth → 1 subscriptions row (trialing)
  *  2. Same account, different module (kb/starter) → 2nd row (different module)
  *  3. Same account + same module (calculators/growth) again → row UPDATED, not duplicated
  *     (partial unique index behaviour: one active sub per account+module)
  *  4. Cancel calculators sub → status='canceled', row preserved (history)
  *  5. Re-activate calculators (new checkout) → NEW row created (history preserves old)
+ *  6. status derives from Stripe subscription (trialing when trial_end set)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -30,6 +31,10 @@ type SubRow = {
 	billing_cycle: string | null;
 	stripe_customer_id: string | null;
 	stripe_subscription_id: string | null;
+	current_period_start: string | null;
+	current_period_end: string | null;
+	trial_start: string | null;
+	trial_end: string | null;
 	date_updated: string | null;
 };
 
@@ -50,10 +55,14 @@ function createMockDb(state: MockState) {
 		const normalized = sql.replace(/\s+/g, ' ').trim().toLowerCase();
 
 		if (normalized.includes('insert into public.subscriptions')) {
-			// Extract positional bindings:
-			// VALUES (gen_random_uuid(), accountId, planId, module, tier, ?, ?, ?, now(), ?)
-			// bindings: [accountId, planId, module, tier, billingCycle, customerId, subscriptionId, nowIso]
-			const [accountId, planId, module, tier, billingCycle, customerId, subscriptionId] = bindings;
+			// New binding order (after fix):
+			// [accountId, planId, module, tier, status, billingCycle,
+			//  customerId, subscriptionId,
+			//  periodStart, periodEnd, trialStart, trialEnd,
+			//  nowIso]
+			const [accountId, planId, module, tier, status, billingCycle,
+				customerId, subscriptionId,
+				periodStart, periodEnd, trialStart, trialEnd] = bindings;
 			const id = `sub-${++state.idCounter}`;
 			const row: SubRow = {
 				id,
@@ -61,11 +70,15 @@ function createMockDb(state: MockState) {
 				subscription_plan_id: planId,
 				module,
 				tier,
-				status: 'active',
+				status,
 				billing_cycle: billingCycle,
 				stripe_customer_id: customerId,
 				stripe_subscription_id: subscriptionId,
-				date_updated: bindings[7] ?? null,
+				current_period_start: periodStart ?? null,
+				current_period_end: periodEnd ?? null,
+				trial_start: trialStart ?? null,
+				trial_end: trialEnd ?? null,
+				date_updated: null,
 			};
 			state.subscriptions.push(row);
 			return { rows: [{ id }] };
@@ -148,7 +161,7 @@ function makeChain(tbl: string, state: MockState) {
 		return 1;
 	});
 
-	chain.insert = vi.fn(async (row: any) => {
+	chain.insert = vi.fn(async (_row: any) => {
 		return [1];
 	});
 
@@ -162,6 +175,35 @@ function makeLogger() {
 		error: vi.fn(),
 		debug: vi.fn(),
 	};
+}
+
+/**
+ * Create a mock Stripe client that returns a subscription object when retrieved.
+ * Default: trialing status with a trial period.
+ */
+function makeMockStripe(opts: {
+	status?: string;
+	trialStart?: number | null;
+	trialEnd?: number | null;
+} = {}) {
+	const now = Math.floor(Date.now() / 1000);
+	const trialEnd = opts.trialEnd !== undefined ? opts.trialEnd : now + 14 * 86400;
+	const trialStart = opts.trialStart !== undefined ? opts.trialStart : now;
+	const status = opts.status ?? (trialEnd ? 'trialing' : 'active');
+
+	return {
+		subscriptions: {
+			retrieve: vi.fn(async (_id: string) => ({
+				id: _id,
+				status,
+				current_period_start: now,
+				current_period_end: now + 30 * 86400,
+				trial_start: trialStart,
+				trial_end: trialEnd,
+				items: { data: [] },
+			})),
+		},
+	} as any;
 }
 
 /** Build a checkout.session.completed Stripe event session */
@@ -195,6 +237,7 @@ describe('26.4 — multi-module subscription integration', () => {
 	let state: MockState;
 	let db: any;
 	let logger: ReturnType<typeof makeLogger>;
+	let stripe: ReturnType<typeof makeMockStripe>;
 	const ACCOUNT_ID = 'acc-multi-test';
 
 	beforeEach(() => {
@@ -208,11 +251,12 @@ describe('26.4 — multi-module subscription integration', () => {
 		};
 		db = createMockDb(state);
 		logger = makeLogger();
+		stripe = makeMockStripe(); // default: trialing with 14-day trial
 	});
 
 	// ── Scenario 1: first module activation ───────────────────
 
-	it('creates one subscription row for calculators/growth', async () => {
+	it('creates one subscription row for calculators/growth with trialing status', async () => {
 		const session = makeCheckoutSession({
 			accountId: ACCOUNT_ID,
 			module: 'calculators',
@@ -220,14 +264,34 @@ describe('26.4 — multi-module subscription integration', () => {
 			subscriptionId: 'sub_calc_001',
 		});
 
-		await handleCheckoutCompleted(session, db, logger);
+		await handleCheckoutCompleted(session, stripe, db, logger);
 
 		expect(state.subscriptions).toHaveLength(1);
 		const sub = state.subscriptions[0];
 		expect(sub.module).toBe('calculators');
 		expect(sub.tier).toBe('growth');
-		expect(sub.status).toBe('active');
+		expect(sub.status).toBe('trialing'); // derived from Stripe subscription status
 		expect(sub.account_id).toBe(ACCOUNT_ID);
+		expect(sub.trial_end).not.toBeNull(); // trial_end populated from Stripe
+		expect(sub.current_period_end).not.toBeNull(); // period dates populated
+	});
+
+	// ── Scenario 1b: active (no trial) ───────────────────────
+
+	it('sets status=active when Stripe subscription has no trial', async () => {
+		const activeStripe = makeMockStripe({ status: 'active', trialStart: null, trialEnd: null });
+		const session = makeCheckoutSession({
+			accountId: ACCOUNT_ID,
+			module: 'calculators',
+			tier: 'growth',
+			subscriptionId: 'sub_calc_notrial',
+		});
+
+		await handleCheckoutCompleted(session, activeStripe, db, logger);
+
+		expect(state.subscriptions).toHaveLength(1);
+		expect(state.subscriptions[0].status).toBe('active');
+		expect(state.subscriptions[0].trial_end).toBeNull();
 	});
 
 	// ── Scenario 2: second module ─────────────────────────────
@@ -240,7 +304,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'growth',
 			subscriptionId: 'sub_calc_001',
 		});
-		await handleCheckoutCompleted(sess1, db, logger);
+		await handleCheckoutCompleted(sess1, stripe, db, logger);
 
 		// Second: kb (different module)
 		const sess2 = makeCheckoutSession({
@@ -249,7 +313,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'starter',
 			subscriptionId: 'sub_kb_001',
 		});
-		await handleCheckoutCompleted(sess2, db, logger);
+		await handleCheckoutCompleted(sess2, stripe, db, logger);
 
 		// Two distinct rows, different modules
 		expect(state.subscriptions).toHaveLength(2);
@@ -267,7 +331,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'growth',
 			subscriptionId: 'sub_calc_001',
 		});
-		await handleCheckoutCompleted(sess1, db, logger);
+		await handleCheckoutCompleted(sess1, stripe, db, logger);
 		expect(state.subscriptions).toHaveLength(1);
 		const originalId = state.subscriptions[0].id;
 
@@ -278,7 +342,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'growth',
 			subscriptionId: 'sub_calc_002', // new stripe sub ID
 		});
-		await handleCheckoutCompleted(sess2, db, logger);
+		await handleCheckoutCompleted(sess2, stripe, db, logger);
 
 		// MUST still be 1 row (partial unique index behaviour: one active per module)
 		const activeSubs = state.subscriptions.filter(
@@ -298,7 +362,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'growth',
 			subscriptionId: 'sub_calc_001',
 		});
-		await handleCheckoutCompleted(sess, db, logger);
+		await handleCheckoutCompleted(sess, stripe, db, logger);
 		expect(state.subscriptions).toHaveLength(1);
 		const subId = state.subscriptions[0].id;
 
@@ -325,7 +389,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'growth',
 			subscriptionId: 'sub_calc_001',
 		});
-		await handleCheckoutCompleted(sess1, db, logger);
+		await handleCheckoutCompleted(sess1, stripe, db, logger);
 
 		// Cancel
 		const stripeSubscription = { id: 'sub_calc_001', items: { data: [] } } as any;
@@ -339,12 +403,12 @@ describe('26.4 — multi-module subscription integration', () => {
 			tier: 'growth',
 			subscriptionId: 'sub_calc_002',
 		});
-		await handleCheckoutCompleted(sess2, db, logger);
+		await handleCheckoutCompleted(sess2, stripe, db, logger);
 
-		// History: 2 rows total. 1 canceled, 1 active.
+		// History: 2 rows total. 1 canceled, 1 trialing.
 		expect(state.subscriptions).toHaveLength(2);
 		const canceledRows = state.subscriptions.filter(s => s.status === 'canceled');
-		const activeRows = state.subscriptions.filter(s => s.status === 'active');
+		const activeRows = state.subscriptions.filter(s => s.status !== 'canceled' && s.status !== 'expired');
 		expect(canceledRows).toHaveLength(1);
 		expect(activeRows).toHaveLength(1);
 		expect(canceledRows[0].stripe_subscription_id).toBe('sub_calc_001');
@@ -361,7 +425,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			metadata: {}, // no account_id / module / tier
 		} as any;
 
-		await handleCheckoutCompleted(session, db, logger);
+		await handleCheckoutCompleted(session, stripe, db, logger);
 
 		expect(state.subscriptions).toHaveLength(0);
 		expect(logger.warn).toHaveBeenCalledWith(
@@ -377,8 +441,23 @@ describe('26.4 — multi-module subscription integration', () => {
 			metadata: { account_id: ACCOUNT_ID, module: 'calculators', tier: 'growth' },
 		} as any;
 
-		await handleCheckoutCompleted(session, db, logger);
+		await handleCheckoutCompleted(session, stripe, db, logger);
 
 		expect(state.subscriptions).toHaveLength(0);
+	});
+
+	// ── New: stripe.subscriptions.retrieve called with correct ID ──
+
+	it('calls stripe.subscriptions.retrieve with the subscriptionId from session', async () => {
+		const session = makeCheckoutSession({
+			accountId: ACCOUNT_ID,
+			module: 'calculators',
+			tier: 'growth',
+			subscriptionId: 'sub_verify_retrieve',
+		});
+
+		await handleCheckoutCompleted(session, stripe, db, logger);
+
+		expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_verify_retrieve');
 	});
 });
