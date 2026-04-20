@@ -114,6 +114,7 @@ export interface WebhookHealth {
   counters_24h: {
     success: number;
     failures: Record<string, number>;
+    reconciled: number; // Task 57 — nightly reconciliation cron activity
     total: number;
   };
   banner: {

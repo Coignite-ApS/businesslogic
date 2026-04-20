@@ -66,11 +66,31 @@
 							<div class="kpi-value">{{ totalFailures }}</div>
 						</div>
 					</div>
+					<div v-if="(data.counters_24h.reconciled ?? 0) > 0" class="kpi-card kpi-card-reconcile">
+						<div class="kpi-icon kpi-icon-reconcile"><v-icon name="sync" /></div>
+						<div class="kpi-body">
+							<div class="kpi-label">Reconciled (24h)</div>
+							<div class="kpi-value">{{ data.counters_24h.reconciled }}</div>
+						</div>
+					</div>
 					<div class="kpi-card">
 						<div class="kpi-icon"><v-icon name="summarize" /></div>
 						<div class="kpi-body">
 							<div class="kpi-label">Total (24h)</div>
 							<div class="kpi-value">{{ data.counters_24h.total }}</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Reconciliation activity (Task 57) -->
+				<div v-if="(data.counters_24h.reconciled ?? 0) > 0" class="section">
+					<div class="section-title">Reconciliation activity (24h)</div>
+					<div class="reconcile-card">
+						<v-icon name="info" class="reconcile-icon" />
+						<div class="reconcile-body">
+							<strong>{{ data.counters_24h.reconciled }} row(s)</strong> were synthetically recovered by the nightly reconciliation cron.
+							This means webhook events were missed (e.g. CMS was down during Stripe delivery) and have now been repaired.
+							Check <code>stripe_webhook_log</code> where <code>status = 'reconciled'</code> for details.
 						</div>
 					</div>
 				</div>
@@ -243,6 +263,8 @@ function statusMeaning(status: string): string {
 			return 'Missing required metadata';
 		case '500':
 			return 'Handler error (backend)';
+		case 'reconciled':
+			return 'Recovered by nightly reconciliation cron (missed webhook)';
 		default:
 			return status;
 	}
@@ -397,6 +419,8 @@ function timeAgo(iso: string): string {
 
 .kpi-icon-ok { background: rgba(46, 174, 93, 0.12); color: var(--theme--success, #2eae5d); }
 .kpi-icon-bad { background: rgba(227, 81, 105, 0.12); color: var(--theme--danger, #e35169); }
+.kpi-icon-reconcile { background: rgba(97, 154, 220, 0.12); color: var(--theme--primary, #619adc); }
+.kpi-card-reconcile { border-color: var(--theme--primary, #619adc); }
 
 .kpi-body { flex: 1; min-width: 0; }
 
@@ -413,6 +437,35 @@ function timeAgo(iso: string): string {
 	font-weight: 700;
 	color: var(--theme--foreground);
 	line-height: 1.2;
+}
+
+/* Reconciliation activity card */
+.reconcile-card {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 14px 18px;
+	border: 1px solid var(--theme--primary, #619adc);
+	border-radius: var(--theme--border-radius);
+	background: rgba(97, 154, 220, 0.06);
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--theme--foreground);
+}
+
+.reconcile-icon {
+	--v-icon-size: 20px;
+	color: var(--theme--primary, #619adc);
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.reconcile-body code {
+	background: var(--theme--background-subdued);
+	padding: 1px 4px;
+	border-radius: 3px;
+	font-size: 11px;
+	font-family: var(--theme--fonts--mono--font-family, monospace);
 }
 
 /* Detail card */

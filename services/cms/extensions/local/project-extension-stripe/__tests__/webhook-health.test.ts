@@ -150,7 +150,7 @@ describe('computeWebhookHealth', () => {
 
 		expect(h.last_success).toBeNull();
 		expect(h.last_failure).toBeNull();
-		expect(h.counters_24h).toEqual({ success: 0, failures: {}, total: 0 });
+		expect(h.counters_24h).toEqual({ success: 0, failures: {}, reconciled: 0, total: 0 });
 		expect(h.banner.state).toBe('neutral');
 	});
 

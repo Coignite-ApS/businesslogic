@@ -35,6 +35,7 @@ export interface WebhookHealth {
 	counters_24h: {
 		success: number;
 		failures: Record<string, number>; // keyed by status, e.g. '400_signature'
+		reconciled: number; // Task 57 — rows written by the reconciliation cron
 		total: number;
 	};
 	banner: {
@@ -81,11 +82,13 @@ export async function computeWebhookHealth(
 
 	let success24h = 0;
 	const failures24h: Record<string, number> = {};
+	let reconciled24h = 0;
 	let total24h = 0;
 	for (const r of statusRows ?? []) {
 		const n = typeof r.count === 'string' ? parseInt(r.count, 10) : Number(r.count);
 		total24h += n;
 		if (r.status === '200') success24h = n;
+		else if (r.status === 'reconciled') reconciled24h = n; // Task 57 — not a failure
 		else failures24h[r.status] = n;
 	}
 
@@ -134,6 +137,7 @@ export async function computeWebhookHealth(
 		counters_24h: {
 			success: success24h,
 			failures: failures24h,
+			reconciled: reconciled24h,
 			total: total24h,
 		},
 		banner,

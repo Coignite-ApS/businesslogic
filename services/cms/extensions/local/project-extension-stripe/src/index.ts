@@ -19,6 +19,7 @@ import { buildRefreshQuotasHooks, buildRefreshAllQuotasCron } from './hooks/refr
 import { registerWebhookHealthRoute } from './webhook-health.js';
 import { validateWebhookSecret } from './startup-validation.js';
 import { createWebhookRouteHandler } from './webhook-route.js';
+import { buildReconcileCron, resolveReconcileCron } from './reconciliation-cron.js';
 import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
@@ -310,6 +311,25 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 	validateWebhookSecret({ webhookSecret, logger });
 
 	const stripe = getStripe(stripeKey);
+
+	// ─── Task 57: Stripe reconciliation nightly cron ────────
+	//
+	// Polls Stripe for recent subscriptions and wallet-topup PaymentIntents,
+	// then checks local DB. Synthetically creates any rows that were missed
+	// due to webhook delivery failures. Logs every recovery to stripe_webhook_log
+	// with status='reconciled' so ops sees it in the Billing Health panel.
+	//
+	// Schedule: STRIPE_RECONCILE_CRON env (default: '0 3 * * *' = 3 AM UTC).
+
+	const reconcileCronExpr = resolveReconcileCron(env as Record<string, unknown>);
+	const reconcileCron = buildReconcileCron({
+		stripe,
+		db,
+		logger,
+		env: env as Record<string, unknown>,
+	});
+	schedule(reconcileCronExpr, reconcileCron);
+	logger.info(`[stripe-reconcile] nightly reconciliation cron registered (${reconcileCronExpr})`);
 
 	// ─── Auto-reload consumer (every minute) ────────────────
 	//
