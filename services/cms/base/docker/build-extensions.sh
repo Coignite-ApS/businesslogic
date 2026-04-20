@@ -29,11 +29,13 @@ for SRC_DIR in "$@"; do
         if [ -d "$ext_dir" ] && [ -f "$ext_dir/package.json" ]; then
             name=$(basename "$ext_dir")
 
-            # Directories without a directus:extension manifest are shared libraries.
-            # Copy them in-place (siblings to built extensions) so relative imports resolve,
-            # but do NOT try to build them with `directus-extension build`.
+            # Shared libraries carry a no-op directus:extension bundle manifest
+            # (see bl:shared-lib convention). They are pre-seeded by the Dockerfile
+            # before this script runs. Build them normally — their no-op entries []
+            # produce dist/app.js + dist/api.js which the post-build check accepts.
             if ! grep -q '"directus:extension"' "$ext_dir/package.json"; then
-                echo "Copying $name (shared library — no directus:extension manifest)"
+                # Legacy path: truly manifest-less dir — copy in-place and skip build.
+                echo "Copying $name (no directus:extension manifest)"
                 cp -r "$ext_dir" "/directus/extensions/$name"
                 continue
             fi
