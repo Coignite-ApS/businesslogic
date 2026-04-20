@@ -2,6 +2,7 @@
   "name": "@businesslogic/cms-shared",
   "version": "1.0.0",
   "private": true,
+  "bl:shared-lib": true,
   "type": "module",
   "directus:extension": {
     "host": "^11.0.0",

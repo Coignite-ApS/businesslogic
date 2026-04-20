@@ -356,7 +356,7 @@ services/cms/
 │
 ├── extensions/
 │   ├── local/                   # Project-specific extensions (18 extensions + 2 shared libs)
-│   │   ├── _shared/                            # Shared lib: v2-subscription helpers (not a Directus extension — skipped by build script)
+│   │   ├── _shared/                            # Shared lib: v2-subscription helpers (no-op Directus bundle manifest — see Shared Library Convention)
 │   │   ├── project-extension-calculators/      # Module: calculator admin UI
 │   │   ├── project-extension-calculator-api/   # Hook: formula API proxy
 │   │   ├── project-extension-admin/            # Module: admin dashboard
@@ -372,12 +372,10 @@ services/cms/
 │   │   ├── project-extension-knowledge/        # Module: KB management UI
 │   │   ├── project-extension-layout-builder/   # Module: widget layout builder
 │   │   ├── project-extension-feature-flags/    # Hook: feature flag gating
-│   │   ├── project-extension-feature-gate/     # Shared lib: feature flag client (not a Directus extension)
+│   │   ├── project-extension-feature-gate/     # Shared lib: feature flag client (no-op Directus bundle manifest — see Shared Library Convention)
 │   │   ├── project-extension-widget-api/       # Hook: widget endpoints
 │   │   ├── project-extension-usage-consumer/   # Hook: usage_events stream consumer + monthly_aggregates cron (Sprint B)
 │   │   └── project-extension-stripe/           # Hook: billing + wallet + quota refresh (Sprint B)
-│
-│   **Shared lib convention:** `_shared/` and `project-extension-feature-gate/` are NOT real extensions — they're build-time helpers whose imports are inlined into consumers at bundle time. They carry a no-op `directus:extension` bundle manifest (`type: "bundle", entries: []`) with pre-built empty `dist/app.js` and `dist/api.js` stubs (checked into git). This is required: Directus 11.16 Zod-validates every directory under `/directus/extensions/` and fails the entire hook layer on any invalid manifest. Any new shared lib MUST follow the same pattern.
 │   └── package.json             # NPM extension dependencies
 │
 ├── config.local.yaml            # Local dev config
@@ -412,6 +410,25 @@ services/cms/
 | project-extension-feature-flags | Hook | Feature flag gating endpoints |
 | project-extension-widget-api | Hook | Widget endpoints |
 | project-extension-usage-consumer | Hook | Drains `bl:usage_events:in` Redis stream → `public.usage_events` INSERT; hourly `aggregate_usage_events()` rollup cron |
+
+### Shared Library Convention
+
+Project-local shared libraries (`_shared/`, `project-extension-feature-gate/`) — code imported at build time by multiple extensions but not registering any runtime routes — MUST:
+
+1. Add a no-op `directus:extension` bundle manifest to `package.json`:
+   ```json
+   "directus:extension": {
+     "host": "^11.0.0",
+     "type": "bundle",
+     "path": { "app": "dist/app.js", "api": "dist/api.js" },
+     "entries": []
+   }
+   ```
+2. Commit minimal stub `dist/app.js` and `dist/api.js` files (with a local `.gitignore` that negates the root `dist/` exclusion).
+3. Add `@directus/extensions-sdk` to `devDependencies`.
+4. Add a top-level `"bl:shared-lib": true` marker so the Docker pre-seed copies them to `/directus/extensions/` BEFORE other extensions build (avoids Rollup alphabetical-ordering failures).
+
+Why: Directus 11.16's `ExtensionManager.load` strict-validates every directory under `/directus/extensions/`. A missing `directus:extension` field disables the entire hook layer. See task 54 for the full incident.
 
 ## Critical Data Collections (PostgreSQL)
 
