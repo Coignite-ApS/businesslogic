@@ -248,14 +248,15 @@ export function useAccount(api: any) {
 		}
 	}
 
-	// v2 checkout: accepts { module, tier, billing_cycle }.
-	async function startCheckout(args: { module: Module; tier: string; billing_cycle?: 'monthly' | 'annual' }) {
+	// v2 checkout: accepts { module, tier, billing_cycle, source }.
+	async function startCheckout(args: { module: Module; tier: string; billing_cycle?: 'monthly' | 'annual'; source?: 'onboarding' | 'subscription' }) {
 		error.value = null;
 		try {
 			const { data } = await api.post('/stripe/checkout', {
 				module: args.module,
 				tier: args.tier,
 				billing_cycle: args.billing_cycle || 'monthly',
+				source: args.source || 'subscription',
 			});
 			if (data.url) {
 				window.location.href = data.url;

@@ -14,6 +14,10 @@
 		</template>
 
 		<div class="module-content" v-if="activeAccountId">
+			<v-notice v-if="returnNotice" :type="returnNotice.type" class="return-notice" dismissible @dismiss="returnNotice = null">
+				{{ returnNotice.message }}
+			</v-notice>
+
 			<p v-if="isTrialing && trialDaysLeft > 0" class="trial-note">
 				Trial: {{ trialDaysLeft }} day{{ trialDaysLeft !== 1 ? 's' : '' }} remaining (earliest)
 			</p>
@@ -112,6 +116,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
+import { useRoute, useRouter } from 'vue-router';
 import { useAccount } from '../composables/use-account';
 import type { Module, SubscriptionPlan } from '../types';
 import AccountNavigation from '../components/account-navigation.vue';
@@ -119,6 +124,9 @@ import AccountSelector from '../components/account-selector.vue';
 import SubscriptionInfo from '../components/subscription-info.vue';
 
 const api = useApi();
+const route = useRoute();
+const router = useRouter();
+
 const {
 	accounts, activeAccountId, subscriptionsByModule, wallet, monthlyTotalEur,
 	plans, loading, error,
@@ -130,6 +138,29 @@ const {
 const checkingOut = ref<string | null>(null);
 const activationVisible = ref(false);
 const activationModule = ref<Module | null>(null);
+
+// Return-URL notice — set from Stripe redirect query params, cleared after display.
+const returnNotice = ref<{ type: 'success' | 'info'; message: string } | null>(null);
+
+function consumeReturnParams() {
+	const { activated, cancelled, topup, amount } = route.query as Record<string, string>;
+	if (activated) {
+		const label = activated.charAt(0).toUpperCase() + activated.slice(1);
+		returnNotice.value = { type: 'success', message: `Your ${label} subscription is active` };
+	} else if (cancelled) {
+		returnNotice.value = { type: 'info', message: `Checkout cancelled — you weren't charged` };
+	} else if (topup === 'success' && amount) {
+		returnNotice.value = { type: 'success', message: `€${amount} added to your AI Wallet` };
+	} else if (topup === 'success') {
+		returnNotice.value = { type: 'success', message: `Wallet top-up successful` };
+	} else if (topup === 'cancelled') {
+		returnNotice.value = { type: 'info', message: `Top-up cancelled — you weren't charged` };
+	}
+	if (activated || cancelled || topup) {
+		// Clean query params so refresh doesn't re-fire the notice.
+		router.replace({ query: {} });
+	}
+}
 
 const MODULE_LABELS: Record<Module, string> = {
 	calculators: 'Calculators',
@@ -193,7 +224,7 @@ async function handleActivate(mod: Module) {
 
 async function handleCheckout(plan: SubscriptionPlan, cycle: 'monthly' | 'annual') {
 	checkingOut.value = `${plan.id}-${cycle}`;
-	await startCheckout({ module: plan.module, tier: plan.tier, billing_cycle: cycle });
+	await startCheckout({ module: plan.module, tier: plan.tier, billing_cycle: cycle, source: 'subscription' });
 	checkingOut.value = null;
 }
 
@@ -217,6 +248,7 @@ watch(activeAccountId, () => {
 });
 
 onMounted(async () => {
+	consumeReturnParams();
 	await fetchAccounts();
 	await Promise.all([fetchSubscription(), fetchWallet(), fetchPlans()]);
 });
@@ -239,6 +271,10 @@ onMounted(async () => {
 	align-items: center;
 	justify-content: center;
 	height: 400px;
+}
+
+.return-notice {
+	margin-bottom: 16px;
 }
 
 .trial-note {

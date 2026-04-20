@@ -161,8 +161,8 @@ export async function createWalletTopupCheckout(opts: {
 		customer: customerId,
 		mode: 'payment',
 		line_items: [lineItem],
-		success_url: `${publicUrl}/admin/content/account?wallet_topup=success`,
-		cancel_url: `${publicUrl}/admin/content/account?wallet_topup=cancelled`,
+		success_url: `${publicUrl}/admin/account/subscription?topup=success&amount=${amountEur.toFixed(2)}`,
+		cancel_url: `${publicUrl}/admin/account/subscription?topup=cancelled`,
 		metadata: {
 			account_id: accountId,
 			pricing_version: 'v2',

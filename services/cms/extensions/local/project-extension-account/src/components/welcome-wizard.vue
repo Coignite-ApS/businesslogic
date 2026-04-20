@@ -291,7 +291,7 @@ async function handleActivate() {
 	if (!mod) return;
 	activating.value = true;
 	// startCheckout redirects to Stripe; wizard returns via ?success=true&module=X
-	await startCheckout({ module: mod, tier: 'starter', billing_cycle: 'monthly' });
+	await startCheckout({ module: mod, tier: 'starter', billing_cycle: 'monthly', source: 'onboarding' });
 	activating.value = false;
 }
 

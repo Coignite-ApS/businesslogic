@@ -1,6 +1,6 @@
 # 51. 🟠 P1: Stripe Checkout return URLs wrong + no success page
 
-**Status:** planned
+**Status:** completed
 **Severity:** P1 — activation funnel UX broken; user pays but has no confirmation
 **Source:** ux-tester 2026-04-20 (Sarah persona, full report: `docs/reports/ux-test-2026-04-20-sarah-billing.md`)
 **Blocks:** activation funnel Score(I) and wallet+billing Score(J) below 3/5
@@ -73,11 +73,11 @@ Shows:
 
 ## Acceptance
 
-- [ ] Onboarding-wizard Stripe Checkout success → returns to wizard step 3 (confirmation)
-- [ ] Manual subscription-page Checkout success → returns to subscription page with visible toast
-- [ ] Wallet top-up Checkout success → returns to subscription page with "added to wallet" toast
-- [ ] Checkout cancellation → returns with clear "you weren't charged" copy
-- [ ] No `/admin/content/*` URLs appear as Checkout return destinations
+- [x] Onboarding-wizard Stripe Checkout success → returns to wizard step 3 (`/admin/account/onboarding?success=true&module=X`)
+- [x] Manual subscription-page Checkout success → returns to subscription page with visible toast (`?activated=X`)
+- [x] Wallet top-up Checkout success → returns to subscription page with "added to wallet" toast (`?topup=success&amount=X`)
+- [x] Checkout cancellation → returns with clear "you weren't charged" copy/toast
+- [x] No `/admin/content/*` URLs appear as Checkout return destinations
 
 ## Estimate
 

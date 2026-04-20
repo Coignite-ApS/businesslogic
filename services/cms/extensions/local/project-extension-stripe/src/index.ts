@@ -20,6 +20,29 @@ import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
 const VALID_CYCLES: BillingCycle[] = ['monthly', 'annual'];
+const VALID_SOURCES = ['onboarding', 'subscription'] as const;
+type CheckoutSource = typeof VALID_SOURCES[number];
+
+/**
+ * Compute Stripe Checkout return URLs based on the source context.
+ * Exported for unit testing.
+ */
+export function buildCheckoutReturnUrls(
+	publicUrl: string,
+	module: string,
+	source: CheckoutSource,
+): { success_url: string; cancel_url: string } {
+	if (source === 'onboarding') {
+		return {
+			success_url: `${publicUrl}/admin/account/onboarding?success=true&module=${module}`,
+			cancel_url: `${publicUrl}/admin/account/onboarding?cancelled=true&module=${module}`,
+		};
+	}
+	return {
+		success_url: `${publicUrl}/admin/account/subscription?activated=${module}`,
+		cancel_url: `${publicUrl}/admin/account/subscription?cancelled=${module}`,
+	};
+}
 
 export default defineHook(({ init, action, schedule }, { env, logger, database, services, getSchema }) => {
 	const db = database;
@@ -305,7 +328,10 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 				return res.status(401).json({ errors: [{ message: 'Authentication required' }] });
 			}
 
-			const { module, tier, billing_cycle } = req.body || {};
+			const { module, tier, billing_cycle, source } = req.body || {};
+
+			const resolvedSource: CheckoutSource =
+				source && (VALID_SOURCES as readonly string[]).includes(source) ? source as CheckoutSource : 'subscription';
 
 			if (!module || !VALID_MODULES.includes(module)) {
 				return res.status(400).json({ errors: [{ message: `module must be one of: ${VALID_MODULES.join(', ')}` }] });
@@ -382,8 +408,7 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 					customer: customerId,
 					mode: 'subscription',
 					line_items: [{ price: stripePriceId, quantity: 1 }],
-					success_url: `${publicUrl}/admin/content/account`,
-					cancel_url: `${publicUrl}/admin/content/account`,
+					...buildCheckoutReturnUrls(publicUrl, module, resolvedSource),
 					metadata: {
 						account_id: accountId,
 						module,
