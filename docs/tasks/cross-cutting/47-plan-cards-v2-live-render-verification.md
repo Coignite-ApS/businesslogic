@@ -1,6 +1,6 @@
 # 47. PlanCards v2 live render verification (needs subscribed test account)
 
-**Status:** planned
+**Status:** completed 2026-04-20 — verified via browser QA
 **Severity:** LOW — shared-component render verified by source review; live exercise untested
 **Source:** Browser QA of cms/36.3 (2026-04-19)
 **Depends on:** cms/36.3 (shipped in Sprint B), Stripe test-cards infrastructure (see `docs/ux-testing/stripe-test-cards.md`)
