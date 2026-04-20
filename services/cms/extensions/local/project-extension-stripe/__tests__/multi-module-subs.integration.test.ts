@@ -42,6 +42,7 @@ type MockState = {
 	plans: Map<string, any>; // keyed by `${module}:${tier}`
 	subscriptions: SubRow[];
 	idCounter: number;
+	refreshQuotaCalls: string[]; // account_ids passed to refresh_feature_quotas()
 };
 
 function createMockDb(state: MockState) {
@@ -51,6 +52,7 @@ function createMockDb(state: MockState) {
 	callable.transaction = async (fn: (trx: any) => Promise<any>) => fn(callable);
 
 	// raw() handles the INSERT ... RETURNING id pattern for subscriptions
+	// AND the SELECT public.refresh_feature_quotas(?) call.
 	callable.raw = vi.fn(async (sql: string, bindings: any[]) => {
 		const normalized = sql.replace(/\s+/g, ' ').trim().toLowerCase();
 
@@ -82,6 +84,11 @@ function createMockDb(state: MockState) {
 			};
 			state.subscriptions.push(row);
 			return { rows: [{ id }] };
+		}
+
+		if (normalized.includes('refresh_feature_quotas')) {
+			state.refreshQuotaCalls.push(bindings[0]);
+			return { rows: [{ refresh_feature_quotas: null }] };
 		}
 
 		throw new Error(`Unhandled raw SQL: ${sql.substring(0, 120)}`);
@@ -248,6 +255,7 @@ describe('26.4 — multi-module subscription integration', () => {
 			]),
 			subscriptions: [],
 			idCounter: 0,
+			refreshQuotaCalls: [],
 		};
 		db = createMockDb(state);
 		logger = makeLogger();
@@ -459,5 +467,64 @@ describe('26.4 — multi-module subscription integration', () => {
 		await handleCheckoutCompleted(session, stripe, db, logger);
 
 		expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_verify_retrieve');
+	});
+
+	// ── Task 17 hook bypass safety: explicit refresh_feature_quotas call ──
+	//
+	// The webhook upserts via raw SQL (and knex .update()) which bypass
+	// Directus action hooks. Without an explicit refresh_feature_quotas() call,
+	// the task 17 hook in src/hooks/refresh-quotas.ts (subscriptions.items.create)
+	// would never fire, leaving feature_quotas stale until the nightly cron.
+
+	it('calls refresh_feature_quotas after creating a new subscription row', async () => {
+		const session = makeCheckoutSession({
+			accountId: ACCOUNT_ID,
+			module: 'calculators',
+			tier: 'growth',
+			subscriptionId: 'sub_quota_refresh',
+		});
+
+		await handleCheckoutCompleted(session, stripe, db, logger);
+
+		expect(state.subscriptions).toHaveLength(1);
+		expect(state.refreshQuotaCalls).toEqual([ACCOUNT_ID]);
+	});
+
+	it('calls refresh_feature_quotas after updating an existing subscription row', async () => {
+		// Initial checkout creates the row
+		const sess1 = makeCheckoutSession({
+			accountId: ACCOUNT_ID,
+			module: 'calculators',
+			tier: 'growth',
+			subscriptionId: 'sub_quota_001',
+		});
+		await handleCheckoutCompleted(sess1, stripe, db, logger);
+
+		// Reset call log to isolate the update path
+		state.refreshQuotaCalls = [];
+
+		// Same module re-checkout takes the UPDATE branch
+		const sess2 = makeCheckoutSession({
+			accountId: ACCOUNT_ID,
+			module: 'calculators',
+			tier: 'growth',
+			subscriptionId: 'sub_quota_002',
+		});
+		await handleCheckoutCompleted(sess2, stripe, db, logger);
+
+		expect(state.refreshQuotaCalls).toEqual([ACCOUNT_ID]);
+	});
+
+	it('does not call refresh_feature_quotas when checkout is rejected (missing metadata)', async () => {
+		const session = {
+			id: 'cs_bad',
+			subscription: 'sub_001',
+			customer: 'cus_test',
+			metadata: {},
+		} as any;
+
+		await handleCheckoutCompleted(session, stripe, db, logger);
+
+		expect(state.refreshQuotaCalls).toEqual([]);
 	});
 });

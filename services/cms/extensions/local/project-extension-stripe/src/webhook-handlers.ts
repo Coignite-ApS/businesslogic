@@ -286,6 +286,20 @@ export async function handleCheckoutCompleted(
 		}
 	});
 
+	// Refresh feature_quotas for this account.
+	// The task 17 Directus action hook (subscriptions.items.create) only fires
+	// for ItemsService writes — our raw-SQL upsert above bypasses it. Without
+	// this explicit call, quotas would only refresh on the nightly cron, which
+	// would leave the account without correct quota rows for hours after
+	// checkout. Errors are swallowed to avoid blocking the webhook response —
+	// the nightly cron is the safety net.
+	try {
+		await db.raw('SELECT public.refresh_feature_quotas(?)', [accountId]);
+		logger.info(`feature_quotas refreshed for account=${accountId}`);
+	} catch (err: any) {
+		logger.error(`refresh_feature_quotas(${accountId}) failed after checkout: ${err?.message || err}`);
+	}
+
 	logger.info(`Subscription activated for account=${accountId} module=${module} tier=${tier} stripe_sub=${subscriptionId} status=${subStatus}`);
 }
 
