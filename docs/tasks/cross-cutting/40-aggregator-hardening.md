@@ -1,6 +1,6 @@
 # 40. monthly_aggregates aggregator hardening (I2 + I3 + I5 bundle)
 
-**Status:** completed 2026-04-20 (pending migration apply via db-admin)
+**Status:** completed 2026-04-20 — migration 033 applied via db-admin (`docs/reports/db-admin-2026-04-20-aggregate-fn-batch-cte-returning-061119.md`)
 **Severity:** MED — correctness and ops readiness gaps in the hourly rollup
 **Source:** Code review of Sprint B task 21 (`docs/tasks/cross-cutting/21-pricing-v2-monthly-aggregates-job.md` — Known follow-ups section)
 **Depends on:** task 21 (already shipped)
