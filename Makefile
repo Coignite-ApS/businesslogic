@@ -39,8 +39,8 @@ down:
 	@echo "✓ Stack stopped"
 
 restart:
-	@$(COMPOSE) restart
-	@echo "✓ Stack restarted"
+	@$(COMPOSE) up -d --force-recreate
+	@echo "✓ Stack restarted (containers recreated — .env picked up)"
 
 stop: down
 
@@ -71,8 +71,8 @@ cms:
 	@$(COMPOSE) up -d bl-cms
 
 cms-restart: ext
-	@$(COMPOSE) restart bl-cms
-	@echo "✓ CMS restarted (extensions rebuilt)"
+	@$(COMPOSE) up -d --force-recreate bl-cms
+	@echo "✓ CMS restarted (extensions rebuilt, container recreated — .env picked up)"
 
 cms-logs:
 	@$(COMPOSE) logs -f --tail=50 bl-cms
