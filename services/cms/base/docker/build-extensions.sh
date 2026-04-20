@@ -50,9 +50,10 @@ for SRC_DIR in "$@"; do
             npm install --include=dev
             npx directus-extension build
 
-            # Verify build succeeded
-            if [ ! -f "dist/index.js" ]; then
-                echo "ERROR: Build failed - dist/index.js not found for $name"
+            # Verify build succeeded — hook extensions produce dist/index.js,
+            # bundle extensions produce dist/app.js + dist/api.js; accept either.
+            if [ ! -f "dist/index.js" ] && [ ! -f "dist/app.js" ] && [ ! -f "dist/api.js" ]; then
+                echo "ERROR: Build failed - no dist output found for $name"
                 exit 1
             fi
 

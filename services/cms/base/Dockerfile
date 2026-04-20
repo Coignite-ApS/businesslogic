@@ -90,13 +90,14 @@ COPY --chown=node:node extensions/shared* /directus/shared/
 #   fail with "Cannot read properties of undefined (reading 'extraneous')" in npm 10.x.
 #   Without a lockfile, npm does a fresh idealTree build and resolves file: links correctly.
 RUN find /tmp/project-extensions -maxdepth 2 \( -name node_modules -type d -o -name package-lock.json \) -exec rm -rf {} + 2>/dev/null; true
-# Pre-seed all shared libraries (dirs lacking "directus:extension" in package.json) to
-# /directus/extensions/ before any extension build runs. build-extensions.sh processes
-# dirs alphabetically — ai-assistant (a) is built before feature-gate (f) is copied,
-# causing Rollup to fail resolving "../../project-extension-feature-gate/src/...".
-# This pre-pass guarantees shared libs are present for all extension builds.
+# Pre-seed all shared libraries to /directus/extensions/ before any extension
+# build runs. build-extensions.sh processes dirs alphabetically — ai-assistant
+# (a) is built before feature-gate (f) is copied, causing Rollup to fail
+# resolving "../../project-extension-feature-gate/src/...".
+# Shared libs are identified by "bl:shared-lib": true in their package.json
+# (explicit positive marker, stable regardless of directus:extension presence).
 RUN for d in /tmp/project-extensions/*/; do \
-      if [ -f "$d/package.json" ] && ! grep -q '"directus:extension"' "$d/package.json"; then \
+      if [ -f "$d/package.json" ] && grep -q '"bl:shared-lib"' "$d/package.json"; then \
         name=$(basename "$d"); \
         echo "Pre-seeding shared lib: $name"; \
         cp -r "$d" "/directus/extensions/$name"; \
