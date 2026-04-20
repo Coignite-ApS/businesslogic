@@ -142,31 +142,38 @@ const activationModule = ref<Module | null>(null);
 // Return-URL notice — set from Stripe redirect query params, cleared after display.
 const returnNotice = ref<{ type: 'success' | 'info'; message: string } | null>(null);
 
-function consumeReturnParams() {
-	const { activated, cancelled, topup, amount } = route.query as Record<string, string>;
-	if (activated) {
-		const label = activated.charAt(0).toUpperCase() + activated.slice(1);
-		returnNotice.value = { type: 'success', message: `Your ${label} subscription is active` };
-	} else if (cancelled) {
-		returnNotice.value = { type: 'info', message: `Checkout cancelled — you weren't charged` };
-	} else if (topup === 'success' && amount) {
-		returnNotice.value = { type: 'success', message: `€${amount} added to your AI Wallet` };
-	} else if (topup === 'success') {
-		returnNotice.value = { type: 'success', message: `Wallet top-up successful` };
-	} else if (topup === 'cancelled') {
-		returnNotice.value = { type: 'info', message: `Top-up cancelled — you weren't charged` };
-	}
-	if (activated || cancelled || topup) {
-		// Clean query params so refresh doesn't re-fire the notice.
-		router.replace({ query: {} });
-	}
-}
-
 const MODULE_LABELS: Record<Module, string> = {
 	calculators: 'Calculators',
 	kb: 'Knowledge Base',
 	flows: 'Flows',
 };
+
+function consumeReturnParams() {
+	const { activated, cancelled, topup, amount } = route.query as Record<string, string>;
+	if (activated) {
+		// Use MODULE_LABELS for proper display names (e.g. 'kb' → 'Knowledge Base', not 'Kb')
+		const label = MODULE_LABELS[activated as Module] ?? activated;
+		returnNotice.value = { type: 'success', message: `Your ${label} subscription is active` };
+	} else if (cancelled) {
+		const label = MODULE_LABELS[cancelled as Module] ?? cancelled;
+		returnNotice.value = { type: 'info', message: `Checkout cancelled for ${label} — you weren't charged` };
+	} else if (topup === 'success') {
+		// Sanitize amount: only render if it's a valid positive number (guards against crafted URLs)
+		const amtNum = Number(amount);
+		if (Number.isFinite(amtNum) && amtNum > 0) {
+			returnNotice.value = { type: 'success', message: `€${amtNum.toFixed(2)} added to your AI Wallet` };
+		} else {
+			returnNotice.value = { type: 'success', message: `Wallet top-up successful` };
+		}
+	} else if (topup === 'cancelled') {
+		returnNotice.value = { type: 'info', message: `Top-up cancelled — you weren't charged` };
+	}
+	if (activated || cancelled || topup) {
+		// Targeted cleanup: remove only handled params, preserve any others.
+		const { activated: _a, cancelled: _c, topup: _t, amount: _amt, ...rest } = route.query;
+		router.replace({ query: rest });
+	}
+}
 
 const activationModuleLabel = computed(() =>
 	activationModule.value ? MODULE_LABELS[activationModule.value] : '',

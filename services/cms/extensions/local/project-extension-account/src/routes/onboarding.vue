@@ -14,6 +14,7 @@
 			<welcome-wizard
 				:initial-intent="initialIntent"
 				:success-module="successModule"
+				:cancelled-module="cancelledModule"
 				@done="handleDone"
 				@skip="handleSkip"
 			/>
@@ -44,6 +45,15 @@ const successModule = computed<Module | null>(() => {
 	return null;
 });
 
+// If Stripe returns ?cancelled=true&module=X, show a "you weren't charged" notice.
+const cancelledModule = computed<Module | null>(() => {
+	if (route.query.cancelled === 'true' && route.query.module) {
+		const m = route.query.module as string;
+		if (m === 'calculators' || m === 'kb' || m === 'flows') return m as Module;
+	}
+	return null;
+});
+
 // Preserve intent across Stripe redirect if passed in query
 const initialIntent = computed<OnboardingIntent | null>(() => {
 	const i = route.query.intent as string;
@@ -54,6 +64,9 @@ const initialIntent = computed<OnboardingIntent | null>(() => {
 });
 
 function handleDone() {
+	// Targeted cleanup: remove only onboarding return params.
+	const { success: _s, cancelled: _c, module: _m, ...rest } = route.query;
+	router.replace({ query: rest });
 	router.push('/');
 }
 

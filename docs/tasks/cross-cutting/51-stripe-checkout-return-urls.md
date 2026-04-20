@@ -86,3 +86,7 @@ Shows:
 ## Dependencies
 
 - Task 48 (webhook pipeline) — without it, the success page shows "No subscription" despite the user having paid. The URL fix is necessary but not sufficient.
+
+## Follow-ups
+
+- Billing portal `return_url` (index.ts ~line 473) has the same UX smell as the pre-fix checkout URLs — routes to `/admin/content/account` instead of `/admin/account/subscription`. Consider fixing in a follow-up task.

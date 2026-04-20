@@ -1,5 +1,16 @@
 <template>
 	<div class="wizard">
+		<!-- Checkout-cancelled notice: shown when returning from Stripe via ?cancelled=true&module=X -->
+		<v-notice
+			v-if="cancelledModule && !cancelledDismissed"
+			type="info"
+			class="wizard-cancelled-notice"
+			dismissible
+			@dismiss="cancelledDismissed = true"
+		>
+			Checkout cancelled — you weren't charged. You can try again when you're ready.
+		</v-notice>
+
 		<!-- Step 1: Intent capture -->
 		<div v-if="step === 1" class="wizard-step">
 			<div class="wizard-hero">
@@ -136,6 +147,8 @@ const props = defineProps<{
 	initialIntent?: OnboardingIntent | null;
 	// If returning from Stripe with ?success=true&module=X, jump straight to step 3
 	successModule?: Module | null;
+	// If returning from Stripe with ?cancelled=true&module=X, show a dismissible notice
+	cancelledModule?: Module | null;
 }>();
 
 const emit = defineEmits<{
@@ -153,6 +166,7 @@ const selectedIntent = ref<OnboardingIntent | null>(props.initialIntent ?? null)
 const confirmedModuleRef = ref<Module | null>(props.successModule ?? null);
 const saving = ref(false);
 const activating = ref(false);
+const cancelledDismissed = ref(false);
 
 const MODULE_LABELS: Record<Module, string> = {
 	calculators: 'Calculators',
@@ -497,5 +511,9 @@ if (props.successModule) {
 
 .wizard-error {
 	margin-top: 8px;
+}
+
+.wizard-cancelled-notice {
+	margin-bottom: 16px;
 }
 </style>

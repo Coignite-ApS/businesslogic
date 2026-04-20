@@ -68,6 +68,25 @@ async function findWalletTopupPriceId(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Return URL helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build the Stripe Checkout success/cancel URLs for a wallet top-up session.
+ * Exported so tests can assert the real shape without reconstructing strings.
+ */
+export function buildWalletTopupReturnUrls(
+	publicUrl: string,
+	amountEur: number,
+): { success_url: string; cancel_url: string } {
+	const amount = amountEur.toFixed(2);
+	return {
+		success_url: `${publicUrl}/admin/account/subscription?topup=success&amount=${amount}`,
+		cancel_url:  `${publicUrl}/admin/account/subscription?topup=cancelled`,
+	};
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // POST /stripe/wallet-topup
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -161,8 +180,7 @@ export async function createWalletTopupCheckout(opts: {
 		customer: customerId,
 		mode: 'payment',
 		line_items: [lineItem],
-		success_url: `${publicUrl}/admin/account/subscription?topup=success&amount=${amountEur.toFixed(2)}`,
-		cancel_url: `${publicUrl}/admin/account/subscription?topup=cancelled`,
+		...buildWalletTopupReturnUrls(publicUrl, amountEur),
 		metadata: {
 			account_id: accountId,
 			pricing_version: 'v2',

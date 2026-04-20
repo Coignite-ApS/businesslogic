@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildCheckoutReturnUrls } from '../src/index.js';
+import { buildCheckoutReturnUrls, resolveCheckoutSource } from '../src/index.js';
+import { buildWalletTopupReturnUrls } from '../src/wallet-handlers.js';
 
 const BASE = 'https://app.example.com';
 
@@ -40,17 +41,52 @@ describe('buildCheckoutReturnUrls', () => {
 	});
 });
 
-describe('wallet-topup return URLs (inline — verified by spec)', () => {
-	it('success URL format', () => {
-		const amountEur = 20;
-		const url = `${BASE}/admin/account/subscription?topup=success&amount=${amountEur.toFixed(2)}`;
-		expect(url).toBe(`${BASE}/admin/account/subscription?topup=success&amount=20.00`);
-		expect(url).not.toContain('/admin/content/');
+describe('resolveCheckoutSource', () => {
+	it('absent source defaults to subscription', () => {
+		expect(resolveCheckoutSource(undefined)).toBe('subscription');
+		expect(resolveCheckoutSource(null)).toBe('subscription');
+		expect(resolveCheckoutSource('')).toBe('subscription');
 	});
 
-	it('cancel URL format', () => {
-		const url = `${BASE}/admin/account/subscription?topup=cancelled`;
-		expect(url).toBe(`${BASE}/admin/account/subscription?topup=cancelled`);
-		expect(url).not.toContain('/admin/content/');
+	it('valid sources pass through', () => {
+		expect(resolveCheckoutSource('onboarding')).toBe('onboarding');
+		expect(resolveCheckoutSource('subscription')).toBe('subscription');
+	});
+
+	it('invalid source returns 400 error object', () => {
+		const result = resolveCheckoutSource('unknown');
+		expect(result).toMatchObject({ status: 400 });
+		expect((result as any).error).toContain('source must be one of');
+	});
+
+	it('typo source (subscriptoin) returns 400', () => {
+		const result = resolveCheckoutSource('subscriptoin');
+		expect(result).toMatchObject({ status: 400 });
+	});
+});
+
+describe('buildWalletTopupReturnUrls', () => {
+	it('standard amount → correct success/cancel shape', () => {
+		const urls = buildWalletTopupReturnUrls(BASE, 20);
+		expect(urls.success_url).toBe(`${BASE}/admin/account/subscription?topup=success&amount=20.00`);
+		expect(urls.cancel_url).toBe(`${BASE}/admin/account/subscription?topup=cancelled`);
+	});
+
+	it('rounding: integer amount formats to 2dp', () => {
+		const urls = buildWalletTopupReturnUrls(BASE, 50);
+		expect(urls.success_url).toBe(`${BASE}/admin/account/subscription?topup=success&amount=50.00`);
+	});
+
+	it('rounding: fractional amount rounded via toFixed(2)', () => {
+		// 49.995 → toFixed(2) → "50.00" in most JS engines
+		const urls = buildWalletTopupReturnUrls(BASE, 49.995);
+		expect(urls.success_url).toMatch(/amount=49\.99|amount=50\.00/); // toFixed rounding is engine-defined
+		expect(urls.cancel_url).toBe(`${BASE}/admin/account/subscription?topup=cancelled`);
+	});
+
+	it('no /admin/content/ in wallet URLs', () => {
+		const urls = buildWalletTopupReturnUrls(BASE, 20);
+		expect(urls.success_url).not.toContain('/admin/content/');
+		expect(urls.cancel_url).not.toContain('/admin/content/');
 	});
 });

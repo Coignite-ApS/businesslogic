@@ -24,6 +24,20 @@ const VALID_SOURCES = ['onboarding', 'subscription'] as const;
 type CheckoutSource = typeof VALID_SOURCES[number];
 
 /**
+ * Resolve and validate `source` from a checkout request body.
+ * Returns the resolved CheckoutSource, or a { error, status } if invalid.
+ * Absent/empty source defaults to 'subscription' for backward compat.
+ * Exported for unit testing.
+ */
+export function resolveCheckoutSource(
+	source: string | undefined | null,
+): CheckoutSource | { error: string; status: 400 } {
+	if (!source) return 'subscription';
+	if ((VALID_SOURCES as readonly string[]).includes(source)) return source as CheckoutSource;
+	return { error: `source must be one of: ${VALID_SOURCES.join(', ')}`, status: 400 };
+}
+
+/**
  * Compute Stripe Checkout return URLs based on the source context.
  * Exported for unit testing.
  */
@@ -330,8 +344,11 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 
 			const { module, tier, billing_cycle, source } = req.body || {};
 
-			const resolvedSource: CheckoutSource =
-				source && (VALID_SOURCES as readonly string[]).includes(source) ? source as CheckoutSource : 'subscription';
+			const sourceResult = resolveCheckoutSource(source);
+			if (typeof sourceResult === 'object' && 'error' in sourceResult) {
+				return res.status(sourceResult.status).json({ errors: [{ message: sourceResult.error }] });
+			}
+			const resolvedSource: CheckoutSource = sourceResult;
 
 			if (!module || !VALID_MODULES.includes(module)) {
 				return res.status(400).json({ errors: [{ message: `module must be one of: ${VALID_MODULES.join(', ')}` }] });
