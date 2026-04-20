@@ -105,38 +105,13 @@
 		</div>
 
 		<!-- AI Wallet top-up dialog -->
-		<v-dialog v-model="showUpgradeDialog" @esc="showUpgradeDialog = false">
-			<v-card class="wallet-dialog">
-				<v-card-title>AI Wallet</v-card-title>
-				<v-card-text>
-					<div v-if="walletLoading" style="text-align: center; padding: 20px;">
-						<v-progress-circular indeterminate />
-					</div>
-					<div v-else>
-						<div class="wallet-current">
-							<span class="wallet-label">Current balance</span>
-							<span class="wallet-balance" :class="{ low: isWalletLow }">{{ formatWalletEur(walletBalance) }}</span>
-						</div>
-						<v-notice v-if="isWalletLow" type="warning" style="margin-bottom: 12px;">
-							Your balance is low. AI calls will be blocked once it reaches €0.
-						</v-notice>
-						<p class="wallet-hint">AI usage is billed from your wallet at cost. Top up to keep going.</p>
-						<div class="topup-grid">
-							<v-button
-								v-for="amt in standardTopups"
-								:key="amt"
-								:loading="checkoutLoading === amt"
-								:disabled="checkoutLoading !== null && checkoutLoading !== amt"
-								@click="handleTopup(amt)"
-							>€{{ amt }}</v-button>
-						</div>
-					</div>
-				</v-card-text>
-				<v-card-actions>
-					<v-button secondary @click="showUpgradeDialog = false">Close</v-button>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
+		<wallet-topup-dialog
+			v-model="showUpgradeDialog"
+			:balance="walletBalance"
+			:loading="walletLoading"
+			:error="topupError"
+			@confirm="handleTopup"
+		/>
 		</template>
 	</private-view>
 </template>
@@ -145,6 +120,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useFeatureGate } from '../../project-extension-feature-gate/src/use-feature-gate';
 import { useApi } from '@directus/extensions-sdk';
+import { formatApiError } from './utils/format-api-error';
 import { useRoute, useRouter } from 'vue-router';
 import { useActiveAccount } from './composables/use-active-account';
 import { useConversations } from './composables/use-conversations';
@@ -154,6 +130,7 @@ import ConversationNav from './components/conversation-nav.vue';
 import LowBalanceBanner from './components/low-balance-banner.vue';
 import PromptPicker from './components/prompt-picker.vue';
 import MessageBubble from './components/message-bubble.vue';
+import WalletTopupDialog from './components/wallet-topup-dialog.vue';
 
 const api = useApi();
 const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'ai.chat');
@@ -199,8 +176,7 @@ const pendingPromptId = ref<string | null>(null);
 const showUpgradeDialog = ref(false);
 const walletBalance = ref<number | string>(0);
 const walletLoading = ref(false);
-const checkoutLoading = ref<number | null>(null);
-const standardTopups = [20, 50, 200] as const;
+const topupError = ref<string | null>(null);
 
 // Init
 onMounted(async () => {
@@ -315,11 +291,9 @@ async function handleSendFromWidget(text: string) {
 	await handleSend();
 }
 
-// Wallet dialog — v2: top-up AI Wallet directly (no per-month query plans).
-const isWalletLow = computed(() => Number(walletBalance.value) < 1);
-
 watch(showUpgradeDialog, async (open) => {
 	if (open) {
+		topupError.value = null;
 		await fetchWalletBalance();
 	}
 });
@@ -336,20 +310,16 @@ async function fetchWalletBalance() {
 	}
 }
 
-function formatWalletEur(n: number | string | null | undefined): string {
-	const v = Number(n || 0);
-	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(v);
-}
-
-async function handleTopup(amount: 20 | 50 | 200) {
+async function handleTopup(amount: number) {
 	checkoutLoading.value = amount;
+	topupError.value = null;
 	try {
 		const { data } = await api.post('/stripe/wallet-topup', { amount_eur: amount });
 		if (data.checkout_url) {
 			window.location.href = data.checkout_url;
 		}
-	} catch {
-		// Top-up failed
+	} catch (err: any) {
+		topupError.value = formatApiError(err);
 	} finally {
 		checkoutLoading.value = null;
 	}
@@ -485,46 +455,6 @@ function resetTextareaHeight() {
 	gap: 10px;
 }
 
-.wallet-dialog {
-	min-width: 380px;
-	max-width: 480px;
-}
-
-.wallet-current {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	margin-bottom: 12px;
-}
-
-.wallet-label {
-	font-size: 13px;
-	color: var(--theme--foreground-subdued);
-	text-transform: uppercase;
-	letter-spacing: 0.4px;
-}
-
-.wallet-balance {
-	font-size: 28px;
-	font-weight: 700;
-	color: var(--theme--foreground);
-}
-
-.wallet-balance.low {
-	color: var(--theme--warning, #d8a04e);
-}
-
-.wallet-hint {
-	font-size: 13px;
-	color: var(--theme--foreground-subdued);
-	margin-bottom: 14px;
-}
-
-.topup-grid {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 8px;
-}
 .feature-gate-loading {
 	display: flex;
 	align-items: center;

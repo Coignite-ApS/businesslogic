@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue';
+import { formatApiError } from '../utils/format-api-error';
 import type {
 	Account,
 	Subscription,
@@ -121,7 +122,7 @@ export function useAccount(api: any) {
 				await fetchExemptStatus();
 			}
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 		} finally {
 			loading.value = false;
 		}
@@ -135,7 +136,7 @@ export function useAccount(api: any) {
 			await fetchExemptStatus();
 			await Promise.all([fetchSubscription(), fetchWallet()]);
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -188,7 +189,7 @@ export function useAccount(api: any) {
 			}
 			subscriptionsByModule.value = next;
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 			subscriptionsByModule.value = emptySubsByModule();
 		}
 	}
@@ -233,7 +234,7 @@ export function useAccount(api: any) {
 			});
 			plans.value = data.data || [];
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -244,7 +245,7 @@ export function useAccount(api: any) {
 			await api.patch(`/items/account/${activeAccountId.value}`, fields);
 			await fetchAccounts();
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -262,7 +263,7 @@ export function useAccount(api: any) {
 				window.location.href = data.url;
 			}
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -274,7 +275,7 @@ export function useAccount(api: any) {
 				window.location.href = data.url;
 			}
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -291,7 +292,7 @@ export function useAccount(api: any) {
 				window.location.href = data.checkout_url;
 			}
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -321,7 +322,7 @@ export function useAccount(api: any) {
 			await fetchApiKeys();
 			return data;
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+			error.value = formatApiError(err);
 			return null;
 		}
 	}
@@ -332,7 +333,7 @@ export function useAccount(api: any) {
 			await api.patch(`/account/api-keys/${id}`, body);
 			await fetchApiKeys();
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -342,7 +343,7 @@ export function useAccount(api: any) {
 			await api.delete(`/account/api-keys/${id}`);
 			await fetchApiKeys();
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+			error.value = formatApiError(err);
 		}
 	}
 
@@ -353,7 +354,7 @@ export function useAccount(api: any) {
 			await fetchApiKeys();
 			return data;
 		} catch (err: any) {
-			error.value = err?.response?.data?.errors?.[0]?.message || err?.response?.data?.error || err.message;
+			error.value = formatApiError(err);
 			return null;
 		}
 	}

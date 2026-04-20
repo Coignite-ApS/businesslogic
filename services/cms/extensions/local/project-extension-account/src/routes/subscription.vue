@@ -87,6 +87,14 @@
 			</div>
 
 			<v-notice v-if="error" type="danger" class="error-notice">{{ error }}</v-notice>
+
+			<!-- Wallet top-up dialog -->
+			<wallet-topup-dialog
+				v-model="topupDialogVisible"
+				:balance="wallet.balance_eur"
+				:error="topupError"
+				@confirm="handleTopupConfirm"
+			/>
 		</div>
 
 		<div v-else class="module-empty">
@@ -122,6 +130,7 @@ import type { Module, SubscriptionPlan } from '../types';
 import AccountNavigation from '../components/account-navigation.vue';
 import AccountSelector from '../components/account-selector.vue';
 import SubscriptionInfo from '../components/subscription-info.vue';
+import WalletTopupDialog from '../components/wallet-topup-dialog.vue';
 
 const api = useApi();
 const route = useRoute();
@@ -138,6 +147,8 @@ const {
 const checkingOut = ref<string | null>(null);
 const activationVisible = ref(false);
 const activationModule = ref<Module | null>(null);
+const topupDialogVisible = ref(false);
+const topupError = ref<string | null>(null);
 
 // Return-URL notice — set from Stripe redirect query params, cleared after display.
 const returnNotice = ref<{ type: 'success' | 'info'; message: string } | null>(null);
@@ -235,10 +246,18 @@ async function handleCheckout(plan: SubscriptionPlan, cycle: 'monthly' | 'annual
 	checkingOut.value = null;
 }
 
-async function handleTopup() {
-	// Default top-up = €20 (cheapest standard amount). Power users can change
-	// via the Stripe billing portal or wallet config endpoint.
-	await startWalletTopup(20);
+function handleTopup() {
+	topupError.value = null;
+	topupDialogVisible.value = true;
+}
+
+async function handleTopupConfirm(amount: number) {
+	topupError.value = null;
+	try {
+		await startWalletTopup(amount as 20 | 50 | 200 | 'custom');
+	} catch (err: any) {
+		topupError.value = err?.message || 'Top-up failed. Please try again.';
+	}
 }
 
 async function handlePortal() {

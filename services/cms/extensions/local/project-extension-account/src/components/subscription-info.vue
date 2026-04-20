@@ -134,6 +134,7 @@ import { ref, computed } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import type { SubscriptionsByModule, AIWalletState, Module, Subscription, SubscriptionStatus } from '../types';
 import WalletSettingsDialog from './wallet-settings-dialog.vue';
+import { formatApiError } from '../utils/format-api-error';
 
 const props = defineProps<{
 	subscriptionsByModule: SubscriptionsByModule;
@@ -173,7 +174,7 @@ async function handleWalletConfigSave(config: {
 		walletSettingsVisible.value = false;
 		emit('walletUpdated');
 	} catch (err: any) {
-		walletConfigError.value = err?.response?.data?.errors?.[0]?.message || err.message || 'Failed to save settings';
+		walletConfigError.value = formatApiError(err);
 	} finally {
 		walletConfigSaving.value = false;
 	}

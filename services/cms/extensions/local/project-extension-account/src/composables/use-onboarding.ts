@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import type { Ref } from 'vue';
 import type { Router } from 'vue-router';
+import { formatApiError } from '../utils/format-api-error';
 
 export type OnboardingIntent = 'calculators' | 'kb' | 'flows' | 'unsure';
 
@@ -75,7 +76,7 @@ export function useOnboarding(api: any) {
 				wizard_completed_at: onboarding.wizard_completed_at ?? null,
 			};
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 			state.value = emptyState();
 		} finally {
 			loading.value = false;
@@ -91,7 +92,7 @@ export function useOnboarding(api: any) {
 			// Optimistic local update (no need to refetch full user)
 			state.value = { ...state.value, ...patch };
 		} catch (err: any) {
-			error.value = err.message;
+			error.value = formatApiError(err);
 		}
 	}
 

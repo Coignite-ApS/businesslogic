@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { formatApiError } from '../utils/format-api-error';
 
 export interface ChatMessage {
 	role: 'user' | 'assistant';
@@ -145,7 +146,7 @@ export function useChat(api: any) {
 			return newConversationId;
 		} catch (err: any) {
 			if (err.name === 'AbortError') return conversationId;
-			error.value = err.message || 'Connection lost. Please try again.';
+			error.value = formatApiError(err);
 			const msg = messages.value[assistantIdx];
 			if (msg) {
 				msg.streaming = false;

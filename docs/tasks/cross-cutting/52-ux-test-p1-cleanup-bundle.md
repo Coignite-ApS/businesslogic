@@ -1,6 +1,6 @@
 # 52. 🟡 P1 bundle: Post-Sprint-B UX cleanup (from ux-tester 2026-04-20)
 
-**Status:** planned
+**Status:** in-progress (52.1 + 52.4 done; 52.2 + 52.3 pending db-admin)
 **Severity:** P1 (bundled polish) — each item LOW individually, but together they degrade Sprint B's perceived quality
 **Source:** ux-tester 2026-04-20 (Sarah persona, full report: `docs/reports/ux-test-2026-04-20-sarah-billing.md`)
 
@@ -59,11 +59,17 @@ Likely a shared utility or a pinia action wrapper. Look at `services/cms/extensi
 
 ## Acceptance
 
-- [ ] 52.1: Both entry points lead to quick-amount dialog; dialog → Checkout with selected amount
-- [ ] 52.2: Non-admin user can open AI Assistant without 500s (permissions granted)
-- [ ] 52.3: account list view loads for a new account with no subscriptions (no crash)
-- [ ] 52.4: 403/401/404/500 errors show human-readable messages in 3+ places tested
-- [ ] All changes verified live via `/ux-tester` re-run after fixes
+- [x] 52.1: Both entry points lead to quick-amount dialog; dialog → Checkout with selected amount
+  - `WalletTopupDialog` component created + duplicated in both extensions
+  - subscription.vue wired: "Top up" → opens dialog → emits `confirm(amount)` → `startWalletTopup(amount)`
+  - ai-assistant module.vue uses `<WalletTopupDialog>` (replaced inline block)
+  - Dialog adds custom-amount input field (€ free-text) in addition to €20/50/200 quick-amounts
+- [ ] 52.2: Non-admin user can open AI Assistant without 500s (permissions granted) — **pending db-admin**
+- [ ] 52.3: account list view loads for a new account with no subscriptions — **pending db-admin**
+- [x] 52.4: 403/401/404/500 errors show human-readable messages in 3+ places tested
+  - `formatApiError` utility created + unit-tested in both extensions (13 test cases each)
+  - Wired into: `use-account.ts` (8 catch blocks), `use-onboarding.ts` (2 catch blocks), `use-chat.ts` (1 catch block), `subscription-info.vue` (1 catch block), `module.vue` handleTopup (1 catch block)
+- [ ] All changes verified live via `/ux-tester` re-run after fixes — pending browser-qa
 
 ## Estimate
 
