@@ -265,14 +265,16 @@ Infrastructure and multi-service concerns.
 | 45 | `/wallet/balance` response echo auto_reload fields (Sprint B QA follow-up — LOW) | planned | [cross-cutting/45-wallet-balance-response-auto-reload-fields.md](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) |
 | 46 | Wallet settings dialog a11y labels (Sprint B QA follow-up — LOW) | planned | [cross-cutting/46-wallet-dialog-a11y-labels.md](cross-cutting/46-wallet-dialog-a11y-labels.md) |
 | 47 | plan-cards.vue v2 live render verification (needs subscribed test account — LOW) | **completed 2026-04-20** | [cross-cutting/47-plan-cards-v2-live-render-verification.md](cross-cutting/47-plan-cards-v2-live-render-verification.md) |
-| 48 | 🔴 **P0: Stripe webhook pipeline not creating subscriptions / updating wallet** (from ux-test) | planned | [cross-cutting/48-stripe-webhook-pipeline-broken.md](cross-cutting/48-stripe-webhook-pipeline-broken.md) |
+| 48 | 🔴 **P0: Stripe webhook pipeline not creating subscriptions / updating wallet** (from ux-test) | **completed 2026-04-20** (e2e verified with Sarah `evt_1TOGlq...R85P` → `sub_1TOGln...RO7I`) | [cross-cutting/48-stripe-webhook-pipeline-broken.md](cross-cutting/48-stripe-webhook-pipeline-broken.md) |
 | 49 | 🔴 **P0: User role missing PATCH /users/me metadata permission** (from ux-test) | planned | [cross-cutting/49-user-role-metadata-permission.md](cross-cutting/49-user-role-metadata-permission.md) |
 | 50 | 🟠 **P1: Onboarding redirect only fires from Account module** (from ux-test) | **completed 2026-04-20** (`e571336`) | [cross-cutting/50-onboarding-wizard-global-redirect.md](cross-cutting/50-onboarding-wizard-global-redirect.md) |
 | 51 | 🟠 **P1: Stripe Checkout return URLs wrong + no success page** (from ux-test) | **completed 2026-04-20** (`7b82c0f` + `99fd335`) | [cross-cutting/51-stripe-checkout-return-urls.md](cross-cutting/51-stripe-checkout-return-urls.md) |
 | 52 | 🟡 **P1: UX polish bundle** — top-up entry + AI perms + account crash + 403 copy (from ux-test) | planned | [cross-cutting/52-ux-test-p1-cleanup-bundle.md](cross-cutting/52-ux-test-p1-cleanup-bundle.md) |
 | 53 | CMS Dockerfile follow-ups (I2 **superseded by 54**; I3 file: dep CI check + M6 smoke test remain) — LOW hygiene | planned | [cross-cutting/53-cms-dockerfile-followups.md](cross-cutting/53-cms-dockerfile-followups.md) |
 | 54 | 🔴 **P0: Shared-libs break entire hook layer** (Directus 11 Zod manifest strict-fail) | **completed 2026-04-20** (`0386f64` + `640c64b` + `12b8314` + `8510283`) | [cross-cutting/54-shared-libs-break-extension-load.md](cross-cutting/54-shared-libs-break-extension-load.md) |
-| 55 | 🟡 Onboarding guard stale-closure on logout→re-login in same tab (P2, follow-up to 50) | planned | [cross-cutting/55-onboarding-guard-logout-reentry.md](cross-cutting/55-onboarding-guard-logout-reentry.md) |
+| 55 | 🟡 Onboarding guard stale-closure on logout→re-login in same tab (P2, follow-up to 50) | **completed 2026-04-20** (`321431c`) | [cross-cutting/55-onboarding-guard-logout-reentry.md](cross-cutting/55-onboarding-guard-logout-reentry.md) |
+| 56 | 🟠 **P1: Stripe webhook observability** — persist every hit + admin "Billing Health" panel + startup validation (from task 48 dev-session drift) | planned | [cross-cutting/56-stripe-webhook-observability.md](cross-cutting/56-stripe-webhook-observability.md) |
+| 57 | 🟡 P2: Stripe reconciliation cron — defense-in-depth for missed webhooks | planned | [cross-cutting/57-stripe-reconciliation-cron.md](cross-cutting/57-stripe-reconciliation-cron.md) |
 
 ---
 

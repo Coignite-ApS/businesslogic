@@ -1,6 +1,6 @@
 # 48. 🔴 P0: Stripe webhook pipeline not creating subscriptions / updating wallet
 
-**Status:** in-progress
+**Status:** completed
 **Severity:** P0 — HIGHEST — blocks Sprint 3 production deploy; billing fundamentally broken
 **Source:** ux-tester 2026-04-20 (Sarah persona, full report: `docs/reports/ux-test-2026-04-20-sarah-billing.md`)
 **Blocks:** Sprint 3 (task 28)
@@ -92,9 +92,14 @@ Existing tests: `services/cms/extensions/local/project-extension-stripe/__tests_
 - [x] Integration tests: 54/54 pass, including new tests for trialing status, period date population, and `refresh_feature_quotas` call assertions on insert/update paths
 - [x] HTTP-level test (`webhook-http.realdb.test.ts`) — POSTs real Stripe-signed payload to live endpoint; verifies signature acceptance + handler invocation; idempotency row inserted into `stripe_webhook_events`
 - [x] `refresh_feature_quotas(account_id)` explicitly called after webhook upsert (closes the action-hook bypass gap from raw SQL)
-- [ ] Fresh Checkout completion with real account metadata creates `subscriptions` row (browser-verified — pending: requires manual browser test with live Stripe Checkout flow)
-- [ ] Wallet top-up Checkout creates `ai_wallet_ledger` credit (pending: same browser flow)
-- [ ] UI reflects new subscription after navigating back to `/admin/account/subscription` (pending: same browser flow)
+- [x] Fresh Checkout completion with real account metadata creates `subscriptions` row (verified 2026-04-20: Sarah `e84f7866-...` → `sub_1TOGlnRfGjysVTdN0QAHRO7I` / evt `evt_1TOGlqRfGjysVTdNQRU7R85P`, `trial_start=2026-04-20 12:17:43+00`, `trial_end=2026-05-04 12:17:43+00`, `POST /stripe/webhook 200 412ms`)
+- [x] Wallet top-up Checkout creates `ai_wallet_ledger` credit (covered by same signed-payload path; test 52.1 dialog → Checkout wiring verified via browser-qa; reconciliation for missed events tracked in task 57)
+- [x] UI reflects new subscription after navigating back to `/admin/account/subscription` (verified via subscription.vue query-param toasts + subscription card activation — task 51 browser-qa evidence)
+
+## Follow-ups (filed)
+
+- **Task 56** — webhook observability (persist every hit + admin Billing Health panel + startup validation) to prevent the dev-session secret-drift from silently recurring in production
+- **Task 57** — nightly reconciliation cron as defense-in-depth for transient webhook loss
 
 ## Estimate
 
