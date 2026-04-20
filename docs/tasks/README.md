@@ -254,6 +254,9 @@ Infrastructure and multi-service concerns.
 | 42 | 🟡 Gateway cache cross-service PUBLISH on wallet debit + usage events (P2 freshness) | planned | [cross-cutting/42-gateway-cache-cross-service-publish.md](cross-cutting/42-gateway-cache-cross-service-publish.md) |
 | 43 | 🟢 `flow.step` cost rate — pricing decision required (P3) | planned | [cross-cutting/43-flow-step-cost-rate.md](cross-cutting/43-flow-step-cost-rate.md) |
 | 44 | 🔴 **CMS Docker image rebuild** — `packages/bl-widget` outside build context (blocks Sprint 3) | planned | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
+| 45 | `/wallet/balance` response echo auto_reload fields (Sprint B QA follow-up — LOW) | planned | [cross-cutting/45-wallet-balance-response-auto-reload-fields.md](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) |
+| 46 | Wallet settings dialog a11y labels (Sprint B QA follow-up — LOW) | planned | [cross-cutting/46-wallet-dialog-a11y-labels.md](cross-cutting/46-wallet-dialog-a11y-labels.md) |
+| 47 | plan-cards.vue v2 live render verification (needs subscribed test account — LOW) | planned | [cross-cutting/47-plan-cards-v2-live-render-verification.md](cross-cutting/47-plan-cards-v2-live-render-verification.md) |
 
 ---
 
@@ -366,7 +369,7 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 13 | 0 | 0 | 19 | 32 |
-| **Total** | **29** | **8** | **0** | **69** | **106** |
+| Cross-Cutting | 16 | 0 | 0 | 19 | 35 |
+| **Total** | **32** | **8** | **0** | **69** | **109** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision

@@ -133,6 +133,30 @@ Verify:
 curl -s http://localhost:18055/server/health
 ```
 
+### Additional prerequisites for billing flows
+
+`subscription-activation`, `wallet-top-up`, `wallet-auto-reload`, `subscription-management`, `quota-exceeded`, `trial-conversion`:
+
+1. Stripe test mode active: `STRIPE_SECRET_KEY` in CMS env starts with `sk_test_`
+2. Stripe CLI installed + listening for webhooks:
+   ```bash
+   brew install stripe/stripe-cli/stripe        # one-time
+   stripe login                                   # one-time
+   stripe listen --forward-to localhost:18055/stripe/webhook  # run during test
+   ```
+3. Read the Stripe test-cards reference first: `docs/ux-testing/stripe-test-cards.md`
+4. Stripe Test Clocks (optional, for `trial-conversion`): see reference doc for setup
+
+**Test card cheat sheet** (from `docs/ux-testing/stripe-test-cards.md`):
+- Success: `4242 4242 4242 4242` — use for all happy-path activations + top-ups
+- Decline: `4000 0000 0000 0002` — test error recovery
+- Insufficient funds: `4000 0000 0000 9995` — test wallet top-up failure copy
+- 3DS challenge: `4000 0025 0000 3155` — test auth challenge UX
+- Subscription setup auth: `4000 0038 0000 0446` — standard for trial starts
+- Expiration: any future date (`12 / 34`); CVC: any 3 digits; ZIP: any
+
+When a flow reaches a Stripe Checkout page, fill using the test card appropriate to the scenario being tested. Do NOT use real card numbers — they WILL be declined in test mode and may cause noise in the Stripe dashboard.
+
 ## Configuration
 
 ### Personas
@@ -151,7 +175,11 @@ Flow definitions live in `docs/ux-testing/flows/`. Read the flow file to get:
 - Accept criteria (binary pass/fail)
 - Red flags that trigger automatic low scores
 
-Available flows: `first-login` (default), `calculator-builder`, `formula-testing`, `ai-assistant`, `knowledge-base`, `api-integration`, `admin-dashboard`
+Available flows:
+- **Discovery + core product:** `first-login` (default), `calculator-builder`, `formula-testing`, `ai-assistant`, `knowledge-base`, `api-integration`, `admin-dashboard`
+- **Billing + subscription (Pricing v2 — Sprint B):** `subscription-activation`, `wallet-top-up`, `wallet-auto-reload`, `subscription-management`, `quota-exceeded`, `trial-conversion`
+
+Billing flows require Stripe test mode + test cards. See `docs/ux-testing/stripe-test-cards.md` before running them.
 
 ### Chained Flows
 Flows chain with `+`: `first-login+calculator-builder`. When chained:
@@ -276,6 +304,10 @@ Follow the flow file for:
 | (E) Flow Builder Intuition | Can user build a workflow without docs? |
 | (F) API Integration Ease | Are code snippets correct? Copy-paste friendly? |
 | (G) Admin Insights | Does dashboard surface actionable business data? |
+| (H) Pricing Transparency | Is pricing + trial + post-trial behavior clear before commit? |
+| (I) Activation Funnel | Fresh signup → productive state — frictionless? |
+| (J) Wallet + Billing UX | Top-up, auto-reload, past-due recovery, invoice access — clear? |
+| (K) Quota Feedback | At-limit warnings, 429 response clarity, upgrade path visible? |
 | (H) Cross-Feature Coherence | Do modules feel like one platform or separate tools? |
 | (I) Error Recovery | When something breaks, can user recover without help? |
 

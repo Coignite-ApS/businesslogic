@@ -15,16 +15,51 @@ docs/ux-testing/
 │   ├── anna.md                  # Freelance consultant
 │   └── raj.md                   # Tech startup CTO
 ├── flows/                       # Test flows (phase sequences)
-│   ├── first-login.md           # Initial login + orientation
-│   ├── calculator-builder.md    # Build and test a calculator
-│   ├── formula-testing.md       # Write and execute formulas
-│   ├── ai-assistant.md          # AI chat interaction
-│   ├── knowledge-base.md        # KB upload, search, ask
-│   ├── api-integration.md       # API keys, code snippets, widget
-│   └── admin-dashboard.md       # Admin analytics overview
+│   ├── first-login.md              # Initial login + orientation
+│   ├── calculator-builder.md       # Build and test a calculator
+│   ├── formula-testing.md          # Write and execute formulas
+│   ├── ai-assistant.md             # AI chat interaction
+│   ├── knowledge-base.md           # KB upload, search, ask
+│   ├── api-integration.md          # API keys, code snippets, widget
+│   ├── admin-dashboard.md          # Admin analytics overview
+│   ├── subscription-activation.md  # Empty-trial wizard + Stripe Checkout (Sprint B)
+│   ├── wallet-top-up.md            # AI Wallet top-up via Stripe Checkout (Sprint B)
+│   ├── wallet-auto-reload.md       # Auto-reload settings + background consumer (Sprint B)
+│   ├── subscription-management.md  # View / upgrade / cancel / billing history (Sprint B)
+│   ├── quota-exceeded.md           # 429 recovery + upgrade funnel (Sprint B)
+│   └── trial-conversion.md         # Trial end → paid conversion + past_due recovery (Sprint B)
+├── stripe-test-cards.md         # Stripe test-card reference + CLI + test clocks
 ├── credentials/users/           # Saved test credentials per persona
 └── experience/users/            # Session history notes per persona
 ```
+
+## Billing + subscription flows (Pricing v2 — Sprint B)
+
+6 flows cover the full monetization journey. Each is designed to be run independently or chained. They require Stripe test mode + Stripe CLI — see [`stripe-test-cards.md`](./stripe-test-cards.md) for setup, card numbers, and webhook triggering.
+
+| Flow | Covers | Prereqs |
+|---|---|---|
+| `subscription-activation` | Empty-trial signup → pick module → Stripe Checkout → 14-day trial | Fresh account |
+| `wallet-top-up` | Low-balance banner → top-up dialog → Stripe Checkout → balance update | Active subscription |
+| `wallet-auto-reload` | Auto-reload config → simulated debit → background fire → Stripe charge | Active sub + saved card |
+| `subscription-management` | View / upgrade / downgrade / cancel / reactivate / billing history | ≥1 active sub |
+| `quota-exceeded` | Drive calls to quota → 429 with Retry-After → upgrade or wait to reset | Active sub + API key |
+| `trial-conversion` | 14-day trial ends → card converts OR past_due → recover via updated card | Trialing sub (any module) |
+
+**Intent coverage matrix** — which flows cover which user intents:
+
+| User intent | Primary flow | Supporting flows |
+|---|---|---|
+| "I signed up — what do I do first?" | subscription-activation | first-login |
+| "I need more AI credit" | wallet-top-up | wallet-auto-reload |
+| "I want my wallet to always stay funded" | wallet-auto-reload | — |
+| "How do I see what I'm paying for?" | subscription-management | admin-dashboard |
+| "I want to upgrade to a bigger plan" | subscription-management | quota-exceeded (upgrade path) |
+| "How do I cancel?" | subscription-management | — |
+| "Why did my API call fail with 429?" | quota-exceeded | api-integration |
+| "My trial is ending — what now?" | trial-conversion | subscription-management |
+| "My card was declined — how do I fix it?" | trial-conversion (Phase 6) | subscription-management (Phase 6) |
+| "Can I test without using a real card?" | (read `stripe-test-cards.md`) | all billing flows |
 
 ## Scoring Rubric
 
