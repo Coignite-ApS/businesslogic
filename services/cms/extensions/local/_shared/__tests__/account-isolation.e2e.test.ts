@@ -592,9 +592,13 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		// allowlist to `*` (or adds these fields individually) this test will fail.
 		if (res.data && res.data.length > 0) {
 			const keys = Object.keys(res.data[0] as Record<string, unknown>);
+			// Secrets must never leak through the user-facing permission.
 			expect(keys).not.toContain('key_hash');
 			expect(keys).not.toContain('encrypted_key');
-			expect(keys).not.toContain('key_prefix');
+			// key_prefix is the public visible portion (like Stripe's sk_live_abc123 — the
+			// prefix alone cannot be used to impersonate the key). Safe to expose to users
+			// so they can identify their own keys in lists; widened in F2.
+			expect(keys).toContain('key_prefix');
 		}
 	});
 
