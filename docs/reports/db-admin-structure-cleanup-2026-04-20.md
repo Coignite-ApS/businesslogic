@@ -22,21 +22,19 @@ Also: `scripts/_directus-common.sh` (shared helper), `scripts/db-structure-clean
 
 - pre PG dump:   `infrastructure/db-snapshots/pre_structure-cleanup_20260420_175017.sql.gz` (26.2 MB)
 - pre YAML:      `services/cms/snapshots/pre_structure-cleanup_20260420_175024.yaml` (562 KB)
-- post PG dump:  `infrastructure/db-snapshots/post_structure-cleanup_20260420_190408.sql.gz` (25 MB)
-- post YAML:     `services/cms/snapshots/post_structure-cleanup_20260420_190415.yaml` (561 KB)
+- post PG dump:  `infrastructure/db-snapshots/post_structure-cleanup_20260420_191018.sql.gz` (25 MB) — taken after bogus_table prune
+- post YAML:     `services/cms/snapshots/post_structure-cleanup_20260420_191022.yaml` (561 KB) — taken after bogus_table prune
 
 ## Delta counts (baseline → final)
 
 | Table | Before (Task A) | After | Δ | Expected Δ |
 |---|---:|---:|---:|---:|
-| directus_relations | 35 | 56 | +21 | +20 |
+| directus_relations | 35 | 55 | +20 | +20 |
 | directus_collections | 45 | 43 | −2 | −2 |
 | directus_fields | 562 | 529 | −33 | −33 |
 | directus_permissions | 81 | 85 | +4 | +4 |
 
-**Note on directus_relations (+21 vs +20 expected):** Task B's dry-run inserted a `bogus_table/bogus_field` test row to verify rollback logic. The row was not cleaned up before the dry-run verification passed. Net real additions: 20 correct relations + 1 artifact = 56 total. The artifact is harmless (no PG FK backing it, no collection named `bogus_table` exists) but should be pruned. Filed as follow-up below.
-
-collections, fields, permissions deltas all match expected exactly.
+All four deltas match expected exactly. (An initial post-snapshot at `20260420_190408`/`190415` briefly showed +21 relations due to a `bogus_table/bogus_field` test row left from Task B's error-smoke; pruned before final post-snapshot.)
 
 ## Verification evidence
 
@@ -73,7 +71,6 @@ Snapshots retained under the standard `KEEP_TASK=20` policy — do not auto-prun
 
 ## Follow-up items filed (non-blocking)
 
-- **Prune `bogus_table` artifact** — `DELETE FROM directus_relations WHERE many_collection='bogus_table'`. One stray row from Task B dry-run; harmless but noise.
 - **Harden preflight across scripts** — add filter-variable and child-collection-column checks to catch the `active_account` kind of drift before apply.
 - **API-keys User read whitelist** — expand to include non-secret config fields once UI requirements confirmed.
 - **`confirm_target_db()` helper** — guard all three phase scripts against accidental prod-DB execution. Lives in `_directus-common.sh`; all scripts would call it before any write.
