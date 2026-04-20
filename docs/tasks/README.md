@@ -14,20 +14,28 @@ Improvements organized by service. Use `/improvements` to manage, or `/improveme
 
 ---
 
-## 🚨 What to do next (Sprint B shipped 2026-04-19)
+## 🚨 What to do next (Sprint B merged + UX-tested 2026-04-20)
 
-Sprint B shipped tasks 17, 20, 21, 22, 27, cms/36, cms/37 on branch `dm/sprint-b-pricing-v2` (40 commits, all signed). Two-stage review caught 8 real bugs before merge (full list in sprint summary). Five follow-ups are now prioritized:
+Sprint B shipped + merged to dev. UX test with Sarah persona (2026-04-20) exposed **4 P0 billing-pipeline bugs** not caught by unit/browser QA because QA ran as admin. **Must fix before Sprint 3 deploy.**
 
 | Priority | # | Task | Why | Est. |
 |---|---|---|---|---|
-| ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes (build script skip, ioredis dep, Sprint B mounts) | Dev works — Sprint B browser QA of cms/36 + cms/37 can proceed now via dev. Full image rebuild split to task 44. | closed |
-| **🔴 P0 — BLOCKER** (for Sprint 3 deploy) | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | Pre-dates Sprint B; blocks production deploy (task 28). Fix via Docker Compose `additional_contexts` or vendor bl-widget dist. | 2-4h |
-| 🟠 P1 — before scale | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5 bundle) | Stats precision race · memory spike on backlog · non-blocking CMS boot | 2-3h |
-| 🟡 P2 — at 100+ accounts | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | Hourly flush of ALL accounts → thundering herd on DB; emit per-account instead | 1-2h |
-| 🟡 P2 — freshness | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | AI spend / KB search cap invalidation goes from 60s TTL to <100ms | 3-4h |
-| 🟢 P3 — product decision | [43](cross-cutting/43-flow-step-cost-rate.md) | `flow.step` cost rate | Pricing call needed (dm@coignite.dk): billable? flat? type-dependent? | 30min + impl |
+| **🔴 P0** (blocks deploy) | [48](cross-cutting/48-stripe-webhook-pipeline-broken.md) | Stripe webhook pipeline not creating subs / updating wallet | Checkout completes in Stripe, local DB never reconciles. Sarah "pays" then sees "No subscription". | 1-4h |
+| **🔴 P0** (blocks non-admin users) | [49](cross-cutting/49-user-role-metadata-permission.md) | User role missing `PATCH /users/me` permission for metadata | Onboarding wizard re-nags forever for any non-admin (invisible to admin-QA). | 30min-1h |
+| 🟠 P1 | [50](cross-cutting/50-onboarding-wizard-global-redirect.md) | Onboarding redirect only fires from Account module | >90% of new users land on `/admin/content/calculators` instead of wizard. | 2-4h |
+| 🟠 P1 | [51](cross-cutting/51-stripe-checkout-return-urls.md) | Stripe Checkout return URLs + no success page | Returns to `/admin/content/account` (raw Directus view) instead of subscription page with toast. | 1h |
+| 🟡 P1 bundle | [52](cross-cutting/52-ux-test-p1-cleanup-bundle.md) | UX polish (top-up inconsistency + AI perms + account crash + raw 403 copy) | 4 small items bundled from ux-test. | 3-4h |
+| **🔴 P0** (blocks deploy artifact) | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | Pre-dates Sprint B; blocks production image build. | 2-4h |
+| ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes | Closed — image rebuild split to task 44. | closed |
+| ✅ shipped 2026-04-20 | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5) | Migration 033 applied via db-admin. | closed |
+| ✅ shipped 2026-04-20 | [47](cross-cutting/47-plan-cards-v2-live-render-verification.md) | plan-cards.vue v2 live render | Verified in browser QA (calculators module). | closed |
+| 🟡 P2 | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | At scale (100+ accounts). | 1-2h |
+| 🟡 P2 | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | AI spend / KB search cap freshness. | 3-4h |
+| 🟢 P3 | [43](cross-cutting/43-flow-step-cost-rate.md) | `flow.step` cost rate | Pricing decision needed. | 30min+impl |
+| LOW QA | [45](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) | `/wallet/balance` echo auto_reload fields | Sprint B QA follow-up. | 30min |
+| LOW QA | [46](cross-cutting/46-wallet-dialog-a11y-labels.md) | Wallet dialog a11y labels | Sprint B QA follow-up. | 1h |
 
-**Suggested order:** ~~39 (dev path shipped)~~ → 40 (harden) → 44 (production deploy prereq) → Sprint 3 → 41/42/43.
+**Suggested order:** 48 (P0 webhook) → 49 (P0 user role perm) → 50+51 (P1 activation funnel) → 52 (P1 polish bundle) → 44 (image rebuild) → Sprint 3 → 41/42/43/45/46.
 
 **Sprint B branch ready for PR:** browser QA of cms/36+37 can proceed on dev NOW (task 39 dev-path shipped). Merge `dm/sprint-b-pricing-v2` → `dev` after browser smoke; task 44 (image rebuild) only blocks Sprint 3 production deploy, not the merge.
 
@@ -256,7 +264,12 @@ Infrastructure and multi-service concerns.
 | 44 | 🔴 **CMS Docker image rebuild** — `packages/bl-widget` outside build context (blocks Sprint 3) | planned | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
 | 45 | `/wallet/balance` response echo auto_reload fields (Sprint B QA follow-up — LOW) | planned | [cross-cutting/45-wallet-balance-response-auto-reload-fields.md](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) |
 | 46 | Wallet settings dialog a11y labels (Sprint B QA follow-up — LOW) | planned | [cross-cutting/46-wallet-dialog-a11y-labels.md](cross-cutting/46-wallet-dialog-a11y-labels.md) |
-| 47 | plan-cards.vue v2 live render verification (needs subscribed test account — LOW) | planned | [cross-cutting/47-plan-cards-v2-live-render-verification.md](cross-cutting/47-plan-cards-v2-live-render-verification.md) |
+| 47 | plan-cards.vue v2 live render verification (needs subscribed test account — LOW) | **completed 2026-04-20** | [cross-cutting/47-plan-cards-v2-live-render-verification.md](cross-cutting/47-plan-cards-v2-live-render-verification.md) |
+| 48 | 🔴 **P0: Stripe webhook pipeline not creating subscriptions / updating wallet** (from ux-test) | planned | [cross-cutting/48-stripe-webhook-pipeline-broken.md](cross-cutting/48-stripe-webhook-pipeline-broken.md) |
+| 49 | 🔴 **P0: User role missing PATCH /users/me metadata permission** (from ux-test) | planned | [cross-cutting/49-user-role-metadata-permission.md](cross-cutting/49-user-role-metadata-permission.md) |
+| 50 | 🟠 **P1: Onboarding redirect only fires from Account module** (from ux-test) | planned | [cross-cutting/50-onboarding-wizard-global-redirect.md](cross-cutting/50-onboarding-wizard-global-redirect.md) |
+| 51 | 🟠 **P1: Stripe Checkout return URLs wrong + no success page** (from ux-test) | planned | [cross-cutting/51-stripe-checkout-return-urls.md](cross-cutting/51-stripe-checkout-return-urls.md) |
+| 52 | 🟡 **P1: UX polish bundle** — top-up entry + AI perms + account crash + 403 copy (from ux-test) | planned | [cross-cutting/52-ux-test-p1-cleanup-bundle.md](cross-cutting/52-ux-test-p1-cleanup-bundle.md) |
 
 ---
 
@@ -369,7 +382,7 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 16 | 0 | 0 | 19 | 35 |
-| **Total** | **32** | **8** | **0** | **69** | **109** |
+| Cross-Cutting | 20 | 0 | 0 | 20 | 40 |
+| **Total** | **36** | **8** | **0** | **70** | **114** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision
