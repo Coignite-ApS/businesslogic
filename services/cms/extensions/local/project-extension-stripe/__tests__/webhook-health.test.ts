@@ -103,6 +103,11 @@ function makeHealthDb(fixtures: {
 				if (col === 'status' && val === '200') mode = 'last-failure';
 				return chain;
 			}),
+			whereNotIn: vi.fn((col: string, vals: any[]) => {
+				// whereNotIn('status', ['200', 'reconciled']) → last-failure mode
+				if (col === 'status' && Array.isArray(vals) && vals.includes('200')) mode = 'last-failure';
+				return chain;
+			}),
 			orderBy: vi.fn().mockReturnThis(),
 			groupBy: vi.fn().mockReturnThis(),
 			select: vi.fn().mockReturnThis(),

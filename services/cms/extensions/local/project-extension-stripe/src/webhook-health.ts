@@ -65,8 +65,9 @@ export async function computeWebhookHealth(
 		.first();
 
 	// ─── Last failure ────────────────────────────────────────
+	// Exclude 'reconciled' rows — they are synthetic success entries, not failures.
 	const lastFailureRow = await db('stripe_webhook_log')
-		.whereNot('status', '200')
+		.whereNotIn('status', ['200', 'reconciled'])
 		.orderBy('received_at', 'desc')
 		.select('received_at', 'status', 'event_id', 'event_type', 'error_message')
 		.first();

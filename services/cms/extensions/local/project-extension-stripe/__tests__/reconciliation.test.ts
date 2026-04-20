@@ -7,6 +7,7 @@
  *   - reconcileWalletTopups: creates missing ledger+topup rows, skips existing ones
  *   - Idempotency: no duplicates on repeat calls with same state
  *   - Reconciliation log: writes stripe_webhook_log rows with status='reconciled'
+ *   - Pagination: autoPagingEach processes >100 items
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -15,6 +16,24 @@ import {
 	reconcileWalletTopups,
 	type ReconcileContext,
 } from '../src/reconciliation.js';
+
+// ─── autoPagingEach helper ─────────────────────────────────────
+
+/**
+ * Creates a Stripe-style list response that supports autoPagingEach.
+ * The callback is called once per item sequentially.
+ */
+function makeStripeList(items: any[]) {
+	return {
+		data: items,
+		has_more: false,
+		autoPagingEach: vi.fn(async (cb: (item: any) => Promise<void>) => {
+			for (const item of items) {
+				await cb(item);
+			}
+		}),
+	};
+}
 
 // ─── Helpers ───────────────────────────────────────────────────
 
@@ -98,59 +117,37 @@ describe('reconcileSubscriptions', () => {
 
 		const stripeClient: any = {
 			subscriptions: {
-				list: vi.fn().mockResolvedValue({
-					data: [stripeSub],
-					has_more: false,
-				}),
+				list: vi.fn().mockReturnValue(makeStripeList([stripeSub])),
 			},
 		};
 
 		const plan = { id: 'plan-uuid-1', module: 'calculators', tier: 'starter' };
 		let insertedSub: any = null;
+		let refreshQuotasCalledWith: string | null = null;
 
-		const db: any = {
-			raw: vi.fn().mockImplementation((sql: string, params?: any[]) => {
-				// INSERT ... RETURNING id
-				if (sql.includes('INSERT INTO public.subscriptions')) {
-					insertedSub = params;
-					return Promise.resolve({ rows: [{ id: 'new-sub-uuid' }] });
-				}
-				// refresh_feature_quotas
-				if (sql.includes('refresh_feature_quotas')) {
-					return Promise.resolve({});
-				}
-				return Promise.resolve({ rows: [] });
-			}),
-			transaction: vi.fn().mockImplementation((fn: any) => fn(db)),
-			// DB queries (knex-style chain mocks)
-			_queryResults: new Map<string, any>(),
-		};
-
-		// subscription lookup → not found
-		const subQuery = createChainMock(null);
-		// plan lookup → found
-		const planQuery = createChainMock(plan);
-
-		db.__call_count = 0;
-		db['__fn'] = vi.fn().mockImplementation((table: string) => {
-			if (table === 'subscriptions') {
-				// First call in transaction: check for existing
-				return subQuery;
+		const rawMock = vi.fn().mockImplementation((sql: string, params?: any[]) => {
+			if (sql.includes('INSERT INTO public.subscriptions')) {
+				insertedSub = params;
+				return Promise.resolve({ rows: [{ id: 'new-sub-uuid' }] });
 			}
-			if (table === 'subscription_plans') {
-				return planQuery;
+			if (sql.includes('refresh_feature_quotas')) {
+				refreshQuotasCalledWith = params?.[0] ?? null;
+				return Promise.resolve({});
 			}
-			if (table === 'stripe_webhook_log') {
-				return createInsertMock();
-			}
-			return createChainMock(null);
+			return Promise.resolve({ rows: [] });
 		});
 
-		// Make db callable
-		const dbFn = Object.assign(
-			(table: string) => db['__fn'](table),
-			db,
-		);
+		// Build dbFn first, then attach transaction that passes dbFn as trx
+		const tableRouter = (table: string) => {
+			if (table === 'subscriptions') return createChainMock(null);
+			if (table === 'subscription_plans') return createChainMock(plan);
+			if (table === 'stripe_webhook_log') return createInsertMock();
+			return createChainMock(null);
+		};
+
+		const db: any = { raw: rawMock };
+		const dbFn: any = Object.assign(tableRouter, db);
+		dbFn.transaction = vi.fn().mockImplementation((fn: any) => fn(dbFn));
 
 		ctx = { stripe: stripeClient, db: dbFn, logger, windowHours: 48 };
 
@@ -162,6 +159,19 @@ describe('reconcileSubscriptions', () => {
 		expect(logger.warn).toHaveBeenCalledWith(
 			expect.stringContaining('reconciled'),
 		);
+
+		// Assert INSERT payload correctness (#6)
+		expect(insertedSub).toBeDefined();
+		// params: [accountId, plan.id, module, tier, subStatus, billingCycle, customerId, sub.id, periodStart, periodEnd, ...]
+		expect(insertedSub[0]).toBe('account-uuid-1');  // account_id
+		expect(insertedSub[1]).toBe('plan-uuid-1');      // subscription_plan_id
+		expect(insertedSub[2]).toBe('calculators');       // module
+		expect(insertedSub[3]).toBe('starter');           // tier
+		expect(insertedSub[4]).toBe('active');            // status
+		expect(insertedSub[7]).toBe('sub_test123');       // stripe_subscription_id
+
+		// Assert refresh_feature_quotas called with correct accountId (#6)
+		expect(refreshQuotasCalledWith).toBe('account-uuid-1');
 	});
 
 	it('skips when matching subscription already exists in DB', async () => {
@@ -170,10 +180,7 @@ describe('reconcileSubscriptions', () => {
 
 		const stripeClient: any = {
 			subscriptions: {
-				list: vi.fn().mockResolvedValue({
-					data: [stripeSub],
-					has_more: false,
-				}),
+				list: vi.fn().mockReturnValue(makeStripeList([stripeSub])),
 			},
 		};
 
@@ -204,7 +211,7 @@ describe('reconcileSubscriptions', () => {
 
 		const stripeClient: any = {
 			subscriptions: {
-				list: vi.fn().mockResolvedValue({ data: [stripeSub], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([stripeSub])),
 			},
 		};
 
@@ -238,7 +245,7 @@ describe('reconcileSubscriptions', () => {
 
 		const stripeClient: any = {
 			subscriptions: {
-				list: vi.fn().mockResolvedValue({ data: [stripeSub], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([stripeSub])),
 			},
 		};
 
@@ -260,7 +267,7 @@ describe('reconcileSubscriptions', () => {
 
 		const stripeClient: any = {
 			subscriptions: {
-				list: vi.fn().mockResolvedValue({ data: [canceledSub], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([canceledSub])),
 			},
 		};
 
@@ -290,21 +297,20 @@ describe('reconcileWalletTopups', () => {
 
 		const stripeClient: any = {
 			paymentIntents: {
-				list: vi.fn().mockResolvedValue({ data: [pi], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
 			},
 		};
 
 		let topupInserted = false;
 		let ledgerInserted = false;
-		let walletUpserted = false;
+		let ledgerRow: any = null;
 
-		const rawMock = vi.fn().mockImplementation((sql: string) => {
+		const rawMock = vi.fn().mockImplementation((sql: string, params?: any[]) => {
 			if (sql.includes('ai_wallet_topup')) {
 				topupInserted = true;
-				return Promise.resolve({ rows: [{ id: 'new-topup-uuid', balance_eur: 10 }] });
+				return Promise.resolve({ rows: [{ id: 'new-topup-uuid' }] });
 			}
 			if (sql.includes('ai_wallet')) {
-				walletUpserted = true;
 				return Promise.resolve({ rows: [{ balance_eur: 10 }] });
 			}
 			return Promise.resolve({ rows: [] });
@@ -312,21 +318,26 @@ describe('reconcileWalletTopups', () => {
 
 		const db: any = {
 			raw: rawMock,
-			transaction: vi.fn().mockImplementation((fn: any) => fn({
-				raw: rawMock,
-				'ai_wallet_topup': () => createChainMock(null), // no existing topup
-				'ai_wallet_ledger': () => ({ insert: vi.fn().mockResolvedValue(undefined) }),
-			})),
+			transaction: vi.fn().mockImplementation((fn: any) => {
+				const trx: any = (table: string) => {
+					if (table === 'ai_wallet_ledger') {
+						return makeLedgerMock((row: any) => {
+							ledgerInserted = true;
+							ledgerRow = row;
+						});
+					}
+					if (table === 'wallet_auto_reload_pending') return createChainMock(null);
+					return createChainMock(null);
+				};
+				trx.raw = rawMock;
+				trx.transaction = db.transaction;
+				return fn(trx);
+			}),
 		};
-
-		// topup lookup → not found
-		const noTopupQuery = createChainMock(null);
-		const topupLedgerInsert = { insert: vi.fn().mockImplementation(() => { ledgerInserted = true; return Promise.resolve(); }) };
 
 		const dbFn = Object.assign(
 			(table: string) => {
-				if (table === 'ai_wallet_topup') return noTopupQuery;
-				if (table === 'ai_wallet_ledger') return topupLedgerInsert;
+				if (table === 'ai_wallet_topup') return createChainMock(null);
 				if (table === 'stripe_webhook_log') return createInsertMock();
 				return createChainMock(null);
 			},
@@ -340,6 +351,15 @@ describe('reconcileWalletTopups', () => {
 		expect(result.reconciled).toBe(1);
 		expect(result.skipped).toBe(0);
 		expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('reconciled'));
+		expect(topupInserted).toBe(true);
+		expect(ledgerInserted).toBe(true);
+
+		// Assert ledger payload (#6)
+		expect(ledgerRow).toBeDefined();
+		expect(Number(ledgerRow.amount_eur)).toBe(10);
+		expect(ledgerRow.source).toBe('topup');
+		expect(JSON.parse(ledgerRow.metadata).reconciled).toBe(true);
+		expect(Number(ledgerRow.balance_after_eur)).toBe(10);
 	});
 
 	it('skips when topup row already exists in DB', async () => {
@@ -348,7 +368,7 @@ describe('reconcileWalletTopups', () => {
 
 		const stripeClient: any = {
 			paymentIntents: {
-				list: vi.fn().mockResolvedValue({ data: [pi], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
 			},
 		};
 
@@ -373,7 +393,7 @@ describe('reconcileWalletTopups', () => {
 
 		const stripeClient: any = {
 			paymentIntents: {
-				list: vi.fn().mockResolvedValue({ data: [pi], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
 			},
 		};
 
@@ -400,7 +420,7 @@ describe('reconcileWalletTopups', () => {
 
 		const stripeClient: any = {
 			paymentIntents: {
-				list: vi.fn().mockResolvedValue({ data: [pi], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
 			},
 		};
 
@@ -421,7 +441,7 @@ describe('reconcileWalletTopups', () => {
 
 		const stripeClient: any = {
 			paymentIntents: {
-				list: vi.fn().mockResolvedValue({ data: [pi], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
 			},
 		};
 
@@ -431,6 +451,78 @@ describe('reconcileWalletTopups', () => {
 
 		const result = await reconcileWalletTopups(ctx);
 		expect(result.errors).toBe(1);
+	});
+
+	it('reads is_auto_reload from PI metadata and passes it through', async () => {
+		const pi = makeStripePI({
+			metadata: {
+				pricing_version: 'v2',
+				product_kind: 'wallet_topup',
+				account_id: 'account-uuid-1',
+				wallet_topup_amount_eur: '10.00',
+				is_auto_reload: 'true',
+			},
+		});
+
+		const stripeClient: any = {
+			paymentIntents: {
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
+			},
+		};
+
+		let autoReloadUpdated = false;
+		let capturedIsAutoReload: boolean | null = null;
+
+		const rawMock = vi.fn().mockImplementation((sql: string, params?: any[]) => {
+			if (sql.includes('ai_wallet_topup')) {
+				// capture is_auto_reload param (5th binding: accountId, amountEur, pi.id, chargeId, isAutoReload)
+				capturedIsAutoReload = params?.[4] ?? null;
+				return Promise.resolve({ rows: [{ id: 'new-topup-uuid' }] });
+			}
+			if (sql.includes('ai_wallet')) {
+				return Promise.resolve({ rows: [{ balance_eur: 10 }] });
+			}
+			return Promise.resolve({ rows: [] });
+		});
+
+		const db: any = {
+			raw: rawMock,
+			transaction: vi.fn().mockImplementation((fn: any) => {
+				const trx: any = (table: string) => {
+					if (table === 'ai_wallet_ledger') {
+						return makeLedgerMock();
+					}
+					if (table === 'wallet_auto_reload_pending') {
+						const chain = createChainMock(null);
+						chain.update = vi.fn().mockImplementation(() => {
+							autoReloadUpdated = true;
+							return Promise.resolve(1);
+						});
+						return chain;
+					}
+					return createChainMock(null);
+				};
+				trx.raw = rawMock;
+				trx.transaction = db.transaction;
+				return fn(trx);
+			}),
+		};
+
+		const dbFn = Object.assign(
+			(table: string) => {
+				if (table === 'ai_wallet_topup') return createChainMock(null);
+				if (table === 'stripe_webhook_log') return createInsertMock();
+				return createChainMock(null);
+			},
+			db,
+		);
+
+		ctx = { stripe: stripeClient, db: dbFn, logger, windowHours: 48 };
+
+		const result = await reconcileWalletTopups(ctx);
+		expect(result.reconciled).toBe(1);
+		expect(capturedIsAutoReload).toBe(true);
+		expect(autoReloadUpdated).toBe(true);
 	});
 });
 
@@ -443,7 +535,7 @@ describe('reconciliation log writes', () => {
 
 		const stripeClient: any = {
 			subscriptions: {
-				list: vi.fn().mockResolvedValue({ data: [stripeSub], has_more: false }),
+				list: vi.fn().mockReturnValue(makeStripeList([stripeSub])),
 			},
 		};
 
@@ -460,10 +552,14 @@ describe('reconciliation log writes', () => {
 
 		const db: any = {
 			raw: rawMock,
-			transaction: vi.fn().mockImplementation((fn: any) => fn({
-				raw: rawMock,
-				__is_trx: true,
-			})),
+			transaction: vi.fn().mockImplementation((fn: any) => {
+				const trx: any = (table: string) => {
+					if (table === 'subscription_plans') return createChainMock(plan);
+					return createChainMock(null);
+				};
+				trx.raw = rawMock;
+				return fn(trx);
+			}),
 		};
 
 		const dbFn = Object.assign(
@@ -495,6 +591,97 @@ describe('reconciliation log writes', () => {
 	});
 });
 
+// ─── Pagination test ──────────────────────────────────────────
+
+describe('pagination — autoPagingEach processes all items', () => {
+	it('processes 150 subscriptions via autoPagingEach (not just first 100)', async () => {
+		// Build 150 unique subs — all existing (skip), just verify all 150 are checked
+		const subs = Array.from({ length: 150 }, (_, i) =>
+			makeStripeSub({
+				id: `sub_page_${i}`,
+				metadata: {
+					account_id: `account-${i}`,
+					module: 'calculators',
+					tier: 'starter',
+					billing_cycle: 'monthly',
+				},
+			}),
+		);
+
+		// All already exist in DB → all skipped
+		const existingRow = { id: 'existing', stripe_subscription_id: 'x' };
+
+		let paginateCallCount = 0;
+		const stripeClient: any = {
+			subscriptions: {
+				list: vi.fn().mockReturnValue({
+					data: subs.slice(0, 100),
+					has_more: true,
+					autoPagingEach: vi.fn(async (cb: (item: any) => Promise<void>) => {
+						for (const sub of subs) {
+							paginateCallCount++;
+							await cb(sub);
+						}
+					}),
+				}),
+			},
+		};
+
+		const dbFn = (table: string) => {
+			if (table === 'subscriptions') return createChainMock(existingRow);
+			return createChainMock(null);
+		};
+
+		const logger = makeLogger();
+		const ctx: ReconcileContext = { stripe: stripeClient, db: dbFn as any, logger, windowHours: 48 };
+
+		const result = await reconcileSubscriptions(ctx);
+		expect(paginateCallCount).toBe(150);
+		expect(result.checked).toBe(150);
+		expect(result.skipped).toBe(150);
+		expect(result.reconciled).toBe(0);
+	});
+
+	it('processes 150 PaymentIntents via autoPagingEach (not just first 100)', async () => {
+		const pis = Array.from({ length: 150 }, (_, i) =>
+			makeStripePI({ id: `pi_page_${i}` }),
+		);
+
+		// All already exist in DB → all skipped
+		const existingTopup = { id: 'existing-topup', stripe_payment_intent_id: 'x' };
+
+		let paginateCallCount = 0;
+		const stripeClient: any = {
+			paymentIntents: {
+				list: vi.fn().mockReturnValue({
+					data: pis.slice(0, 100),
+					has_more: true,
+					autoPagingEach: vi.fn(async (cb: (item: any) => Promise<void>) => {
+						for (const pi of pis) {
+							paginateCallCount++;
+							await cb(pi);
+						}
+					}),
+				}),
+			},
+		};
+
+		const dbFn = (table: string) => {
+			if (table === 'ai_wallet_topup') return createChainMock(existingTopup);
+			return createChainMock(null);
+		};
+
+		const logger = makeLogger();
+		const ctx: ReconcileContext = { stripe: stripeClient, db: dbFn as any, logger, windowHours: 48 };
+
+		const result = await reconcileWalletTopups(ctx);
+		expect(paginateCallCount).toBe(150);
+		expect(result.checked).toBe(150);
+		expect(result.skipped).toBe(150);
+		expect(result.reconciled).toBe(0);
+	});
+});
+
 // ─── chainMock factory ─────────────────────────────────────────
 
 /**
@@ -508,7 +695,10 @@ function createChainMock(result: any) {
 	}
 	chain.first = vi.fn().mockResolvedValue(result);
 	chain.update = vi.fn().mockResolvedValue(1);
-	chain.insert = vi.fn().mockResolvedValue(undefined);
+	chain.insert = vi.fn().mockReturnValue({
+		returning: vi.fn().mockResolvedValue([{ id: 'mock-row-id' }]),
+		then: (resolve: any) => Promise.resolve(undefined).then(resolve),
+	});
 	// Allow use as a query-builder that also resolves as a promise (for `.then`-able)
 	chain.then = undefined; // not thenable at root level
 	return chain;
@@ -516,6 +706,25 @@ function createChainMock(result: any) {
 
 function createInsertMock() {
 	return {
-		insert: vi.fn().mockResolvedValue(undefined),
+		insert: vi.fn().mockReturnValue({
+			returning: vi.fn().mockResolvedValue([{ id: 'mock-row-id' }]),
+			then: (resolve: any) => Promise.resolve(undefined).then(resolve),
+		}),
+	};
+}
+
+/**
+ * Creates an ai_wallet_ledger mock that supports `insert(row).returning('id')`.
+ * The `onInsert` callback receives the row payload for assertions.
+ */
+function makeLedgerMock(onInsert?: (row: any) => void) {
+	return {
+		insert: vi.fn().mockImplementation((row: any) => {
+			onInsert?.(row);
+			return {
+				returning: vi.fn().mockResolvedValue([{ id: 'ledger-uuid' }]),
+				then: (resolve: any) => Promise.resolve([{ id: 'ledger-uuid' }]).then(resolve),
+			};
+		}),
 	};
 }
