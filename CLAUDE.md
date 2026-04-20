@@ -376,6 +376,8 @@ services/cms/
 │   │   ├── project-extension-widget-api/       # Hook: widget endpoints
 │   │   ├── project-extension-usage-consumer/   # Hook: usage_events stream consumer + monthly_aggregates cron (Sprint B)
 │   │   └── project-extension-stripe/           # Hook: billing + wallet + quota refresh (Sprint B)
+│
+│   **Shared lib convention:** `_shared/` and `project-extension-feature-gate/` are NOT real extensions — they're build-time helpers whose imports are inlined into consumers at bundle time. They carry a no-op `directus:extension` bundle manifest (`type: "bundle", entries: []`) with pre-built empty `dist/app.js` and `dist/api.js` stubs (checked into git). This is required: Directus 11.16 Zod-validates every directory under `/directus/extensions/` and fails the entire hook layer on any invalid manifest. Any new shared lib MUST follow the same pattern.
 │   └── package.json             # NPM extension dependencies
 │
 ├── config.local.yaml            # Local dev config

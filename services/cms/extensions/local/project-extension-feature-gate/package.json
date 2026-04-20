@@ -2,5 +2,17 @@
   "name": "project-extension-feature-gate",
   "version": "1.0.0",
   "type": "module",
-  "main": "src/index.ts"
+  "main": "src/index.ts",
+  "directus:extension": {
+    "host": "^11.0.0",
+    "type": "bundle",
+    "path": { "app": "dist/app.js", "api": "dist/api.js" },
+    "entries": []
+  },
+  "scripts": {
+    "build": "directus-extension build"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^17.0.11"
+  }
 }
