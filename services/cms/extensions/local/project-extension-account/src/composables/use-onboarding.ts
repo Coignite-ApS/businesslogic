@@ -51,18 +51,10 @@ export function useOnboarding(api: any) {
 	async function _patchOnboardingState(patch: Partial<OnboardingState>): Promise<void> {
 		error.value = null;
 		try {
-			// Fetch current metadata first to avoid overwriting other keys
-			const { data } = await api.get('/users/me', {
-				params: { fields: ['metadata'] },
-			});
-			const existingMeta = data?.data?.metadata || {};
-			const existingOnboarding = existingMeta?.onboarding_state || {};
-
-			const newOnboarding = { ...existingOnboarding, ...patch };
-			await api.patch('/users/me', {
-				metadata: { ...existingMeta, onboarding_state: newOnboarding },
-			});
-			// Update local state
+			// POST to dedicated endpoint — bypasses User-role directus_users.update
+			// restriction. Server merges patch into metadata.onboarding_state via admin DB.
+			await api.post('/account/onboarding/state', patch);
+			// Optimistic local update (no need to refetch full user)
 			state.value = { ...state.value, ...patch };
 		} catch (err: any) {
 			error.value = err.message;

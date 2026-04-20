@@ -13,11 +13,11 @@ function makeMeta(onboarding_state: Record<string, any> | undefined = undefined)
 	};
 }
 
-function makeApi(overrides: { getMeta?: any; patchFn?: any } = {}) {
-	const patchFn = overrides.patchFn ?? vi.fn().mockResolvedValue({});
+function makeApi(overrides: { getMeta?: any; postFn?: any } = {}) {
+	const postFn = overrides.postFn ?? vi.fn().mockResolvedValue({ data: { ok: true, onboarding_state: {} } });
 	const getMeta = overrides.getMeta ?? {};
 	const getFn = vi.fn().mockResolvedValue(makeMeta(getMeta));
-	return { api: { get: getFn, patch: patchFn }, getFn, patchFn };
+	return { api: { get: getFn, post: postFn }, getFn, postFn };
 }
 
 // ─── needsWizard ──────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ describe('useOnboarding: fetchOnboardingState', () => {
 	});
 
 	it('sets error and resets to empty on fetch failure', async () => {
-		const errApi = { get: vi.fn().mockRejectedValue(new Error('network')), patch: vi.fn() };
+		const errApi = { get: vi.fn().mockRejectedValue(new Error('network')), post: vi.fn() };
 		const { state, error, fetchOnboardingState } = useOnboarding(errApi);
 		await fetchOnboardingState();
 		expect(error.value).toBe('network');
@@ -107,26 +107,27 @@ describe('useOnboarding: fetchOnboardingState', () => {
 // ─── captureIntent ─────────────────────────────────────────────────────────────
 
 describe('useOnboarding: captureIntent', () => {
-	it('PATCHes user metadata with intent and updates local state', async () => {
-		const { api, patchFn } = makeApi();
+	it('POSTs to /account/onboarding/state with intent and updates local state', async () => {
+		const { api, postFn } = makeApi();
 		const { state, captureIntent } = useOnboarding(api);
 		await captureIntent('kb');
-		expect(patchFn).toHaveBeenCalledOnce();
-		const body = patchFn.mock.calls[0][1];
-		expect(body.metadata.onboarding_state.intent_captured).toBe('kb');
+		expect(postFn).toHaveBeenCalledOnce();
+		const [url, body] = postFn.mock.calls[0];
+		expect(url).toBe('/account/onboarding/state');
+		expect(body.intent_captured).toBe('kb');
 		expect(state.value.intent_captured).toBe('kb');
 	});
 
-	it('merges with existing metadata keys', async () => {
-		const { api, patchFn } = makeApi({
+	it('sends only the changed field to the endpoint', async () => {
+		const { api, postFn } = makeApi({
 			getMeta: { intent_captured: 'calculators', some_other: 'key' },
 		});
 		const { captureIntent } = useOnboarding(api);
 		await captureIntent('flows');
-		const body = patchFn.mock.calls[0][1];
-		// onboarding_state should be merged
-		expect(body.metadata.onboarding_state.intent_captured).toBe('flows');
-		// The outer metadata key `some_other` is preserved via spread
+		const [, body] = postFn.mock.calls[0];
+		// Flat patch — server handles the merge
+		expect(body.intent_captured).toBe('flows');
+		expect(body.metadata).toBeUndefined(); // no metadata wrapper
 	});
 });
 
@@ -134,12 +135,12 @@ describe('useOnboarding: captureIntent', () => {
 
 describe('useOnboarding: markActivated', () => {
 	it('sets first_module_activated_at and wizard_completed_at', async () => {
-		const { api, patchFn } = makeApi();
+		const { api, postFn } = makeApi();
 		const { state, markActivated } = useOnboarding(api);
 		await markActivated();
-		const body = patchFn.mock.calls[0][1];
-		expect(body.metadata.onboarding_state.first_module_activated_at).toBeTruthy();
-		expect(body.metadata.onboarding_state.wizard_completed_at).toBeTruthy();
+		const [, body] = postFn.mock.calls[0];
+		expect(body.first_module_activated_at).toBeTruthy();
+		expect(body.wizard_completed_at).toBeTruthy();
 		expect(state.value.first_module_activated_at).toBeTruthy();
 	});
 
@@ -155,14 +156,15 @@ describe('useOnboarding: markActivated', () => {
 // ─── markCompleted ─────────────────────────────────────────────────────────────
 
 describe('useOnboarding: markCompleted', () => {
-	it('sets wizard_completed_at without touching first_module_activated_at', async () => {
-		const { api, patchFn } = makeApi();
+	it('sets wizard_completed_at — only sends that field', async () => {
+		const { api, postFn } = makeApi();
 		const { state, markCompleted } = useOnboarding(api);
 		await markCompleted();
-		const body = patchFn.mock.calls[0][1];
-		expect(body.metadata.onboarding_state.wizard_completed_at).toBeTruthy();
-		// first_module_activated_at not in patch
-		expect(body.metadata.onboarding_state.first_module_activated_at).toBeUndefined();
+		const [url, body] = postFn.mock.calls[0];
+		expect(url).toBe('/account/onboarding/state');
+		expect(body.wizard_completed_at).toBeTruthy();
+		// first_module_activated_at not in patch (server preserves it)
+		expect(body.first_module_activated_at).toBeUndefined();
 		expect(state.value.wizard_completed_at).toBeTruthy();
 	});
 
