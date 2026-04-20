@@ -580,11 +580,14 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 
 	// ── api_keys + api_key_usage (no Directus permissions) ──
 
-	it('api_keys: user token cannot read via HTTP (no policy grants it)', async () => {
+	it('api_keys: user token can read own keys (User Access policy with account filter)', async () => {
 		if (!run) return;
 		const res = await getItems(tokenA, 'api_keys');
-		// 403 (forbidden) expected — no User Access permission configured.
-		expect(res.status).toBe(403);
+		// 200 expected — Task D (structure-cleanup Phase 3) added a User Access READ
+		// permission with account_id = $CURRENT_USER.active_account filter.
+		// Sensitive fields (key_hash, encrypted_key, key_prefix) are NOT in the allowed
+		// field list; only safe config fields are exposed.
+		expect(res.status).toBe(200);
 	});
 
 	it('api_keys: DB-level account filter isolates rows', async () => {
@@ -719,9 +722,10 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 		// asserted in detail by the Task-36 regression guard above.
 		expect(tokenUsagePerms.length).toBeGreaterThan(0);
 
-		// api_keys + api_key_usage: no Directus permissions (service-internal; gateway-only access).
-		// Asserted so a future change that adds permissions without an account filter fails here.
-		expect(apiKeysPerms.length).toBe(0);
+		// api_keys: 1 permission row — User Access READ with account_id = $CURRENT_USER.active_account
+		// filter (Task D / structure-cleanup Phase 3). Sensitive fields excluded from allowed list.
+		// api_key_usage: still no Directus permissions (composite-PK table removed from directus_collections).
+		expect(apiKeysPerms.length).toBe(1);
 		expect(apiKeyUsagePerms.length).toBe(0);
 	});
 });
