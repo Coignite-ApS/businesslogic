@@ -1,8 +1,34 @@
 # 37. Extract shared test helpers (pricing v2 realdb tests)
 
-**Status:** planned
+**Status:** completed 2026-04-21 — helpers live under `services/cms/extensions/local/_shared/test-helpers/` (not `packages/bl-test-helpers`; see "Landing location" below).
 **Severity:** LOW — hygiene / maintainability
 **Source:** Task 26 code review (commit `dd75873`) — issues I2, I3, I4
+
+## Resolution (2026-04-21)
+
+Shipped on `dm/task-37-shared-test-helpers`:
+- Moved `_shared/__tests__/helpers/` → `_shared/test-helpers/` (promoted out of the per-suite `__tests__` dir so sibling extensions can import it).
+- Added `lookupRoleIdByName()` and `lookupPolicyIdByName()` helpers. `createTestUser()` defaults to name-based lookup ("User"); callers can override.
+- Added `getPgClient()` helper for tests that prefer raw `pg.Client` over knex (`refresh-quotas.integration.test.ts`).
+- Refactored 4 stripe tests to import shared helpers, deleting duplicate knex/pg bootstraps and local `createTestAccount`:
+  - `wallet-flow.realdb.test.ts`
+  - `multi-module-subs.realdb.test.ts`
+  - `auto-reload-consumer.realdb.test.ts` (bonus — task doc called out 2, but this one had the same pattern)
+  - `refresh-quotas.integration.test.ts` (ported from raw `pg` import to `getPgClient()` helper)
+- Refactored `webhook-http.realdb.test.ts` similarly.
+- Replaced 2 hardcoded UUIDs in `account-isolation.e2e.test.ts` (Administrator role, User Access policy) with name lookups.
+- Removed `knex` + `pg` from `project-extension-stripe/devDependencies` + regenerated `package-lock.json` (knex remains as transitive via `@directus/extensions-sdk`, which is expected).
+- Added `_shared/test-helpers/README.md` documenting the pattern + env overrides.
+
+Tests: 150/150 stripe (incl. 15 realdb live + 3 integration live) · 37/37 _shared · full calculator-api and ai-api/knowledge-api builds still clean.
+
+### Landing location — why `_shared/test-helpers/` and not `packages/bl-test-helpers`
+
+The repo has no root npm workspace; `packages/` is reserved for publishable libs (`@coignite/bl-events`, `@coignite/bl-sdk`, `@coignite/bl-widget`). Cross-extension code reuse inside the CMS is already done via `_shared/` with relative imports (`../../_shared/v2-subscription.js`). Test helpers follow that same pattern — dev-only, not published, imported by relative path. Fewer moving parts than a standalone package; zero bundler coupling to Rollup's Directus build.
+
+---
+
+## Original problem statement (preserved for reference)
 
 ## Problem
 

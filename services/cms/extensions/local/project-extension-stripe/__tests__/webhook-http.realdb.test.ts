@@ -30,11 +30,12 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRequire } from 'module';
 import Stripe from 'stripe';
-
-const require = createRequire(import.meta.url);
-const knex = require('knex');
+import {
+	getDb,
+	createTestAccount as _createTestAccount,
+	cleanupAccounts,
+} from '../../_shared/test-helpers/db.js';
 
 const CMS_URL = process.env.TEST_CMS_URL ?? 'http://localhost:18055';
 const WEBHOOK_PATH = '/stripe/webhook';
@@ -93,12 +94,7 @@ async function stripeRouteRegistered(): Promise<boolean> {
 }
 
 async function createTestAccount(name: string): Promise<string> {
-	const [{ id }] = await db.raw(
-		`INSERT INTO public.account (id, status, name, date_created)
-		 VALUES (gen_random_uuid(), 'active', ?, now())
-		 RETURNING id`,
-		[name],
-	).then((r: any) => r.rows);
+	const id = await _createTestAccount(db, name);
 	testAccountIds.push(id);
 	return id;
 }
@@ -213,17 +209,7 @@ describe('Task 48 — HTTP-level webhook integration', () => {
 		// Initialize Stripe (only used for the static signature helper)
 		makeStripeWebhookKey();
 
-		db = knex({
-			client: 'pg',
-			connection: {
-				host: process.env.TEST_DB_HOST ?? '127.0.0.1',
-				port: Number(process.env.TEST_DB_PORT ?? 15432),
-				user: process.env.TEST_DB_USER ?? 'directus',
-				password: process.env.TEST_DB_PASSWORD ?? 'directus',
-				database: process.env.TEST_DB_NAME ?? 'directus',
-			},
-			pool: { min: 0, max: 2 },
-		});
+		db = getDb();
 
 		const dbOk = await dbReachable();
 		const cmsOk = await cmsReachable();
@@ -265,10 +251,9 @@ describe('Task 48 — HTTP-level webhook integration', () => {
 	afterAll(async () => {
 		if (!db) return;
 		if (run && testAccountIds.length > 0) {
-			// Clean up: cascade order matters
+			// feature_quotas not covered by cleanupAccounts helper — wipe first
 			await db('feature_quotas').whereIn('account_id', testAccountIds).delete().catch(() => {});
-			await db('subscriptions').whereIn('account_id', testAccountIds).delete().catch(() => {});
-			await db('account').whereIn('id', testAccountIds).delete().catch(() => {});
+			await cleanupAccounts(db, testAccountIds);
 		}
 		// Clean up any test webhook events we inserted
 		if (testEventIds.length > 0) {

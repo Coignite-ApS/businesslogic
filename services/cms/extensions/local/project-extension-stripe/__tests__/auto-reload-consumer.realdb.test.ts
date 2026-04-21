@@ -19,7 +19,6 @@
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
-import { createRequire } from 'module';
 import {
 	processAutoReloadBatch,
 	MAX_ATTEMPTS,
@@ -28,9 +27,11 @@ import {
 	handlePaymentIntentSucceeded,
 	handlePaymentIntentFailed,
 } from '../src/webhook-handlers.js';
-
-const require = createRequire(import.meta.url);
-const knex = require('knex');
+import {
+	getDb,
+	createTestAccount,
+	cleanupAccounts,
+} from '../../_shared/test-helpers/db.js';
 
 let db: any;
 let run = false;
@@ -46,11 +47,7 @@ function makeLogger() {
 }
 
 async function createAccount(name: string): Promise<string> {
-	const [{ id }] = await db.raw(
-		`INSERT INTO public.account (id, status, name, date_created)
-		 VALUES (gen_random_uuid(), 'active', ?, now()) RETURNING id`,
-		[name],
-	).then((r: any) => r.rows);
+	const id = await createTestAccount(db, name);
 	testAccountIds.push(id);
 	return id;
 }
@@ -123,17 +120,7 @@ function makeStripeMock(opts: {
 
 describe('Task 31 — auto-reload consumer (real DB)', () => {
 	beforeAll(async () => {
-		db = knex({
-			client: 'pg',
-			connection: {
-				host: process.env.TEST_DB_HOST ?? '127.0.0.1',
-				port: Number(process.env.TEST_DB_PORT ?? 15432),
-				user: process.env.TEST_DB_USER ?? 'directus',
-				password: process.env.TEST_DB_PASSWORD ?? 'directus',
-				database: process.env.TEST_DB_NAME ?? 'directus',
-			},
-			pool: { min: 0, max: 5 },
-		});
+		db = getDb();
 		try {
 			await db.raw('SELECT 1');
 			run = true;
@@ -159,10 +146,8 @@ describe('Task 31 — auto-reload consumer (real DB)', () => {
 
 	afterAll(async () => {
 		if (!db) return;
-		if (run && testAccountIds.length > 0) {
-			// CASCADE removes ai_wallet, ai_wallet_ledger, ai_wallet_topup,
-			// wallet_auto_reload_pending
-			await db('account').whereIn('id', testAccountIds).delete();
+		if (run) {
+			await cleanupAccounts(db, testAccountIds);
 		}
 		await db.destroy();
 	});

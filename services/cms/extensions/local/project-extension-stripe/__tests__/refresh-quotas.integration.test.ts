@@ -18,19 +18,12 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import pg from 'pg';
+import { getPgClient } from '../../_shared/test-helpers/db.js';
 
-const { Client } = pg;
-
-// ─── DB connection ────────────────────────────────────────────────────────────
-
-const DATABASE_URL =
-	process.env.DATABASE_URL ?? 'postgres://directus:directus@localhost:15432/directus';
-
-let client: InstanceType<typeof Client>;
+let client: ReturnType<typeof getPgClient>;
 
 beforeAll(async () => {
-	client = new Client({ connectionString: DATABASE_URL });
+	client = getPgClient();
 	await client.connect();
 });
 

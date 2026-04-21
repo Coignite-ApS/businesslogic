@@ -26,8 +26,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { getDb, createTestAccount, cleanupAccounts, createTestUser, cleanupTestUsers } from './helpers/db.js';
-import { getItems, patchItem, deleteItem, directusReachable } from './helpers/directus.js';
+import { getDb, createTestAccount, cleanupAccounts, createTestUser, cleanupTestUsers, lookupRoleIdByName, lookupPolicyIdByName } from '../test-helpers/db.js';
+import { getItems, patchItem, deleteItem, directusReachable } from '../test-helpers/directus.js';
 
 const accountIds: string[] = [];
 const userTokens: string[] = [];
@@ -636,8 +636,8 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 	it('admin token: sees rows for both accounts (distinguishes permission vs. missing)', async () => {
 		if (!run) return;
 
-		// Admin role id
-		const ADMIN_ROLE = '3fae9d27-9cc7-4f54-a74c-5c396b844be1';
+		// Admin role id — resolved by name to survive DB re-seeds across envs
+		const ADMIN_ROLE = await lookupRoleIdByName(db, 'Administrator');
 		const adminToken = `test-admin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 		// Create a throwaway admin user (not linked to any account)
 		const [{ id: adminUserId }] = await db.raw(
@@ -697,7 +697,7 @@ describe('Account isolation E2E — pricing v2 collections', () => {
 
 		// Only audit the User Access policy (the one users actually hit).
 		// Service policies legitimately have {} filters to serve all tenants.
-		const USER_ACCESS_POLICY = '54f17d5e-e565-47d0-9372-b3b48db16109';
+		const USER_ACCESS_POLICY = await lookupPolicyIdByName(db, 'User Access');
 
 		const gaps: string[] = [];
 		for (const { collection, col } of audit) {
