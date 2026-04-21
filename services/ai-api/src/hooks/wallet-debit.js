@@ -42,7 +42,8 @@ function usdToEur(costUsd) {
  * @param {string} opts.accountId
  * @param {number} opts.costUsd       - cost in USD (from calculateCost())
  * @param {string} opts.model         - model name (e.g. 'claude-sonnet-4-6')
- * @param {string} opts.module        - module_kind enum: 'kb' | 'calculators' | 'flows'
+ * @param {string} opts.module        - module_kind enum: 'ai' | 'kb' | 'calculators' | 'flows'
+ *                                       ('ai' for chat, 'kb' for KB ask/search/embed)
  * @param {string} opts.eventKind     - e.g. 'ai.message', 'kb.ask', 'embed.tokens'
  * @param {object} [opts.metadata]    - free-form jsonb (stored on both rows)
  * @param {string} [opts.apiKeyId]    - optional, stored on usage_events

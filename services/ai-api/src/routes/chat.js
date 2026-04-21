@@ -408,7 +408,7 @@ export async function registerRoutes(app) {
               accountId,
               costUsd,
               model,
-              module: 'kb',
+              module: 'ai',
               eventKind: 'ai.message',
               apiKeyId: req.apiKeyId || null,
               metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
@@ -423,7 +423,7 @@ export async function registerRoutes(app) {
               await recordFailedDebit({
                 accountId, costUsd, model,
                 inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
-                eventKind: 'ai.message', module: 'kb',
+                eventKind: 'ai.message', module: 'ai',
                 apiKeyId: req.apiKeyId || null,
                 conversationId,
                 errorReason: 'debit_returned_not_ok',
@@ -443,7 +443,7 @@ export async function registerRoutes(app) {
             await recordFailedDebit({
               accountId, costUsd, model,
               inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
-              eventKind: 'ai.message', module: 'kb',
+              eventKind: 'ai.message', module: 'ai',
               apiKeyId: req.apiKeyId || null,
               conversationId,
               errorReason: 'debit_threw',
@@ -838,7 +838,7 @@ export async function registerRoutes(app) {
             accountId,
             costUsd,
             model,
-            module: 'kb',
+            module: 'ai',
             eventKind: 'ai.message',
             apiKeyId: req.apiKeyId || null,
             metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
@@ -851,7 +851,7 @@ export async function registerRoutes(app) {
             await recordFailedDebit({
               accountId, costUsd, model,
               inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
-              eventKind: 'ai.message', module: 'kb',
+              eventKind: 'ai.message', module: 'ai',
               apiKeyId: req.apiKeyId || null,
               conversationId,
               errorReason: 'debit_returned_not_ok',
@@ -871,7 +871,7 @@ export async function registerRoutes(app) {
           await recordFailedDebit({
             accountId, costUsd, model,
             inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
-            eventKind: 'ai.message', module: 'kb',
+            eventKind: 'ai.message', module: 'ai',
             apiKeyId: req.apiKeyId || null,
             conversationId,
             errorReason: 'debit_threw',
