@@ -165,7 +165,7 @@ Formula evaluation, calculator CRUD, MCP, execute endpoints.
 | 05 | Graceful Shutdown Timeout | completed | [formula-api/05-shutdown-timeout.md](formula-api/05-shutdown-timeout.md) |
 | 06 | Account-Level MCP | completed | [formula-api/06-account-mcp.md](formula-api/06-account-mcp.md) |
 | 07 | Direct Database Migration | completed | [formula-api/07-direct-db-migration.md](formula-api/07-direct-db-migration.md) |
-| 08 | Replace console.log with Structured Logger | planned | [formula-api/08-console-log-cleanup.md](formula-api/08-console-log-cleanup.md) |
+| 08 | Replace console.log with Structured Logger | completed | [formula-api/08-console-log-cleanup.md](formula-api/08-console-log-cleanup.md) |
 
 ### Formula Engine — bl-excel (Rust)
 
@@ -230,7 +230,7 @@ Infrastructure and multi-service concerns.
 | 09 | API Key & Resource Management Cleanup | completed | [cross-cutting/09-api-key-resource-cleanup.md](cross-cutting/09-api-key-resource-cleanup.md) |
 | 10 | Platform Feature Flags (DB + Redis + Gateway + Admin UI + Module Gating) | completed | — |
 | 11 | Migration Rollback Scripts | completed | [cross-cutting/11-migration-rollbacks.md](cross-cutting/11-migration-rollbacks.md) |
-| 12 | Container Resource Limits | planned | [cross-cutting/12-container-resource-limits.md](cross-cutting/12-container-resource-limits.md) |
+| 12 | Container Resource Limits | completed | [cross-cutting/12-container-resource-limits.md](cross-cutting/12-container-resource-limits.md) |
 | 13 | Startup Secret Validation (Fail-Fast) | completed | [cross-cutting/13-startup-secret-validation.md](cross-cutting/13-startup-secret-validation.md) |
 | 14 | Pricing v2 — Stripe Product Catalog | planned | [cross-cutting/14-pricing-v2-stripe-catalog.md](cross-cutting/14-pricing-v2-stripe-catalog.md) |
 | 15 | Pricing v2 — Directus Schema (DB Admin) | **completed (Inv 1 + Inv 2)** | [cross-cutting/15-pricing-v2-directus-schema.md](cross-cutting/15-pricing-v2-directus-schema.md) — see [Inv 1 report](../reports/db-admin-2026-04-18-pricing-v2-schema-064122.md) + [Inv 2 report](../reports/db-admin-2026-04-18-ai-token-usage-fk-fix-073027.md) |
@@ -385,11 +385,11 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 |---------|---------|------|-------------|-----------|-------|
 | CMS | 15 | 0 | 0 | 21 | 36 |
 | AI API | 5 | 0 | 0 | 15 | 20 |
-| Formula API | 1 | 0 | 0 | 7 | 8 |
+| Formula API | 0 | 0 | 0 | 8 | 8 |
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 13 | 0 | 0 | 45 | 58 |
-| **Total** | **36** | **8** | **0** | **99** | **143** |
+| Cross-Cutting | 12 | 0 | 0 | 46 | 58 |
+| **Total** | **34** | **8** | **0** | **101** | **143** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision
