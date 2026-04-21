@@ -250,12 +250,17 @@ make diff                              # diffs current DB schema vs latest YAML 
 make diff SNAPSHOT=pre_<slug>_<ts>.yaml
 ```
 
-For raw SQL migrations, dry-run inside a transaction:
+For raw SQL migrations, dry-run inside a transaction that **always rolls back** — you are only proving the script executes cleanly, you are NOT applying it:
 ```bash
-docker compose -f infrastructure/docker/docker-compose.dev.yml exec -T postgres \
-  psql -U directus -d directus -v ON_ERROR_STOP=1 -1 -f - < migrations/<schema>/NNN_<name>.sql
-# -1 = single transaction; if it errors, nothing committed.
+# Dry-run: wraps the migration in BEGIN;/ROLLBACK;. Never commits, even on success.
+(echo "BEGIN;"; cat migrations/<schema>/NNN_<name>.sql; echo "ROLLBACK;") | \
+  docker compose -f infrastructure/docker/docker-compose.dev.yml exec -T postgres \
+    psql -U directus -d directus -v ON_ERROR_STOP=1
 ```
+
+**CRITICAL — do NOT use `psql -1` (or `--single-transaction`) for dry-run.** That flag wraps the script in ONE transaction but **COMMITS on success**. Only rollback-on-error is not dry-run; it's "apply atomically". Using `-1` for Phase 4 causes the migration to land before Phase 5's user approval ever fires — bypassing the consent gate. The explicit `BEGIN;`/`ROLLBACK;` wrapper above is the only pattern that guarantees no persisted side effect.
+
+Verify the dry-run actually rolled back: re-run a sanity query (e.g., `SELECT to_regclass('public.<new_table>');` or equivalent `information_schema` check) and confirm the object the migration creates does NOT exist yet. If it DOES exist, the dry-run committed — stop and investigate before proceeding.
 
 **Evaluate every diff entry:**
 - Does it match what was asked?
@@ -794,6 +799,7 @@ Stop immediately and return a CONSULTATION if you see any of these:
 - Phase 6.5 hash mismatch on a column expected to be preserved
 - Apply succeeded but a backup table required by Phase 4.5 plan is missing or has wrong row count
 - pg_dump file size shrank dramatically vs. pre-task dump (sign of data loss)
+- Phase 4 dry-run used `psql -1` or `--single-transaction` instead of explicit `BEGIN;`/`ROLLBACK;` — the migration COMMITTED on success and Phase 5 approval was silently bypassed (see Phase 4)
 
 ---
 
