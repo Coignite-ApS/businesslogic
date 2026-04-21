@@ -11,6 +11,7 @@
  */
 
 import { getPool } from '../db.js';
+import { publishGatewayCacheInvalidation, getRedis } from '../services/usage-events.js';
 
 // EUR per USD exchange rate. Override via env var for production.
 // Locked decision #6/#7: AI Wallet in EUR; 1.5× wholesale markup baked into
@@ -46,10 +47,11 @@ function usdToEur(costUsd) {
  * @param {object} [opts.metadata]    - free-form jsonb (stored on both rows)
  * @param {string} [opts.apiKeyId]    - optional, stored on usage_events
  * @param {import('pg').Pool} [opts.pool] - optional pg.Pool override (for testing)
+ * @param {object} [opts.redis]           - optional ioredis client override (for testing)
  *
  * @returns {Promise<DebitResult>}
  */
-export async function debitWallet({ accountId, costUsd, model, module, eventKind, metadata, apiKeyId, pool: poolOverride }) {
+export async function debitWallet({ accountId, costUsd, model, module, eventKind, metadata, apiKeyId, pool: poolOverride, redis: redisOverride }) {
   const pool = poolOverride || getPool();
   if (!pool) {
     // DB not initialised (unit test environment without DB)
@@ -163,6 +165,14 @@ export async function debitWallet({ accountId, costUsd, model, module, eventKind
     );
 
     await client.query('COMMIT');
+
+    // ── Gateway cache invalidation (task 42) ─────────────────────────────────
+    // Publish after commit so gateway drops the 60s-stale AI spend cache entry.
+    // Fire-and-forget: failure here must never affect the debit result.
+    if (apiKeyId) {
+      publishGatewayCacheInvalidation(redisOverride !== undefined ? redisOverride : getRedis(), 'ai_spend', apiKeyId)
+        .catch(() => {}); // belt+suspenders; publishGatewayCacheInvalidation already swallows
+    }
 
     // ── Auto-reload check (best-effort, separate from committed transaction) ──
     let autoReloadTriggered = false;

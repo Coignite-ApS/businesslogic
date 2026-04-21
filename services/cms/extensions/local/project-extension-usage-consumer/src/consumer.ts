@@ -19,6 +19,11 @@ export const USAGE_STREAM_KEY = 'bl:usage_events:in';
 export const CONSUMER_GROUP = 'cms-consumer';
 export const CONSUMER_NAME = 'cms-consumer-1';
 
+/** Gateway sublimit cache invalidation channel for KB search/ask counts. */
+export const GW_KB_SEARCH_CHANNEL = 'bl:gw_apikey_kb_search:invalidated';
+
+const KB_INVALIDATION_KINDS = new Set(['kb.search', 'kb.ask']);
+
 const BATCH_SIZE = 100;
 const BLOCK_MS = 1000; // 1s BLOCK
 const RETRY_SLEEP_MS = 2000;
@@ -105,6 +110,39 @@ export async function insertBatch(
 }
 
 /**
+ * Publish gateway KB search cache invalidations for any kb.search / kb.ask
+ * events in the batch that have an api_key_id.
+ *
+ * Deduplicates per api_key_id so a batch of N kb.search events for the same
+ * key emits only one PUBLISH. Fire-and-forget: errors are swallowed.
+ */
+export async function publishKbCacheInvalidations(
+	redis: Redis,
+	envelopes: { id: string; envelope: UsageEventEnvelope }[],
+): Promise<void> {
+	if (!redis) return;
+
+	// Collect unique api_key_ids for kb events
+	const keyIds = new Set<string>();
+	for (const { envelope } of envelopes) {
+		if (
+			KB_INVALIDATION_KINDS.has(envelope.event_kind) &&
+			envelope.api_key_id
+		) {
+			keyIds.add(envelope.api_key_id);
+		}
+	}
+
+	if (keyIds.size === 0) return;
+
+	// Publish one message per unique api_key_id — swallow all errors
+	const publishes = Array.from(keyIds).map((keyId) =>
+		redis.publish(GW_KB_SEARCH_CHANNEL, keyId).catch(() => {}),
+	);
+	await Promise.all(publishes);
+}
+
+/**
  * Read one batch from the stream, insert into DB, then XACK.
  * Returns ConsumeStats for the batch.
  */
@@ -171,6 +209,9 @@ export async function processBatch(
 		// ACK after successful commit
 		const ids = valid.map(({ id }) => id);
 		await (redis as any).xack(USAGE_STREAM_KEY, CONSUMER_GROUP, ...ids);
+
+		// Publish gateway KB cache invalidations (task 42) — fire-and-forget
+		publishKbCacheInvalidations(redis, valid).catch(() => {});
 	} catch (err: any) {
 		// Don't ACK — Redis will redeliver after visibility timeout
 		logger.error(`[usage-consumer] DB insert failed: ${err?.message || err}`);
