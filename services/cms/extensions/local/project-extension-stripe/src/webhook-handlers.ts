@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import type { DB, Module, Tier } from './types.js';
-import { STATUS_MAP as _STATUS_MAP, provisionSubscriptionRow, provisionWalletTopup } from './provisioning.js';
+import { STATUS_MAP as _STATUS_MAP, provisionSubscriptionRow, provisionWalletTopup, computeSubscriptionDates } from './provisioning.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Idempotency helpers
@@ -208,10 +208,7 @@ export async function handleCheckoutCompleted(
 	}
 
 	const subStatus = STATUS_MAP[stripeSub.status] || stripeSub.status;
-	const periodStart = new Date(stripeSub.current_period_start * 1000).toISOString();
-	const periodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
-	const trialStart = stripeSub.trial_start ? new Date(stripeSub.trial_start * 1000).toISOString() : null;
-	const trialEnd = stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null;
+	const dates = computeSubscriptionDates(stripeSub);
 
 	// Lookup target plan by (module, tier, status='published')
 	const plan = await db('subscription_plans')
@@ -243,10 +240,10 @@ export async function handleCheckoutCompleted(
 			billing_cycle: billingCycle,
 			stripe_customer_id: customerId,
 			stripe_subscription_id: subscriptionId,
-			current_period_start: periodStart,
-			current_period_end: periodEnd,
-			trial_start: trialStart,
-			trial_end: trialEnd,
+			current_period_start: dates.current_period_start,
+			current_period_end: dates.current_period_end,
+			trial_start: dates.trial_start,
+			trial_end: dates.trial_end,
 			date_updated: nowIso,
 		};
 

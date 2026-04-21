@@ -93,7 +93,7 @@ export async function computeWebhookHealth(
 		else failures24h[r.status] = n;
 	}
 
-	// ─── 1h signature-failure count (for red banner) ─────────
+	// ─── 1h signature-failure count (for RED banner trigger) ─
 	const sigFailRow = await db('stripe_webhook_log')
 		.where('status', '400_signature')
 		.where('received_at', '>=', oneHourAgo)
@@ -105,9 +105,23 @@ export async function computeWebhookHealth(
 			: Number(sigFailRow.count)
 		: 0;
 
+	// ─── 1h any-failure count (for GREEN eligibility — task 58.2) ─
+	// GREEN requires zero failures of ANY kind in last 1h (not just sig failures).
+	const anyFailRow = await db('stripe_webhook_log')
+		.whereNotIn('status', ['200', 'reconciled'])
+		.where('received_at', '>=', oneHourAgo)
+		.count<{ count: string | number }>('* as count')
+		.first();
+	const anyFail1h = anyFailRow
+		? typeof anyFailRow.count === 'string'
+			? parseInt(anyFailRow.count, 10)
+			: Number(anyFailRow.count)
+		: 0;
+
 	// ─── Banner logic ────────────────────────────────────────
 	const banner = computeBanner({
 		signatureFailures1h: sigFail1h,
+		anyFailures1h: anyFail1h,
 		lastSuccessAt: lastSuccessRow?.received_at ? new Date(lastSuccessRow.received_at) : null,
 		now,
 	});
@@ -149,11 +163,13 @@ export async function computeWebhookHealth(
  * Banner state decision logic. Pure function — exported for unit testing.
  *
  *   RED    — ≥1 signature failure in last 1h. Urgent: STRIPE_WEBHOOK_SECRET likely stale.
- *   GREEN  — last success <24h ago AND zero signature failures in last 1h.
- *   NEUTRAL— otherwise (quiet period, or failures that aren't signature — use counters panel).
+ *   GREEN  — last success <24h ago AND zero failures of ANY kind in last 1h (task 58.2).
+ *   NEUTRAL— otherwise (quiet period, or recent non-signature failures — use counters panel).
  */
 export function computeBanner(input: {
 	signatureFailures1h: number;
+	/** Total non-success, non-reconciled rows in the last 1h. Used for green eligibility. */
+	anyFailures1h: number;
 	lastSuccessAt: Date | null;
 	now: Date;
 }): { state: BannerState; message: string } {
@@ -166,7 +182,7 @@ export function computeBanner(input: {
 	}
 
 	const lastSuccess = input.lastSuccessAt;
-	if (lastSuccess) {
+	if (lastSuccess && input.anyFailures1h === 0) {
 		const ageMs = input.now.getTime() - lastSuccess.getTime();
 		const under24h = ageMs < 24 * 60 * 60 * 1000;
 		if (under24h) {
@@ -184,6 +200,15 @@ export function computeBanner(input: {
 	};
 }
 
+interface HealthReq {
+	accountability?: { admin?: boolean; user?: string };
+}
+
+interface HealthRes {
+	status(code: number): HealthRes;
+	json(payload: unknown): void;
+}
+
 /**
  * Express route registration. Admin-only via Directus accountability —
  * returns 401 for anonymous and non-admin users. The endpoint is safe to
@@ -194,7 +219,7 @@ export function registerWebhookHealthRoute(
 	db: DB,
 	logger: { error: (msg: string) => void },
 ): void {
-	app.get('/stripe/webhook-health', async (req: any, res: any) => {
+	app.get('/stripe/webhook-health', async (req: HealthReq, res: HealthRes) => {
 		// Directus populates req.accountability.admin=true for users whose role
 		// has admin_access. Anonymous → admin=false/undefined; non-admin → false.
 		const isAdmin = req.accountability?.admin === true;

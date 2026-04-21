@@ -22,6 +22,35 @@ const STATUS_MAP: Record<string, string> = {
 
 export { STATUS_MAP };
 
+// ─── computeSubscriptionDates ─────────────────────────────────
+
+export interface SubscriptionDates {
+	current_period_start: string;
+	current_period_end: string;
+	trial_start: string | null;
+	trial_end: string | null;
+}
+
+/**
+ * Convert Stripe subscription Unix timestamps to ISO-8601 strings.
+ * Shared by provisionSubscriptionRow (INSERT path) and
+ * handleCheckoutCompleted UPDATE branch — eliminates date-math duplication
+ * (task 58.8).
+ */
+export function computeSubscriptionDates(stripeSub: {
+	current_period_start: number;
+	current_period_end: number;
+	trial_start?: number | null;
+	trial_end?: number | null;
+}): SubscriptionDates {
+	return {
+		current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
+		current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
+		trial_start: stripeSub.trial_start ? new Date(stripeSub.trial_start * 1000).toISOString() : null,
+		trial_end: stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null,
+	};
+}
+
 // ─── provisionSubscriptionRow ──────────────────────────────────
 
 export interface ProvisionSubOptions {
@@ -66,10 +95,7 @@ export async function provisionSubscriptionRow(
 		);
 	}
 
-	const periodStart = new Date(stripeSub.current_period_start * 1000).toISOString();
-	const periodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
-	const trialStart = stripeSub.trial_start ? new Date(stripeSub.trial_start * 1000).toISOString() : null;
-	const trialEnd = stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null;
+	const dates = computeSubscriptionDates(stripeSub);
 	const nowIso = new Date().toISOString();
 
 	const result = await trx.raw(
@@ -86,7 +112,7 @@ export async function provisionSubscriptionRow(
 		[
 			accountId, plan.id, module, tier, subStatus, billingCycle,
 			customerId, stripeSub.id,
-			periodStart, periodEnd, trialStart, trialEnd,
+			dates.current_period_start, dates.current_period_end, dates.trial_start, dates.trial_end,
 			nowIso,
 		],
 	);

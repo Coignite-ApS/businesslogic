@@ -16,19 +16,21 @@ import type { DB } from './types.js';
  * Closed set of status codes we persist. Narrower than HTTP status — these
  * encode which code-path the request exited from.
  *
- * '200'                 — webhook processed successfully
- * '400_signature'       — Stripe signature verification failed
- * '400_parse'           — payload parse error
- * '400_missing_metadata'— required metadata absent
- * '500'                 — handler threw an uncaught error
- * 'reconciled'          — Task 57: row synthetically created by the nightly
- *                         reconciliation cron (not a webhook hit — ops signal)
+ * '200'            — webhook processed successfully
+ * '400_signature'  — Stripe signature verification failed
+ * '400_parse'      — payload parse error
+ * '500'            — handler threw an uncaught error
+ * 'reconciled'     — Task 57: row synthetically created by the nightly
+ *                    reconciliation cron (not a webhook hit — ops signal)
+ *
+ * Note: '400_missing_metadata' was dropped (task 58.1) — no code path emits
+ * it. If a future handler needs to signal missing app-level metadata, add it
+ * back then.
  */
 export type WebhookLogStatus =
 	| '200'
 	| '400_signature'
 	| '400_parse'
-	| '400_missing_metadata'
 	| '500'
 	| 'reconciled';
 

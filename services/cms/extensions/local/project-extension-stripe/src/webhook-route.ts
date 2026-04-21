@@ -21,6 +21,20 @@
 import type { DB } from './types.js';
 import { recordWebhookLog, extractSourceIp } from './webhook-log.js';
 
+/** Minimal inline types for the Express-like req/res objects used in the handler. */
+export interface WebhookReq {
+	rawBody: Buffer;
+	headers?: Record<string, string | string[] | undefined>;
+	socket?: { remoteAddress?: string };
+	ip?: string;
+	accountability?: { admin?: boolean; user?: string };
+}
+
+export interface WebhookRes {
+	status(code: number): WebhookRes;
+	json(payload: unknown): void;
+}
+
 export interface WebhookRouteDeps {
 	db: DB;
 	logger: { warn: (msg: string) => void; error: (msg: string) => void; debug: (msg: string) => void; info?: (msg: string) => void };
@@ -61,13 +75,16 @@ export function createWebhookRouteHandler(deps: WebhookRouteDeps) {
 	const nowFn = deps.now ?? (() => Date.now());
 	const classifyErr = deps.classifyVerifyError ?? classifyStripeVerifyError;
 
-	return async function handle(req: any, res: any): Promise<void> {
+	return async function handle(req: WebhookReq, res: WebhookRes): Promise<void> {
 		const startMs = nowFn();
 		const sourceIp = extractSourceIp(req);
 		const webhookSecret = deps.getWebhookSecret();
 
 		// Defensive guard — startup validation should prevent this path,
 		// but if the secret is somehow unset at runtime we still record it.
+		// 503 (Service Unavailable) is more accurate than 500 here: the service
+		// is misconfigured, not broken. Startup validation already fails boot,
+		// so this path is purely defensive.
 		if (!webhookSecret) {
 			await recordWebhookLog(deps.db, deps.logger, {
 				event_id: null,
@@ -77,7 +94,7 @@ export function createWebhookRouteHandler(deps: WebhookRouteDeps) {
 				response_ms: nowFn() - startMs,
 				source_ip: sourceIp,
 			});
-			res.status(500).json({ errors: [{ message: 'Webhook secret not configured' }] });
+			res.status(503).json({ errors: [{ message: 'Webhook secret not configured' }] });
 			return;
 		}
 
