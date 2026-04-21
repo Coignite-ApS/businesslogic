@@ -106,7 +106,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 0.05,           // ~€0.0475 at 0.95 rate
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: { test: true },
       });
@@ -157,7 +157,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 0.10,           // ~€0.095 — way more than €0.001
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: {},
       });
@@ -210,7 +210,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 0.021,         // ~€0.0193 at 0.92 rate
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: {},
       });
@@ -247,7 +247,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 0.001,
         model: 'claude-haiku-4-5-20251001',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: {},
       });
@@ -272,7 +272,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 0.01,
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: {},
       });
@@ -303,7 +303,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd,
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: { concurrentTest: 1 },
       }),
@@ -311,7 +311,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd,
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: { concurrentTest: 2 },
       }),
@@ -363,7 +363,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 1.578,         // ~€1.4518 at 0.92 → balance becomes ~€0.55
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: {},
       });
@@ -399,7 +399,7 @@ describe('wallet-debit hook', () => {
         accountId,
         costUsd: 1.578,
         model: 'claude-sonnet-4-6',
-        module: 'kb',
+        module: 'ai',
         eventKind: 'ai.message',
         metadata: {},
       });
@@ -440,7 +440,7 @@ describe('wallet-debit hook', () => {
       // 1st qualifying debit: balance 4.00 → ~2.55
       const r1 = await debitWallet({
         accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
-        module: 'kb', eventKind: 'ai.message', metadata: {},
+        module: 'ai', eventKind: 'ai.message', metadata: {},
       });
       assert.ok(r1.ok);
       assert.strictEqual(r1.autoReloadTriggered, true);
@@ -448,7 +448,7 @@ describe('wallet-debit hook', () => {
       // 2nd qualifying debit: balance ~2.55 → ~1.10 — still below threshold
       const r2 = await debitWallet({
         accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
-        module: 'kb', eventKind: 'ai.message', metadata: {},
+        module: 'ai', eventKind: 'ai.message', metadata: {},
       });
       assert.ok(r2.ok, 'Debit must still succeed even when enqueue is a no-op');
       assert.strictEqual(r2.autoReloadTriggered, true);
@@ -472,7 +472,7 @@ describe('wallet-debit hook', () => {
     try {
       const result = await debitWallet({
         accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
-        module: 'kb', eventKind: 'ai.message', metadata: {},
+        module: 'ai', eventKind: 'ai.message', metadata: {},
       });
       assert.ok(result.ok);
       assert.strictEqual(result.autoReloadTriggered, false);
@@ -510,7 +510,7 @@ describe('wallet-debit hook', () => {
     try {
       const result = await debitWallet({
         accountId, costUsd: 1.578, model: 'claude-sonnet-4-6',
-        module: 'kb', eventKind: 'ai.message', metadata: {},
+        module: 'ai', eventKind: 'ai.message', metadata: {},
       });
       assert.ok(result.ok);
       assert.strictEqual(result.autoReloadTriggered, true);

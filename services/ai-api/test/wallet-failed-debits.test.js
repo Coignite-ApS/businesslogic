@@ -83,7 +83,7 @@ describe('wallet-failed-debits', () => {
           inputTokens: 1000,
           outputTokens: 500,
           eventKind: 'ai.message',
-          module: 'kb',
+          module: 'ai',
           anthropicRequestId: 'req_abc123',
           apiKeyId: null,
           conversationId: null,
@@ -125,7 +125,7 @@ describe('wallet-failed-debits', () => {
           costUsd: 1.00,
           model: 'claude-sonnet-4-6',
           inputTokens: 10, outputTokens: 5,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
         });
         const rows = await getFailedDebits(client, accountId);
@@ -146,7 +146,7 @@ describe('wallet-failed-debits', () => {
         const r = await recordFailedDebit({
           accountId, costUsd: 0.01, model: 'claude-sonnet-4-6',
           inputTokens: 1, outputTokens: 1,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
           errorDetail: huge,
         });
@@ -167,7 +167,7 @@ describe('wallet-failed-debits', () => {
         accountId: randomUUID(),
         costUsd: 0.01, model: 'x',
         inputTokens: 1, outputTokens: 1,
-        eventKind: 'ai.message', module: 'kb',
+        eventKind: 'ai.message', module: 'ai',
         errorReason: 'debit_threw',
       });
       assert.strictEqual(r.recorded, false);
@@ -181,7 +181,7 @@ describe('wallet-failed-debits', () => {
         costUsd: 0.01,
         model: 'claude-sonnet-4-6',
         inputTokens: 1, outputTokens: 1,
-        eventKind: 'ai.message', module: 'kb',
+        eventKind: 'ai.message', module: 'ai',
         errorReason: 'debit_threw',
       });
       assert.strictEqual(r.recorded, false);
@@ -207,7 +207,7 @@ describe('wallet-failed-debits', () => {
           costEur: 0.092,
           model: 'claude-sonnet-4-6',
           inputTokens: 100, outputTokens: 50,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
           errorDetail: 'timeout',
         });
@@ -248,7 +248,7 @@ describe('wallet-failed-debits', () => {
           costEur: 0.92,
           model: 'claude-sonnet-4-6',
           inputTokens: 100, outputTokens: 50,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
           errorDetail: 'timeout',
         });
@@ -284,7 +284,7 @@ describe('wallet-failed-debits', () => {
         await recordFailedDebit({
           accountId, costUsd: 0.01, costEur: 0.0092,
           model: 'x', inputTokens: 1, outputTokens: 1,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
         });
         // Don't back-date — created just now.
@@ -308,7 +308,7 @@ describe('wallet-failed-debits', () => {
         const rec = await recordFailedDebit({
           accountId, costUsd: 0.10, costEur: 0.092,
           model: 'x', inputTokens: 1, outputTokens: 1,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
         });
         await client.query(
@@ -346,13 +346,13 @@ describe('wallet-failed-debits', () => {
         const ra = await recordFailedDebit({
           accountId: accountA, costUsd: 0.05, costEur: 0.046,
           model: 'x', inputTokens: 1, outputTokens: 1,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
         });
         const rb = await recordFailedDebit({
           accountId: accountB, costUsd: 0.05, costEur: 0.046,
           model: 'x', inputTokens: 1, outputTokens: 1,
-          eventKind: 'ai.message', module: 'kb',
+          eventKind: 'ai.message', module: 'ai',
           errorReason: 'debit_threw',
         });
         await client.query(

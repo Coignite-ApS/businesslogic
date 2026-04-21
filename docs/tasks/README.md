@@ -250,7 +250,7 @@ Infrastructure and multi-service concerns.
 | 29 | Pricing v2 — Per-tier RPS spec lock (schema + code refactor) | **completed 2026-04-21** — gateway MIN enforcement split to new follow-up | [cross-cutting/29-pricing-v2-rps-spec.md](cross-cutting/29-pricing-v2-rps-spec.md) |
 | 30 | ai_wallet_ledger compound index for monthly cap query (LOW, defer until scale) | planned | [cross-cutting/30-ai-wallet-ledger-index.md](cross-cutting/30-ai-wallet-ledger-index.md) |
 | 31 | wallet_auto_reload_pending table + CMS Stripe consumer (Sprint 2 — revenue) | **completed 2026-04-19** | [cross-cutting/31-wallet-auto-reload-pending.md](cross-cutting/31-wallet-auto-reload-pending.md) |
-| 32 | Extend module_kind enum to include 'chat' (analytics) | planned | [cross-cutting/32-module-kind-enum-chat.md](cross-cutting/32-module-kind-enum-chat.md) |
+| 32 | Extend module_kind enum to include 'chat' (analytics) | **completed 2026-04-21** — resolved via existing `'ai'` value (migration 029); no new enum value | [cross-cutting/32-module-kind-enum-chat.md](cross-cutting/32-module-kind-enum-chat.md) |
 | 33 | Failed-debit reconciliation queue (Sprint 2 — accounting) | **completed 2026-04-19** | [cross-cutting/33-failed-debit-reconciliation.md](cross-cutting/33-failed-debit-reconciliation.md) |
 | 34 | calculator_slots reconcile + concurrent-upload race fix (Sprint 2 — quota) | **completed 2026-04-19** | [cross-cutting/34-calculator-slots-reconcile-race.md](cross-cutting/34-calculator-slots-reconcile-race.md) |
 | 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | **completed 2026-04-19** | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
@@ -390,7 +390,7 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 11 | 0 | 0 | 48 | 59 |
-| **Total** | **33** | **8** | **0** | **103** | **144** |
+| Cross-Cutting | 10 | 0 | 0 | 49 | 59 |
+| **Total** | **32** | **8** | **0** | **104** | **144** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision

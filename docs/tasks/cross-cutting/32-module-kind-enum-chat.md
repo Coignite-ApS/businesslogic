@@ -1,8 +1,28 @@
-# 32. Extend `module_kind` enum to include `'chat'`
+# 32. Extend `module_kind` enum to include `'chat'` → **resolved via existing `'ai'` value**
 
-**Status:** planned
+**Status:** completed 2026-04-21 — no new enum value added; chat debits now use `'ai'` (already added by migration 029).
 **Severity:** LOW — analytics taxonomy, not a functional bug
 **Source:** Task 18 code review (commit `0823b8b`) — issue I4
+
+## Resolution (2026-04-21)
+
+Deviates from the original plan: **no new `'chat'` enum value was added.** Rationale: migration `029_module_kind_add_ai.sql` (shipped 2026-04-19) already added `'ai'` to the enum, and `emitAiMessage()` in `services/ai-api/src/services/usage-events.js` already tags events as `module: 'ai' / event_kind: 'ai.message'`. The wallet-debit path was the only place still masquerading chat events as `'kb'`. Harmonizing chat.js to also use `'ai'` avoids introducing a 3rd vocabulary (`kb`, `ai`, `chat`) while achieving the same taxonomy goal.
+
+Shipped on `dm/task-32-module-kind-chat`:
+- `services/ai-api/src/routes/chat.js` — 6 call sites changed from `module: 'kb'` → `module: 'ai'` (both sync + SSE handlers, happy path + failure/threw branches).
+- `services/ai-api/src/hooks/wallet-debit.js` — JSDoc updated to list `'ai'` alongside the other module values and explain the 'ai' vs 'kb' split.
+- `services/ai-api/test/wallet-debit.test.js` — 13 chat-flow test cases updated.
+- `services/ai-api/test/wallet-failed-debits.test.js` — 11 chat-flow test cases updated.
+
+**Backfill:** not required. Live `public.usage_events` contains zero `event_kind='ai.message' AND module='kb'` rows (only 5 `calc_call` events exist in dev), so the historical data migration step the task doc contemplated is a no-op.
+
+**feature_quotas:** no new rows needed — `'ai'` module is already a valid quota target.
+
+Tests: 313/313 ai-api pass (78 suites).
+
+## Known remaining reference to `'chat'` as a name
+
+The task 32 filename keeps `module-kind-enum-chat` for archaeology. Future reports should reference module `'ai'` not `'chat'`.
 
 ## Problem
 
