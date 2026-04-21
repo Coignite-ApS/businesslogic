@@ -152,9 +152,9 @@ Test checkout sessions created during this run:
 - Sarah test account: `sarah-uxtest-1776658880@coignite.dk` / `TestPass123!` (account_id `e84f7866-dca1-4e14-891a-4d221c13ccd0`)
 - Sarah's subscriptions before test: 0 rows (clean)
 - Sarah's wallet ledger before: 1 credit €5 promo + 1 debit €4.50 adjustment (pre-existing)
-- `STRIPE_WEBHOOK_SECRET` inside CMS container: `whsec_cb983ec14e5a1556fdba5bc395bdb2ca53f4454e3586d167eb0210e8451d96b3`
-- `STRIPE_SECRET_KEY` inside CMS: `sk_test_51T66pLRfGjysVTdN...` → Stripe account `acct_1T66pLRfGjysVTdN` ("Businesslogic")
-- Local Stripe CLI default profile: account `acct_1C2b12DtMOoQtGrr` ("Coignite") — `sk_test_51C2b12DtMOoQtGrr...`
+- `STRIPE_WEBHOOK_SECRET` inside CMS container: `whsec_<REDACTED>` (rotate if compromise suspected — prior commit leaked full value)
+- `STRIPE_SECRET_KEY` inside CMS: `sk_test_<REDACTED>` → Stripe account `acct_1T66pLRfGjysVTdN` ("Businesslogic")
+- Local Stripe CLI default profile: account `acct_1C2b12DtMOoQtGrr` ("Coignite") — `sk_test_<REDACTED>`
 
 ### Test 1: Subscription Checkout (Calculators Starter monthly trial)
 
@@ -180,7 +180,7 @@ Test checkout sessions created during this run:
 
 Confirmation:
 - `stripe checkout sessions retrieve cs_test_...ZqVHo` (no api-key) → `"No such checkout.session"`.
-- Same command with explicit `--api-key sk_test_51T66pLRfGjysVTdN...` → full session returned.
+- Same command with explicit `--api-key sk_test_<REDACTED>` → full session returned.
 - `stripe events list --limit 5` (default) → newest event is `evt_1TO9u4DtMOoQtGrrWcBE69q4`, epoch 1776661068 (~7h stale). Same command with CMS api-key → `evt_1TOGlqRfGjysVTdNQRU7R85P` at epoch 1776687466 (Sarah's event, present).
 
 ### Test 2: Wallet top-up — skipped
