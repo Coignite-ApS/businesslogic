@@ -303,8 +303,8 @@ async function withIdempotency<T>(db, event, logger, work) {
         │     WHERE s.account_id = $1 AND s.module = 'calculators'
         │       AND s.status NOT IN ('canceled','expired')
         │
-        │  Returns: { tier, slot_allowance, request_allowance, ao_allowance }
-        │  RPS derived from tier: rpsForTier(sub.tier) → {Starter:10, Growth:50, Scale:200}
+        │  Returns: { tier, slot_allowance, request_allowance, rps_allowance, ao_allowance }
+        │  RPS: sp.rps_allowance (Starter:10, Growth:50, Scale:200, Enterprise:NULL)
         │
         │  If no subscription: return 402 "Subscription required for calculators"
         │
@@ -416,7 +416,6 @@ services/formula-api/src/services/calculator-db.js  ← inlined helper (plain JS
 |---|---|---|---|
 | Direct JOIN reader pattern | Decouples from feature_quotas refresh job | When task 17 ships | Task 17 |
 | 1-calc-=-1-slot proxy in slot enforcement | Slot computation not yet implemented | When task 19 ships | Task 19 |
-| RPS by tier (Starter=10, Growth=50, Scale=200) | Per-key RPS not yet decided | When per-key RPS spec is locked | New task TBD |
 | Wallet balance "infinite" (never debits) | Debit hook deferred to task 18 | When task 18 ships | Task 18 |
 | `metrics-aggregator.js` reads from new columns but rollup not scheduled | Background job not wired | When task 21 ships | Task 21 |
 | `monthly_aggregates` and `api_key_usage` lack Directus collection metadata | Composite PKs; service-internal counters | If admin UI needs to display them | Task 25 |

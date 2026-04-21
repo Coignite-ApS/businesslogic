@@ -1,8 +1,24 @@
 # 29. Pricing v2 — Per-tier RPS spec lock + per-key RPS support
 
-**Status:** planned
+**Status:** completed (2026-04-21) — schema + code refactor shipped. Gateway per-tier enforcement deferred to a new follow-up task (non-trivial: gateway does not currently read subscription plans).
 **Severity:** MEDIUM — transitional code in place; lock the spec so it stops being "transitional"
 **Source:** Architecture doc `docs/architecture/pricing-v2.md` §7 transitional patterns
+
+## Resolution (2026-04-21)
+
+Decisions locked: **Option Y** (new `subscription_plans.rps_allowance` column, single source of truth) applied. Option A/B/C (gateway-level MIN enforcement) partially deferred — gateway today enforces per-key `rate_limit_rps` only; formula-api enforces per-tier RPS via `loadAccountLimitsFromDb`. Filed as separate follow-up.
+
+Shipped on `dm/task-29-rps-spec-lock`:
+- Migration `038_subscription_plans_rps_allowance.sql` (+ down) — additive column, backfilled starter=10 / growth=50 / scale=200; enterprise + non-calculators rows = NULL. DB-admin report: `docs/reports/db-admin-2026-04-21-task-29-rps-allowance.md`.
+- Deleted `rpsForTier()` from both `_shared/v2-subscription.ts` and `services/formula-api/src/services/calculator-db.js`; both now read `sp.rps_allowance` directly.
+- `ActiveSubscription` type + SELECT in `getActiveSubscription()` include `rps_allowance`.
+- `project-extension-calculator-api/{src/auth.ts, src/index.ts}` read `sub.rps_allowance` directly.
+- `scripts/create-products-v2.ts` `feature_metadata` includes `rps_allowance` for all 3 paid calculators tiers.
+- Architecture doc `docs/architecture/pricing-v2.md` §7 row removed; diagram updated to reference `sp.rps_allowance`.
+
+Tests: 121/121 calculator-api · 37/37 _shared · 67/67 formula-api · 150/150 stripe · 28/28 ai-api · 36/36 knowledge-api. Builds clean on all touched extensions.
+
+Follow-up filed: **Gateway per-tier RPS enforcement** (not this task). Gateway needs to read subscription plan allowances and enforce MIN(per-key, per-tier) — requires new query path + Redis cache invalidation on subscription changes. Not blocking production since formula-api already enforces tier RPS.
 
 ## Problem
 

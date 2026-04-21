@@ -5,7 +5,7 @@ import { handleFormulaApiError, buildPayload, buildRecipe, configIsComplete, toS
 import { registerAdminRoutes } from './admin-routes.js';
 import { encrypt, decrypt, isEncrypted } from './crypto.js';
 import { compareOutputs } from './test-runner.js';
-import { getActiveSubscription, rpsForTier } from '../../_shared/v2-subscription.js';
+import { getActiveSubscription } from '../../_shared/v2-subscription.js';
 import type { CalculatorConfig, DB } from './types.js';
 
 /** Strip internal fields from describe response (mapping, available_data) */
@@ -102,11 +102,11 @@ export default defineHook(({ init, action, filter, schedule }, { env, logger, da
 				// v2: fetch the calculators-module subscription joined with plan allowances.
 				// Field renames vs v1:
 				//   calls_per_month   → request_allowance
-				//   calls_per_second  → derived from tier (transitional; see rpsForTier)
+				//   calls_per_second  → rps_allowance (DB-backed; migration 038)
 				const sub = await getActiveSubscription(db, accountId, 'calculators');
 				const isActive = sub?.status === 'active' || sub?.status === 'trialing';
 
-				const rateLimitRps = isActive ? rpsForTier(sub!.tier) : null;
+				const rateLimitRps = isActive ? (sub!.rps_allowance ?? null) : null;
 				const rateLimitMonthly = isActive ? (sub!.request_allowance ?? null) : null;
 
 				// Count calculator_calls this month for this account

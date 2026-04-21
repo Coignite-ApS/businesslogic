@@ -40,6 +40,7 @@ export interface ActiveSubscription {
 	plan_name: string;
 	slot_allowance: number | null;
 	request_allowance: number | null;
+	rps_allowance: number | null;
 	ao_allowance: number | null;
 	storage_mb: number | null;
 	embed_tokens_m: number | null;
@@ -90,6 +91,7 @@ export async function getActiveSubscription(
 			'sp.name as plan_name',
 			'sp.slot_allowance',
 			'sp.request_allowance',
+			'sp.rps_allowance',
 			'sp.ao_allowance',
 			'sp.storage_mb',
 			'sp.embed_tokens_m',
@@ -103,27 +105,6 @@ export async function getActiveSubscription(
 			'sp.price_eur_annual',
 		)
 		.first();
-}
-
-/**
- * Transitional rate-limit-per-second mapping per tier.
- *
- * v1 had `subscription_plans.calls_per_second`. v2 dropped that column
- * — the spec hasn't decided whether RPS should be per-tier or per-API-key.
- * Until that is resolved (follow-up), we use these defaults so existing
- * rate limiters keep working.
- *
- * NOTE: when v2 RPS is finalized, replace every call site with a real
- * lookup (likely `api_keys.rate_limit_rps` or a `feature_quotas` field).
- */
-export function rpsForTier(tier: Tier | null | undefined): number | null {
-	switch (tier) {
-		case 'starter': return 10;
-		case 'growth': return 50;
-		case 'scale': return 200;
-		case 'enterprise': return null; // unlimited
-		default: return null;
-	}
 }
 
 // ─── AI Wallet helpers ─────────────────────────────────────────────────────

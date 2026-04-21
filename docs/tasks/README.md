@@ -247,7 +247,7 @@ Infrastructure and multi-service concerns.
 | 26 | Pricing v2 — test coverage hardening + account isolation E2E | **completed (partial — CI pending via 35)** (`24e1671` + `dd75873` + `9101118`) | [cross-cutting/26-pricing-v2-test-coverage.md](cross-cutting/26-pricing-v2-test-coverage.md) |
 | 27 | Pricing v2 — Gateway per-API-key sub-limit enforcement | **completed (Sprint B)** | [cross-cutting/27-pricing-v2-gateway-sublimits.md](cross-cutting/27-pricing-v2-gateway-sublimits.md) |
 | 28 | Pricing v2 — Production deployment + smoke test | planned | [cross-cutting/28-pricing-v2-production-deployment.md](cross-cutting/28-pricing-v2-production-deployment.md) |
-| 29 | Pricing v2 — Per-tier RPS spec lock + per-key RPS support | planned | [cross-cutting/29-pricing-v2-rps-spec.md](cross-cutting/29-pricing-v2-rps-spec.md) |
+| 29 | Pricing v2 — Per-tier RPS spec lock (schema + code refactor) | **completed 2026-04-21** — gateway MIN enforcement split to new follow-up | [cross-cutting/29-pricing-v2-rps-spec.md](cross-cutting/29-pricing-v2-rps-spec.md) |
 | 30 | ai_wallet_ledger compound index for monthly cap query (LOW, defer until scale) | planned | [cross-cutting/30-ai-wallet-ledger-index.md](cross-cutting/30-ai-wallet-ledger-index.md) |
 | 31 | wallet_auto_reload_pending table + CMS Stripe consumer (Sprint 2 — revenue) | **completed 2026-04-19** | [cross-cutting/31-wallet-auto-reload-pending.md](cross-cutting/31-wallet-auto-reload-pending.md) |
 | 32 | Extend module_kind enum to include 'chat' (analytics) | planned | [cross-cutting/32-module-kind-enum-chat.md](cross-cutting/32-module-kind-enum-chat.md) |
@@ -277,6 +277,7 @@ Infrastructure and multi-service concerns.
 | 56 | 🟠 **P1: Stripe webhook observability** — persist every hit + admin "Billing Health" panel + startup validation (from task 48 dev-session drift) | **completed 2026-04-20** | [cross-cutting/56-stripe-webhook-observability.md](cross-cutting/56-stripe-webhook-observability.md) |
 | 57 | 🟡 P2: Stripe reconciliation cron — defense-in-depth for missed webhooks | **completed 2026-04-21** (`7caf27e` + `5843c1e` — autoPagingEach + shared provisioning + is_auto_reload + quota-err; 142 tests) | [cross-cutting/57-stripe-reconciliation-cron.md](cross-cutting/57-stripe-reconciliation-cron.md) |
 | 58 | Post-Sprint-B follow-ups bundle — 12 minor polish items surfaced in reviews | **completed 2026-04-20** (3 commits — 58.4 NOP, 58.9 WONTFIX, all others done; +7 tests) | [cross-cutting/58-post-sprint-b-followups-cleanup.md](cross-cutting/58-post-sprint-b-followups-cleanup.md) |
+| 59 | Gateway per-tier RPS enforcement (MIN of per-key + per-tier caps) — follow-up to task 29 | planned | [cross-cutting/59-gateway-per-tier-rps-enforcement.md](cross-cutting/59-gateway-per-tier-rps-enforcement.md) |
 
 ---
 
@@ -389,7 +390,7 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 12 | 0 | 0 | 46 | 58 |
-| **Total** | **34** | **8** | **0** | **101** | **143** |
+| Cross-Cutting | 12 | 0 | 0 | 47 | 59 |
+| **Total** | **34** | **8** | **0** | **102** | **144** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision
