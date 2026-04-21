@@ -192,4 +192,34 @@ describe('debitWallet gateway cache invalidation publish', () => {
     await new Promise(r => setTimeout(r, 10));
     assert.equal(published.length, 0, 'no publish for zero-cost event');
   });
+
+  it('does not publish when debit is rolled back due to insufficient balance (task 58.11)', async () => {
+    // Balance too low → ROLLBACK path → publish must NOT fire
+    const published = [];
+    const fakeRedis = {
+      async publish(channel, payload) { published.push({ channel, payload }); return 1; },
+    };
+
+    // Pool with a near-zero balance that can't cover even a 1¢ debit
+    const pool = makeMockPool({ balanceEur: '0.0001' });
+
+    const result = await debitWallet({
+      accountId: 'acc-pub-6',
+      costUsd: 0.01, // ~0.0092 EUR — exceeds 0.0001 balance
+      model: 'claude-sonnet-4-6',
+      module: 'ai',
+      eventKind: 'ai.message',
+      metadata: {},
+      apiKeyId: 'key-uuid-rollback',
+      pool,
+      redis: fakeRedis,
+    });
+
+    // Must be a 402 failure, not ok
+    assert.equal(result.ok, false, 'debit should fail with insufficient balance');
+    assert.equal(result.statusCode, 402);
+    // Allow any async fire-and-forget to settle
+    await new Promise(r => setTimeout(r, 20));
+    assert.equal(published.length, 0, 'must not publish on rollback path');
+  });
 });

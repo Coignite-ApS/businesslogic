@@ -82,9 +82,17 @@ func main() {
 	// Sublimit checker (task 27)
 	sublimitChecker := service.NewSublimitChecker(dbPool, rdb)
 
-	// Cache invalidation subscriber (task 42) — runs until ctx is cancelled
+	// Cache invalidation subscriber (task 42, task 58.10) — dedicated client
+	// for PubSub so Subscribe() does not hold a connection from the main pool.
+	// go-redis/v9 PubSub internally takes its own connection; a dedicated client
+	// makes this explicit and matches formula-api's quotaSubRedis pattern.
 	if rdb != nil {
-		go service.StartCacheInvalidationSubscriber(ctx, rdb, log.Logger)
+		subOpts, _ := redis.ParseURL(cfg.RedisURL) // already validated above; ignore err
+		subRdb := redis.NewClient(subOpts)
+		go func() {
+			service.StartCacheInvalidationSubscriber(ctx, subRdb, log.Logger)
+			subRdb.Close() //nolint:errcheck
+		}()
 	}
 
 	// Response cache
