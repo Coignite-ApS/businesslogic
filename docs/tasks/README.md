@@ -14,35 +14,31 @@ Improvements organized by service. Use `/improvements` to manage, or `/improveme
 
 ---
 
-## 🚨 What to do next (Sprint B merged + UX-tested 2026-04-20)
+## 🚨 What to do next (Sprint B + all follow-ups shipped 2026-04-21)
 
-Sprint B shipped + merged to dev. UX test with Sarah persona (2026-04-20) exposed **4 P0 billing-pipeline bugs** not caught by unit/browser QA because QA ran as admin. **Must fix before Sprint 3 deploy.**
+Sprint B + every post-Sprint-B follow-up (incl. tasks 43, 52, 58) merged to `dev` via PRs #62 (`dm/post-sprint-b-followups`) and #63 (`dm/task-43-58-followups`). No Sprint B work remains. **Next milestone: Sprint 3 — production deployment (task 28).**
 
-| Priority | # | Task | Why | Est. |
-|---|---|---|---|---|
-| **🔴 P0** (blocks deploy) | [48](cross-cutting/48-stripe-webhook-pipeline-broken.md) | Stripe webhook pipeline not creating subs / updating wallet | Checkout completes in Stripe, local DB never reconciles. Sarah "pays" then sees "No subscription". | 1-4h |
-| ✅ shipped 2026-04-20 | [49](cross-cutting/49-user-role-metadata-permission.md) | User role missing `PATCH /users/me` permission for metadata | `POST /account/onboarding/state` endpoint (commits `c61bec4`, `0ad4a37`, `fde3371`). Live-verified as Sarah. | done |
-| 🟠 P1 | [50](cross-cutting/50-onboarding-wizard-global-redirect.md) | Onboarding redirect only fires from Account module | >90% of new users land on `/admin/content/calculators` instead of wizard. | 2-4h |
-| 🟠 P1 | [51](cross-cutting/51-stripe-checkout-return-urls.md) | Stripe Checkout return URLs + no success page | Returns to `/admin/content/account` (raw Directus view) instead of subscription page with toast. | 1h |
-| 🟡 in-progress | [52](cross-cutting/52-ux-test-p1-cleanup-bundle.md) | UX polish bundle | 52.1/52.2/52.4 shipped (`4d32075`, `f27b70d`); 52.3 **cancelled** (directus_* constraint — needs manual admin-UI delete of `account.subscriptions` ghost field); browser-qa pending. | partial |
-| ✅ **completed 2026-04-20** | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild — `packages/bl-widget` outside build context | additional_contexts + Dockerfile fixes applied; 18 extensions built, /server/ping OK. | done |
-| ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes | Closed — image rebuild split to task 44. | closed |
-| ✅ shipped 2026-04-20 | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5) | Migration 033 applied via db-admin. | closed |
-| ✅ shipped 2026-04-20 | [47](cross-cutting/47-plan-cards-v2-live-render-verification.md) | plan-cards.vue v2 live render | Verified in browser QA (calculators module). | closed |
-| ✅ shipped 2026-04-20 | [56](cross-cutting/56-stripe-webhook-observability.md) | Stripe webhook observability + billing-health panel | stripe_webhook_log + per-path log writes + /stripe/webhook-health endpoint + Billing Health Vue panel + startup validation. 59 new unit tests + live red-banner verification. | closed |
-| ✅ shipped 2026-04-21 | [57](cross-cutting/57-stripe-reconciliation-cron.md) | Stripe reconciliation cron | autoPagingEach + shared provisioning helpers + is_auto_reload + quota-err surfacing. 142 tests. | closed |
-| ✅ shipped 2026-04-20 | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation | Migration 036 + cron fanout + Set dedup. 23 tests. | closed |
-| ✅ shipped 2026-04-21 | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH | Go subscriber + ai-api publish + kb-event publish. 349 tests across 3 services. | closed |
-| 🟢 P3 | [43](cross-cutting/43-flow-step-cost-rate.md) | `flow.step` cost rate | **BLOCKED** — pricing decision required (dm@coignite.dk): A steps free / B flat rate / C type-dependent. | 30min+impl |
-| ✅ shipped 2026-04-21 | [45](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) | `/wallet/balance` echo auto_reload fields | 3 extra fields in response. 4 new tests, 146 pass. | closed |
-| ✅ shipped 2026-04-21 | [46](cross-cutting/46-wallet-dialog-a11y-labels.md) | Wallet dialog a11y labels | label/id pairs + aria-pressed + role=dialog. 10 a11y assertions. | closed |
-| LOW | [58](cross-cutting/58-post-sprint-b-followups-cleanup.md) | Post-Sprint-B follow-ups bundle | 12 minor polish items surfaced across 56/57/41/42/45/46 reviews. | 6-8h |
+| Status | # | Task |
+|---|---|---|
+| ✅ shipped 2026-04-20 | [48](cross-cutting/48-stripe-webhook-pipeline-broken.md) | Stripe webhook pipeline fix (P0) |
+| ✅ shipped 2026-04-20 | [49](cross-cutting/49-user-role-metadata-permission.md) | User role `PATCH /users/me` perm (P0) |
+| ✅ shipped 2026-04-20 | [50](cross-cutting/50-onboarding-wizard-global-redirect.md) | Global onboarding redirect (P1) |
+| ✅ shipped 2026-04-20 | [51](cross-cutting/51-stripe-checkout-return-urls.md) | Stripe Checkout return URLs + success page (P1) |
+| ✅ completed 2026-04-21 | [52](cross-cutting/52-ux-test-p1-cleanup-bundle.md) | UX polish bundle — all 4 sub-items + browser-qa pass |
+| ✅ completed 2026-04-20 | [44](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) | CMS Docker image rebuild |
+| ✅ shipped (dev) | [39](cross-cutting/39-cms-shared-extension-build-collision.md) | CMS dev-path extensions fixes |
+| ✅ shipped 2026-04-20 | [40](cross-cutting/40-aggregator-hardening.md) | Aggregator hardening (I2+I3+I5) |
+| ✅ shipped 2026-04-20 | [47](cross-cutting/47-plan-cards-v2-live-render-verification.md) | plan-cards.vue v2 live render |
+| ✅ shipped 2026-04-20 | [56](cross-cutting/56-stripe-webhook-observability.md) | Stripe webhook observability + billing-health panel |
+| ✅ shipped 2026-04-21 | [57](cross-cutting/57-stripe-reconciliation-cron.md) | Stripe reconciliation cron |
+| ✅ shipped 2026-04-20 | [41](cross-cutting/41-per-account-aggregate-cache-invalidation.md) | Per-account aggregate cache invalidation |
+| ✅ shipped 2026-04-21 | [42](cross-cutting/42-gateway-cache-cross-service-publish.md) | Gateway cache cross-service PUBLISH |
+| ✅ shipped 2026-04-21 | [43](cross-cutting/43-flow-step-cost-rate.md) | `flow.step` cost rate — Option B approved (flat €0.001/non-AI step, env-tunable, AI excluded) |
+| ✅ shipped 2026-04-21 | [45](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) | `/wallet/balance` auto_reload echo |
+| ✅ shipped 2026-04-21 | [46](cross-cutting/46-wallet-dialog-a11y-labels.md) | Wallet dialog a11y labels |
+| ✅ completed 2026-04-20 | [58](cross-cutting/58-post-sprint-b-followups-cleanup.md) | Post-Sprint-B follow-ups (12 items: 9 DONE + 1 NOP + 1 WONTFIX + 58.12) |
 
-**Sprint post-Sprint-B complete** on branch `dm/post-sprint-b-followups` (12 commits). Ready for merge to `dev`. Task 43 still blocked on pricing decision. Task 58 follow-ups planned. Sprint 3 production deploy (task 28) ready to unblock once dev is merged.
-
-**Suggested order:** 48 ✅ → 49 ✅ → 50+51 ✅ → 52 partial → 56+57 ✅ → 41/42/45/46 ✅ → 43 (pricing decision) → 58 (optional polish) → Sprint 3.
-
-**Sprint B branch ready for PR:** browser QA of cms/36+37 can proceed on dev NOW (task 39 dev-path shipped). Merge `dm/sprint-b-pricing-v2` → `dev` after browser smoke; task 44 (image rebuild) only blocks Sprint 3 production deploy, not the merge.
+**Next: Sprint 3 — Production deployment (task 28).** Real customers sign up + activate + check out via Stripe live mode.
 
 ---
 
@@ -265,7 +261,7 @@ Infrastructure and multi-service concerns.
 | 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | **completed 2026-04-20** (migration 033 applied via db-admin) | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
 | 41 | 🟡 Per-account aggregate cache invalidation (replace `ALL` flush, P2 at scale) | **completed 2026-04-20** (`76502a8` + migration 036) | [cross-cutting/41-per-account-aggregate-cache-invalidation.md](cross-cutting/41-per-account-aggregate-cache-invalidation.md) |
 | 42 | 🟡 Gateway cache cross-service PUBLISH on wallet debit + usage events (P2 freshness) | **completed 2026-04-21** (`7668dce` — gateway Go subscriber + ai-api + usage-consumer publishes; 349 tests) | [cross-cutting/42-gateway-cache-cross-service-publish.md](cross-cutting/42-gateway-cache-cross-service-publish.md) |
-| 43 | 🟢 `flow.step` cost rate — pricing decision required (P3) | planned | [cross-cutting/43-flow-step-cost-rate.md](cross-cutting/43-flow-step-cost-rate.md) |
+| 43 | `flow.step` cost rate — Option B flat €0.001/non-AI step (P3) | **completed 2026-04-21** (`df6f536` — migration 037 + env `FLOW_STEP_COST_EUR` + cron + 39 tests; user-approved Option B) | [cross-cutting/43-flow-step-cost-rate.md](cross-cutting/43-flow-step-cost-rate.md) |
 | 44 | CMS Docker image rebuild — `packages/bl-widget` outside build context | **completed 2026-04-20** | [cross-cutting/44-cms-docker-image-rebuild-packages-context.md](cross-cutting/44-cms-docker-image-rebuild-packages-context.md) |
 | 45 | `/wallet/balance` response echo auto_reload fields (Sprint B QA follow-up — LOW) | **completed 2026-04-21** (`e0bb843`, 4 tests) | [cross-cutting/45-wallet-balance-response-auto-reload-fields.md](cross-cutting/45-wallet-balance-response-auto-reload-fields.md) |
 | 46 | Wallet settings dialog a11y labels (Sprint B QA follow-up — LOW) | **completed 2026-04-21** (`99b9e8b` + `c7fbd9b`, 10 a11y tests) | [cross-cutting/46-wallet-dialog-a11y-labels.md](cross-cutting/46-wallet-dialog-a11y-labels.md) |
@@ -274,7 +270,7 @@ Infrastructure and multi-service concerns.
 | 49 | 🔴 **P0: User role missing PATCH /users/me metadata permission** (from ux-test) | **completed 2026-04-20** (`c61bec4` + `0ad4a37` + `fde3371`) | [cross-cutting/49-user-role-metadata-permission.md](cross-cutting/49-user-role-metadata-permission.md) |
 | 50 | 🟠 **P1: Onboarding redirect only fires from Account module** (from ux-test) | **completed 2026-04-20** (`e571336`) | [cross-cutting/50-onboarding-wizard-global-redirect.md](cross-cutting/50-onboarding-wizard-global-redirect.md) |
 | 51 | 🟠 **P1: Stripe Checkout return URLs wrong + no success page** (from ux-test) | **completed 2026-04-20** (`7b82c0f` + `99fd335`) | [cross-cutting/51-stripe-checkout-return-urls.md](cross-cutting/51-stripe-checkout-return-urls.md) |
-| 52 | 🟡 **P1: UX polish bundle** — top-up entry + AI perms + account crash + 403 copy (from ux-test) | **in-progress** — 52.1/52.2/52.4 shipped (`4d32075` + `f27b70d`); 52.3 **cancelled** (directus_* constraint); browser-qa pending | [cross-cutting/52-ux-test-p1-cleanup-bundle.md](cross-cutting/52-ux-test-p1-cleanup-bundle.md) |
+| 52 | **P1: UX polish bundle** — top-up entry + AI perms + account crash + 403 copy (from ux-test) | **completed 2026-04-21** — 52.1/52.2/52.4 shipped (`4d32075` + `f27b70d`); 52.3 resolved via Admin UI manual delete (`31e8793`); browser-qa pass (`docs/reports/browser-qa-2026-04-20-tasks-48-50-51-52-summary.md`) | [cross-cutting/52-ux-test-p1-cleanup-bundle.md](cross-cutting/52-ux-test-p1-cleanup-bundle.md) |
 | 53 | CMS Dockerfile follow-ups (I2 **superseded by 54**; I3 file: dep CI check + M6 smoke test remain) — LOW hygiene | planned | [cross-cutting/53-cms-dockerfile-followups.md](cross-cutting/53-cms-dockerfile-followups.md) |
 | 54 | 🔴 **P0: Shared-libs break entire hook layer** (Directus 11 Zod manifest strict-fail) | **completed 2026-04-20** (`0386f64` + `640c64b` + `12b8314` + `8510283`) | [cross-cutting/54-shared-libs-break-extension-load.md](cross-cutting/54-shared-libs-break-extension-load.md) |
 | 55 | 🟡 Onboarding guard stale-closure on logout→re-login in same tab (P2, follow-up to 50) | **completed 2026-04-20** (`321431c`) | [cross-cutting/55-onboarding-guard-logout-reentry.md](cross-cutting/55-onboarding-guard-logout-reentry.md) |
@@ -387,13 +383,13 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 
 | Service | Planned | Idea | In-Progress | Completed | Total |
 |---------|---------|------|-------------|-----------|-------|
-| CMS | 12 | 0 | 0 | 22 | 34 |
-| AI API | 1 | 0 | 0 | 10 | 11 |
+| CMS | 15 | 0 | 0 | 21 | 36 |
+| AI API | 5 | 0 | 0 | 15 | 20 |
 | Formula API | 1 | 0 | 0 | 7 | 8 |
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 20 | 0 | 0 | 20 | 40 |
-| **Total** | **36** | **8** | **0** | **70** | **114** |
+| Cross-Cutting | 13 | 0 | 0 | 45 | 58 |
+| **Total** | **36** | **8** | **0** | **99** | **143** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision
