@@ -98,33 +98,15 @@ export async function loadMcpConfigFromDb(id) {
  * Returns same shape as Admin API GET /accounts/:accountId:
  *   { rateLimitRps, rateLimitMonthly, monthlyUsed }
  *
- * v2 NOTE: pricing_v2 schema renamed columns and scopes subscriptions per
- * (account, module). For Formula API rate limiting we read the calculators-
- * module subscription only.
- *   v1 sp.calls_per_month   → v2 sp.request_allowance
- *   v1 sp.calls_per_second  → derived from sp.tier (transitional; v2 spec
- *                             hasn't decided whether RPS is per-tier or
- *                             per-API-key; defaults below match the CMS-side
- *                             rpsForTier() helper in _shared/v2-subscription.ts).
- *   v1 s.account            → v2 s.account_id
- *   v1 s.plan               → v2 s.subscription_plan_id
+ * Reads the calculators-module subscription joined with its plan. RPS comes
+ * from sp.rps_allowance (single source of truth; migration 038).
+ *   v1 s.account → v2 s.account_id
+ *   v1 s.plan    → v2 s.subscription_plan_id
  */
-function rpsForTier(tier) {
-  // Keep in sync with services/cms/extensions/local/_shared/v2-subscription.ts.
-  switch (tier) {
-    case 'starter': return 10;
-    case 'growth': return 50;
-    case 'scale': return 200;
-    case 'enterprise': return null;
-    default: return null;
-  }
-}
-
 export async function loadAccountLimitsFromDb(accountId) {
-  // Fetch the calculators-module subscription joined with its plan allowances.
   const sub = await queryOne(
     `SELECT sp.request_allowance AS "rateLimitMonthly",
-            sp.tier              AS tier
+            sp.rps_allowance     AS "rateLimitRps"
      FROM subscriptions s
      JOIN subscription_plans sp ON sp.id = s.subscription_plan_id
      WHERE s.account_id = $1
@@ -135,7 +117,6 @@ export async function loadAccountLimitsFromDb(accountId) {
     [accountId],
   );
 
-  // Count calls this month for monthly usage
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -148,7 +129,7 @@ export async function loadAccountLimitsFromDb(accountId) {
   );
 
   return {
-    rateLimitRps: sub ? rpsForTier(sub.tier) : null,
+    rateLimitRps: sub?.rateLimitRps ?? null,
     rateLimitMonthly: sub?.rateLimitMonthly ?? null,
     monthlyUsed: parseInt(usageRow?.count ?? '0', 10),
   };

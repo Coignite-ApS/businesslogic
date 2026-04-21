@@ -1,5 +1,5 @@
 import type { DB } from './types.js';
-import { getActiveSubscription, rpsForTier } from '../../_shared/v2-subscription.js';
+import { getActiveSubscription } from '../../_shared/v2-subscription.js';
 
 export interface SubscriptionInfo {
 	exempt: boolean;
@@ -146,11 +146,11 @@ export function requireActiveSubscription(db: DB) {
 			// Attach limits for downstream use.
 			// Field renames vs v1:
 			//   calls_per_month   → request_allowance
-			//   calls_per_second  → derived from tier (transitional; see rpsForTier)
+			//   calls_per_second  → rps_allowance (DB-backed; migration 038)
 			//   calculator_limit  → slot_allowance (1 calc = 1 slot until task 19)
 			req.subscriptionLimits = {
 				calls_per_month: sub.request_allowance,
-				calls_per_second: rpsForTier(sub.tier),
+				calls_per_second: sub.rps_allowance,
 				calculator_limit: sub.slot_allowance,
 			};
 

@@ -153,7 +153,7 @@ describe('GET /accounts/:accountId', () => {
 	it('returns rate limits and usage for valid account', async () => {
 		const handler = await setupAccountsHandler({
 			account: { id: 'acc-1' },
-			subscription: { tier: 'growth', request_allowance: 50000, status: 'active' },
+			subscription: { tier: 'growth', request_allowance: 50000, rps_allowance: 50, status: 'active' },
 			callCount: 1234,
 		});
 		const req = { params: { accountId: 'acc-1' }, accountability: { user: 'u1' } };
@@ -161,7 +161,7 @@ describe('GET /accounts/:accountId', () => {
 		await handler(req, res);
 
 		expect(res.json).toHaveBeenCalledWith({
-			rateLimitRps: 50, // v2: derived from tier (Growth=50)
+			rateLimitRps: 50,
 			rateLimitMonthly: 50000,
 			monthlyUsed: 1234,
 		});
@@ -187,7 +187,7 @@ describe('GET /accounts/:accountId', () => {
 	it('allows role-based auth (no user, but has role)', async () => {
 		const handler = await setupAccountsHandler({
 			account: { id: 'acc-1' },
-			subscription: { tier: 'starter', request_allowance: 10000, status: 'active' },
+			subscription: { tier: 'starter', request_allowance: 10000, rps_allowance: 10, status: 'active' },
 			callCount: 42,
 		});
 		const req = { params: { accountId: 'acc-1' }, accountability: { role: 'formula-api-role' } };
@@ -195,7 +195,7 @@ describe('GET /accounts/:accountId', () => {
 		await handler(req, res);
 
 		expect(res.json).toHaveBeenCalledWith({
-			rateLimitRps: 10, // v2: derived from tier (Starter=10)
+			rateLimitRps: 10,
 			rateLimitMonthly: 10000,
 			monthlyUsed: 42,
 		});

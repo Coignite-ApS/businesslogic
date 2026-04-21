@@ -77,7 +77,7 @@ const BASE_PRODUCTS: BaseProduct[] = [
     tier: 'starter',
     prices: { eur_monthly: 1900, eur_annual: 19000, usd_monthly: 2100, usd_annual: 21000 },
     feature_metadata: {
-      slot_allowance: '10', request_allowance: '10000', ao_allowance: '2',
+      slot_allowance: '10', request_allowance: '10000', rps_allowance: '10', ao_allowance: '2',
       included_api_keys: '3', included_users: '5',
     },
   },
@@ -89,7 +89,7 @@ const BASE_PRODUCTS: BaseProduct[] = [
     tier: 'growth',
     prices: { eur_monthly: 7900, eur_annual: 79000, usd_monthly: 8900, usd_annual: 89000 },
     feature_metadata: {
-      slot_allowance: '50', request_allowance: '100000', ao_allowance: '10',
+      slot_allowance: '50', request_allowance: '100000', rps_allowance: '50', ao_allowance: '10',
       included_api_keys: '10', included_users: '5',
     },
   },
@@ -101,7 +101,7 @@ const BASE_PRODUCTS: BaseProduct[] = [
     tier: 'scale',
     prices: { eur_monthly: 29900, eur_annual: 299000, usd_monthly: 33500, usd_annual: 335000 },
     feature_metadata: {
-      slot_allowance: '250', request_allowance: '1000000', ao_allowance: '50',
+      slot_allowance: '250', request_allowance: '1000000', rps_allowance: '200', ao_allowance: '50',
       included_api_keys: '999', included_users: '25',
     },
   },
