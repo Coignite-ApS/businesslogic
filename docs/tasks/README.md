@@ -280,7 +280,7 @@ Infrastructure and multi-service concerns.
 | 55 | 🟡 Onboarding guard stale-closure on logout→re-login in same tab (P2, follow-up to 50) | **completed 2026-04-20** (`321431c`) | [cross-cutting/55-onboarding-guard-logout-reentry.md](cross-cutting/55-onboarding-guard-logout-reentry.md) |
 | 56 | 🟠 **P1: Stripe webhook observability** — persist every hit + admin "Billing Health" panel + startup validation (from task 48 dev-session drift) | **completed 2026-04-20** | [cross-cutting/56-stripe-webhook-observability.md](cross-cutting/56-stripe-webhook-observability.md) |
 | 57 | 🟡 P2: Stripe reconciliation cron — defense-in-depth for missed webhooks | **completed 2026-04-21** (`7caf27e` + `5843c1e` — autoPagingEach + shared provisioning + is_auto_reload + quota-err; 142 tests) | [cross-cutting/57-stripe-reconciliation-cron.md](cross-cutting/57-stripe-reconciliation-cron.md) |
-| 58 | Post-Sprint-B follow-ups bundle — 12 minor polish items surfaced in reviews | planned | [cross-cutting/58-post-sprint-b-followups-cleanup.md](cross-cutting/58-post-sprint-b-followups-cleanup.md) |
+| 58 | Post-Sprint-B follow-ups bundle — 12 minor polish items surfaced in reviews | **completed 2026-04-20** (3 commits — 58.4 NOP, 58.9 WONTFIX, all others done; +7 tests) | [cross-cutting/58-post-sprint-b-followups-cleanup.md](cross-cutting/58-post-sprint-b-followups-cleanup.md) |
 
 ---
 

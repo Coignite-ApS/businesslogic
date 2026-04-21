@@ -19,12 +19,13 @@
 				<p class="wizard-subtitle">What brings you here? We'll help you get started.</p>
 			</div>
 
-			<div class="intent-grid">
+			<div class="intent-grid" role="group" aria-label="Choose your goal">
 				<button
 					v-for="tile in intentTiles"
 					:key="tile.intent"
 					class="intent-tile"
 					:class="{ selected: selectedIntent === tile.intent }"
+					:aria-pressed="selectedIntent === tile.intent"
 					@click="selectIntent(tile.intent)"
 				>
 					<v-icon :name="tile.icon" class="tile-icon" />

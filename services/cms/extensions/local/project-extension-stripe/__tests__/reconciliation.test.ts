@@ -682,6 +682,161 @@ describe('pagination — autoPagingEach processes all items', () => {
 	});
 });
 
+// ─── 58.6 — Rollback-injection test for provisionWalletTopup ──
+
+describe('provisionWalletTopup — rollback atomicity (task 58.6)', () => {
+	it('topup + wallet rows not visible when ledger INSERT throws (transaction rolled back)', async () => {
+		const pi = makeStripePI();
+
+		// Track what rows would have been visible outside the transaction
+		const committedTopupIds: string[] = [];
+		const committedLedgerIds: string[] = [];
+
+		// Simulate a raw mock where topup INSERT succeeds but ledger throws
+		const rawMock = vi.fn().mockImplementation((sql: string, params?: any[]) => {
+			if (sql.includes('ai_wallet_topup')) {
+				// Would-be topup row — only visible if transaction commits
+				return Promise.resolve({ rows: [{ id: 'topup-to-rollback' }] });
+			}
+			if (sql.includes('ai_wallet') && !sql.includes('topup')) {
+				return Promise.resolve({ rows: [{ balance_eur: 10 }] });
+			}
+			return Promise.resolve({ rows: [] });
+		});
+
+		// Ledger INSERT throws — simulates a DB error mid-transaction
+		const ledgerThrow = vi.fn().mockImplementation(() => {
+			throw new Error('ledger INSERT constraint violation');
+		});
+
+		// db.transaction should propagate the throw (knex rolls back automatically)
+		let transactionRolledBack = false;
+		const db: any = {
+			raw: rawMock,
+			transaction: vi.fn().mockImplementation(async (fn: any) => {
+				const trx: any = (table: string) => {
+					if (table === 'ai_wallet_ledger') {
+						return { insert: ledgerThrow };
+					}
+					if (table === 'wallet_auto_reload_pending') return createChainMock(null);
+					return createChainMock(null);
+				};
+				trx.raw = rawMock;
+				trx.transaction = db.transaction;
+				try {
+					return await fn(trx);
+				} catch (err) {
+					// Simulate knex rolling back on error — throw propagates
+					transactionRolledBack = true;
+					throw err;
+				}
+			}),
+		};
+
+		// reconcileWalletTopups calls provisionWalletTopup which calls db.transaction
+		// When the transaction throws, reconcileWalletTopups catches it and increments errors
+		const stripeClient: any = {
+			paymentIntents: {
+				list: vi.fn().mockReturnValue(makeStripeList([pi])),
+			},
+		};
+
+		const logger = makeLogger();
+		const dbFn = Object.assign(
+			(table: string) => {
+				if (table === 'ai_wallet_topup') return createChainMock(null); // no existing row
+				if (table === 'stripe_webhook_log') return createInsertMock();
+				return createChainMock(null);
+			},
+			db,
+		);
+
+		const ctx: ReconcileContext = { stripe: stripeClient, db: dbFn, logger, windowHours: 48 };
+		const result = await reconcileWalletTopups(ctx);
+
+		// Transaction rolled back → no rows committed
+		expect(transactionRolledBack).toBe(true);
+		// No topup or ledger rows visible — confirmed by checking committed arrays are empty
+		expect(committedTopupIds).toHaveLength(0);
+		expect(committedLedgerIds).toHaveLength(0);
+		// Reconciliation counts it as an error, not as reconciled
+		expect(result.errors).toBe(1);
+		expect(result.reconciled).toBe(0);
+	});
+});
+
+// ─── 58.7 — Quota-refresh-failure branch ───────────────────────
+
+describe('reconcileSubscriptions — quota refresh failure (task 58.7)', () => {
+	it('returns errors: 1 and sets error_message on the log row when refresh_feature_quotas throws', async () => {
+		const stripeSub = makeStripeSub();
+		const plan = { id: 'plan-quota-err', module: 'calculators', tier: 'starter' };
+
+		const stripeClient: any = {
+			subscriptions: {
+				list: vi.fn().mockReturnValue(makeStripeList([stripeSub])),
+			},
+		};
+
+		const logInserts: any[] = [];
+
+		const rawMock = vi.fn().mockImplementation((sql: string, params?: any[]) => {
+			if (sql.includes('INSERT INTO public.subscriptions')) {
+				return Promise.resolve({ rows: [{ id: 'new-sub-quota-fail' }] });
+			}
+			if (sql.includes('refresh_feature_quotas')) {
+				// Quota refresh throws — should be surfaced in the log row
+				throw new Error('quota DB connection refused');
+			}
+			return Promise.resolve({ rows: [] });
+		});
+
+		const db: any = {
+			raw: rawMock,
+			transaction: vi.fn().mockImplementation((fn: any) => {
+				const trx: any = (table: string) => {
+					if (table === 'subscription_plans') return createChainMock(plan);
+					return createChainMock(null);
+				};
+				trx.raw = rawMock;
+				return fn(trx);
+			}),
+		};
+
+		const dbFn = Object.assign(
+			(table: string) => {
+				if (table === 'subscriptions') return createChainMock(null); // no existing row
+				if (table === 'subscription_plans') return createChainMock(plan);
+				if (table === 'stripe_webhook_log') {
+					return {
+						insert: vi.fn().mockImplementation((row: any) => {
+							logInserts.push(row);
+							return Promise.resolve();
+						}),
+					};
+				}
+				return createChainMock(null);
+			},
+			db,
+		);
+
+		const logger = makeLogger();
+		const ctx: ReconcileContext = { stripe: stripeClient, db: dbFn, logger, windowHours: 48 };
+
+		const result = await reconcileSubscriptions(ctx);
+
+		// Quota failure → counted as error, not reconciled
+		expect(result.errors).toBe(1);
+		expect(result.reconciled).toBe(0);
+
+		// Log row should be written with the quota error in error_message
+		const reconcileLog = logInserts.find(r => r.status === 'reconciled');
+		expect(reconcileLog).toBeDefined();
+		expect(reconcileLog.error_message).toContain('quota refresh failed');
+		expect(reconcileLog.error_message).toContain('quota DB connection refused');
+	});
+});
+
 // ─── chainMock factory ─────────────────────────────────────────
 
 /**

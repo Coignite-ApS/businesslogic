@@ -1,46 +1,57 @@
-# 43. `flow.step` cost rate — pricing decision required
+# 43. `flow.step` cost rate — flat rate (B), env-configurable
 
-**Status:** planned (pricing decision, not engineering)
-**Severity:** LOW — events are emitted, aggregated, and displayed; just no `cost_eur` per step
+**Status:** completed
+**Decision:** Option B — flat rate €0.001/step, env-var `FLOW_STEP_COST_EUR`, AI steps excluded
+**Severity:** LOW
 **Source:** Sprint B task 20 implementation — `flow.step` wired end-to-end but no cost rate defined
-**Owner:** product/pricing (not engineering)
+**Owner:** dm@coignite.dk
 
-## Problem
+## Decision
 
-Sprint B task 20 wired `flow.step` emit on every successful node completion in `flow-engine/executor/mod.rs`. Events land in `usage_events` with `cost_eur = NULL`. Aggregator (task 21) sums them into `monthly_aggregates.flow_steps` counter correctly.
+**Option B selected:** flat rate per non-AI flow.step.
 
-But the pricing model has not decided whether flow steps cost separately from flow executions:
-- Option A: steps are free; billing is per-execution only (`flow.execution` carries cost)
-- Option B: steps have a per-step cost (e.g., €0.001/step); execution cost is additional flat rate
-- Option C: step cost varies by step type (AI nodes cost more than HTTP nodes) — requires metadata-based cost lookup
+- Rate: **€0.001/step** (1 millicent) — ops-tunable via `FLOW_STEP_COST_EUR` env var
+- AI steps (`core:llm`, `core:embedding`, `core:vector_search`, `ai:*`) are **excluded** — they are already billed through the AI Wallet via `ai.message` cost_eur. Double-billing prevented.
+- step_kind identified from `metadata->>'step_kind'` in `usage_events` (emitted by the Rust executor as `node_type`)
 
-Until decided, `flow_steps` counter increments but never contributes to `total_cost_eur` in `monthly_aggregates`.
+## Implementation
 
-## Required decision
+### Migration 037 — aggregator function update
 
-Product/pricing team (dm@coignite.dk):
+`public.aggregate_usage_events(p_batch_size int DEFAULT 100000, p_flow_step_cost_eur numeric DEFAULT 0.001)`
 
-1. Is flow-step a billable unit?
-2. If yes, flat rate or type-dependent?
-3. If type-dependent, what's the rate card per `step_kind`? (AI node, HTTP request, formula call, KB search-from-flow, conditional, etc.)
-4. Does it belong in the Flows tier price or separately metered?
+Non-AI `flow.step` events contribute `p_flow_step_cost_eur` to `total_cost_eur`. AI steps use their existing `cost_eur` (or 0).
 
-## Implementation (once decided)
+- Up: `migrations/cms/037_aggregate_usage_events_flow_step_cost.sql`
+- Down: `migrations/cms/037_aggregate_usage_events_flow_step_cost_down.sql`
+- DB admin report: `docs/reports/db-admin-2026-04-21-task-43-flow-step-cost-083015.md`
 
-If A (steps free): no engineering work; just document and close.
+### Cron handler
 
-If B (flat rate): update the aggregator SQL function to set `cost_eur = quantity * flat_rate` for `flow.step` events in the monthly rollup. One-line migration via db-admin.
+`services/cms/extensions/local/project-extension-usage-consumer/src/cron.ts`:
+- `parseFlowStepCostEur(env)` — reads `FLOW_STEP_COST_EUR`, validates (finite ≥ 0), falls back to 0.001 with WARN
+- `runAggregation(db, batchSize, flowStepCostEur)` — passes rate as second SQL param
+- `buildAggregateUsageEventsCron(db, logger, getRedis, env)` — wires env → rate
 
-If C (type-dependent): requires a rate-card table `flow_step_rates(step_kind text, cost_eur_per_step numeric)` + aggregator JOIN against it. Medium-sized task.
+### Env var
+
+`FLOW_STEP_COST_EUR=0.001` — documented in `infrastructure/docker/.env.example`
+
+## Key Tasks
+
+- [x] Migration 037 written + applied
+- [x] Down migration written
+- [x] cron.ts updated (parseFlowStepCostEur + runAggregation signature + buildAggregateUsageEventsCron env param)
+- [x] index.ts updated (pass env to buildAggregateUsageEventsCron)
+- [x] .env.example documented
+- [x] docs/pricing/businesslogic-api-pricing.md section 3b added
+- [x] Unit tests: parseFlowStepCostEur (7 cases), runAggregation (updated SQL assertion), buildAggregateUsageEventsCron (3 new env tests)
+- [x] E2E test: total_cost_eur updated to include flow.step rate (9 steps × €0.001 = €0.009 added)
 
 ## Acceptance
 
-- Decision documented in `docs/pricing/businesslogic-api-pricing.md`
-- Implementation matches decision
-- `monthly_aggregates` includes flow-step cost in `total_cost_eur` (if billable)
-- Dashboard/ops view reflects step volume regardless of billable status
-
-## Estimate
-
-- Decision: 30min conversation + doc update
-- Implementation: 30min (A), 1h (B), half day (C)
+- [x] Decision documented in `docs/pricing/businesslogic-api-pricing.md` (section 3b)
+- [x] Implementation matches decision (B: flat rate, env-configurable)
+- [x] `monthly_aggregates.total_cost_eur` includes non-AI flow-step cost
+- [x] AI steps excluded (step_kind LIKE 'ai:%' OR IN core:llm/embedding/vector_search)
+- [x] 39/39 unit tests pass

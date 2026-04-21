@@ -312,7 +312,8 @@ describe('createWebhookRouteHandler — missing secret at runtime', () => {
 		const res = makeRes();
 		await handler(makeReq(), res);
 
-		expect(res.statusCode).toBe(500);
+		// 503 (Service Unavailable) — misconfigured service, not a broken handler
+		expect(res.statusCode).toBe(503);
 		expect(verifySignature).not.toHaveBeenCalled();
 		expect(processEvent).not.toHaveBeenCalled();
 		expect(db.__insert).toHaveBeenCalledWith(

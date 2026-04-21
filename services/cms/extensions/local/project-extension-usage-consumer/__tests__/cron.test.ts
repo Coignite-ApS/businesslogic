@@ -5,7 +5,14 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { runAggregation, buildAggregateUsageEventsCron, MAX_ITERATIONS, type AggregateResult } from '../src/cron.js';
+import {
+	runAggregation,
+	buildAggregateUsageEventsCron,
+	parseFlowStepCostEur,
+	DEFAULT_FLOW_STEP_COST_EUR,
+	MAX_ITERATIONS,
+	type AggregateResult,
+} from '../src/cron.js';
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -25,10 +32,52 @@ function makeLogger() {
 	};
 }
 
+// ---- parseFlowStepCostEur --------------------------------------------------
+
+describe('parseFlowStepCostEur', () => {
+	it('returns default when env key absent', () => {
+		expect(parseFlowStepCostEur({})).toBe(DEFAULT_FLOW_STEP_COST_EUR);
+	});
+
+	it('returns default when env value is empty string', () => {
+		expect(parseFlowStepCostEur({ FLOW_STEP_COST_EUR: '' })).toBe(DEFAULT_FLOW_STEP_COST_EUR);
+	});
+
+	it('parses valid numeric value', () => {
+		expect(parseFlowStepCostEur({ FLOW_STEP_COST_EUR: '0.005' })).toBeCloseTo(0.005);
+	});
+
+	it('parses zero (free steps allowed)', () => {
+		expect(parseFlowStepCostEur({ FLOW_STEP_COST_EUR: '0' })).toBe(0);
+	});
+
+	it('falls back to default and warns on non-numeric value', () => {
+		const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+		const result = parseFlowStepCostEur({ FLOW_STEP_COST_EUR: 'abc' }, logger);
+		expect(result).toBe(DEFAULT_FLOW_STEP_COST_EUR);
+		expect(logger.warn).toHaveBeenCalledOnce();
+		expect(logger.warn.mock.calls[0][0]).toContain('FLOW_STEP_COST_EUR');
+	});
+
+	it('falls back to default and warns on negative value', () => {
+		const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+		const result = parseFlowStepCostEur({ FLOW_STEP_COST_EUR: '-1' }, logger);
+		expect(result).toBe(DEFAULT_FLOW_STEP_COST_EUR);
+		expect(logger.warn).toHaveBeenCalledOnce();
+	});
+
+	it('falls back to default and warns on Infinity', () => {
+		const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+		const result = parseFlowStepCostEur({ FLOW_STEP_COST_EUR: 'Infinity' }, logger);
+		expect(result).toBe(DEFAULT_FLOW_STEP_COST_EUR);
+		expect(logger.warn).toHaveBeenCalledOnce();
+	});
+});
+
 // ---- runAggregation --------------------------------------------------------
 
 describe('runAggregation', () => {
-	it('calls aggregate_usage_events() with default batchSize and returns parsed stats', async () => {
+	it('calls aggregate_usage_events() with default batchSize + flowStepCostEur and returns parsed stats', async () => {
 		const uuid1 = 'cccccccc-0000-0000-0000-000000000001';
 		const expected: AggregateResult = {
 			events_aggregated: 100,
@@ -42,8 +91,8 @@ describe('runAggregation', () => {
 		const result = await runAggregation(db);
 
 		expect(db.raw).toHaveBeenCalledWith(
-			'SELECT public.aggregate_usage_events(?::int) AS stats',
-			[100_000],
+			'SELECT public.aggregate_usage_events(?::int, ?::numeric) AS stats',
+			[100_000, DEFAULT_FLOW_STEP_COST_EUR],
 		);
 		expect(result.events_aggregated).toBe(100);
 		expect(result.accounts_touched).toBe(3);
@@ -52,14 +101,14 @@ describe('runAggregation', () => {
 		expect(result.touched_accounts).toEqual([uuid1]);
 	});
 
-	it('passes custom batchSize into the SQL binding', async () => {
+	it('passes custom batchSize and flowStepCostEur into the SQL binding', async () => {
 		const db = makeDb({ events_aggregated: 50, accounts_touched: 1, periods_touched: 1, lag_seconds: 0 });
 
-		await runAggregation(db, 500);
+		await runAggregation(db, 500, 0.005);
 
 		expect(db.raw).toHaveBeenCalledWith(
-			'SELECT public.aggregate_usage_events(?::int) AS stats',
-			[500],
+			'SELECT public.aggregate_usage_events(?::int, ?::numeric) AS stats',
+			[500, 0.005],
 		);
 	});
 
@@ -81,6 +130,47 @@ describe('runAggregation', () => {
 // ---- buildAggregateUsageEventsCron -----------------------------------------
 
 describe('buildAggregateUsageEventsCron', () => {
+	it('passes FLOW_STEP_COST_EUR from env to runAggregation', async () => {
+		const db = makeDb({ events_aggregated: 0, accounts_touched: 0, periods_touched: 0, lag_seconds: 0 });
+		const logger = makeLogger();
+
+		const handler = buildAggregateUsageEventsCron(db, logger, undefined, { FLOW_STEP_COST_EUR: '0.005' });
+		await handler();
+
+		expect(db.raw).toHaveBeenCalledWith(
+			'SELECT public.aggregate_usage_events(?::int, ?::numeric) AS stats',
+			[100_000, 0.005],
+		);
+	});
+
+	it('uses default flow step rate when FLOW_STEP_COST_EUR absent', async () => {
+		const db = makeDb({ events_aggregated: 0, accounts_touched: 0, periods_touched: 0, lag_seconds: 0 });
+		const logger = makeLogger();
+
+		const handler = buildAggregateUsageEventsCron(db, logger, undefined, {});
+		await handler();
+
+		expect(db.raw).toHaveBeenCalledWith(
+			'SELECT public.aggregate_usage_events(?::int, ?::numeric) AS stats',
+			[100_000, DEFAULT_FLOW_STEP_COST_EUR],
+		);
+	});
+
+	it('warns + uses default when FLOW_STEP_COST_EUR is invalid', async () => {
+		const db = makeDb({ events_aggregated: 0, accounts_touched: 0, periods_touched: 0, lag_seconds: 0 });
+		const logger = makeLogger();
+
+		const handler = buildAggregateUsageEventsCron(db, logger, undefined, { FLOW_STEP_COST_EUR: 'bad' });
+		await handler();
+
+		expect(logger.warn).toHaveBeenCalledOnce();
+		expect(logger.warn.mock.calls[0][0]).toContain('FLOW_STEP_COST_EUR');
+		expect(db.raw).toHaveBeenCalledWith(
+			'SELECT public.aggregate_usage_events(?::int, ?::numeric) AS stats',
+			[100_000, DEFAULT_FLOW_STEP_COST_EUR],
+		);
+	});
+
 	it('logs info on success (single iteration, nothing to drain)', async () => {
 		const stats: AggregateResult = {
 			events_aggregated: 42,
