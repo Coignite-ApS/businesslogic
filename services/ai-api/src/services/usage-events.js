@@ -7,6 +7,28 @@ import { logger } from '../logger.js';
 export const USAGE_STREAM_KEY = 'bl:usage_events:in';
 const STREAM_MAXLEN = 100_000;
 
+// Gateway cache invalidation channels (task 42)
+export const GW_AI_SPEND_CHANNEL = 'bl:gw_apikey_ai_spend:invalidated';
+export const GW_KB_SEARCH_CHANNEL = 'bl:gw_apikey_kb_search:invalidated';
+
+/**
+ * Publish a gateway sublimit-cache invalidation message.
+ * Fire-and-forget — never throws, swallows all errors.
+ *
+ * @param {object|null} rdb  - ioredis client (or null — no-op)
+ * @param {'ai_spend'|'kb_search'} cacheType
+ * @param {string} apiKeyId
+ */
+export async function publishGatewayCacheInvalidation(rdb, cacheType, apiKeyId) {
+  if (!rdb || !apiKeyId) return;
+  const channel = cacheType === 'ai_spend' ? GW_AI_SPEND_CHANNEL : GW_KB_SEARCH_CHANNEL;
+  try {
+    await rdb.publish(channel, apiKeyId);
+  } catch (err) {
+    logger.warn({ err, channel, apiKeyId }, '[usage-events] gateway cache invalidation publish failed (non-fatal)');
+  }
+}
+
 let redis = null;
 let redisReady = false;
 let droppedEventCount = 0;
@@ -43,7 +65,7 @@ export async function closeUsageEvents() {
   }
 }
 
-function getRedis() {
+export function getRedis() {
   return redisReady ? redis : null;
 }
 

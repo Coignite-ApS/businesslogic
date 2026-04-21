@@ -184,8 +184,7 @@ func (sc *SublimitChecker) getKBSearchCount(ctx context.Context, keyID string) (
 	return count, nil
 }
 
-// Cache invalidation (InvalidateAISpendCache / InvalidateKBSearchCache) is deferred to TTL (60s).
-// Re-add when the wallet-debit hook (task 18) and usage_events emit path (task 20) publish invalidation events.
+// Cache invalidation helpers are in cache_invalidator.go (task 42).
 
 func aiSpendCacheKey(keyID string) string {
 	ym := time.Now().Format("200601")

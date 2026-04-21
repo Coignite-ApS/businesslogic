@@ -8,6 +8,8 @@ import {
   buildEvent,
   USAGE_STREAM_KEY,
   getDroppedEventCount,
+  publishGatewayCacheInvalidation,
+  GW_AI_SPEND_CHANNEL,
 } from '../src/services/usage-events.js';
 
 describe('ai-api usage events', () => {
@@ -99,6 +101,33 @@ describe('ai-api usage events', () => {
     const parsed = JSON.parse(collected[0][6]);
     assert.equal(parsed.quantity, 3000);
     assert.equal(parsed.event_kind, 'embed.tokens');
+  });
+
+  it('publishGatewayCacheInvalidation publishes to ai_spend channel', async () => {
+    const published = [];
+    const fakeRedis = {
+      async publish(channel, payload) { published.push({ channel, payload }); return 1; },
+    };
+
+    await publishGatewayCacheInvalidation(fakeRedis, 'ai_spend', 'key-uuid-123');
+    assert.equal(published.length, 1);
+    assert.equal(published[0].channel, GW_AI_SPEND_CHANNEL);
+    assert.equal(published[0].payload, 'key-uuid-123');
+  });
+
+  it('publishGatewayCacheInvalidation is silent when redis null', async () => {
+    await assert.doesNotReject(() =>
+      publishGatewayCacheInvalidation(null, 'ai_spend', 'key-x'),
+    );
+  });
+
+  it('publishGatewayCacheInvalidation swallows publish errors', async () => {
+    const fakeRedis = {
+      async publish() { throw new Error('connection refused'); },
+    };
+    await assert.doesNotReject(() =>
+      publishGatewayCacheInvalidation(fakeRedis, 'ai_spend', 'key-x'),
+    );
   });
 
   it('emitUsageEvent is silent when redis unavailable', async () => {

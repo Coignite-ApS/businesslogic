@@ -1,6 +1,6 @@
 # 56. 🟠 P1: Stripe webhook observability — surface misconfigs in Directus, not docker logs
 
-**Status:** planned
+**Status:** completed (2026-04-20)
 **Severity:** P1 — prod misconfig (stale `STRIPE_WEBHOOK_SECRET`, rotated signing key, etc.) currently silent. Users would pay, get nothing, no one would notice until a support ticket.
 **Source:** controller question during task 48 verification (2026-04-20). Motivated by the dev-session drift where a stale `whsec_` silently rejected all webhooks for hours.
 
@@ -62,12 +62,39 @@ Fail-fast at boot is preferred over degraded-runtime — if billing pipeline is 
 
 ## Acceptance
 
-- [ ] `stripe_webhook_log` table created; webhook handler writes on every code path (unit-tested: 4+ rows from 4+ simulated request types)
-- [ ] `GET /stripe/webhook-health` endpoint returns JSON with the 4 metrics; 401 for non-admin
-- [ ] Billing Health panel visible in an admin module; polling update every 60s; red-banner threshold triggers on 1 signature failure in last 1h
-- [ ] Startup validation fails the CMS boot if secret is missing/malformed; success path logs prefix-only INFO line
-- [ ] Integration test: malformed secret → boot fails loudly; correct secret → boot succeeds + log line present
-- [ ] Manual test: force a signature failure → panel shows red banner within 1 min
+- [x] `stripe_webhook_log` table created (migration 035); webhook handler writes on every code path — 10 unit-test cases in `webhook-route.test.ts` cover 400_signature, 400_parse, 500 (handler error), 200 (success), missing-secret-at-runtime, plus source_ip + response_ms invariants
+- [x] `GET /stripe/webhook-health` endpoint returns JSON with the 4 metrics (last_success, last_failure, counters_24h, banner); 401 for non-admin — verified live via curl: anon → 401, admin bearer → 200 + JSON
+- [x] Billing Health panel visible at `/ai-observatory/billing-health`; polls every 60s via `setInterval`, cleared on unmount; red-banner state validated in unit + live runtime (1 forced sig-fail → banner.state = 'red' in API response)
+- [x] Startup validation fails CMS boot on missing/malformed `STRIPE_WEBHOOK_SECRET` (throws `WebhookSecretValidationError`); success path logs `INFO: Stripe webhook secret loaded (whsec_XXXX...)` — confirmed in dev CMS boot logs
+- [x] Integration tests: 5 cases in `startup-validation.integration.test.ts` covering realistic 64-hex secret shape, unset env, prefix-only, pk_live_* misuse, prefix-only-INFO leak check
+- [x] Manual test: live sig-fail via unsigned POST /stripe/webhook → row written to `stripe_webhook_log` with status=`400_signature` → /stripe/webhook-health returns `banner.state: 'red'` with spec'd message
+
+## Implementation Notes
+
+- **Observability home:** `project-extension-ai-observatory` (per spec preference — observability is the cleaner fit than admin module). New route + navigation entry added; preserves existing `admin_access` pre-register check.
+- **Schema:** `stripe_webhook_events` (idempotency ledger) kept unchanged. New `stripe_webhook_log` is a broader HTTP-level hit log — different purpose, different retention expectations.
+- **Handler refactor:** the webhook body was extracted into `webhook-route.ts` (`createWebhookRouteHandler` factory) so every code path can be unit-tested with a synthetic req/res, no Directus boot required. `index.ts` composes the factory with the live Stripe client + knex + idempotency.
+- **HTTP status policy:** 400 for signature/parse (Stripe retries are safe); 200 for handler errors (the event was received — a 500 would trigger Stripe retries while our backend tries to catch up). Handler errors surface via the log table's status='500', not HTTP.
+- **Log write never throws:** `recordWebhookLog` swallows DB errors and reports to logger. Log-write failure must never break the billing pipeline.
+- **Secret prefix log:** exactly 10 chars (`whsec_` + 4 hex) so drift is visible in `docker logs` but entropy leakage ≤ 16 bits.
+
+## Files Delivered
+
+- `migrations/cms/035_stripe_webhook_log.sql` (+ `_down.sql`)
+- `services/cms/extensions/local/project-extension-stripe/src/webhook-log.ts` (recordWebhookLog, extractSourceIp, isValidWebhookSecret)
+- `services/cms/extensions/local/project-extension-stripe/src/webhook-health.ts` (computeWebhookHealth, computeBanner, registerWebhookHealthRoute)
+- `services/cms/extensions/local/project-extension-stripe/src/webhook-route.ts` (createWebhookRouteHandler factory)
+- `services/cms/extensions/local/project-extension-stripe/src/startup-validation.ts` (validateWebhookSecret, WebhookSecretValidationError)
+- `services/cms/extensions/local/project-extension-stripe/src/index.ts` (integrates all of the above)
+- `services/cms/extensions/local/project-extension-stripe/__tests__/{webhook-log,webhook-health,webhook-route,startup-validation,startup-validation.integration}.test.ts` — 59 new vitest cases
+- `services/cms/extensions/local/project-extension-ai-observatory/src/routes/billing-health.vue`
+- `services/cms/extensions/local/project-extension-ai-observatory/src/{index.ts,types.ts,components/observatory-navigation.vue,composables/use-observatory-api.ts}` (glue)
+
+## Follow-ups (out of scope here)
+
+- Retention cron (trim `stripe_webhook_log` rows older than 90 days) — separate task
+- Per-account breakdown in the panel — MVP is global only
+- Slack / email alerting — handled by external monitoring stack
 
 ## Estimate
 

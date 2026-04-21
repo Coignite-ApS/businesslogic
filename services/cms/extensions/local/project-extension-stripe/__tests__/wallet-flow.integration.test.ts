@@ -131,21 +131,40 @@ function makeChain(tbl: string, state: MockState) {
 		}
 		return undefined;
 	});
-	chain.insert = vi.fn(async (row: any) => {
+	chain.insert = vi.fn((row: any) => {
+		let rejectErr: any = null;
 		if (tbl === 'stripe_webhook_events') {
 			if (state.stripeEventIds.has(row.stripe_event_id)) {
 				// Simulate unique constraint violation
 				const err: any = new Error('duplicate key value violates unique constraint');
 				err.code = '23505';
-				throw err;
+				rejectErr = err;
+			} else {
+				state.stripeEventIds.add(row.stripe_event_id);
 			}
-			state.stripeEventIds.add(row.stripe_event_id);
 		}
 		if (tbl === 'ai_wallet_ledger') {
 			state.ledgerEntries.push({ ...row });
 		}
-		return [1];
+		// Return a thenable chain so both `.returning().then(...)` and
+		// direct `await insert(...)` patterns work.
+		const insertChain: any = {
+			returning: vi.fn().mockImplementation(() => {
+				if (rejectErr) return Promise.reject(rejectErr);
+				return Promise.resolve([{ id: `${tbl}-row-1` }]);
+			}),
+			then: (resolve: any, reject: any) => {
+				if (rejectErr) return Promise.reject(rejectErr).then(resolve, reject);
+				return Promise.resolve([{ id: `${tbl}-row-1` }]).then(resolve, reject);
+			},
+			catch: (handler: any) => {
+				if (rejectErr) return Promise.reject(rejectErr).catch(handler);
+				return Promise.resolve([{ id: `${tbl}-row-1` }]);
+			},
+		};
+		return insertChain;
 	});
+	chain.returning = vi.fn().mockReturnThis();
 	chain.update = vi.fn(async () => 1);
 	chain.whereIn = vi.fn(() => chain);
 	chain.andWhere = vi.fn(() => chain);

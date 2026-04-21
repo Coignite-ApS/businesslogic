@@ -1,5 +1,6 @@
 import type Stripe from 'stripe';
 import type { DB, Module, Tier } from './types.js';
+import { STATUS_MAP as _STATUS_MAP, provisionSubscriptionRow, provisionWalletTopup } from './provisioning.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Idempotency helpers
@@ -61,16 +62,8 @@ export async function withIdempotency<T = void>(
 // product.updated — sync subscription_plans from Stripe
 // ────────────────────────────────────────────────────────────────────────────
 
-const STATUS_MAP: Record<string, string> = {
-	active: 'active',
-	trialing: 'trialing',
-	past_due: 'past_due',
-	canceled: 'canceled',
-	unpaid: 'past_due',
-	incomplete: 'past_due',
-	incomplete_expired: 'expired',
-	paused: 'canceled',
-};
+// Re-export so callers can still reference STATUS_MAP from this module
+const STATUS_MAP = _STATUS_MAP;
 
 function isV2Product(product: Stripe.Product): boolean {
 	return (product.metadata || {}).pricing_version === 'v2';
@@ -261,44 +254,27 @@ export async function handleCheckoutCompleted(
 			await trx('subscriptions')
 				.where('id', existing.id)
 				.update(baseUpdate);
+			// Refresh quotas for updates too — the Directus action hook only fires
+			// for ItemsService writes; raw SQL updates bypass it.
+			try {
+				await trx.raw('SELECT public.refresh_feature_quotas(?)', [accountId]);
+				logger.info(`feature_quotas refreshed for account=${accountId}`);
+			} catch (err: any) {
+				logger.error(`refresh_feature_quotas(${accountId}) failed after sub update: ${err?.message || err}`);
+			}
 		} else {
-			// gen_random_uuid via DB default isn't on this table (PK has no default in 005).
-			// Use the database to generate the id.
-			const [row] = await trx.raw(
-				`INSERT INTO public.subscriptions (
-					id, account_id, subscription_plan_id, module, tier, status, billing_cycle,
-					stripe_customer_id, stripe_subscription_id,
-					current_period_start, current_period_end, trial_start, trial_end,
-					date_created, date_updated
-				) VALUES (
-					gen_random_uuid(), ?, ?, ?, ?, ?, ?,
-					?, ?, ?, ?, ?, ?,
-					now(), ?
-				) RETURNING id`,
-				[
-					accountId, plan.id, module, tier, subStatus, billingCycle,
-					customerId, subscriptionId,
-					periodStart, periodEnd, trialStart, trialEnd,
-					nowIso,
-				],
-			).then((r: any) => r.rows ?? r[0]?.rows ?? r);
-			logger.info(`Created subscription row ${row?.id ?? '<id>'} for account=${accountId} module=${module} tier=${tier} status=${subStatus}`);
+			await provisionSubscriptionRow(trx, logger, {
+				accountId,
+				module,
+				tier,
+				billingCycle,
+				customerId,
+				stripeSub,
+				subStatus,
+				source: 'webhook',
+			});
 		}
 	});
-
-	// Refresh feature_quotas for this account.
-	// The task 17 Directus action hook (subscriptions.items.create) only fires
-	// for ItemsService writes — our raw-SQL upsert above bypasses it. Without
-	// this explicit call, quotas would only refresh on the nightly cron, which
-	// would leave the account without correct quota rows for hours after
-	// checkout. Errors are swallowed to avoid blocking the webhook response —
-	// the nightly cron is the safety net.
-	try {
-		await db.raw('SELECT public.refresh_feature_quotas(?)', [accountId]);
-		logger.info(`feature_quotas refreshed for account=${accountId}`);
-	} catch (err: any) {
-		logger.error(`refresh_feature_quotas(${accountId}) failed after checkout: ${err?.message || err}`);
-	}
 
 	logger.info(`Subscription activated for account=${accountId} module=${module} tier=${tier} stripe_sub=${subscriptionId} status=${subStatus}`);
 }
@@ -518,84 +494,20 @@ async function processWalletTopupSucceeded(
 		return;
 	}
 
-	const chargeId = (intent.latest_charge && typeof intent.latest_charge === 'string')
-		? intent.latest_charge
-		: (intent.latest_charge as any)?.id ?? null;
-
 	const isAutoReload = meta.is_auto_reload === 'true';
 
-	await db.transaction(async (trx: DB) => {
-		// 1. Insert ai_wallet_topup; ON CONFLICT DO NOTHING for idempotency.
-		const insertedTopupRows = await trx.raw(
-			`INSERT INTO public.ai_wallet_topup (
-				id, account_id, amount_eur, stripe_payment_intent_id, stripe_charge_id,
-				expires_at, is_auto_reload, status, date_created
-			) VALUES (
-				gen_random_uuid(), ?, ?, ?, ?, NOW() + INTERVAL '12 months', ?, 'completed', NOW()
-			)
-			ON CONFLICT (stripe_payment_intent_id) DO NOTHING
-			RETURNING id`,
-			[accountId, amountEur, intent.id, chargeId, isAutoReload],
-		);
-
-		// Knex .raw returns either { rows } (pg) or [rows, fields].
-		const rows = (insertedTopupRows as any).rows
-			?? (Array.isArray(insertedTopupRows) ? insertedTopupRows[0] : null)
-			?? [];
-
-		if (!rows || rows.length === 0) {
-			// Already inserted — duplicate webhook delivery. Ledger and balance
-			// already updated in the original transaction. No-op.
-			logger.info(`wallet_topup payment_intent ${intent.id} already credited — skipping (dup webhook)`);
-			return;
-		}
-		const topupId = rows[0].id;
-
-		// 2. Ensure ai_wallet row exists, then increment balance atomically.
-		// Single UPSERT keyed on UNIQUE(account_id).
-		const updatedWallets = await trx.raw(
-			`INSERT INTO public.ai_wallet (id, account_id, balance_eur, last_topup_at, last_topup_eur, date_created)
-			VALUES (gen_random_uuid(), ?, ?, NOW(), ?, NOW())
-			ON CONFLICT (account_id) DO UPDATE SET
-				balance_eur = ai_wallet.balance_eur + EXCLUDED.balance_eur,
-				last_topup_at = NOW(),
-				last_topup_eur = EXCLUDED.last_topup_eur,
-				date_updated = NOW()
-			RETURNING balance_eur`,
-			[accountId, amountEur, amountEur],
-		);
-		const walletRows = (updatedWallets as any).rows
-			?? (Array.isArray(updatedWallets) ? updatedWallets[0] : null)
-			?? [];
-		const newBalance = walletRows[0]?.balance_eur;
-		if (newBalance == null) {
-			throw new Error(`Failed to upsert ai_wallet for account ${accountId}`);
-		}
-
-		// 3. Insert ledger entry recording the credit.
-		await trx('ai_wallet_ledger').insert({
-			account_id: accountId,
-			entry_type: 'credit',
-			amount_eur: amountEur,
-			balance_after_eur: newBalance,
-			source: 'topup',
-			topup_id: topupId,
-			metadata: JSON.stringify({
-				stripe_payment_intent_id: intent.id,
-				stripe_charge_id: chargeId,
-				...(isAutoReload ? { is_auto_reload: true } : {}),
-			}),
-		});
-
-		// 4. Mark matching wallet_auto_reload_pending row succeeded (if any).
-		//    Scoped to intent.id (the UNIQUE column), so we can't accidentally
-		//    succeed a different row.
-		if (isAutoReload) {
-			await trx('wallet_auto_reload_pending')
-				.where('stripe_payment_intent_id', intent.id)
-				.update({ status: 'succeeded', processed_at: new Date().toISOString(), last_error: null });
-		}
+	const { created } = await provisionWalletTopup(db, logger, {
+		accountId,
+		amountEur,
+		paymentIntent: intent,
+		isAutoReload,
+		source: 'webhook',
 	});
+
+	if (!created) {
+		logger.info(`wallet_topup payment_intent ${intent.id} already credited — skipping (dup webhook)`);
+		return;
+	}
 
 	logger.info(`Wallet credited: account=${accountId} amount=€${amountEur.toFixed(2)} pi=${intent.id} auto_reload=${isAutoReload}`);
 }

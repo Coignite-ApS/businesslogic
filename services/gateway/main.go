@@ -82,6 +82,11 @@ func main() {
 	// Sublimit checker (task 27)
 	sublimitChecker := service.NewSublimitChecker(dbPool, rdb)
 
+	// Cache invalidation subscriber (task 42) — runs until ctx is cancelled
+	if rdb != nil {
+		go service.StartCacheInvalidationSubscriber(ctx, rdb, log.Logger)
+	}
+
 	// Response cache
 	responseCache := cache.New(rdb)
 

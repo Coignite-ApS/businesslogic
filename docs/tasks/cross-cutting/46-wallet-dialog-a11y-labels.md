@@ -1,6 +1,6 @@
 # 46. Wallet settings dialog — a11y labels + input ids
 
-**Status:** planned
+**Status:** completed
 **Severity:** LOW — accessibility hygiene; not a functional blocker
 **Source:** Browser QA of cms/36.1 (2026-04-19) flagged missing label/id associations
 **Depends on:** task cms/36.1 (shipped in Sprint B)
@@ -35,3 +35,21 @@ All form controls must have programmatically associated labels:
 ## Estimate
 
 1h — mechanical label/id additions + Lighthouse verification + optional axe test.
+
+## Implementation (2026-04-20)
+
+**Commit:** 99b9e8b — `dm/post-sprint-b-followups`
+
+Changes applied to `wallet-settings-dialog.vue`:
+- `label[for]` / `input[id]` pairs: `wallet-threshold`, `wallet-amount`, `wallet-cap`
+- Checkbox: `label[for="wallet-autotopup"]` + `id="wallet-autotopup-label"` + `aria-labelledby` on `v-checkbox`
+- Quick-amount buttons: `aria-pressed` bound to `localAmount === amt`; wrapped in `role="group" aria-label="Quick top-up amounts"`
+- `v-card`: `role="dialog" aria-modal="true" aria-labelledby="wallet-dialog-title"`
+- Dialog title: `<span id="wallet-dialog-title">` for labelledby target
+- Currency `€` spans: `aria-hidden="true"`
+- Error paragraphs: `role="alert"` + `id` for `aria-describedby` on inputs
+- Monthly cap hint: `id="wallet-cap-hint"` + `aria-describedby` on input
+
+Tests: 10 a11y assertions in `__tests__/wallet-settings-dialog.a11y.test.ts` (vitest + jsdom + @vue/test-utils; no axe — `vitest-axe` not pre-installed, label/id assertions cover the same structural requirements).
+
+Adjacent files: `low-balance-banner.vue` — does not exist. `welcome-wizard.vue` — uses only `v-button` Directus components, no raw inputs; non-trivial to fix (tile button aria-pressed), deferred per scope rule.

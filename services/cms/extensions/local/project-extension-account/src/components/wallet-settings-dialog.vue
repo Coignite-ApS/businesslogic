@@ -1,71 +1,88 @@
 <template>
 	<v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" @esc="$emit('update:modelValue', false)">
-		<v-card class="wallet-settings-card">
-			<v-card-title>Wallet Auto-Reload Settings</v-card-title>
+		<v-card
+			class="wallet-settings-card"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="wallet-dialog-title"
+		>
+			<v-card-title>
+				<span id="wallet-dialog-title">Wallet Auto-Reload Settings</span>
+			</v-card-title>
 			<v-card-text>
 				<div class="settings-form">
 					<div class="field-row toggle-row">
-						<label class="field-label">Auto top-up</label>
-						<v-checkbox v-model="localEnabled" />
+						<label id="wallet-autotopup-label" class="field-label" for="wallet-autotopup">Auto top-up</label>
+						<v-checkbox id="wallet-autotopup" v-model="localEnabled" aria-labelledby="wallet-autotopup-label" />
 					</div>
 
 					<template v-if="localEnabled">
 						<div class="field-row">
-							<label class="field-label">When balance drops below</label>
+							<label class="field-label" for="wallet-threshold">When balance drops below</label>
 							<div class="input-with-prefix">
-								<span class="currency-prefix">€</span>
+								<span class="currency-prefix" aria-hidden="true">€</span>
 								<input
+									id="wallet-threshold"
 									v-model.number="localThreshold"
 									type="number"
 									min="1"
 									step="1"
 									placeholder="e.g. 5"
 									class="number-input"
+									aria-label="Threshold amount in euros"
+									:aria-describedby="showThresholdError ? 'wallet-threshold-error' : undefined"
 								/>
 							</div>
-							<p v-if="showThresholdError" class="field-error">Must be greater than 0</p>
+							<p v-if="showThresholdError" id="wallet-threshold-error" class="field-error" role="alert">Must be greater than 0</p>
 						</div>
 
 						<div class="field-row">
-							<label class="field-label">Top up by</label>
+							<label class="field-label" for="wallet-amount">Top up by</label>
 							<div class="input-with-prefix">
-								<span class="currency-prefix">€</span>
+								<span class="currency-prefix" aria-hidden="true">€</span>
 								<input
+									id="wallet-amount"
 									v-model.number="localAmount"
 									type="number"
 									min="1"
 									step="1"
 									placeholder="e.g. 20"
 									class="number-input"
+									aria-label="Top-up amount in euros"
+									:aria-describedby="showAmountError ? 'wallet-amount-error' : undefined"
 								/>
 							</div>
-							<div class="quick-amounts">
+							<div class="quick-amounts" role="group" aria-label="Quick top-up amounts">
 								<button
 									v-for="amt in [20, 50, 200]"
 									:key="amt"
 									class="quick-btn"
 									:class="{ active: localAmount === amt }"
+									:aria-pressed="localAmount === amt"
 									@click="localAmount = amt"
 								>€{{ amt }}</button>
 							</div>
-							<p v-if="showAmountError" class="field-error">Must be greater than 0</p>
+							<p v-if="showAmountError" id="wallet-amount-error" class="field-error" role="alert">Must be greater than 0</p>
 						</div>
 					</template>
 
 					<div class="field-row">
-						<label class="field-label">Monthly spending cap <span class="optional">(optional)</span></label>
+						<label class="field-label" for="wallet-cap">Monthly spending cap <span class="optional">(optional)</span></label>
 						<div class="input-with-prefix">
-							<span class="currency-prefix">€</span>
+							<span class="currency-prefix" aria-hidden="true">€</span>
 							<input
+								id="wallet-cap"
 								v-model.number="localCap"
 								type="number"
 								min="0"
 								step="1"
 								placeholder="No cap"
 								class="number-input"
+								aria-label="Monthly spending cap in euros"
+								aria-describedby="wallet-cap-hint"
 							/>
 						</div>
-						<p class="field-hint">Blocks new charges if monthly debits exceed this amount</p>
+						<p id="wallet-cap-hint" class="field-hint">Blocks new charges if monthly debits exceed this amount</p>
 					</div>
 				</div>
 

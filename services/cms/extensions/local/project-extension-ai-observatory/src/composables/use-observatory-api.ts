@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { CostDetails, QualityMetrics, ToolAnalyticsData, RetrievalMetrics, ModelPerformanceData } from '../types';
+import type { CostDetails, QualityMetrics, ToolAnalyticsData, RetrievalMetrics, ModelPerformanceData, WebhookHealth } from '../types';
 
 export function useObservatoryApi(api: any) {
 	const loading = ref(false);
@@ -32,5 +32,8 @@ export function useObservatoryApi(api: any) {
 			request<RetrievalMetrics>(() => api.get('/assistant/admin/retrieval-metrics', { params: { days } })),
 		fetchModelPerformance: (days = 30) =>
 			request<ModelPerformanceData>(() => api.get('/assistant/admin/model-performance', { params: { days } })),
+		// Task 56 — Stripe webhook health (Billing Health panel)
+		fetchWebhookHealth: () =>
+			request<WebhookHealth>(() => api.get('/stripe/webhook-health')),
 	};
 }

@@ -94,3 +94,31 @@ export interface RetrievalMetrics {
   };
   search_latency: { p50: number; p95: number; p99: number; sample_size: number };
 }
+
+// Task 56 — Stripe webhook health panel (Billing Health)
+export type WebhookBannerState = 'red' | 'green' | 'neutral';
+
+export interface WebhookHealth {
+  last_success: {
+    received_at: string;
+    event_id: string | null;
+    event_type: string | null;
+  } | null;
+  last_failure: {
+    received_at: string;
+    status: string;
+    event_id: string | null;
+    event_type: string | null;
+    error_message: string | null;
+  } | null;
+  counters_24h: {
+    success: number;
+    failures: Record<string, number>;
+    reconciled: number; // Task 57 — nightly reconciliation cron activity
+    total: number;
+  };
+  banner: {
+    state: WebhookBannerState;
+    message: string;
+  };
+}

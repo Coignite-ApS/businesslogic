@@ -317,6 +317,8 @@ export interface WalletBalanceResult {
 	balance_eur: string | number;
 	monthly_cap_eur: string | number | null;
 	auto_reload_enabled: boolean;
+	auto_reload_threshold_eur: string | number | null;
+	auto_reload_amount_eur: string | number | null;
 	recent_ledger: any[];
 }
 
@@ -335,6 +337,8 @@ export async function getWalletBalance(opts: {
 			balance_eur: 0,
 			monthly_cap_eur: null,
 			auto_reload_enabled: false,
+			auto_reload_threshold_eur: null,
+			auto_reload_amount_eur: null,
 			recent_ledger: [],
 		};
 	}
@@ -346,8 +350,10 @@ export async function getWalletBalance(opts: {
 
 	return {
 		balance_eur: wallet.balance_eur,
-		monthly_cap_eur: wallet.monthly_cap_eur,
+		monthly_cap_eur: wallet.monthly_cap_eur ?? null,
 		auto_reload_enabled: !!wallet.auto_reload_enabled,
+		auto_reload_threshold_eur: wallet.auto_reload_threshold_eur ?? null,
+		auto_reload_amount_eur: wallet.auto_reload_amount_eur ?? null,
 		recent_ledger: recentLedger,
 	};
 }

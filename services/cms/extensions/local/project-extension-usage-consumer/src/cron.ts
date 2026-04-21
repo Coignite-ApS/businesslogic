@@ -24,6 +24,8 @@ export interface AggregateResult {
 	accounts_touched: number;
 	periods_touched: number;
 	lag_seconds: number;
+	/** UUIDs of accounts whose monthly_aggregates rows were upserted (migration 036). */
+	touched_accounts?: string[];
 }
 
 // Max loop iterations per cron tick — guards against infinite loop on persistent backlog
@@ -53,10 +55,10 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?:
 
 		let totalEventsAggregated = 0;
 		// Sum across iterations; same account touched in N iterations counts N times — see task 40 code review.
-		// SQL function returns counts only (not IDs), so true distinct dedup is not possible without
-		// schema change. Field names below use *_touches (cumulative) vs *_touched (per-call).
+		// touched_accounts (migration 036) gives exact UUIDs; collected in a Set for distinct dedup across iterations.
 		let totalAccountTouches = 0;
 		let totalPeriodTouches = 0;
+		const touchedAccountsSet = new Set<string>();
 		let firstIterationLag = 0;
 		let iterations = 0;
 		let lastEventsAggregated = 0;
@@ -74,6 +76,9 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?:
 				totalEventsAggregated += stats.events_aggregated;
 				totalAccountTouches += stats.accounts_touched;
 				totalPeriodTouches += stats.periods_touched;
+				if (Array.isArray(stats.touched_accounts)) {
+					for (const id of stats.touched_accounts) touchedAccountsSet.add(id);
+				}
 
 				logger.info(
 					`[usage-consumer] monthly_aggregates rollup: iteration=${iterations} ` +
@@ -102,10 +107,14 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?:
 				);
 			}
 
-			// Publish global cache invalidation once at end — formula-api flushes fa:agg:* keys
+			// Per-account cache invalidation — formula-api DELs the specific fa:agg:<id>:<period> key.
+			// Publish one message per touched account; subscriber handles deterministic DEL (no Redis SCAN).
+			// The ALL branch in the subscriber remains as a legacy fallback for manual ops triggers.
 			const redis = getRedis ? getRedis() : null;
-			if (redis && totalAccountTouches > 0) {
-				redis.publish('bl:monthly_aggregates:invalidated', 'ALL').catch(() => {});
+			if (redis && touchedAccountsSet.size > 0) {
+				for (const accountId of touchedAccountsSet) {
+					await redis.publish('bl:monthly_aggregates:invalidated', accountId).catch(() => {});
+				}
 			}
 		} catch (err: any) {
 			logger.error(`[usage-consumer] monthly_aggregates rollup failed: ${err?.message || err}`);
