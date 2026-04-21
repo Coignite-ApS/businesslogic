@@ -14,13 +14,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRequire } from 'module';
 import { handlePaymentIntentSucceeded } from '../src/webhook-handlers.js';
+import {
+	getDb,
+	createTestAccount as _createTestAccount,
+	cleanupAccounts,
+} from '../../_shared/test-helpers/db.js';
 
-const require = createRequire(import.meta.url);
-const knex = require('knex');
-
-const TEST_ACCOUNT_NAMES: string[] = [];
 const testAccountIds: string[] = [];
 let db: any;
 let run = false;
@@ -35,13 +35,7 @@ async function dbReachable(): Promise<boolean> {
 }
 
 async function createTestAccount(name: string): Promise<string> {
-	const [{ id }] = await db.raw(
-		`INSERT INTO public.account (id, status, name, date_created)
-		 VALUES (gen_random_uuid(), 'active', ?, now())
-		 RETURNING id`,
-		[name],
-	).then((r: any) => r.rows);
-	TEST_ACCOUNT_NAMES.push(name);
+	const id = await _createTestAccount(db, name);
 	testAccountIds.push(id);
 	return id;
 }
@@ -57,18 +51,7 @@ function makeLogger() {
 
 describe('26.3 (real DB) — wallet flow invariants', () => {
 	beforeAll(async () => {
-		db = knex({
-			client: 'pg',
-			connection: {
-				host: process.env.TEST_DB_HOST ?? '127.0.0.1',
-				port: Number(process.env.TEST_DB_PORT ?? 15432),
-				user: process.env.TEST_DB_USER ?? 'directus',
-				password: process.env.TEST_DB_PASSWORD ?? 'directus',
-				database: process.env.TEST_DB_NAME ?? 'directus',
-			},
-			pool: { min: 0, max: 2 },
-		});
-
+		db = getDb();
 		run = await dbReachable();
 		if (!run) {
 			// Fail loud in CI; set TEST_ALLOW_SKIP=1 to skip locally.
@@ -83,10 +66,7 @@ describe('26.3 (real DB) — wallet flow invariants', () => {
 	afterAll(async () => {
 		if (!db) return;
 		if (run) {
-			// CASCADE cleanup — ai_wallet, topups, ledger all cascade on account delete
-			if (testAccountIds.length > 0) {
-				await db('account').whereIn('id', testAccountIds).delete();
-			}
+			await cleanupAccounts(db, testAccountIds);
 		}
 		await db.destroy();
 	});

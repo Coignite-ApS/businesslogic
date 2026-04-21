@@ -255,7 +255,7 @@ Infrastructure and multi-service concerns.
 | 34 | calculator_slots reconcile + concurrent-upload race fix (Sprint 2 — quota) | **completed 2026-04-19** | [cross-cutting/34-calculator-slots-reconcile-race.md](cross-cutting/34-calculator-slots-reconcile-race.md) |
 | 35 | CI pipeline — run scripts/test-all.sh on PRs (Sprint 2 — test signal) | **completed 2026-04-19** | [cross-cutting/35-ci-pipeline-test-all.md](cross-cutting/35-ci-pipeline-test-all.md) |
 | 36 | **Fix ai_token_usage Directus permission gap** (Sprint 2 — SECURITY) | **completed 2026-04-19** | [cross-cutting/36-ai-token-usage-permission-fix.md](cross-cutting/36-ai-token-usage-permission-fix.md) |
-| 37 | Extract shared test helpers (hygiene) | planned | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
+| 37 | Extract shared test helpers (hygiene) | **completed 2026-04-21** — landed at `_shared/test-helpers/`; knex+pg removed from stripe devDeps; role/policy UUIDs replaced with name lookups | [cross-cutting/37-shared-test-helpers-workspace.md](cross-cutting/37-shared-test-helpers-workspace.md) |
 | 38 | Audit AI KB Assistance policy — close remaining `{}` row filter gaps | completed | [cross-cutting/38-ai-kb-policy-filter-audit.md](cross-cutting/38-ai-kb-policy-filter-audit.md) |
 | 39 | CMS dev extensions fixes (`_shared` skip, ioredis dep, Sprint B mounts) | **completed (dev path)** 2026-04-19 (`d3f9e8c` + `17ec8a5`) — image rebuild split to task 44 | [cross-cutting/39-cms-shared-extension-build-collision.md](cross-cutting/39-cms-shared-extension-build-collision.md) |
 | 40 | 🟠 Aggregator hardening — I2 stats race + I3 batch cap + I5 non-blocking boot (P1) | **completed 2026-04-20** (migration 033 applied via db-admin) | [cross-cutting/40-aggregator-hardening.md](cross-cutting/40-aggregator-hardening.md) |
@@ -390,7 +390,7 @@ Security and reliability fixes from CTO review. Must-fix before next production 
 | Formula Engine | 0 | 8 | 0 | 1 | 9 |
 | Flow | 2 | 0 | 0 | 2 | 4 |
 | Gateway | 0 | 0 | 0 | 8 | 8 |
-| Cross-Cutting | 12 | 0 | 0 | 47 | 59 |
-| **Total** | **34** | **8** | **0** | **102** | **144** |
+| Cross-Cutting | 11 | 0 | 0 | 48 | 59 |
+| **Total** | **33** | **8** | **0** | **103** | **144** |
 
 > **Legend for emoji priorities in cross-cutting table:** 🔴 P0 blocker · 🟠 P1 before scale · 🟡 P2 at scale/freshness · 🟢 P3 product decision

@@ -9,21 +9,43 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
-// Dynamic require for CJS knex
+// Dynamic require for CJS knex + pg; avoids needing either package in the
+// consuming extension's devDependencies — `_shared` carries them.
 const knex = require('knex');
+const pg = require('pg');
+
+function pgConnectionConfig() {
+	return {
+		host: process.env.TEST_DB_HOST ?? '127.0.0.1',
+		port: Number(process.env.TEST_DB_PORT ?? 15432),
+		user: process.env.TEST_DB_USER ?? 'directus',
+		password: process.env.TEST_DB_PASSWORD ?? 'directus',
+		database: process.env.TEST_DB_NAME ?? 'directus',
+	};
+}
 
 export function getDb() {
 	return knex({
 		client: 'pg',
-		connection: {
-			host: process.env.TEST_DB_HOST ?? '127.0.0.1',
-			port: Number(process.env.TEST_DB_PORT ?? 15432),
-			user: process.env.TEST_DB_USER ?? 'directus',
-			password: process.env.TEST_DB_PASSWORD ?? 'directus',
-			database: process.env.TEST_DB_NAME ?? 'directus',
-		},
+		connection: pgConnectionConfig(),
 		pool: { min: 0, max: 3 },
 	});
+}
+
+/**
+ * Return an unconnected node-postgres Client using the test DB env vars.
+ * Caller must .connect() and .end() it. Use when a test needs raw pg.Client
+ * semantics (e.g. LISTEN/NOTIFY, specific parametrized-query shape) rather
+ * than the knex query builder.
+ */
+export function getPgClient() {
+	return new pg.Client({ connectionString: pgConnectionString() });
+}
+
+function pgConnectionString(): string {
+	if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+	const c = pgConnectionConfig();
+	return `postgres://${c.user}:${c.password}@${c.host}:${c.port}/${c.database}`;
 }
 
 /** Insert a bare-bones test account row. Returns the UUID. */
@@ -60,21 +82,44 @@ export async function cleanupAccounts(db: any, ids: string[]): Promise<void> {
 }
 
 /**
+ * Look up a Directus role UUID by name. Throws with a self-describing error
+ * if the role does not exist (avoids cryptic FK violations in test setup
+ * when CI/dev DB has been re-seeded with different UUIDs).
+ */
+export async function lookupRoleIdByName(db: any, name: string): Promise<string> {
+	const row = await db('directus_roles').where('name', name).first('id');
+	if (!row) {
+		throw new Error(`Expected Directus role "${name}" not found — seed CMS first`);
+	}
+	return row.id;
+}
+
+/** Look up a Directus policy UUID by name (e.g. "User Access", "Administrator"). */
+export async function lookupPolicyIdByName(db: any, name: string): Promise<string> {
+	const row = await db('directus_policies').where('name', name).first('id');
+	if (!row) {
+		throw new Error(`Expected Directus policy "${name}" not found — seed CMS first`);
+	}
+	return row.id;
+}
+
+/**
  * Create a Directus test user with a static access token and associate it
- * with an account. Returns { userId, token }.
+ * with an account. Returns the user UUID.
  *
  * Uses the `directus_users.token` column directly — any request with
  * `Authorization: Bearer <token>` is authenticated as this user.
- * Role defaults to the "User" role (id: a3317ba7-1036-4304-b5e0-9df23321d627),
- * which carries the "User Access" policy with account-scoped permissions.
+ * Role defaults to the "User" role — resolved by name lookup so tests don't
+ * break when role UUIDs differ across environments.
  */
 export async function createTestUser(db: any, opts: {
 	accountId: string;
 	email: string;
 	token: string;
 	roleId?: string;
+	roleName?: string;
 }): Promise<string> {
-	const roleId = opts.roleId ?? 'a3317ba7-1036-4304-b5e0-9df23321d627'; // User role
+	const roleId = opts.roleId ?? await lookupRoleIdByName(db, opts.roleName ?? 'User');
 	const [{ id }] = await db.raw(
 		`INSERT INTO public.directus_users
 			(id, email, role, token, active_account, status, provider)
