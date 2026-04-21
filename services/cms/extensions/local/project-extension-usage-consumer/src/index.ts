@@ -59,7 +59,8 @@ export default defineHook(({ init, schedule }, { env, logger, database }) => {
 	// ─── monthly_aggregates hourly rollup (task 21) ──────────────────────────
 	// Pass a getter so the cron captures the live redis reference (task 22).
 	// redis is assigned in app.before; by the time the cron fires it will be set.
-	const runAggregation = buildAggregateUsageEventsCron(db, logger, () => redis);
+	// Pass env for FLOW_STEP_COST_EUR (task 43 — flat rate per non-AI flow.step).
+	const runAggregation = buildAggregateUsageEventsCron(db, logger, () => redis, env as Record<string, string | undefined>);
 
 	// On-boot run: deferred 30s so CMS becomes healthy immediately (I5 fix)
 	init('app.after', () => {

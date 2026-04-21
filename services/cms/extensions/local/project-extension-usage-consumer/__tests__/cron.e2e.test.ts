@@ -182,7 +182,7 @@ describe('aggregate_usage_events() E2E', () => {
 			flow_executions: 0, flow_steps: 0, flow_failed: 0, total_cost_eur: 0,
 		};
 
-		const stats = await runAggregation(db);
+		const stats = await runAggregation(db, 100_000, 0.001);
 
 		expect(stats.events_aggregated).toBeGreaterThanOrEqual(37); // 7+3+2+4+5+6+9+1
 		expect(stats.accounts_touched).toBeGreaterThanOrEqual(1);
@@ -220,8 +220,12 @@ describe('aggregate_usage_events() E2E', () => {
 		expect(Number(row.flow_executions)).toBe(Number(baseline.flow_executions) + 6);
 		expect(Number(row.flow_steps)).toBe(Number(baseline.flow_steps) + 9);
 		expect(Number(row.flow_failed)).toBe(Number(baseline.flow_failed) + 1);
-		// total_cost_eur = SUM(cost_eur) across ALL events: 5×0.002 + 4×0.0005 = 0.012
-		expect(Number(row.total_cost_eur)).toBeCloseTo(Number(baseline.total_cost_eur) + 0.012, 6);
+		// total_cost_eur = ai/embed cost_eur + flow.step flat rate (migration 037):
+		//   ai.message: 5×0.002 = 0.010
+		//   embed.tokens: 4×0.0005 = 0.002
+		//   flow.step: 9 non-AI steps × €0.001 = 0.009 (metadata has no step_kind → treated as non-AI)
+		//   total: 0.010 + 0.002 + 0.009 = 0.021
+		expect(Number(row.total_cost_eur)).toBeCloseTo(Number(baseline.total_cost_eur) + 0.021, 6);
 
 		// Verify all inserted events now have aggregated_at set
 		const { rows: unagg } = await pool.query(

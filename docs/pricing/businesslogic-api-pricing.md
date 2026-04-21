@@ -113,6 +113,48 @@ Bought ad-hoc or auto-attached when limits are hit (only with auto-reload enable
 
 ---
 
+## 3b. flow.step Metering (non-AI steps)
+
+### Rate
+
+**€0.001 per non-AI flow step** (1 millicent/step).
+
+A "step" is a single node that successfully completes inside a flow execution (emitted as a `flow.step` usage event). The flat rate is applied by the usage-consumer aggregator during hourly rollup into `monthly_aggregates.total_cost_eur`.
+
+### AI step exclusion
+
+Steps running AI-node types are **not charged** as flow steps — they are already debited from the AI Wallet via `ai.message` cost_eur (LLM tokens priced at wholesale ×1.5):
+
+| Node type | Excluded from flow.step rate? | Billed via |
+|-----------|-------------------------------|------------|
+| `core:llm` | ✅ excluded | AI Wallet (token cost) |
+| `core:embedding` | ✅ excluded | AI Wallet (token cost) |
+| `core:vector_search` | ✅ excluded | AI Wallet (token cost) |
+| `ai:*` (KB pipeline nodes) | ✅ excluded | AI Wallet (token cost) |
+| `core:noop`, `core:http_request`, `core:transform`, `core:condition`, `core:formula_eval`, `core:calculator`, `core:loop`, `core:database`, `core:redis`, `core:delay`, `core:aggregate`, `core:script`, `core:expression` | **charged** | flow.step flat rate |
+
+### Env-var control
+
+The rate is configurable without code change:
+
+```bash
+FLOW_STEP_COST_EUR=0.001   # default; ops can tune per deployment
+```
+
+Read by the usage-consumer cron at startup. Invalid/negative values fall back to the default with a WARN log.
+
+### Example
+
+| Scenario | Steps | Rate | Cost |
+|----------|-------|------|------|
+| 1,000 non-AI steps/mo | 1,000 | €0.001 | **€1.00** |
+| 10,000 non-AI steps/mo (Growth-tier flow user) | 10,000 | €0.001 | **€10.00** |
+| 1,000 AI steps (core:llm) | 1,000 | €0.000 (excluded) | **€0.00** from this rate; token cost from AI Wallet |
+
+Step costs accumulate in `monthly_aggregates.total_cost_eur` alongside AI and other event costs.
+
+---
+
 ## 4. Module: Flows
 
 | Tier | Executions/mo | Max steps/exec | Concurrent runs | Scheduled triggers | EUR/mo | USD/mo |

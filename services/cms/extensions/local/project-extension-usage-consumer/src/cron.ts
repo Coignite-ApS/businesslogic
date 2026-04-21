@@ -1,13 +1,18 @@
 /**
  * Task 21 — monthly_aggregates hourly rollup cron handler
  *
- * Calls public.aggregate_usage_events(p_batch_size) which:
+ * Calls public.aggregate_usage_events(p_batch_size, p_flow_step_cost_eur) which:
  *   1. Aggregates unaggregated usage_events into monthly_aggregates (UPSERT, additive)
  *   2. Marks source rows aggregated_at = NOW() in the same transaction
  *   3. Returns JSONB stats: { events_aggregated, accounts_touched, periods_touched, lag_seconds }
  *
  * Idempotency: guaranteed by the function's aggregated_at IS NULL filter.
  * Monitoring: structured log after each run (v1; Prometheus export is out of scope).
+ *
+ * Task 43: flow.step flat-rate cost.
+ * FLOW_STEP_COST_EUR env var (default 0.001 = €0.001/step) is passed as p_flow_step_cost_eur.
+ * AI-node steps (core:llm, core:embedding, core:vector_search, ai:*) are excluded from this
+ * rate — they are already billed via the AI Wallet through ai.message cost_eur.
  */
 
 type DB = any; // Knex instance provided by Directus context
@@ -18,6 +23,26 @@ type Logger = {
 };
 type RedisLike = { publish: (channel: string, message: string) => Promise<any> } | null;
 type RedisGetter = () => RedisLike;
+
+/** Default flow.step flat rate in EUR (1 millicent per non-AI step). */
+export const DEFAULT_FLOW_STEP_COST_EUR = 0.001;
+
+/**
+ * Parse FLOW_STEP_COST_EUR from environment. Returns DEFAULT_FLOW_STEP_COST_EUR if
+ * the value is absent, non-numeric, negative, or non-finite.
+ */
+export function parseFlowStepCostEur(env: Record<string, string | undefined>, logger?: Logger): number {
+	const raw = env['FLOW_STEP_COST_EUR'];
+	if (raw === undefined || raw === '') return DEFAULT_FLOW_STEP_COST_EUR;
+	const parsed = parseFloat(raw);
+	if (!isFinite(parsed) || parsed < 0) {
+		logger?.warn(
+			`[usage-consumer] FLOW_STEP_COST_EUR="${raw}" is invalid (must be finite ≥ 0); using default ${DEFAULT_FLOW_STEP_COST_EUR}`,
+		);
+		return DEFAULT_FLOW_STEP_COST_EUR;
+	}
+	return parsed;
+}
 
 export interface AggregateResult {
 	events_aggregated: number;
@@ -34,9 +59,18 @@ export const MAX_ITERATIONS = 50;
 /**
  * Run one aggregation pass. Returns the result JSONB row from the PL/pgSQL function.
  * Throws on DB failure so the caller can log and decide whether to retry.
+ *
+ * @param flowStepCostEur - flat rate per non-AI flow.step event (€/step, migration 037)
  */
-export async function runAggregation(db: DB, batchSize: number = 100_000): Promise<AggregateResult> {
-	const result = await db.raw('SELECT public.aggregate_usage_events(?::int) AS stats', [batchSize]);
+export async function runAggregation(
+	db: DB,
+	batchSize: number = 100_000,
+	flowStepCostEur: number = DEFAULT_FLOW_STEP_COST_EUR,
+): Promise<AggregateResult> {
+	const result = await db.raw(
+		'SELECT public.aggregate_usage_events(?::int, ?::numeric) AS stats',
+		[batchSize, flowStepCostEur],
+	);
 	const stats = result?.rows?.[0]?.stats as AggregateResult;
 	return stats ?? { events_aggregated: 0, accounts_touched: 0, periods_touched: 0, lag_seconds: 0 };
 }
@@ -48,8 +82,15 @@ export async function runAggregation(db: DB, batchSize: number = 100_000): Promi
  * Loops until drained (events_aggregated === 0) or MAX_ITERATIONS reached.
  * Publishes bl:monthly_aggregates:invalidated once at end if any accounts were touched.
  * Pass redis to publish bl:monthly_aggregates:invalidated when accounts were touched.
+ * Pass env to read FLOW_STEP_COST_EUR (default 0.001 = €0.001/non-AI step).
  */
-export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?: RedisGetter): () => Promise<void> {
+export function buildAggregateUsageEventsCron(
+	db: DB,
+	logger: Logger,
+	getRedis?: RedisGetter,
+	env: Record<string, string | undefined> = {},
+): () => Promise<void> {
+	const flowStepCostEur = parseFlowStepCostEur(env, logger);
 	return async () => {
 		logger.info('[usage-consumer] monthly_aggregates rollup: starting');
 
@@ -65,7 +106,7 @@ export function buildAggregateUsageEventsCron(db: DB, logger: Logger, getRedis?:
 
 		try {
 			for (let i = 0; i < MAX_ITERATIONS; i++) {
-				const stats = await runAggregation(db);
+				const stats = await runAggregation(db, 100_000, flowStepCostEur);
 				iterations = i + 1;
 				lastEventsAggregated = stats.events_aggregated;
 
