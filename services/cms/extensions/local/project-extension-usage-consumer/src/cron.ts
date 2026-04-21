@@ -11,8 +11,10 @@
  *
  * Task 43: flow.step flat-rate cost.
  * FLOW_STEP_COST_EUR env var (default 0.001 = €0.001/step) is passed as p_flow_step_cost_eur.
- * AI-node steps (core:llm, core:embedding, core:vector_search, ai:*) are excluded from this
- * rate — they are already billed via the AI Wallet through ai.message cost_eur.
+ * Two classes of steps are excluded from this rate:
+ *   1. core:llm — billed via AI Wallet through ai.message cost_eur (LLM tokens)
+ *   2. core:embedding, core:vector_search, ai:* (KB pipeline) — free internal/local compute
+ * Rationale: encourage KB ingestion + local compute without per-step friction.
  */
 
 type DB = any; // Knex instance provided by Directus context
