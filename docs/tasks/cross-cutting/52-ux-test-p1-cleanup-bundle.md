@@ -1,6 +1,6 @@
 # 52. 🟡 P1 bundle: Post-Sprint-B UX cleanup (from ux-tester 2026-04-20)
 
-**Status:** in-progress (52.1 + 52.2 + 52.4 done; 52.3 cancelled — directus_* constraint; pending manual admin-UI + browser-qa)
+**Status:** completed (52.1 + 52.2 + 52.4 shipped in Sprint B; 52.3 resolved 2026-04-21 — user deleted `account.subscriptions` ghost field via Directus Admin UI, verified clean in `directus_fields`)
 **Severity:** P1 (bundled polish) — each item LOW individually, but together they degrade Sprint B's perceived quality
 **Source:** ux-tester 2026-04-20 (Sarah persona, full report: `docs/reports/ux-test-2026-04-20-sarah-billing.md`)
 
@@ -69,11 +69,10 @@ Likely a shared utility or a pinia action wrapper. Look at `services/cms/extensi
   - `directus_permissions` id=163: User Access × ai_prompts × read (filter: `{}`)
   - `directus_permissions` id=164: User Access × ai_conversations × read (filter: `{"account":{"_eq":"$CURRENT_USER.active_account"}}`)
   - Prod re-apply: see `docs/reports/db-admin-2026-04-20-task-52-cancelled-directus-constraint-*.md`
-- [ ] 52.3: account list view loads for a new account with no subscriptions — **CANCELLED** (directus_* constraint)
-  - Ghost field `account.subscriptions` (directus_fields id=109) still present
-  - Fix requires deleting from `directus_fields` — forbidden under "no directus_* collection changes" rule
+- [x] 52.3: account list view loads for a new account with no subscriptions — **RESOLVED 2026-04-21**
+  - User deleted `account.subscriptions` ghost field manually via Directus Admin UI
+  - Verified: `SELECT * FROM directus_fields WHERE collection='account' AND field LIKE '%subscription%'` → only legitimate `exempt_from_subscription` remains
   - Forensic migration preserved at `migrations/cms/dryrun_cancelled_035_task_52_account_subscriptions_ghost_field.sql`
-  - User must apply via Directus Admin UI: Settings → Data Model → account collection → delete `subscriptions` field
 - [x] 52.4: 403/401/404/500 errors show human-readable messages in 3+ places tested
   - `formatApiError` utility created + unit-tested in both extensions (13 test cases each)
   - Wired into: `use-account.ts` (8 catch blocks), `use-onboarding.ts` (2 catch blocks), `use-chat.ts` (1 catch block), `subscription-info.vue` (1 catch block), `module.vue` handleTopup (1 catch block)
