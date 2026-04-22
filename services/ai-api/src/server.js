@@ -5,10 +5,11 @@ import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import multipart from '@fastify/multipart';
-import { config } from './config.js';
+import { config, validateSecrets } from './config.js';
 import { initDb, closeDb } from './db.js';
 import { verifyAuth } from './utils/auth.js';
 import { initBudget, closeBudget } from './services/budget.js';
+import { initUsageEvents, closeUsageEvents } from './services/usage-events.js';
 import { initWidgetCache, closeWidgetCache } from './widgets/cache.js';
 import { loadBuiltinTemplates } from './widgets/resolver.js';
 import { startCleanup, stopCleanup } from './utils/rate-limit.js';
@@ -101,6 +102,7 @@ const shutdown = async (signal) => {
     stopCleanup();
     stopAggregation();
     await closeBudget();
+    await closeUsageEvents();
     await closeWidgetCache();
     await closeDb();
     await shutdownTelemetry();
@@ -122,6 +124,9 @@ process.on('uncaughtException', (err) => {
 });
 
 export async function start() {
+  // Fail fast if critical secrets missing
+  validateSecrets();
+
   try {
     // Init database (optional — runs without DB for health checks)
     if (config.databaseUrl) {
@@ -131,6 +136,7 @@ export async function start() {
     if (config.redisUrl) {
       await initBudget(config.redisUrl);
       app.log.info('Budget Redis connected');
+      await initUsageEvents(config.redisUrl);
       initWidgetCache(config.redisUrl);
     } else {
       initWidgetCache(null);
@@ -138,7 +144,7 @@ export async function start() {
     loadBuiltinTemplates();
     app.log.info(`Widget cache initialized (${config.redisUrl ? 'L1+L2' : 'L1-only'})`);
     startCleanup();
-    if (config.databaseUrl) scheduleAggregation();
+    if (config.databaseUrl) scheduleAggregation(app.log);
     await app.listen({ port: config.port, host: config.host });
     app.log.info({ host: config.host, port: config.port }, 'bl-ai-api ready');
   } catch (err) {

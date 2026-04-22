@@ -22,38 +22,42 @@
 				<!-- Usage KPIs -->
 				<div class="kpi-grid">
 					<kpi-card
-						label="Plan"
-						:value="0"
-						icon="credit_card"
-						:icon-variant="planVariant"
+						label="Active Modules"
+						:value="activeSubs.length"
+						icon="apps"
+						:icon-variant="activeSubs.length > 0 ? 'success' : undefined"
 					>
-						<template #custom-value>
-							<div class="kpi-value">{{ detail.subscription?.plan_name || 'None' }}</div>
-						</template>
 						<template #custom-subtitle>
-							<v-chip v-if="detail.subscription" :class="'chip-' + detail.subscription.status" x-small>
-								{{ detail.subscription.status }}
-							</v-chip>
 							<span v-if="detail.account.exempt_from_subscription" class="exempt-badge">Exempt</span>
+							<span v-else-if="!activeSubs.length" class="kpi-subtitle">No active subscriptions</span>
+							<span v-else class="kpi-subtitle">{{ activeSubs.map(s => s.module).join(', ') }}</span>
 						</template>
 					</kpi-card>
 					<kpi-card
 						label="Calculators"
 						:value="detail.calculators.length"
-						:max="detail.subscription?.calculator_limit || undefined"
+						:max="calcLimit || undefined"
 						icon="calculate"
 						:progress="calcProgress"
-						:subtitle="activeCalcs + ' active, ' + (detail.subscription?.calculator_limit ? (detail.subscription.calculator_limit - detail.calculators.length) + ' remaining' : 'no limit')"
+						:subtitle="activeCalcs + ' active, ' + (calcLimit ? (calcLimit - detail.calculators.length) + ' remaining' : 'no limit')"
 						:icon-variant="calcProgress > 90 ? 'danger' : calcProgress > 70 ? 'warning' : undefined"
 					/>
 					<kpi-card
 						label="API Calls"
 						:value="totalMonthlyCalls"
-						:max="detail.subscription?.calls_per_month || undefined"
+						:max="callsLimit || undefined"
 						icon="trending_up"
 						:progress="callsProgress"
-						:subtitle="detail.subscription?.calls_per_month ? Math.round(callsProgress) + '% of monthly limit used' : 'no monthly limit'"
+						:subtitle="callsLimit ? Math.round(callsProgress) + '% of monthly limit used' : 'no monthly limit'"
 						:icon-variant="callsProgress > 90 ? 'danger' : callsProgress > 70 ? 'warning' : undefined"
+					/>
+					<kpi-card
+						label="AI Wallet"
+						:value="walletBalance"
+						icon="account_balance_wallet"
+						prefix="€"
+						:icon-variant="walletBalance < 1 ? 'warning' : 'success'"
+						:subtitle="detail.wallet?.auto_reload_enabled ? 'auto-reload on' : 'manual top-up'"
 					/>
 					<kpi-card
 						label="Errors"
@@ -62,6 +66,58 @@
 						:subtitle="totalMonthlyCalls ? (Math.round((totalMonthlyErrors / totalMonthlyCalls) * 100)) + '% of ' + totalMonthlyCalls + ' calls failed' : 'no calls this month'"
 						:icon-variant="totalMonthlyErrors > 0 ? 'danger' : 'success'"
 					/>
+				</div>
+
+				<!-- Per-module subscription cards -->
+				<div v-if="activeSubs.length" class="section">
+					<h3 class="section-title">Subscriptions</h3>
+					<div class="sub-grid">
+						<div v-for="sub in activeSubs" :key="sub.id" class="sub-card">
+							<div class="sub-header">
+								<span class="sub-module">{{ moduleLabel(sub.module) }}</span>
+								<v-chip :class="'chip-' + sub.status" x-small>{{ sub.status }}</v-chip>
+							</div>
+							<div class="sub-tier">{{ sub.plan_name || sub.tier }}</div>
+							<div class="sub-allowances">
+								<div v-for="row in subAllowances(sub)" :key="row.label" class="sub-allowance">
+									<span class="sub-allow-label">{{ row.label }}</span>
+									<span class="sub-allow-value">{{ row.value }}</span>
+								</div>
+							</div>
+							<div class="sub-meta">
+								<span v-if="sub.current_period_end">Renews {{ formatDate(sub.current_period_end) }}</span>
+								<span v-else-if="sub.trial_end">Trial ends {{ formatDate(sub.trial_end) }}</span>
+							</div>
+							<div class="sub-meta">{{ subPriceLabel(sub) }}</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- AI Wallet card -->
+				<div v-if="detail.wallet" class="section">
+					<h3 class="section-title">AI Wallet</h3>
+					<div class="wallet-detail">
+						<div class="wallet-row">
+							<span class="wallet-row-label">Balance</span>
+							<span class="wallet-row-value">€{{ formatNum(walletBalance) }}</span>
+						</div>
+						<div class="wallet-row" v-if="detail.wallet.monthly_cap_eur">
+							<span class="wallet-row-label">Monthly cap</span>
+							<span class="wallet-row-value">€{{ formatNum(Number(detail.wallet.monthly_cap_eur)) }}</span>
+						</div>
+						<div class="wallet-row" v-if="detail.wallet.auto_reload_enabled">
+							<span class="wallet-row-label">Auto-reload</span>
+							<span class="wallet-row-value">at €{{ formatNum(Number(detail.wallet.auto_reload_threshold_eur || 0)) }} → +€{{ formatNum(Number(detail.wallet.auto_reload_amount_eur || 0)) }}</span>
+						</div>
+						<div v-if="detail.wallet.recent_topups.length" class="wallet-topups">
+							<div class="wallet-topups-title">Recent top-ups</div>
+							<div v-for="t in detail.wallet.recent_topups" :key="t.id" class="topup-row">
+								<span>€{{ formatNum(Number(t.amount_eur)) }}</span>
+								<span class="topup-status">{{ t.status }}{{ t.is_auto_reload ? ' · auto' : '' }}</span>
+								<span class="topup-date">{{ formatDate(t.date_created) }}</span>
+							</div>
+						</div>
+					</div>
 				</div>
 
 				<!-- Admin Actions -->
@@ -182,7 +238,7 @@
 				<div v-if="accounts.length" class="account-table">
 					<div class="acct-header">
 						<div class="col-name">Account</div>
-						<div class="col-plan">Plan</div>
+						<div class="col-modules">Modules</div>
 						<div class="col-status">Status</div>
 						<div class="col-usage">Calculators</div>
 						<div class="col-usage">Calls/Mo</div>
@@ -198,7 +254,18 @@
 							<span class="acct-name">{{ acct.name || '—' }}</span>
 							<span v-if="acct.exempt_from_subscription" class="exempt-badge">Exempt</span>
 						</div>
-						<div class="col-plan">{{ acct.plan_name || '—' }}</div>
+						<div class="col-modules">
+							<template v-if="acct.active_modules && acct.active_modules.length">
+								<v-chip
+									v-for="mod in acct.active_modules"
+									:key="mod"
+									x-small
+									class="module-chip"
+								>{{ formatModuleBadge(mod) }}</v-chip>
+							</template>
+							<span v-else-if="acct.plan_name" class="no-data-inline">{{ acct.plan_name }}</span>
+							<span v-else class="no-data-inline">—</span>
+						</div>
 						<div class="col-status">
 							<v-chip v-if="acct.subscription_status" :class="'chip-' + acct.subscription_status" x-small>
 								{{ acct.subscription_status }}
@@ -309,22 +376,78 @@ const errorRateLabel = computed(() => {
 	const pct = Math.round((totalMonthlyErrors.value / totalMonthlyCalls.value) * 100);
 	return pct + '% error rate';
 });
+
+// v2 Phase 5: per-module subs surfaced. Calculator allowances come from the
+// calculators-module sub specifically (slot_allowance/request_allowance).
+const activeSubs = computed(() => detail.value?.subscriptions || []);
+const calcSub = computed(() => activeSubs.value.find((s) => s.module === 'calculators') || null);
+const calcLimit = computed(() => calcSub.value?.slot_allowance ?? null);
+const callsLimit = computed(() => calcSub.value?.request_allowance ?? null);
+const walletBalance = computed(() => Number(detail.value?.wallet?.balance_eur || 0));
+
 const calcProgress = computed(() => {
-	const limit = detail.value?.subscription?.calculator_limit;
+	const limit = calcLimit.value;
 	if (!limit) return 0;
 	return (detail.value!.calculators.length / limit) * 100;
 });
 const callsProgress = computed(() => {
-	const limit = detail.value?.subscription?.calls_per_month;
+	const limit = callsLimit.value;
 	if (!limit) return 0;
 	return (totalMonthlyCalls.value / limit) * 100;
 });
-const planVariant = computed(() => {
-	const status = detail.value?.subscription?.status;
-	if (!status || status === 'canceled' || status === 'expired') return 'danger' as const;
-	if (status === 'trialing') return 'warning' as const;
-	return 'success' as const;
-});
+
+function moduleLabel(m: string): string {
+	if (m === 'calculators') return 'Calculators';
+	if (m === 'kb') return 'Knowledge Base';
+	if (m === 'flows') return 'Flows';
+	return m;
+}
+
+function subAllowances(sub: any): { label: string; value: string }[] {
+	const fmtNullable = (v: number | null | undefined, suffix = '') =>
+		v == null ? 'Unlimited' : `${Number(v).toLocaleString()}${suffix}`;
+	if (sub.module === 'calculators') {
+		return [
+			{ label: 'Slots', value: fmtNullable(sub.slot_allowance) },
+			{ label: 'Always-on', value: fmtNullable(sub.ao_allowance) },
+			{ label: 'Requests/mo', value: fmtNullable(sub.request_allowance) },
+		];
+	}
+	if (sub.module === 'kb') {
+		return [
+			{ label: 'Storage', value: sub.storage_mb == null ? 'Unlimited' : `${sub.storage_mb} MB` },
+			{ label: 'Embed tokens', value: sub.embed_tokens_m == null ? 'Unlimited' : `${sub.embed_tokens_m}M` },
+		];
+	}
+	return [
+		{ label: 'Executions/mo', value: fmtNullable(sub.executions) },
+		{ label: 'Max steps', value: fmtNullable(sub.max_steps) },
+		{ label: 'Concurrent runs', value: fmtNullable(sub.concurrent_runs) },
+	];
+}
+
+function subPriceLabel(sub: any): string {
+	const m = Number(sub.price_eur_monthly || 0);
+	const a = Number(sub.price_eur_annual || 0);
+	if (sub.billing_cycle === 'annual' && a > 0) {
+		return `€${formatNum(Math.round((a / 12) * 100) / 100)}/mo (billed €${formatNum(a)}/yr)`;
+	}
+	return m > 0 ? `€${formatNum(m)}/mo` : '';
+}
+
+function formatNum(n: number): string {
+	return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+// Render "calculators:growth" → "Calc Growth" with module-specific icon emoji.
+function formatModuleBadge(modTier: string): string {
+	const [mod, tier] = modTier.split(':');
+	const tierStr = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : '';
+	if (mod === 'calculators') return `Calc ${tierStr}`;
+	if (mod === 'kb') return `KB ${tierStr}`;
+	if (mod === 'flows') return `Flows ${tierStr}`;
+	return modTier;
+}
 
 const usageChartData = computed(() => {
 	if (!detail.value) return [];
@@ -545,10 +668,136 @@ onMounted(() => {
 
 .acct-header, .acct-row {
 	display: grid;
-	grid-template-columns: 2fr 1fr 90px 100px 90px 80px;
+	grid-template-columns: 2fr 2fr 90px 100px 90px 80px;
 	gap: 8px;
 	padding: 12px 16px;
 	align-items: center;
+}
+
+.col-modules {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+
+.module-chip {
+	--v-chip-background-color: var(--theme--primary-background);
+	--v-chip-color: var(--theme--primary);
+}
+
+.sub-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 12px;
+}
+
+.sub-card {
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	padding: 14px;
+	background: var(--theme--background);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.sub-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.sub-module {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+}
+
+.sub-tier {
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.sub-allowances {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	border-top: 1px solid var(--theme--border-color);
+	border-bottom: 1px solid var(--theme--border-color);
+	padding: 8px 0;
+}
+
+.sub-allowance {
+	display: flex;
+	justify-content: space-between;
+	font-size: 12px;
+}
+
+.sub-allow-label { color: var(--theme--foreground-subdued); }
+.sub-allow-value { font-weight: 600; }
+
+.sub-meta {
+	font-size: 11px;
+	color: var(--theme--foreground-subdued);
+}
+
+.wallet-detail {
+	border: 1px solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	padding: 14px;
+	background: var(--theme--background);
+}
+
+.wallet-row {
+	display: flex;
+	justify-content: space-between;
+	padding: 6px 0;
+	font-size: 13px;
+	border-bottom: 1px solid var(--theme--border-color);
+}
+
+.wallet-row:last-of-type {
+	border-bottom: none;
+}
+
+.wallet-row-label {
+	color: var(--theme--foreground-subdued);
+}
+
+.wallet-row-value {
+	font-weight: 600;
+}
+
+.wallet-topups {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--theme--border-color);
+}
+
+.wallet-topups-title {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	margin-bottom: 8px;
+}
+
+.topup-row {
+	display: grid;
+	grid-template-columns: 80px 1fr auto;
+	gap: 8px;
+	padding: 4px 0;
+	font-size: 12px;
+}
+
+.topup-status {
+	color: var(--theme--foreground-subdued);
+}
+
+.topup-date {
+	color: var(--theme--foreground-subdued);
 }
 
 .acct-header {

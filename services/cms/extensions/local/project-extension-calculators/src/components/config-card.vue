@@ -102,48 +102,6 @@
 						/>
 					</div>
 				</div>
-				<div class="config-field">
-					<div class="config-label">API token</div>
-					<div class="config-value token-value">
-						<template v-if="config.api_key">
-							<v-progress-circular v-if="fetchingKey" x-small indeterminate />
-							<code v-else-if="showApiKey && decryptedKey">{{ decryptedKey }}</code>
-							<code v-else>{{ maskedKey }}</code>
-							<v-icon
-								class="token-action"
-								:name="showApiKey ? 'visibility_off' : 'visibility'"
-								small
-								clickable
-								@click="toggleShowKey"
-							/>
-							<v-icon
-								class="token-action"
-								name="content_copy"
-								small
-								clickable
-								v-tooltip.bottom="'Copy'"
-								@click="copyApiKey"
-							/>
-						</template>
-						<span v-else class="muted">not set</span>
-						<v-dialog v-model="confirmRegenerate" @esc="confirmRegenerate = false">
-							<template #activator="{ on }">
-								<span class="token-action-link" @click="on">
-									<v-icon name="refresh" small class="token-action" />
-									{{ config.api_key ? 'Regenerate' : 'Generate' }}
-								</span>
-							</template>
-							<v-card>
-								<v-card-title>Regenerate Token</v-card-title>
-								<v-card-text>{{ config.api_key ? 'The current token will be replaced. Any integrations using it will stop working.' : 'A new API token will be generated for this configuration.' }}</v-card-text>
-								<v-card-actions>
-									<v-button secondary @click="confirmRegenerate = false">Cancel</v-button>
-									<v-button kind="danger" @click="$emit('regenerate-api-key'); confirmRegenerate = false">Regenerate Token</v-button>
-								</v-card-actions>
-							</v-card>
-						</v-dialog>
-					</div>
-				</div>
 			</div>
 		</div>
 
@@ -217,7 +175,8 @@
 					</div>
 					<plan-cards
 						v-else
-						:plans="plans"
+						module="calculators"
+						:tiers="plans"
 						:current-plan-id="currentPlanId"
 						:current-plan-sort="currentPlanSort"
 						:checking-out="checkingOut"
@@ -239,7 +198,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import type { CalculatorConfig } from '../types';
 import PlanCards from 'project-shared-ui/plan-cards.vue';
-import type { PlanInfo } from 'project-shared-ui/plan-cards.vue';
+import type { ModulePlan } from 'project-shared-ui/plan-cards.vue';
 
 interface SubscriptionInfo {
 	plan: { id: string; sort: number | null };
@@ -269,7 +228,6 @@ defineEmits<{
 	test: [];
 	activate: [];
 	deactivate: [];
-	'regenerate-api-key': [];
 	download: [];
 }>();
 
@@ -331,10 +289,6 @@ watch(configIsComplete, (complete) => {
 	else verified.value = null;
 }, { immediate: true });
 
-const showApiKey = ref(false);
-const decryptedKey = ref<string | null>(null);
-const fetchingKey = ref(false);
-const confirmRegenerate = ref(false);
 const confirmDeactivateVisible = ref(false);
 
 function countdownText(expiresAt: string | null | undefined): string {
@@ -352,59 +306,14 @@ const testActive = computed(() => {
 	return props.testEnabled && props.testExpiresAt && new Date(props.testExpiresAt) > new Date();
 });
 
-const maskedKey = computed(() => {
-	if (decryptedKey.value) {
-		const key = decryptedKey.value;
-		if (key.length <= 8) return '*'.repeat(key.length);
-		return key.slice(0, 4) + '*'.repeat(key.length - 8) + key.slice(-4);
-	}
-	// Token exists but not yet decrypted — show generic mask
-	return props.config?.api_key ? '••••••••••••••••' : '';
-});
-
-async function ensureDecrypted(): Promise<string | null> {
-	if (decryptedKey.value) return decryptedKey.value;
-	if (!props.config?.id) return null;
-	fetchingKey.value = true;
-	try {
-		const { data } = await api.get(`/calc/api-key/${props.config.id}`);
-		decryptedKey.value = data.api_key || null;
-		return decryptedKey.value;
-	} catch {
-		return null;
-	} finally {
-		fetchingKey.value = false;
-	}
-}
-
-async function toggleShowKey() {
-	if (showApiKey.value) {
-		showApiKey.value = false;
-		return;
-	}
-	await ensureDecrypted();
-	showApiKey.value = true;
-}
-
 function copyText(text: string) {
 	navigator.clipboard.writeText(text);
 }
 
-async function copyApiKey() {
-	const key = await ensureDecrypted();
-	if (key) navigator.clipboard.writeText(key);
-}
-
-// Reset decrypted key when config changes
-watch(() => props.config?.api_key, () => {
-	decryptedKey.value = null;
-	showApiKey.value = false;
-});
-
 // Upgrade plan dialog
 const upgradeVisible = ref(false);
 const plansLoaded = ref(false);
-const plans = ref<PlanInfo[]>([]);
+const plans = ref<ModulePlan[]>([]);
 const subscription = ref<SubscriptionInfo | null>(null);
 const checkingOut = ref<string | null>(null);
 const upgradeError = ref<string | null>(null);
@@ -419,25 +328,57 @@ async function fetchUpgradeData() {
 		const [plansRes, userRes] = await Promise.all([
 			api.get('/items/subscription_plans', {
 				params: {
-					filter: { status: { _eq: 'published' } },
+					filter: {
+						status: { _eq: 'published' },
+						module: { _eq: 'calculators' },
+					},
 					sort: ['sort'],
-					fields: ['id', 'name', 'calculator_limit', 'calls_per_month', 'calls_per_second', 'monthly_price', 'yearly_price', 'sort'],
+					fields: [
+						'id', 'module', 'tier', 'name',
+						'slot_allowance', 'ao_allowance', 'request_allowance',
+						'price_eur_monthly', 'price_eur_annual', 'sort',
+					],
 				},
 			}),
 			api.get('/users/me', { params: { fields: ['active_account'] } }),
 		]);
-		plans.value = plansRes.data.data || [];
+		// v2: pass rows directly — plan-cards.vue now accepts ModulePlan natively.
+		plans.value = (plansRes.data.data || []).map((p: any): ModulePlan => ({
+			id: p.id,
+			name: p.name,
+			module: 'calculators',
+			tier: p.tier,
+			price_eur_monthly: p.price_eur_monthly ?? null,
+			price_eur_annual: p.price_eur_annual ?? null,
+			sort: p.sort ?? 0,
+			slot_allowance: p.slot_allowance ?? null,
+			ao_allowance: p.ao_allowance ?? null,
+			request_allowance: p.request_allowance ?? null,
+			storage_mb: null,
+			embed_tokens_m: null,
+			executions: null,
+			concurrent_runs: null,
+		}));
 
 		const accountId = userRes.data.data?.active_account;
 		if (accountId) {
 			const subRes = await api.get('/items/subscriptions', {
 				params: {
-					filter: { account: { _eq: accountId } },
-					fields: ['plan.id', 'plan.sort'],
+					filter: {
+						account_id: { _eq: accountId },
+						module: { _eq: 'calculators' },
+						status: { _nin: ['canceled', 'expired'] },
+					},
+					fields: ['subscription_plan_id.id', 'subscription_plan_id.sort'],
 					limit: 1,
 				},
 			});
-			subscription.value = subRes.data.data?.[0] || null;
+			const sub = subRes.data.data?.[0];
+			if (sub?.subscription_plan_id && typeof sub.subscription_plan_id === 'object') {
+				subscription.value = { plan: { id: sub.subscription_plan_id.id, sort: sub.subscription_plan_id.sort ?? 0 } };
+			} else {
+				subscription.value = null;
+			}
 		}
 		plansLoaded.value = true;
 	} catch (err: any) {
@@ -456,7 +397,15 @@ async function handleCheckout(planId: string) {
 	checkingOut.value = planId;
 	upgradeError.value = null;
 	try {
-		const { data } = await api.post('/stripe/checkout', { plan_id: planId });
+		const plan = plans.value.find((p) => p.id === planId);
+		if (!plan) {
+			throw new Error('Plan not found');
+		}
+		const { data } = await api.post('/stripe/checkout', {
+			module: 'calculators',
+			tier: plan.tier,
+			billing_cycle: 'monthly',
+		});
 		if (data.url) {
 			window.location.href = data.url;
 		}
@@ -618,23 +567,6 @@ async function handleCheckout(planId: string) {
 	font-style: italic;
 }
 
-.token-action-link {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 14px;
-	color: var(--theme--foreground-subdued);
-	cursor: pointer;
-	margin-top: -4px;
-}
-
-.token-action-link:hover {
-	color: var(--theme--foreground);
-}
-
-.token-action-link:hover .token-action {
-	color: var(--theme--foreground);
-}
 
 .muted {
 	color: var(--theme--foreground-subdued);

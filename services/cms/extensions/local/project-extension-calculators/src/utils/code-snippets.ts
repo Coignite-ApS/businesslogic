@@ -18,13 +18,13 @@ function jsonBody(body: Record<string, unknown>): string {
 
 export function curlExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const body = sampleBody ? ` \\\n  -d '${jsonBody(sampleBody)}'` : '';
-	return `curl -X POST "${baseUrl}/execute/calculator/${calculatorId}" \\
+	return `curl -X POST "${baseUrl}/execute/${calculatorId}" \\
   -H "X-API-Key: ${apiKey}" \\
   -H "Content-Type: application/json"${body}`;
 }
 
 export function curlDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
-	return `curl "${baseUrl}/calculator/${calculatorId}/describe" \\
+	return `curl "${baseUrl}/describe/${calculatorId}" \\
   -H "X-API-Key: ${apiKey}"`;
 }
 
@@ -32,7 +32,7 @@ export function curlDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): 
 
 export function jsExecute({ baseUrl, calculatorId, apiKey, sampleBody }: SnippetParams): string {
 	const body = sampleBody ? `\n  body: JSON.stringify(${jsonBody(sampleBody)}),` : '';
-	return `const response = await fetch("${baseUrl}/execute/calculator/${calculatorId}", {
+	return `const response = await fetch("${baseUrl}/execute/${calculatorId}", {
   method: "POST",
   headers: {
     "X-API-Key": "${apiKey}",
@@ -45,7 +45,7 @@ console.log(result);`;
 }
 
 export function jsDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
-	return `const response = await fetch("${baseUrl}/calculator/${calculatorId}/describe", {
+	return `const response = await fetch("${baseUrl}/describe/${calculatorId}", {
   headers: {
     "X-API-Key": "${apiKey}",
   },
@@ -63,7 +63,7 @@ export function pythonExecute({ baseUrl, calculatorId, apiKey, sampleBody }: Sni
 	return `import requests
 ${body}
 response = requests.post(
-    "${baseUrl}/execute/calculator/${calculatorId}",
+    "${baseUrl}/execute/${calculatorId}",
     headers={"X-API-Key": "${apiKey}"}${arg}
 )
 
@@ -74,7 +74,7 @@ export function pythonDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams)
 	return `import requests
 
 response = requests.get(
-    "${baseUrl}/calculator/${calculatorId}/describe",
+    "${baseUrl}/describe/${calculatorId}",
     headers={"X-API-Key": "${apiKey}"}
 )
 
@@ -91,7 +91,7 @@ export function phpExecute({ baseUrl, calculatorId, apiKey, sampleBody }: Snippe
 		? `\ncurl_setopt($ch, CURLOPT_POSTFIELDS, $data);\n`
 		: '';
 	return `<?php
-$ch = curl_init("${baseUrl}/execute/calculator/${calculatorId}");
+$ch = curl_init("${baseUrl}/execute/${calculatorId}");
 ${body}
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -107,7 +107,7 @@ echo $response;`;
 
 export function phpDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): string {
 	return `<?php
-$ch = curl_init("${baseUrl}/calculator/${calculatorId}/describe");
+$ch = curl_init("${baseUrl}/describe/${calculatorId}");
 
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -135,7 +135,7 @@ import (
 )
 
 func main() {
-	url := "${baseUrl}/execute/calculator/${calculatorId}"
+	url := "${baseUrl}/execute/${calculatorId}"
 	${bodySetup}
 	if err != nil {
 		panic(err)
@@ -165,7 +165,7 @@ import (
 )
 
 func main() {
-	url := "${baseUrl}/calculator/${calculatorId}/describe"
+	url := "${baseUrl}/describe/${calculatorId}"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		panic(err)
@@ -194,7 +194,7 @@ export function rustExecute({ baseUrl, calculatorId, apiKey, sampleBody }: Snipp
 async fn main() -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let res = client
-        .post("${baseUrl}/execute/calculator/${calculatorId}")
+        .post("${baseUrl}/execute/${calculatorId}")
         .header("X-API-Key", "${apiKey}")
         ${bodyArg}
         .send()
@@ -213,7 +213,7 @@ export function rustDescribe({ baseUrl, calculatorId, apiKey }: SnippetParams): 
 async fn main() -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
     let res = client
-        .get("${baseUrl}/calculator/${calculatorId}/describe")
+        .get("${baseUrl}/describe/${calculatorId}")
         .header("X-API-Key", "${apiKey}")
         .send()
         .await?;
@@ -237,7 +237,7 @@ import java.net.http.HttpResponse;
 
 var client = HttpClient.newHttpClient();
 var request = HttpRequest.newBuilder()
-    .uri(URI.create("${baseUrl}/execute/calculator/${calculatorId}"))
+    .uri(URI.create("${baseUrl}/execute/${calculatorId}"))
     .header("X-API-Key", "${apiKey}")
     .header("Content-Type", "application/json")
     .POST(${bodyPublisher})
@@ -255,7 +255,7 @@ import java.net.http.HttpResponse;
 
 var client = HttpClient.newHttpClient();
 var request = HttpRequest.newBuilder()
-    .uri(URI.create("${baseUrl}/calculator/${calculatorId}/describe"))
+    .uri(URI.create("${baseUrl}/describe/${calculatorId}"))
     .header("X-API-Key", "${apiKey}")
     .GET()
     .build();

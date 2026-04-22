@@ -132,8 +132,30 @@ async fn main() -> Result<(), anyhow::Error> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(100_000);
 
+    // Validate critical secrets
+    let skip_validation = std::env::var("SKIP_SECRET_VALIDATION")
+        .ok()
+        .map(|v| v == "true")
+        .unwrap_or(false);
+
+    let mut missing_secrets = Vec::new();
     if admin_token.is_none() {
-        warn!("ADMIN_TOKEN not set — management endpoints unprotected");
+        missing_secrets.push("ADMIN_TOKEN");
+    }
+
+    if !missing_secrets.is_empty() {
+        if skip_validation {
+            warn!(
+                "SKIP_SECRET_VALIDATION=true — missing secrets ignored: {}",
+                missing_secrets.join(", ")
+            );
+        } else {
+            error!(
+                "FATAL: missing required secrets: {}. Set them or use SKIP_SECRET_VALIDATION=true for local dev",
+                missing_secrets.join(", ")
+            );
+            std::process::exit(1);
+        }
     }
 
     // Initialize Redis connection pool

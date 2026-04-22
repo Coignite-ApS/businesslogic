@@ -562,13 +562,13 @@ func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// /v1/mcp/calc/ should still require X-API-Key
-	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/calc/some-endpoint", nil)
+	// /v1/mcp/calculator/ should still require X-API-Key (renamed from /v1/mcp/calc/)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/calculator/some-endpoint", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401 for /v1/mcp/calc/ without API key, got %d", rec.Code)
+		t.Errorf("expected 401 for /v1/mcp/calculator/ without API key, got %d", rec.Code)
 	}
 
 	// /v1/mcp/ai/ should still require X-API-Key
@@ -578,6 +578,28 @@ func TestAuthMiddleware_DoesNotSkipMCPCalcAI(t *testing.T) {
 
 	if rec2.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for /v1/mcp/ai/ without API key, got %d", rec2.Code)
+	}
+}
+
+func TestDefaultPermissions_AllServicesEnabled(t *testing.T) {
+	dp := service.DefaultPermissions
+	for _, svc := range []string{"calc", "kb", "flow"} {
+		if !dp.HasServiceAccess(svc) {
+			t.Errorf("DefaultPermissions should grant %s service access", svc)
+		}
+	}
+}
+
+func TestDefaultPermissions_WildcardAccess(t *testing.T) {
+	dp := service.DefaultPermissions
+	if !dp.HasAccess("calc", "any-uuid", "execute") {
+		t.Error("DefaultPermissions should grant calc wildcard access")
+	}
+	if !dp.HasAccess("kb", "any-uuid", "search") {
+		t.Error("DefaultPermissions should grant kb wildcard access")
+	}
+	if !dp.HasAccess("flow", "any-uuid", "trigger") {
+		t.Error("DefaultPermissions should grant flow wildcard access")
 	}
 }
 

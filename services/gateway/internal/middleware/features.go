@@ -10,13 +10,16 @@ import (
 )
 
 var routeFeatureMap = map[string]string{
-	"/v1/ai/chat/":      "ai.chat",
-	"/v1/ai/kb/":        "ai.kb",
-	"/v1/ai/embed/":     "ai.embeddings",
-	"/v1/calc/execute/": "calc.execute",
-	"/v1/calc/mcp/":     "calc.mcp",
-	"/v1/flow/":         "flow.execute",
-	"/v1/widget/":       "widget.render",
+	"/v1/ai/chat/":             "ai.chat",
+	"/v1/ai/kb/":               "ai.kb",
+	"/v1/ai/embed/":            "ai.embeddings",
+	"/v1/formula/":             "formula.execute",
+	"/v1/calculator/execute/":  "calculator.execute",
+	"/v1/calculator/describe/": "calculator.execute",
+	"/v1/mcp/formula/":         "formula.mcp",
+	"/v1/mcp/calculator/":      "calculator.mcp",
+	"/v1/flow/":                "flow.execute",
+	"/v1/widget/":              "widget.render",
 }
 
 // CheckFeatureFlag returns (featureKey, allowed).

@@ -383,6 +383,98 @@ All endpoints scoped to authenticated user. No cross-user access.
 29. [ ] Build privacy mode toggle (disable extraction per-conversation)
 30. [ ] Add subscription tier limits for twin storage
 
+### Phase 6: Self-Improvement Loop (Autoresearch Pattern)
+
+**Inspired by:** [Karpathy's Autoresearch](https://github.com/karpathy/autoresearch) — hypothesis → experiment → measure → commit/revert. The Digital Twin should not just accumulate knowledge — it should get measurably better at extraction, retrieval, and personalization over time, autonomously.
+
+**Core pattern:** Three editable assets, each with a scalar metric and a fast feedback loop. The system modifies one asset at a time, evaluates against the metric, and commits improvements or reverts failures. Git history tracks the evolution of each asset.
+
+#### 6A: Extraction Prompt Tuning (easiest, start here)
+
+**Editable asset:** `config/twin-extraction-prompt.md` — the LLM instructions for Stage 1 (episode classification) and Stage 2 (entity/relationship extraction).
+
+**Scalar metric:** Extraction F1 score against a golden evaluation set.
+
+**How it works:**
+```
+Nightly cron (after consolidation):
+  1. Load golden_conversations (curated set with known-correct entities/edges)
+  2. Run current extraction prompt against golden set
+  3. Measure baseline F1
+  4. Agent modifies extraction prompt (one change per iteration)
+  5. Re-run against golden set
+  6. If F1 improved → commit new prompt as baseline
+  7. If F1 unchanged or worse → revert
+  8. Repeat for N iterations (default: 20 per night)
+```
+
+Tasks:
+31. [ ] Create golden evaluation set: 50+ conversations with manually verified entities/edges
+32. [ ] Build extraction evaluator: runs extraction prompt against golden set, returns F1
+33. [ ] Build autoresearch loop: modify prompt → evaluate → commit/revert
+34. [ ] Store extraction prompt as versioned config (git-tracked, not hardcoded)
+35. [ ] Add extraction F1 metric to Digital Twin Stats dashboard
+36. [ ] Write tests: verify improvement loop commits only on genuine F1 gain
+
+#### 6B: Retrieval Weight Optimization (medium difficulty)
+
+**Editable asset:** `config/twin-retrieval-config.json` — weights for the four retrieval paths (vector, graph traversal, temporal, module-specific), similarity thresholds, top-K settings.
+
+**Scalar metric:** Retrieval relevance score — measured by whether injected context appeared in the LLM's response (context utilization rate).
+
+**How it works:**
+```
+Weekly cron:
+  1. Sample last 200 conversations where twin context was injected
+  2. For each: measure context utilization (did the LLM use the injected context?)
+  3. Baseline = average utilization rate with current config
+  4. Agent adjusts one weight/threshold in retrieval config
+  5. Replay sampled conversations with modified config
+  6. If utilization rate improved → commit
+  7. If not → revert
+  8. Repeat for N iterations (default: 10 per week)
+```
+
+Tasks:
+37. [ ] Build context utilization metric: compare injected twin context vs LLM response
+38. [ ] Build conversation replay evaluator (offline — re-runs retrieval, not full LLM call)
+39. [ ] Build retrieval config autoresearch loop
+40. [ ] Store retrieval config as versioned JSON (git-tracked)
+41. [ ] Add retrieval relevance metric to Digital Twin Stats dashboard
+
+#### 6C: Prompt Template A/B Testing (continuous, hardest)
+
+**Editable asset:** `config/twin-injection-template.md` — how Digital Twin context is formatted and injected into the AI system prompt.
+
+**Scalar metric:** Conversation quality score — composite of: response acceptance rate (no immediate correction), session completion (user didn't abandon), and explicit feedback (thumbs up/down if available).
+
+**How it works:**
+```
+Continuous (live traffic split):
+  1. Maintain current template (control) and candidate template (variant)
+  2. Route 90% traffic to control, 10% to candidate
+  3. After N conversations (default: 100), compare quality scores
+  4. If candidate statistically significant better (p < 0.05) → promote to control
+  5. If worse → discard candidate
+  6. Agent generates new candidate variant
+  7. Repeat
+```
+
+Tasks:
+42. [ ] Build conversation quality scoring (acceptance rate + completion + feedback)
+43. [ ] Build A/B traffic splitter for injection templates
+44. [ ] Build statistical significance calculator (chi-squared or Mann-Whitney)
+45. [ ] Build candidate template generator (LLM proposes variations)
+46. [ ] Add A/B test status and results to Digital Twin Stats dashboard
+47. [ ] Write tests: verify traffic split ratios, verify promotion logic
+
+#### Self-Improvement Safeguards
+48. [ ] All editable assets version-controlled in git — full rollback capability
+49. [ ] Maximum regression threshold: if any metric drops >5% vs 7-day average, auto-revert and alert
+50. [ ] Rate limit: max 20 extraction experiments/night, 10 retrieval experiments/week
+51. [ ] Human override: admin can lock any asset to prevent auto-modification
+52. [ ] Audit log: every experiment logged with hypothesis, metric before/after, commit/revert decision
+
 ---
 
 ## Acceptance Criteria
@@ -400,6 +492,10 @@ All endpoints scoped to authenticated user. No cross-user access.
 - [ ] Nightly consolidation merges duplicates and archives low-confidence entities
 - [ ] Full GDPR export + erasure functional
 - [ ] MCP tools allow external agents to read/write the twin
+- [ ] Extraction F1 measurably improves over 30-day period without human intervention
+- [ ] Retrieval relevance (context utilization) improves over 30-day period
+- [ ] Self-improvement loop has full rollback capability and regression safeguards
+- [ ] All editable assets are git-tracked with complete experiment history
 
 ---
 
@@ -424,6 +520,12 @@ All endpoints scoped to authenticated user. No cross-user access.
 - Target: <300ms added latency per chat message
 - **Optimization:** Pre-compute working-context summary, cache per-session
 
+**Self-improvement loop (Phase 6):**
+- Extraction tuning: ~20 experiments/night × $0.01/experiment = ~$0.20/night per golden set
+- Retrieval optimization: ~10 experiments/week × $0.005/experiment = ~$0.05/week (replay, no LLM)
+- A/B testing: zero marginal cost (runs on live traffic, just measures differently)
+- **Total:** <$10/month for continuous self-improvement — negligible vs. the quality gains
+
 ---
 
 ## Relationship to #04
@@ -439,6 +541,7 @@ This improvement (#05) is the **intelligence layer** that sits on top of #04's *
 | Contradictions | "Latest wins" | Bi-temporal versioning with state transitions |
 | UI | Memory Manager (list view) | Digital Twin (timeline + graph + module browser) |
 | Personalization | None | Progressive tiers (cold → deep) |
+| Self-improvement | None | Autoresearch loop: extraction, retrieval, prompt templates |
 
 **Implementation strategy:** Build #04's basic storage first, then layer #05's graph and intelligence on top. #04's `personal_memories` table can be migrated into the `twin_entities` structure, or kept as a simple input mechanism that feeds into the graph.
 
@@ -455,6 +558,9 @@ This improvement (#05) is the **intelligence layer** that sits on top of #04's *
 | Temporal model | Bi-temporal (event time + ingestion time) | B2B audit requirements, enables corrections without data loss |
 | Active learning | Passive extraction only (no probing questions) | Research shows probing has mixed results, extract from natural conversation |
 | UI paradigm | Timeline-first (not list-first) | Timeline tells a story, lists are flat and hard to navigate |
+| Self-improvement | Autoresearch pattern (Karpathy) | Editable asset + scalar metric + commit/revert = proven loop. Git as memory. |
+| Improvement scope | Three assets: extraction prompt, retrieval config, injection template | Each has a clear metric. Start with extraction (easiest to measure objectively). |
+| Improvement safety | Max 5% regression auto-revert + rate limits | Prevents runaway degradation while allowing meaningful experimentation |
 
 ---
 
@@ -466,3 +572,6 @@ This improvement (#05) is the **intelligence layer** that sits on top of #04's *
 4. Graph visualization library: D3.js, vis.js, or Cytoscape.js for Directus module?
 5. Should the Digital Twin be accessible via the public SDK (@coignite/sdk)?
 6. How to handle the Digital Twin during account migration (user moves between accounts)?
+7. Should the self-improvement loop run globally (one prompt for all users) or per-account (account-specific extraction tuning)?
+8. When is the golden evaluation set large enough to start extraction tuning? Minimum 50 conversations, but how diverse?
+9. Bilevel autoresearch (Karpathy's extension): should the system eventually optimize its own improvement strategy? Likely premature — revisit after Phase 6A proves value.

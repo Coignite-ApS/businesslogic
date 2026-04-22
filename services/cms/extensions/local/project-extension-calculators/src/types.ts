@@ -88,6 +88,7 @@ export interface CallRecord {
 	response_time_ms: number | null;
 	error_message: string | null;
 	test: boolean;
+	calculator?: string;
 }
 
 export interface CalculatorTemplate {
@@ -161,8 +162,6 @@ export interface CalculatorConfig {
 	date_created: string | null;
 	user_updated: string | null;
 	date_updated: string | null;
-	allowed_ips: string[] | null;
-	allowed_origins: string[] | null;
 	mcp: McpConfig | null;
 	integration: IntegrationConfig | null;
 	expressions: { name: string; expression: string; scope?: string }[] | null;

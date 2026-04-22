@@ -155,9 +155,9 @@ func TestMCPByKeyPrefix_MethodNotAllowed(t *testing.T) {
 	}
 }
 
-// TestMCPByKeyPrefix_CalcAndAIRoutesUnaffected verifies that /v1/mcp/calc/
+// TestMCPByKeyPrefix_FormulaAndAIRoutesUnaffected verifies that /v1/mcp/formula/
 // and /v1/mcp/ai/ still work (proxied, not intercepted by the keyPrefix handler).
-func TestMCPByKeyPrefix_CalcAndAIRoutesUnaffected(t *testing.T) {
+func TestMCPByKeyPrefix_FormulaAndAIRoutesUnaffected(t *testing.T) {
 	var receivedPath string
 
 	router, _ := setupMCPPrefixRouter(t, func(w http.ResponseWriter, r *http.Request) {
@@ -166,18 +166,18 @@ func TestMCPByKeyPrefix_CalcAndAIRoutesUnaffected(t *testing.T) {
 		w.Write([]byte(`{}`))
 	}, nil)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/calc/tools/list", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/mcp/formula/tools/list", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
 
-	// /v1/mcp/calc/ is a standard proxy route — should reach backend
+	// /v1/mcp/formula/ is a standard proxy route — should reach backend
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected 200 for /v1/mcp/calc/ route, got %d", rec.Code)
+		t.Errorf("expected 200 for /v1/mcp/formula/ route, got %d", rec.Code)
 	}
 	if receivedPath == "" {
-		t.Errorf("backend was not called for /v1/mcp/calc/ route")
+		t.Errorf("backend was not called for /v1/mcp/formula/ route")
 	}
 }
 

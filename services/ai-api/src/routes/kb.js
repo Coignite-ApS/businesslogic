@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { query, queryOne, queryAll } from '../db.js';
-import { getActiveAccount } from '../utils/auth.js';
+import { getActiveAccount, checkAiQuota } from '../utils/auth.js';
 import { hybridSearch } from '../services/search.js';
 import { assertKbAccess, getAllowedKbIds } from '../utils/kb-access.js';
 import { createEmbeddingClientForKb, getModelDimensions, LOCAL_EMBEDDING_MODEL } from '../services/embedding-factory.js';
@@ -12,6 +12,10 @@ import { generateAnswer } from '../services/answer.js';
 import { logRetrievalQuality } from '../services/retrieval-logger.js';
 import { enqueueIngest } from '../services/ingest-queue.js';
 import { triggerFlowIngest, isFlowIngestEnabled } from '../services/flow-ingest.js';
+import { debitWallet } from '../hooks/wallet-debit.js';
+import { recordFailedDebit } from '../hooks/wallet-failed-debits.js';
+import { calculateCost } from '../utils/cost.js';
+import { emitKbSearch, emitKbAsk, emitEmbedTokens } from '../services/usage-events.js';
 
 /** Check AI permission on gateway-forwarded requests */
 function checkAiPermission(req, reply) {
@@ -29,19 +33,19 @@ async function verifyKbOwnership(req, reply) {
   const accountId = req.accountId || await getActiveAccount(req.userId);
   if (!accountId) { reply.code(403).send({ errors: [{ message: 'No active account' }] }); return null; }
 
-  const kb = await queryOne(
-    'SELECT * FROM knowledge_bases WHERE id = $1 AND account = $2',
-    [req.params.kbId, accountId],
-  );
-  if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
-
-  // API key KB scoping — check if key has access to this specific KB
+  // API key KB scoping — check BEFORE DB lookup to avoid leaking KB existence
   try {
     assertKbAccess(req, req.params.kbId);
   } catch (err) {
     reply.code(err.statusCode || 403).send({ errors: [{ message: err.message }] });
     return null;
   }
+
+  const kb = await queryOne(
+    'SELECT * FROM knowledge_bases WHERE id = $1 AND account = $2',
+    [req.params.kbId, accountId],
+  );
+  if (!kb) { reply.code(404).send({ errors: [{ message: 'Knowledge base not found' }] }); return null; }
 
   return { accountId, kb };
 }
@@ -488,6 +492,15 @@ export async function registerRoutes(app) {
       featuresActive,
     });
 
+    // Emit usage event (fire-and-forget)
+    emitKbSearch({
+      accountId,
+      apiKeyId: req.apiKeyId || null,
+      kbId: kb_id || null,
+      query: searchQuery.trim(),
+      resultsCount: results.length,
+    });
+
     return { data: results };
   });
 
@@ -509,6 +522,14 @@ export async function registerRoutes(app) {
 
     if (!config.anthropicApiKey) {
       return reply.code(503).send({ errors: [{ message: 'AI service not configured' }] });
+    }
+
+    // Wallet balance pre-flight: block before any AI work (skip for admins)
+    if (!req.isAdmin) {
+      const quota = await checkAiQuota(accountId);
+      if (!quota.allowed) {
+        return reply.code(402).send({ errors: [{ message: quota.reason, code: 'WALLET_EMPTY' }] });
+      }
     }
 
     // Resolve embedding client — use KB's locked model if kb_id provided
@@ -560,6 +581,71 @@ export async function registerRoutes(app) {
     const answerModel = model || config.defaultModel;
     const result = await generateAnswer(config.anthropicApiKey, question.trim(), chunks, answerModel, curatedContext);
     const totalLatencyMs = Date.now() - searchStart;
+
+    // Debit AI Wallet for KB ask (skip for admins; best-effort)
+    if (!req.isAdmin && accountId && (result.inputTokens > 0 || result.outputTokens > 0)) {
+      const kbAskCostUsd = calculateCost(answerModel, result.inputTokens, result.outputTokens);
+      try {
+        const debit = await debitWallet({
+          accountId,
+          costUsd: kbAskCostUsd,
+          model: answerModel,
+          module: 'kb',
+          eventKind: 'kb.ask',
+          apiKeyId: req.apiKeyId || null,
+          metadata: { kb_id: kb_id || null, total_latency_ms: totalLatencyMs },
+        });
+        if (!debit.ok) {
+          req.log.error(
+            { accountId, costUsd: kbAskCostUsd, model: answerModel, inputTokens: result.inputTokens, outputTokens: result.outputTokens, reason: debit.reason },
+            'wallet debit failed post-kb-ask — failure row queued',
+          );
+          await recordFailedDebit({
+            accountId,
+            costUsd: kbAskCostUsd,
+            model: answerModel,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            eventKind: 'kb.ask', module: 'kb',
+            apiKeyId: req.apiKeyId || null,
+            errorReason: 'debit_returned_not_ok',
+            errorDetail: debit.reason,
+          });
+        } else {
+          req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model: answerModel }, 'wallet debit ok');
+          if (debit.autoReloadTriggered) {
+            req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+          }
+        }
+      } catch (err) {
+        req.log.error(
+          { err, accountId, costUsd: kbAskCostUsd, model: answerModel, inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+          'wallet debit threw post-kb-ask — failure row queued',
+        );
+        await recordFailedDebit({
+          accountId,
+          costUsd: kbAskCostUsd,
+          model: answerModel,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          eventKind: 'kb.ask', module: 'kb',
+          apiKeyId: req.apiKeyId || null,
+          errorReason: 'debit_threw',
+          errorDetail: err?.stack || err?.message || String(err),
+        });
+      }
+    }
+
+    // Emit usage event for kb.ask (fire-and-forget)
+    emitKbAsk({
+      accountId,
+      apiKeyId: req.apiKeyId || null,
+      kbId: kb_id || null,
+      query: question.trim(),
+      model: answerModel,
+      inputTokens: result.inputTokens || 0,
+      outputTokens: result.outputTokens || 0,
+    });
 
     // Calculate context utilization
     const chunksInjected = chunks.length;

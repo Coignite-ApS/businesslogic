@@ -2,10 +2,6 @@ package handler
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -80,6 +76,53 @@ type keyResponse struct {
 	CreatedAt      time.Time                    `json:"created_at"`
 }
 
+// insertKey performs the INSERT + RETURNING scan shared by Create, Rotate, and AutoProvision.
+func (h *APIKeyHandler) insertKey(ctx context.Context, gk *service.GeneratedKey, req createKeyRequest) (*keyResponse, error) {
+	var permJSON []byte
+	if req.Permissions != nil {
+		permJSON, _ = json.Marshal(req.Permissions)
+	}
+	if req.AllowedIPs == nil {
+		req.AllowedIPs = []string{}
+	}
+	if req.AllowedOrigins == nil {
+		req.AllowedOrigins = []string{}
+	}
+
+	// Encrypt the raw key if KEY_ENCRYPTION_KEY is configured
+	var encryptedKey *string
+	if service.EncryptionKeyAvailable() {
+		enc, err := service.Encrypt(gk.RawKey)
+		if err == nil {
+			encryptedKey = &enc
+		}
+	}
+
+	var resp keyResponse
+	err := h.db.QueryRow(ctx, `
+		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
+			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at, encrypted_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id, key_prefix, account_id, name, environment, permissions,
+			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
+			expires_at, last_used_at, created_at
+	`, gk.KeyHash, gk.KeyPrefix, req.AccountID, req.Environment, req.Name,
+		permJSON, req.AllowedIPs, req.AllowedOrigins, req.RateLimitRPS, req.MonthlyQuota, req.ExpiresAt, encryptedKey,
+	).Scan(
+		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
+		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
+		&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	parsed := service.ParsePermissions(permJSON)
+	resp.Permissions = &parsed
+	resp.RawKey = gk.RawKey
+	return &resp, nil
+}
+
 // Create generates a new API key. Raw key is returned ONLY in this response.
 func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createKeyRequest
@@ -100,52 +143,19 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate 48-byte random key → base64url → prefix with bl_
-	rawBytes := make([]byte, 48)
-	if _, err := rand.Read(rawBytes); err != nil {
+	gk, err := service.GenerateKey()
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
 		return
 	}
-	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
 
-	// Hash for storage
-	hash := sha256.Sum256([]byte(rawKey))
-	keyHash := hex.EncodeToString(hash[:])
-	keyPrefix := rawKey[:11] // "bl_" + first 8 chars of encoded key
-
-	// nil permissions → store as SQL NULL (full access, v3 default)
-	var permJSON []byte
-	if req.Permissions != nil {
-		permJSON, _ = json.Marshal(req.Permissions)
-	}
-
-	var resp keyResponse
-	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
-			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id, key_prefix, account_id, name, environment, permissions,
-			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
-	`, keyHash, keyPrefix, req.AccountID, req.Environment, req.Name,
-		permJSON, req.AllowedIPs, req.AllowedOrigins, req.RateLimitRPS, req.MonthlyQuota, req.ExpiresAt,
-	).Scan(
-		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
-		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
-		&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
-	)
+	resp, err := h.insertKey(r.Context(), gk, req)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
 		return
 	}
 
-	parsed := service.ParsePermissions(permJSON)
-	resp.Permissions = &parsed
-	resp.RawKey = rawKey
-
-	// Invalidate account cache
-	h.invalidateAccountCache(r, req.AccountID)
-
+	h.invalidateKeyCache(r.Context(), gk.KeyHash, gk.KeyPrefix)
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -160,7 +170,7 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
+			expires_at, last_used_at, created_at, encrypted_key
 		FROM api_keys
 		WHERE account_id = $1 AND revoked_at IS NULL
 		ORDER BY created_at DESC
@@ -175,15 +185,22 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var k keyResponse
 		var permJSON []byte
+		var encryptedKey *string
 		if err := rows.Scan(
 			&k.ID, &k.KeyPrefix, &k.AccountID, &k.Name, &k.Environment, &permJSON,
 			&k.AllowedIPs, &k.AllowedOrigins, &k.RateLimitRPS, &k.MonthlyQuota,
-			&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt,
+			&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt, &encryptedKey,
 		); err != nil {
 			continue
 		}
 		p := service.ParsePermissions(permJSON)
 		k.Permissions = &p
+		// Decrypt raw key if available
+		if encryptedKey != nil {
+			if raw, err := service.Decrypt(*encryptedKey); err == nil {
+				k.RawKey = raw
+			}
+		}
 		keys = append(keys, k)
 	}
 
@@ -203,15 +220,16 @@ func (h *APIKeyHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var k keyResponse
 	var permJSON []byte
+	var encryptedKey *string
 	err := h.db.QueryRow(r.Context(), `
 		SELECT id, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
+			expires_at, last_used_at, created_at, encrypted_key
 		FROM api_keys WHERE id = $1 AND revoked_at IS NULL
 	`, id).Scan(
 		&k.ID, &k.KeyPrefix, &k.AccountID, &k.Name, &k.Environment, &permJSON,
 		&k.AllowedIPs, &k.AllowedOrigins, &k.RateLimitRPS, &k.MonthlyQuota,
-		&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt,
+		&k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt, &encryptedKey,
 	)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
@@ -219,6 +237,12 @@ func (h *APIKeyHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	p := service.ParsePermissions(permJSON)
 	k.Permissions = &p
+	// Decrypt raw key if available
+	if encryptedKey != nil {
+		if raw, err := service.Decrypt(*encryptedKey); err == nil {
+			k.RawKey = raw
+		}
+	}
 	writeJSON(w, http.StatusOK, k)
 }
 
@@ -272,17 +296,17 @@ func (h *APIKeyHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := fmt.Sprintf("UPDATE api_keys SET %s WHERE id = $%d AND revoked_at IS NULL RETURNING account_id",
+	query := fmt.Sprintf("UPDATE api_keys SET %s WHERE id = $%d AND revoked_at IS NULL RETURNING key_hash, key_prefix",
 		strings.Join(sets, ", "), argIdx)
 	args = append(args, id)
 
-	var accountID string
-	if err := h.db.QueryRow(r.Context(), query, args...).Scan(&accountID); err != nil {
+	var keyHash, keyPrefix string
+	if err := h.db.QueryRow(r.Context(), query, args...).Scan(&keyHash, &keyPrefix); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
 		return
 	}
 
-	h.invalidateAccountCache(r, accountID)
+	h.invalidateKeyCache(r.Context(), keyHash, keyPrefix)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
@@ -294,18 +318,18 @@ func (h *APIKeyHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var accountID string
+	var keyHash, keyPrefix string
 	err := h.db.QueryRow(r.Context(), `
 		UPDATE api_keys SET revoked_at = NOW()
 		WHERE id = $1 AND revoked_at IS NULL
-		RETURNING account_id
-	`, id).Scan(&accountID)
+		RETURNING key_hash, key_prefix
+	`, id).Scan(&keyHash, &keyPrefix)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "key not found"})
 		return
 	}
 
-	h.invalidateAccountCache(r, accountID)
+	h.invalidateKeyCache(r.Context(), keyHash, keyPrefix)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
 }
 
@@ -322,12 +346,13 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 	// Get existing key details
 	var old keyResponse
 	var permJSON []byte
+	var oldKeyHash string
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, account_id, name, environment, permissions,
+		SELECT id, key_hash, key_prefix, account_id, name, environment, permissions,
 			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at
 		FROM api_keys WHERE id = $1 AND revoked_at IS NULL
 	`, id).Scan(
-		&old.ID, &old.AccountID, &old.Name, &old.Environment, &permJSON,
+		&old.ID, &oldKeyHash, &old.KeyPrefix, &old.AccountID, &old.Name, &old.Environment, &permJSON,
 		&old.AllowedIPs, &old.AllowedOrigins, &old.RateLimitRPS, &old.MonthlyQuota, &old.ExpiresAt,
 	)
 	if err != nil {
@@ -335,47 +360,36 @@ func (h *APIKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// (permJSON kept as raw bytes to pass to new key insert — no need to parse old.Permissions)
+	oldPerms := service.ParsePermissions(permJSON)
 
 	// Revoke old key
 	_, _ = h.db.Exec(r.Context(), `UPDATE api_keys SET revoked_at = NOW() WHERE id = $1`, id)
 
 	// Create new key with same settings
-	rawBytes := make([]byte, 48)
-	if _, err := rand.Read(rawBytes); err != nil {
+	gk, err := service.GenerateKey()
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
 		return
 	}
-	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
-	hash := sha256.Sum256([]byte(rawKey))
-	keyHash := hex.EncodeToString(hash[:])
-	keyPrefix := rawKey[:11]
 
-	var resp keyResponse
-	err = h.db.QueryRow(r.Context(), `
-		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
-			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id, key_prefix, account_id, name, environment, permissions,
-			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
-	`, keyHash, keyPrefix, old.AccountID, old.Environment, old.Name,
-		permJSON, old.AllowedIPs, old.AllowedOrigins, old.RateLimitRPS, old.MonthlyQuota, old.ExpiresAt,
-	).Scan(
-		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
-		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
-		&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
-	)
+	resp, err := h.insertKey(r.Context(), gk, createKeyRequest{
+		AccountID:      old.AccountID,
+		Name:           old.Name,
+		Environment:    old.Environment,
+		Permissions:    &oldPerms,
+		AllowedIPs:     old.AllowedIPs,
+		AllowedOrigins: old.AllowedOrigins,
+		RateLimitRPS:   old.RateLimitRPS,
+		MonthlyQuota:   old.MonthlyQuota,
+		ExpiresAt:      old.ExpiresAt,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create rotated key"})
 		return
 	}
 
-	rp := service.ParsePermissions(permJSON)
-	resp.Permissions = &rp
-	resp.RawKey = rawKey
-
-	h.invalidateAccountCache(r, old.AccountID)
+	h.invalidateKeyCache(r.Context(), oldKeyHash, old.KeyPrefix)
+	h.invalidateKeyCache(r.Context(), gk.KeyHash, gk.KeyPrefix)
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -419,43 +433,29 @@ func (h *APIKeyHandler) AutoProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawBytes := make([]byte, 48)
-	if _, err := rand.Read(rawBytes); err != nil {
+	gk, err := service.GenerateKey()
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key generation failed"})
 		return
 	}
-	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
-	hash := sha256.Sum256([]byte(rawKey))
-	keyHash := hex.EncodeToString(hash[:])
-	keyPrefix := rawKey[:11]
 
-	var resp keyResponse
-	var permJSON []byte
-	err = h.db.QueryRow(r.Context(), `
-		INSERT INTO api_keys (key_hash, key_prefix, account_id, environment, name,
-			permissions, allowed_ips, allowed_origins, rate_limit_rps, monthly_quota, expires_at)
-		VALUES ($1, $2, $3, 'test', 'Test', NULL, '{}', '{}', NULL, NULL, NULL)
-		RETURNING id, key_prefix, account_id, name, environment, permissions,
-			allowed_ips, allowed_origins, rate_limit_rps, monthly_quota,
-			expires_at, last_used_at, created_at
-	`, keyHash, keyPrefix, req.AccountID,
-	).Scan(
-		&resp.ID, &resp.KeyPrefix, &resp.AccountID, &resp.Name, &resp.Environment,
-		&permJSON, &resp.AllowedIPs, &resp.AllowedOrigins, &resp.RateLimitRPS, &resp.MonthlyQuota,
-		&resp.ExpiresAt, &resp.LastUsedAt, &resp.CreatedAt,
-	)
+	defaultPerms := service.DefaultPermissions
+	resp, err := h.insertKey(r.Context(), gk, createKeyRequest{
+		AccountID:   req.AccountID,
+		Name:        "Default",
+		Environment: "live",
+		Permissions: &defaultPerms,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create key"})
 		return
 	}
-	resp.Permissions = nil // full access
-	resp.RawKey = rawKey
 
-	h.invalidateAccountCache(r, req.AccountID)
+	h.invalidateKeyCache(r.Context(), gk.KeyHash, gk.KeyPrefix)
 
 	writeJSON(w, http.StatusCreated, autoProvisionResponse{
 		Provisioned: true,
-		Key:         &resp,
+		Key:         resp,
 	})
 }
 
@@ -501,15 +501,15 @@ func (h *APIKeyHandler) CheckLiveKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *APIKeyHandler) invalidateAccountCache(r *http.Request, accountID string) {
+func (h *APIKeyHandler) invalidateKeyCache(ctx context.Context, keyHash, keyPrefix string) {
 	if h.redis == nil {
 		return
 	}
-	// Clear all cached keys for this account by scanning gw:key:* pattern
-	// This is a blunt approach but safe — keys re-cache on next validation
-	iter := h.redis.Scan(r.Context(), 0, "gw:key:*", 100).Iterator()
-	for iter.Next(r.Context()) {
-		h.redis.Del(r.Context(), iter.Val())
+	if keyHash != "" {
+		h.redis.Del(ctx, "gw:key:"+keyHash)
+	}
+	if keyPrefix != "" {
+		h.redis.Del(ctx, "gw:prefix:"+keyPrefix)
 	}
 }
 

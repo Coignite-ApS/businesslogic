@@ -27,8 +27,10 @@ fi
 echo "Applying schema from: ${SNAPSHOT_FILE}"
 echo ""
 
-# Apply the schema
-docker compose exec directus npx directus schema apply "/directus/snapshots/${SNAPSHOT_FILE}" --yes
+# Apply the schema — use infrastructure dev compose + bl-cms service (matches Makefile convention).
+# Script is invoked from services/cms/, so the relative path goes up two levels.
+docker compose -f ../../infrastructure/docker/docker-compose.dev.yml exec -T bl-cms \
+    npx directus schema apply "/directus/snapshots/${SNAPSHOT_FILE}" --yes
 
 echo ""
 echo "Schema applied successfully!"

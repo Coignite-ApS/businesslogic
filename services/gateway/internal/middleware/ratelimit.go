@@ -53,9 +53,10 @@ func RateLimit(keyService *service.KeyService) func(http.Handler) http.Handler {
 				return
 			}
 
-			rpsLimit := acct.RateLimitRPS
-			if rpsLimit <= 0 {
-				rpsLimit = 10 // default
+			defaultRPS := 10
+			rpsLimit := defaultRPS
+			if acct.RateLimitRPS != nil && *acct.RateLimitRPS > 0 {
+				rpsLimit = *acct.RateLimitRPS
 			}
 
 			allowed, remaining, err := keyService.CheckRateLimit(r.Context(), acct.AccountID, rpsLimit)

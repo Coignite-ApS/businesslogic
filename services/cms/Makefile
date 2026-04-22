@@ -10,15 +10,35 @@
 #   make update  # Update base submodule to latest
 # =============================================================================
 
-.PHONY: init update dev build stop clean check-updates reset-cache db-sync snapshot \
-       ext-build-all ext-build ext-calculators-build ext-calculators-watch \
+# Use the infrastructure dev compose file + bl-cms service (matches root Makefile convention).
+# Snapshots are written inside the container to /directus/snapshots, then copied to the host
+# via `docker cp` because /directus/snapshots/ is NOT a bind mount (it's baked into the image
+# by the base Dockerfile). Using docker cp avoids the rebuild a volume mount would require.
+COMPOSE := docker compose -f ../../infrastructure/docker/docker-compose.dev.yml
+CMS_SVC := bl-cms
+# Container name pattern: <project>-<service>-<instance>. Project = businesslogic.
+CMS_CONTAINER := businesslogic-bl-cms-1
+
+.PHONY: init update dev build stop clean check-updates reset-cache db-sync snapshot snapshot-pre snapshot-post snapshot-dryrun snapshot-forensic diff apply \
+       ext-build-all ext-build \
+       ext-calculators-build ext-calculators-watch \
        ext-calculator-api-build ext-calculator-api-watch \
        ext-formulas-build ext-formulas-watch \
        ext-account-build ext-account-watch \
+       ext-account-api-build ext-account-api-watch \
        ext-admin-build ext-admin-watch \
        ext-stripe-build ext-stripe-watch \
        ext-ai-api-build ext-ai-api-watch \
        ext-ai-assistant-build ext-ai-assistant-watch \
+       ext-ai-observatory-build ext-ai-observatory-watch \
+       ext-flows-build ext-flows-watch \
+       ext-flow-hooks-build ext-flow-hooks-watch \
+       ext-knowledge-build ext-knowledge-watch \
+       ext-knowledge-api-build ext-knowledge-api-watch \
+       ext-feature-flags-build ext-feature-flags-watch \
+       ext-feature-gate-build ext-feature-gate-watch \
+       ext-layout-builder-build ext-layout-builder-watch \
+       ext-widget-api-build ext-widget-api-watch \
        build-no-cache logs
 
 # Initialize submodule and environment
@@ -77,11 +97,69 @@ logs:
 	@docker compose logs -f directus
 
 # --- Schema snapshots ---
+# Naming conventions (used by db-admin skill):
+#   snapshot_YYYYMMDD_HHMMSS[_slug].yaml  — routine baselines (rotated, keep last 5)
+#   pre_<slug>_YYYYMMDD_HHMMSS.yaml       — taken before a db-admin task
+#   post_<slug>_YYYYMMDD_HHMMSS.yaml      — taken after a db-admin task
+#   snapshot.yaml                          — canonical schema, committed to git, NEVER pruned
 
+# Helper: take a snapshot inside the container, copy the YAML to the host, delete the in-container copy.
+# $(1) = output filename (no path)
+define _take_snapshot
+	$(COMPOSE) exec -T $(CMS_SVC) node /directus/cli.js schema snapshot "/directus/snapshots/$(1)" >/dev/null && \
+	docker cp "$(CMS_CONTAINER):/directus/snapshots/$(1)" "snapshots/$(1)" >/dev/null && \
+	$(COMPOSE) exec -T $(CMS_SVC) rm -f "/directus/snapshots/$(1)" >/dev/null
+endef
+
+# Routine schema snapshot. Optional: SLUG=<branch-or-task> appends slug.
 snapshot:
-	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
-	docker compose exec directus node /directus/cli.js schema snapshot "/directus/snapshots/snapshot_$${TIMESTAMP}.yaml"; \
-	echo "Saved: snapshots/snapshot_$${TIMESTAMP}.yaml"
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	SUFFIX=$(if $(SLUG),_$(SLUG),); \
+	OUT="snapshot_$${TS}$${SUFFIX}.yaml"; \
+	$(call _take_snapshot,$${OUT}); \
+	echo "Saved: snapshots/$${OUT}"
+
+# Pre-task schema snapshot (REQUIRES SLUG).
+snapshot-pre:
+	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>  (e.g., make snapshot-pre SLUG=add-widget-collection)"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="pre_$(SLUG)_$${TS}.yaml"; \
+	$(call _take_snapshot,$${OUT}); \
+	echo "Saved: snapshots/$${OUT}"
+
+# Post-task schema snapshot (REQUIRES SLUG).
+snapshot-post:
+	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="post_$(SLUG)_$${TS}.yaml"; \
+	$(call _take_snapshot,$${OUT}); \
+	echo "Saved: snapshots/$${OUT}"
+
+# Dryrun schema snapshot (REQUIRES PURPOSE). Use for exploratory snapshots NOT tied to a real applied change.
+# These are aggressively pruned by `make prune` (default: keep last 2).
+snapshot-dryrun:
+	@[ -n "$(PURPOSE)" ] || { echo "ERROR: pass PURPOSE=<short-purpose>  (e.g., make snapshot-dryrun PURPOSE=test-rename)"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="dryrun_$(PURPOSE)_$${TS}.yaml"; \
+	$(call _take_snapshot,$${OUT}); \
+	echo "Saved: snapshots/$${OUT}  (will be pruned aggressively)"
+
+# Forensic schema snapshot (REQUIRES SLUG). Used by db-admin Phase 6.5 to capture a FAILED
+# apply state BEFORE rolling back, so the failure can be investigated.
+snapshot-forensic:
+	@[ -n "$(SLUG)" ] || { echo "ERROR: pass SLUG=<task-slug>"; exit 1; }
+	@TS=$$(date +%Y%m%d_%H%M%S); \
+	OUT="forensic_$(SLUG)_$${TS}.yaml"; \
+	$(call _take_snapshot,$${OUT}); \
+	echo "Saved: snapshots/$${OUT}  (failed state — preserved for investigation)"
+
+# Diff current schema against latest snapshot (or SNAPSHOT=<file.yaml>).
+diff:
+	@./snapshots/diff-schema.sh $(SNAPSHOT)
+
+# Apply latest schema snapshot to the database (or SNAPSHOT=<file.yaml>).
+apply:
+	@./snapshots/apply-schema.sh $(SNAPSHOT)
 
 # --- Extension development ---
 
@@ -152,3 +230,63 @@ ext-ai-assistant-build:
 
 ext-ai-assistant-watch:
 	@cd extensions/local/project-extension-ai-assistant && npm run dev
+
+ext-ai-observatory-build:
+	@cd extensions/local/project-extension-ai-observatory && npm run build
+
+ext-ai-observatory-watch:
+	@cd extensions/local/project-extension-ai-observatory && npm run dev
+
+ext-account-api-build:
+	@cd extensions/local/project-extension-account-api && npm run build
+
+ext-account-api-watch:
+	@cd extensions/local/project-extension-account-api && npm run dev
+
+ext-flows-build:
+	@cd extensions/local/project-extension-flows && npm run build
+
+ext-flows-watch:
+	@cd extensions/local/project-extension-flows && npm run dev
+
+ext-flow-hooks-build:
+	@cd extensions/local/project-extension-flow-hooks && npm run build
+
+ext-flow-hooks-watch:
+	@cd extensions/local/project-extension-flow-hooks && npm run dev
+
+ext-knowledge-build:
+	@cd extensions/local/project-extension-knowledge && npm run build
+
+ext-knowledge-watch:
+	@cd extensions/local/project-extension-knowledge && npm run dev
+
+ext-knowledge-api-build:
+	@cd extensions/local/project-extension-knowledge-api && npm run build
+
+ext-knowledge-api-watch:
+	@cd extensions/local/project-extension-knowledge-api && npm run dev
+
+ext-feature-flags-build:
+	@cd extensions/local/project-extension-feature-flags && npm run build
+
+ext-feature-flags-watch:
+	@cd extensions/local/project-extension-feature-flags && npm run dev
+
+ext-feature-gate-build:
+	@cd extensions/local/project-extension-feature-gate && npm run build
+
+ext-feature-gate-watch:
+	@cd extensions/local/project-extension-feature-gate && npm run dev
+
+ext-layout-builder-build:
+	@cd extensions/local/project-extension-layout-builder && npm run build
+
+ext-layout-builder-watch:
+	@cd extensions/local/project-extension-layout-builder && npm run dev
+
+ext-widget-api-build:
+	@cd extensions/local/project-extension-widget-api && npm run build
+
+ext-widget-api-watch:
+	@cd extensions/local/project-extension-widget-api && npm run dev

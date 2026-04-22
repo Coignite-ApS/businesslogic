@@ -226,7 +226,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="KB &amp; Retrieval" close>
+			<sidebar-detail id="info" icon="info" title="KB &amp; Retrieval">
 				<div class="sidebar-info">
 					<p>Cross-KB retrieval performance: similarity scores, context utilization, curated answer impact, and search latency over the selected period. Complements the per-KB feedback dashboard in the Knowledge extension.</p>
 				</div>

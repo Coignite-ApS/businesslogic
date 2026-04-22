@@ -1,4 +1,5 @@
 import type { DB } from './types.js';
+import { getActiveSubscription } from '../../_shared/v2-subscription.js';
 
 export function requireAuth(req: any, res: any, next: () => void) {
 	if (!req.accountability?.user) {
@@ -40,21 +41,17 @@ export function requireActiveSubscription(db: DB) {
 			const account = await db('account').where('id', user.active_account).select('exempt_from_subscription').first();
 			if (account?.exempt_from_subscription) return next();
 
-			const sub = await db('subscriptions as s')
-				.where('s.account', user.active_account)
-				.select('s.status', 's.trial_end')
-				.first();
+			// v2: check active subscription scoped to KB module.
+			//   account → account_id; module = 'kb'.
+			// The shared helper already excludes canceled/expired statuses.
+			const sub = await getActiveSubscription(db, user.active_account, 'kb');
 
 			if (!sub) {
-				return res.status(403).json({ errors: [{ message: 'No subscription found' }] });
-			}
-
-			if (sub.status === 'canceled' || sub.status === 'expired') {
-				return res.status(403).json({ errors: [{ message: `Subscription ${sub.status}` }] });
+				return res.status(403).json({ errors: [{ message: 'No active Knowledge Base subscription' }] });
 			}
 
 			if (sub.status === 'trialing' && sub.trial_end && new Date(sub.trial_end) < new Date()) {
-				return res.status(403).json({ errors: [{ message: 'Trial expired' }] });
+				return res.status(403).json({ errors: [{ message: 'Knowledge Base trial expired' }] });
 			}
 
 			next();

@@ -17,7 +17,6 @@
 				:creating="saving"
 				:has-excel="hasExcel"
 				:has-config="hasConfig"
-				current-view="dashboard"
 				@create="handleCreate"
 			/>
 		</template>
@@ -28,7 +27,7 @@
 			<v-chip v-else-if="currentId && current && isTestActive" small class="chip-test">Test {{ testVersion }}</v-chip>
 			<v-chip v-else-if="currentId && current && (testConfig || prodConfig)" small class="chip-inactive">Deactivated</v-chip>
 
-			<v-dialog v-if="currentId" v-model="confirmDelete" @esc="confirmDelete = false">
+			<v-dialog v-if="currentId" v-model="confirmDelete" @esc="closeDeleteDialog">
 				<template #activator="{ on }">
 					<v-button
 						v-tooltip.bottom="'Delete'"
@@ -43,10 +42,29 @@
 
 				<v-card>
 					<v-card-title>Delete "{{ current?.name || currentId }}"?</v-card-title>
-					<v-card-text>This will remove both test and live versions from the Formula API, delete all configurations, and cannot be undone.</v-card-text>
+					<v-card-text>
+						<p style="margin-bottom: 12px;">This will remove both test and live versions from the Formula API, delete all configurations, and cannot be undone.</p>
+						<div style="margin-bottom: 8px;">
+							<div class="field-label" style="margin-bottom: 4px;">Calculator ID</div>
+							<div style="display: flex; align-items: center; gap: 8px;">
+								<v-input :model-value="currentId" disabled />
+								<v-icon
+									name="content_copy"
+									small
+									clickable
+									v-tooltip.bottom="'Copy'"
+									@click="navigator.clipboard.writeText(currentId!)"
+								/>
+							</div>
+						</div>
+						<div>
+							<div class="field-label" style="margin-bottom: 4px;">Type the calculator ID to confirm</div>
+							<v-input v-model="deleteConfirmSlug" placeholder="Paste or type calculator ID" />
+						</div>
+					</v-card-text>
 					<v-card-actions>
-						<v-button secondary @click="confirmDelete = false">Cancel</v-button>
-						<v-button kind="danger" :loading="saving" @click="handleDelete">Delete</v-button>
+						<v-button secondary @click="closeDeleteDialog">Cancel</v-button>
+						<v-button kind="danger" :loading="saving" :disabled="deleteConfirmSlug !== currentId" @click="handleDelete">Delete</v-button>
 					</v-card-actions>
 				</v-card>
 			</v-dialog>
@@ -78,6 +96,7 @@
 				:live-test-result="liveTestResult"
 				:live-test-error="liveTestError"
 				:action-error="actionError"
+			:gateway-api-key="gatewayKey?.raw_key || gatewayKey?.key_prefix || ''"
 				@apply-template="handleApplyTemplate"
 				@select-file="handleSelectFile"
 				@drop-file="handleDropFile"
@@ -89,7 +108,7 @@
 				@complete-onboarding="handleCompleteOnboarding"
 				@activate="handleActivate"
 				@deactivate="handleDeactivate"
-				@regenerate-api-key="handleRegenerateApiKey"
+
 				@enable-test="handleEnableTest"
 				@disable-test="handleDisableTest"
 				@download-excel="handleDownloadExcel"
@@ -104,11 +123,11 @@
 			/>
 		</div>
 
-		<div v-else-if="!currentId" class="module-empty">
-			<v-info icon="calculate" title="Calculators" center>
-				Select a calculator from the sidebar or create a new one.
-			</v-info>
-		</div>
+		<calculator-dashboard
+			v-else-if="!currentId"
+			:calculators="calculators"
+			:api="api"
+		/>
 
 		<div v-else-if="loading" class="module-loading">
 			<v-progress-circular indeterminate />
@@ -116,7 +135,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Calculators" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Calculators">
 				<div class="sidebar-info">
 					<p>Turn Excel models into live APIs. Upload a spreadsheet, define inputs and outputs, test, then deploy.</p>
 					<p><strong>Features:</strong></p>
@@ -129,7 +148,7 @@
 					</ul>
 				</div>
 			</sidebar-detail>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info" v-if="current">
 					<div class="info-row">
 						<span class="info-label">ID</span>
@@ -190,13 +209,15 @@ import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
 import { useActiveAccount } from '../composables/use-active-account';
 import { useSubscription } from '../composables/use-subscription';
+import { useApiKeys } from '../composables/use-api-keys';
 import CalculatorNavigation from '../components/navigation.vue';
 import CalculatorDetail from '../components/calculator-detail.vue';
+import CalculatorDashboard from '../components/calculator-dashboard.vue';
 import type { Calculator, CalculatorConfig, CalculatorTemplate } from '../types';
 import { extractErrorMessage } from '../utils/error';
 
 const api = useApi();
-const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calculator.execute');
 const route = useRoute();
 const router = useRouter();
 
@@ -218,11 +239,19 @@ const {
 	fetchActiveAccount,
 } = useActiveAccount(api);
 
+const {
+	selectedKey: gatewayKey,
+	fetchKeys,
+	ensureCalcKey,
+	selectKeyForEnv,
+} = useApiKeys(api);
+
 const pendingFile = ref<File | null>(null);
 const pendingFileName = ref<string | null>(null);
 const uploadedFileName = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const confirmDelete = ref(false);
+const deleteConfirmSlug = ref('');
 const testResult = ref<unknown>(null);
 const testError = ref<string | null>(null);
 const testRunning = ref(false);
@@ -365,12 +394,9 @@ async function handleUploadFile() {
 			});
 		}
 
-		// Auto-generate test API key if not set
-		const updatedTestCfg = current.value?.configs?.find((c) => c.test_environment);
-		if (updatedTestCfg && !updatedTestCfg.api_key) {
-			const newKey = crypto.randomUUID().replace(/-/g, '');
-			await updateConfig(updatedTestCfg.id, currentId.value, { api_key: newKey });
-		}
+		// Auto-provision gateway test key
+		const provisionedUpload = await ensureCalcKey('test');
+		if (provisionedUpload && !gatewayKey.value) selectKeyForEnv('test');
 
 		uploadedFileName.value = pendingFile.value.name;
 		pendingFile.value = null;
@@ -415,12 +441,9 @@ async function handleApplyTemplate(template: CalculatorTemplate) {
 		await createConfig(currentId.value, configData);
 	}
 
-	// Auto-generate test API key if not set
-	const updatedTestCfg = current.value?.configs?.find((c) => c.test_environment);
-	if (updatedTestCfg && !updatedTestCfg.api_key) {
-		const newKey = crypto.randomUUID().replace(/-/g, '');
-		await updateConfig(updatedTestCfg.id, currentId.value, { api_key: newKey });
-	}
+	// Auto-provision gateway test key
+	const provisionedTemplate = await ensureCalcKey('test');
+	if (provisionedTemplate && !gatewayKey.value) selectKeyForEnv('test');
 }
 
 async function handleLaunch() {
@@ -430,16 +453,10 @@ async function handleLaunch() {
 
 	await launchConfig(currentId.value, testConfig.value);
 
-	// Launch activates the calculator via the activate endpoint (handles limits)
-	const configs = current.value?.configs || [];
-	const liveConfig = configs.find((c) => !c.test_environment);
-	if (liveConfig) {
-		// Auto-generate live API key if not set
-		if (!liveConfig.api_key) {
-			const newKey = crypto.randomUUID().replace(/-/g, '');
-			await updateConfig(liveConfig.id, currentId.value, { api_key: newKey });
-		}
-	}
+	// Auto-provision gateway live key
+	const provisionedLaunch = await ensureCalcKey('live');
+	if (provisionedLaunch && !gatewayKey.value) selectKeyForEnv('live');
+
 	await activateCalc(currentId.value);
 	await fetchSubscriptionInfo();
 
@@ -518,9 +535,14 @@ async function handleDownloadExcel(configId: string, filename: string) {
 	}
 }
 
+function closeDeleteDialog() {
+	confirmDelete.value = false;
+	deleteConfirmSlug.value = '';
+}
+
 async function handleDelete() {
 	if (!currentId.value) return;
-	confirmDelete.value = false;
+	closeDeleteDialog();
 
 	// Undeploy both configs from Formula API before deleting
 	const configs = current.value?.configs || [];
@@ -534,25 +556,6 @@ async function handleDelete() {
 
 	await remove(currentId.value);
 	router.push('/calculators');
-}
-
-async function handleRegenerateApiKey(env: string) {
-	if (!currentId.value) return;
-	const newKey = crypto.randomUUID().replace(/-/g, '');
-
-	if (env === 'test') {
-		if (testConfig.value) {
-			await updateConfig(testConfig.value.id, currentId.value, { api_key: newKey });
-		} else {
-			await createConfig(currentId.value, { api_key: newKey, test_environment: true });
-		}
-	} else if (env === 'prod') {
-		if (prodConfig.value) {
-			await updateConfig(prodConfig.value.id, currentId.value, { api_key: newKey });
-		} else {
-			await createConfig(currentId.value, { api_key: newKey, test_environment: false });
-		}
-	}
 }
 
 async function handleSaveConfig(payload: { input: Record<string, unknown>; output: Record<string, unknown> }) {
@@ -642,6 +645,7 @@ function formatDate(date: string | null | undefined): string {
 fetchActiveAccount().then(() => {
 	fetchAll(activeAccountId.value);
 	fetchSubscriptionInfo();
+	fetchKeys();
 });
 fetchTemplates();
 fetchFormulaApiUrl().then((url) => { formulaApiUrl.value = url; }).catch(() => {});
@@ -703,12 +707,19 @@ watch(currentId, (id) => {
 	padding-bottom: var(--content-padding-bottom);
 }
 
-.module-empty,
 .module-loading {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	height: 400px;
+}
+
+.field-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--theme--foreground-subdued);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
 }
 
 .sidebar-info {

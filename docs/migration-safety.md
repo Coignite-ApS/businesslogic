@@ -276,9 +276,54 @@ Final state:
 | bl-ai-api has bug | Coolify one-click rollback to previous image | <60 seconds |
 | bl-ai-api returns wrong answers | Set `ai_service_v2 = false` (Directus handles locally) | <10 seconds |
 | bl-gateway crashes | Cloudflare auto-routes to Traefik (DNS failover) | <60 seconds |
-| Database migration breaks | Revert migration script (pre-tested in staging) | <5 minutes |
+| Database migration breaks | Run `migrate.sh --rollback` (see Section 6.1) | <5 minutes |
 | New service overloads Redis | Rate limit the new service, scale Redis | <2 minutes |
 | Full disaster | Terraform recreates infrastructure from code | <30 minutes |
+
+### 6.1 Database Migration Rollback
+
+Every forward migration (`NNN_name.sql`) has a matching rollback script (`NNN_name_down.sql`) in the same directory. Rollback scripts reverse schema changes: DROP what was CREATEd, remove columns that were ADDed, etc.
+
+**Rollback a specific schema:**
+
+```bash
+# Preview what would rollback
+./scripts/migrate.sh --rollback --schema ai --dry-run
+
+# Rollback all ai schema migrations (reverse order, newest first)
+./scripts/migrate.sh --rollback --schema ai --target local
+
+# Rollback a specific migration
+./scripts/migrate.sh --rollback --migration 007 --target local
+
+# Rollback everything (all schemas, all migrations)
+./scripts/migrate.sh --rollback --target local
+```
+
+**Rollback order:** Scripts execute in reverse numerical order (007 before 006 before 005...) to respect dependencies.
+
+**Before rolling back in production:**
+
+1. Take a database snapshot: `make snapshot` or manual `pg_dump`
+2. Identify which migration caused the issue
+3. Dry-run first: `./scripts/migrate.sh --rollback --schema <schema> --migration <number> --dry-run`
+4. Apply the rollback: `./scripts/migrate.sh --rollback --schema <schema> --migration <number> --target <prod-url>`
+5. Verify all services still pass health checks
+6. If rollback fails, restore from snapshot
+
+**Data loss warnings:** Some rollbacks are destructive (DROP TABLE loses data). Each `_down.sql` file has WARNING comments when data loss is possible. Always have a backup before rolling back table/schema drops.
+
+**Rollback file naming convention:**
+
+```
+migrations/
+  ai/
+    001_add_hnsw_index.sql           # forward
+    001_add_hnsw_index_down.sql      # rollback
+    002_add_content_hash.sql
+    002_add_content_hash_down.sql
+    ...
+```
 
 ---
 

@@ -97,22 +97,26 @@ export async function loadMcpConfigFromDb(id) {
  * Load account rate limits from direct DB.
  * Returns same shape as Admin API GET /accounts/:accountId:
  *   { rateLimitRps, rateLimitMonthly, monthlyUsed }
+ *
+ * Reads the calculators-module subscription joined with its plan. RPS comes
+ * from sp.rps_allowance (single source of truth; migration 038).
+ *   v1 s.account → v2 s.account_id
+ *   v1 s.plan    → v2 s.subscription_plan_id
  */
 export async function loadAccountLimitsFromDb(accountId) {
-  // Fetch subscription plan limits
   const sub = await queryOne(
-    `SELECT sp.calls_per_second AS "rateLimitRps",
-            sp.calls_per_month  AS "rateLimitMonthly"
+    `SELECT sp.request_allowance AS "rateLimitMonthly",
+            sp.rps_allowance     AS "rateLimitRps"
      FROM subscriptions s
-     JOIN subscription_plans sp ON sp.id = s.plan
-     WHERE s.account = $1
-       AND s.status = 'active'
+     JOIN subscription_plans sp ON sp.id = s.subscription_plan_id
+     WHERE s.account_id = $1
+       AND s.module = 'calculators'
+       AND s.status NOT IN ('canceled', 'expired')
      ORDER BY s.date_created DESC
      LIMIT 1`,
     [accountId],
   );
 
-  // Count calls this month for monthly usage
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -128,6 +132,45 @@ export async function loadAccountLimitsFromDb(accountId) {
     rateLimitRps: sub?.rateLimitRps ?? null,
     rateLimitMonthly: sub?.rateLimitMonthly ?? null,
     monthlyUsed: parseInt(usageRow?.count ?? '0', 10),
+  };
+}
+
+/**
+ * Fetch calculator_configs row metadata needed to write to calculator_slots.
+ * Returns { configId, accountId, fileVersion, configVersion } or null.
+ *
+ * calculatorStringId is the VARCHAR PK of public.calculators (not the UUID).
+ *
+ * Uniqueness invariant: there must be at most one non-test calculator_configs
+ * row per calculator. If multiple rows exist we throw loudly — this is a data
+ * integrity violation that should surface immediately rather than being masked
+ * by silent LIMIT 1 picking.
+ */
+export async function loadCalculatorConfigMeta(calculatorStringId) {
+  const rows = await queryAll(
+    `SELECT cc.id           AS config_id,
+            c.account       AS account_id,
+            cc.file_version,
+            cc.config_version
+     FROM calculator_configs cc
+     JOIN calculators c ON c.id = cc.calculator
+     WHERE c.id = $1
+       AND cc.test_environment = false
+     ORDER BY cc.date_created DESC`,
+    [calculatorStringId],
+  );
+  if (!rows || rows.length === 0) return null;
+  if (rows.length > 1) {
+    throw new Error(
+      `loadCalculatorConfigMeta: multiple non-test configs for calculator '${calculatorStringId}' (found ${rows.length}). Data integrity violation.`,
+    );
+  }
+  const row = rows[0];
+  return {
+    configId: row.config_id,
+    accountId: row.account_id,
+    fileVersion: row.file_version ?? null,
+    configVersion: row.config_version ?? null,
   };
 }
 

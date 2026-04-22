@@ -1,17 +1,18 @@
 <template>
-	<div class="flow-navigation">
-		<v-button full-width @click="$emit('create')" :disabled="creating">
-			<v-icon name="add" left />
-			New flow
-		</v-button>
+	<div class="nav-container">
+		<v-list nav>
+			<v-list-item to="/flows" :active="!currentId" clickable>
+				<v-list-item-icon><v-icon name="dashboard" /></v-list-item-icon>
+				<v-list-item-content><v-text-overflow text="Dashboard" /></v-list-item-content>
+			</v-list-item>
 
-		<v-list v-if="flows.length > 0" class="flow-list">
+			<v-divider />
+
 			<v-list-item
 				v-for="flow in flows"
 				:key="flow.id"
-				:active="flow.id === currentId"
+				:to="`/flows/${flow.id}`"
 				clickable
-				@click="$router.push(`/flows/${flow.id}`)"
 			>
 				<v-list-item-icon>
 					<v-icon name="account_tree" small />
@@ -23,9 +24,14 @@
 			</v-list-item>
 		</v-list>
 
-		<v-info v-else-if="!loading" icon="account_tree" title="No Flows">
+		<v-info v-if="!loading && flows.length === 0" icon="account_tree" title="No Flows">
 			Create your first flow to get started.
 		</v-info>
+
+		<v-button full-width @click="$emit('create')" :disabled="creating" class="create-button">
+			<v-icon name="add" left />
+			New flow
+		</v-button>
 	</div>
 </template>
 
@@ -45,15 +51,24 @@ defineEmits<{
 </script>
 
 <style scoped>
-.flow-navigation {
+.nav-container {
 	padding: 12px;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
 }
 
-.flow-list {
-	margin-top: 12px;
+.nav-container :deep(.v-list) {
+	flex: 1;
+	overflow-y: auto;
 }
 
-.flow-list :deep(.v-list-item-content) {
+.create-button {
+	margin-top: auto;
+	flex-shrink: 0;
+}
+
+.nav-container :deep(.v-list-item-content) {
 	flex: 1;
 	min-width: 0;
 	margin-right: 8px;

@@ -12,7 +12,6 @@
 				:current-id="currentId"
 				:loading="kbLoading"
 				:creating="kbSaving"
-				@select="navigateTo"
 				@create="handleCreate"
 			/>
 		</template>
@@ -79,11 +78,12 @@
 			/>
 		</div>
 
-		<div v-else-if="!currentId" class="module-empty">
-			<v-info icon="menu_book" title="Knowledge Bases" center>
-				Select a knowledge base from the sidebar or create a new one.
-			</v-info>
-		</div>
+		<kb-dashboard
+			v-else-if="!currentId"
+			:knowledge-bases="knowledgeBases"
+			:api="api"
+			@create="handleCreate"
+		/>
 
 		<div v-else-if="kbLoading" class="module-loading">
 			<v-progress-circular indeterminate />
@@ -91,7 +91,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Knowledge Bases" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Knowledge Bases">
 				<div class="sidebar-info">
 					<p>Upload documents and search them with AI-powered semantic search. Get cited answers grounded in your content.</p>
 					<p><strong>Supported formats:</strong></p>
@@ -103,7 +103,7 @@
 					</ul>
 				</div>
 			</sidebar-detail>
-			<sidebar-detail v-if="currentKb" icon="info" title="Information" close>
+			<sidebar-detail v-if="currentKb" id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<div class="info-row">
 						<span class="info-label">Status</span>
@@ -147,6 +147,7 @@ import { useCuratedAnswers } from '../composables/use-curated-answers';
 import { useActiveAccount } from '../composables/use-active-account';
 import KbNavigation from '../components/navigation.vue';
 import KbDetail from '../components/kb-detail.vue';
+import KbDashboard from '../components/kb-dashboard.vue';
 
 const api = useApi();
 const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'ai.kb');
@@ -186,10 +187,6 @@ const viewTitle = computed(() => {
 	if (currentKb.value?.name) return currentKb.value.name;
 	return 'Knowledge Base';
 });
-
-function navigateTo(id: string) {
-	router.push(`/knowledge/${id}`);
-}
 
 async function handleCreate() {
 	const kb = await create({ name: 'New Knowledge Base' });
@@ -318,7 +315,6 @@ watch(currentId, (id) => {
 	padding-bottom: var(--content-padding-bottom);
 }
 
-.module-empty,
 .module-loading {
 	display: flex;
 	align-items: center;

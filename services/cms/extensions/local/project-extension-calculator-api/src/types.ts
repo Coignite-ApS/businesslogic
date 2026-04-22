@@ -27,8 +27,6 @@ export interface CalculatorConfig {
 	file_version: number | null;
 	config_version: number | null;
 	api_key: string | null;
-	allowed_ips: string[] | null;
-	allowed_origins: string[] | null;
 	mcp: McpConfig | null;
 	integration: IntegrationConfig | null;
 	expressions: { name: string; expression: string; scope?: string }[] | null;
@@ -60,8 +58,6 @@ export interface FormulaApiCalculatorPayload {
 	formulas: Record<string, unknown>;
 	input: unknown[];
 	output: unknown[];
-	allowedIps?: string[];
-	allowedOrigins?: string[];
 	mcp?: {
 		enabled: boolean;
 		toolName: string;

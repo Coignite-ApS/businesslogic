@@ -52,6 +52,9 @@ if [ ${#CHANGED_SERVICES[@]} -eq 0 ]; then
   exit 0
 fi
 
+# Allow services to start without real secrets during tests
+export SKIP_SECRET_VALIDATION=true
+
 echo "Pre-commit: Changes detected in: ${CHANGED_SERVICES[*]}" >&2
 FAILED=false
 

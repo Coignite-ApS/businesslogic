@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { LRUCache } from 'lru-cache';
 import { getOrRebuild, executeCalculatorCore, loadAccountLimits, refreshRedisTtl } from './calculators.js';
 import { validateGatewayAuth } from '../utils/auth.js';
+import { emitCalcCall } from '../services/usage-events.js';
 import * as rateLimiter from '../services/rate-limiter.js';
 import * as stats from '../services/stats.js';
 import { routeByCalcId } from '../utils/routing.js';
@@ -9,6 +10,7 @@ import { cleanInputSchemaForTools, resolveResponseTemplate } from '../utils/inte
 import { listAccountMcpCalculators } from '../services/calculator-db.js';
 import { getRedisClient, isRedisReady } from '../services/cache.js';
 import { redisWarn } from '../utils/redis-warn.js';
+import { enforceCalcQuota, currentPeriod, incrementAggCache } from '../middleware/quota.js';
 
 const MCP_PROTOCOL_VERSION = '2025-03-26';
 const SERVER_NAME = 'excel-formula-api';
@@ -200,14 +202,34 @@ export async function registerRoutes(app) {
           return reply.send(jsonRpcError(id, SERVER_ERROR_RETRYABLE, msg, { httpStatus: 429, retryable: true, retryAfterMs }));
         }
 
+        // Monthly calls_per_month quota enforcement (task 22)
+        req.quotaContext = { accountId, isTest: !!calc.test };
+        const mcpQuotaReply = await enforceCalcQuota(req, reply);
+        if (mcpQuotaReply !== undefined) return mcpQuotaReply;
+
         refreshRedisTtl(calcId);
 
         // Extract input from params.arguments (MCP spec)
         const inputData = params?.arguments || {};
 
         try {
+          const mcpExecStart = Date.now();
           const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+          const mcpDurationMs = Date.now() - mcpExecStart;
           stat({ cached, error: false });
+
+          // Emit usage event + write-through agg cache increment (fire-and-forget)
+          if (!calc.test) {
+            const _redis = isRedisReady() ? getRedisClient() : null;
+            emitCalcCall({
+              accountId: calc.accountId,
+              apiKeyId: null,
+              formulaId: calcId,
+              durationMs: mcpDurationMs,
+              inputsSizeBytes: JSON.stringify(inputData).length,
+            });
+            incrementAggCache(_redis, calc.accountId, currentPeriod()).catch(() => {});
+          }
 
           // Build MCP content
           const content = [{ type: 'text', text: JSON.stringify(result) }];
@@ -355,14 +377,34 @@ export async function registerRoutes(app) {
           return reply.send(jsonRpcError(id, SERVER_ERROR_PERMANENT, 'Calculator not found or expired', { httpStatus: 410, retryable: false }));
         }
 
+        // Monthly calls_per_month quota enforcement (task 22)
+        req.quotaContext = { accountId, isTest: !!calc.test };
+        const mcp2QuotaReply = await enforceCalcQuota(req, reply);
+        if (mcp2QuotaReply !== undefined) return mcp2QuotaReply;
+
         refreshRedisTtl(calcId);
 
         const inputData = params?.arguments || {};
 
         try {
+          const mcp2ExecStart = Date.now();
           const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+          const mcp2DurationMs = Date.now() - mcp2ExecStart;
           stat({ cached, error: false });
           rateLimiter.record(accountId);
+
+          // Emit usage event + write-through agg cache increment (fire-and-forget)
+          if (!calc.test) {
+            const _redis = isRedisReady() ? getRedisClient() : null;
+            emitCalcCall({
+              accountId: accountId || calc.accountId,
+              apiKeyId: null,
+              formulaId: calcId,
+              durationMs: mcp2DurationMs,
+              inputsSizeBytes: JSON.stringify(inputData).length,
+            });
+            incrementAggCache(_redis, accountId || calc.accountId, currentPeriod()).catch(() => {});
+          }
 
           const content = [{ type: 'text', text: JSON.stringify(result) }];
 

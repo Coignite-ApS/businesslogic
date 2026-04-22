@@ -10,16 +10,21 @@
   },
   "scripts": {
     "build": "directus-extension build",
-    "dev": "directus-extension build -w --no-minify"
+    "dev": "directus-extension build -w --no-minify",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@directus/extensions-sdk": "^17.0.11",
+    "@types/dompurify": "^3.0.5",
+    "@types/jsdom": "^28.0.1",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
     "vue": "^3.5.30"
   },
   "dependencies": {
     "@businesslogic/widget": "file:../../../../../packages/bl-widget",
     "dompurify": "^3.2.6",
+    "jsdom": "^29.0.1",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.4"
   }

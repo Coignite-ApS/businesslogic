@@ -2,8 +2,8 @@
  * OpenAPI 3.0 spec generator for calculator endpoints.
  *
  * Generates a per-calculator spec with:
- * - POST /execute/calculator/{id} — run a calculation
- * - GET  /calculator/{id}/describe — get schema metadata
+ * - POST /execute/{id} — run a calculation
+ * - GET  /describe/{id} — get schema metadata
  * - ApiKeyAuth via X-API-Key header
  *
  * Type mapping:
@@ -111,7 +111,7 @@ export function generateOpenApiSpec(params: OpenApiSpecParams): Record<string, u
 		servers: [{ url: baseUrl }],
 		security: [{ ApiKeyAuth: [] }],
 		paths: {
-			[`/execute/calculator/${calculatorId}`]: {
+			[`/execute/${calculatorId}`]: {
 				post: {
 					summary: `Execute ${calculatorName}`,
 					operationId: 'executeCalculator',
@@ -142,7 +142,7 @@ export function generateOpenApiSpec(params: OpenApiSpecParams): Record<string, u
 					security: [{ ApiKeyAuth: [] }],
 				},
 			},
-			[`/calculator/${calculatorId}/describe`]: {
+			[`/describe/${calculatorId}`]: {
 				get: {
 					summary: `Describe ${calculatorName}`,
 					operationId: 'describeCalculator',

@@ -21,7 +21,7 @@ const container = ref<HTMLElement>();
 
 function renderTree() {
 	if (!container.value || !props.tree) return;
-	container.value.innerHTML = '';
+	container.value.replaceChildren();
 
 	const el = document.createElement('bl-chatkit');
 	(el as any).tree = props.tree;

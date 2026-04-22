@@ -10,6 +10,8 @@ import (
 	"github.com/coignite-aps/bl-gateway/internal/service"
 )
 
+func intPtr(v int) *int { return &v }
+
 func TestRateLimit_SkipsHealthEndpoint(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
 	handler := middleware.RateLimit(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +34,7 @@ func TestRateLimit_NoAccountPassesThrough(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/calc/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/formula/test", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -46,7 +48,7 @@ func TestRateLimit_WithAccountNoRedis_FallsBackToMemory(t *testing.T) {
 	keyService := service.NewKeyService(nil, nil, 0, 0)
 	acct := &service.AccountData{
 		AccountID:    "test-account-123",
-		RateLimitRPS: 5,
+		RateLimitRPS: intPtr(5),
 	}
 
 	handler := middleware.RateLimit(keyService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +57,7 @@ func TestRateLimit_WithAccountNoRedis_FallsBackToMemory(t *testing.T) {
 
 	// Should use in-memory fallback since no Redis
 	for i := 0; i < 5; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/v1/calc/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/formula/test", nil)
 		ctx := context.WithValue(req.Context(), middleware.AccountContextKey, acct)
 		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()

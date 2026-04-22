@@ -70,7 +70,7 @@ export const config = {
   requestLogging: env.REQUEST_LOGGING === 'true' || env.REQUEST_LOGGING === '1',
 
   // Admin token (protects management endpoints: calculators CRUD, list, parse)
-  adminToken: env.ADMIN_TOKEN || null,
+  adminToken: env.FORMULA_API_ADMIN_TOKEN || env.ADMIN_TOKEN || null,
 
   // Direct PostgreSQL connection (replaces Admin API for data reads)
   databaseUrl: env.DATABASE_URL || null,
@@ -80,7 +80,33 @@ export const config = {
 
   // Graceful shutdown timeout (ms) — hard exit if app.close() hangs
   shutdownTimeoutMs: parseInt(env.SHUTDOWN_TIMEOUT_MS || '5000', 10),
+
+  // Secret validation opt-out (for local dev without secrets)
+  skipSecretValidation: env.SKIP_SECRET_VALIDATION === 'true',
 };
+
+/**
+ * Validate critical secrets are present. Call during startup.
+ * Exits process if secrets missing and SKIP_SECRET_VALIDATION !== 'true'.
+ */
+export function validateSecrets() {
+  const required = [
+    ['GATEWAY_SHARED_SECRET', config.gatewaySharedSecret],
+    ['FORMULA_API_ADMIN_TOKEN', config.adminToken],
+  ];
+  const missing = required.filter(([, v]) => !v).map(([k]) => k);
+
+  if (missing.length === 0) return;
+
+  if (config.skipSecretValidation) {
+    console.warn(`[config] SKIP_SECRET_VALIDATION=true — missing secrets ignored: ${missing.join(', ')}`);
+    return;
+  }
+
+  console.error(`[config] FATAL: missing required secrets: ${missing.join(', ')}`);
+  console.error('[config] Set them or use SKIP_SECRET_VALIDATION=true for local dev');
+  process.exit(1);
+}
 
 // Locale mapping: short code -> engine locale
 export const LOCALES = {

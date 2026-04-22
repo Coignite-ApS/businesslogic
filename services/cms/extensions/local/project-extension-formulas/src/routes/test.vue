@@ -20,24 +20,7 @@
 			</v-info>
 		</div>
 		<template v-else>
-		<!-- No-token notice -->
-		<div v-if="!hasToken && !tokenLoading" class="no-token-notice">
-			<v-info icon="vpn_key" title="API Key Required" center>
-				Create an API key in your Account settings to start using formulas.
-				<template #append>
-					<v-button secondary @click="$router.push('/account')">
-						<v-icon name="manage_accounts" left />
-						Go to Account
-					</v-button>
-				</template>
-			</v-info>
-		</div>
-
-		<div v-else-if="tokenLoading" class="module-loading">
-			<v-progress-circular indeterminate />
-		</div>
-
-		<div v-else class="formulas-content">
+		<div class="formulas-content">
 			<!-- Mode tabs (advanced only) -->
 			<div v-if="advanced" class="mode-bar">
 				<button class="tab-btn" :class="{ active: mode === 'single' }" @click="switchMode('single')">Single</button>
@@ -337,7 +320,7 @@
 
 		</template>
 		<template #sidebar>
-			<sidebar-detail icon="help_outline" title="About Formulas" close>
+			<sidebar-detail id="about" icon="help_outline" title="About Formulas">
 				<div class="sidebar-info">
 					<p>Evaluate Excel formulas via API. Single formulas, batches, or full spreadsheet models.</p>
 					<p><strong>Features:</strong></p>
@@ -368,7 +351,7 @@ import type { FormulaExample } from '../types';
 import type { SheetFormula } from '../types';
 
 const api = useApi();
-const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'calc.execute');
+const { allowed: featureAllowed, loading: featureLoading } = useFeatureGate(api, 'formula.execute');
 const {
 	executing, error: formulaError, result: resultData,
 	requestPayload, statusCode,
@@ -399,10 +382,6 @@ type Mode = 'single' | 'batch' | 'sheet';
 const mode = ref<Mode>('single');
 const activeTab = ref<'request' | 'response' | 'result'>('result');
 const advanced = ref(false);
-
-// Token check
-const hasToken = ref(true);
-const tokenLoading = ref(true);
 
 // Single mode
 const singleFormula = ref('');
@@ -564,16 +543,6 @@ async function handleExecute() {
 }
 
 onMounted(async () => {
-	// Load token status + examples + user preference in parallel
-	const tokenPromise = api.get('/calc/api-keys').then(({ data }: any) => {
-		const keys = data?.data || data;
-		hasToken.value = Array.isArray(keys) && keys.length > 0;
-	}).catch(() => {
-		hasToken.value = false;
-	}).finally(() => {
-		tokenLoading.value = false;
-	});
-
 	const prefPromise = api.get('/users/me', { params: { fields: ['appearance_preferences'] } }).then(({ data }: any) => {
 		const prefs = data?.data?.appearance_preferences || data?.appearance_preferences || {};
 		if (prefs.formulas_advanced === true) {
@@ -581,7 +550,7 @@ onMounted(async () => {
 		}
 	}).catch(() => {});
 
-	await Promise.all([tokenPromise, prefPromise, fetchExamples()]);
+	await Promise.all([prefPromise, fetchExamples()]);
 });
 </script>
 
@@ -594,22 +563,6 @@ onMounted(async () => {
 .formulas-content {
 	padding: var(--content-padding);
 	padding-bottom: 0;
-}
-
-.no-token-notice {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	padding: var(--content-padding);
-	height: 400px;
-}
-
-.module-loading {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	height: 400px;
 }
 
 /* Simple mode desc */

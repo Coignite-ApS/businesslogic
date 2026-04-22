@@ -1,4 +1,5 @@
 import { createDecipheriv, randomUUID } from 'node:crypto';
+import { getActiveSubscription } from '../../_shared/v2-subscription.js';
 import type { ToolDefinition, DB } from './types.js';
 
 export const AI_TOOLS: ToolDefinition[] = [
@@ -93,7 +94,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 	},
 	{
 		name: 'get_calculator_config',
-		description: 'Get the full configuration status of a calculator, including input/output field counts, whether it has sheets and formulas, and completeness status.',
+		description: 'Get the full configuration of a calculator including input/output schemas with mappings, sheet data, and formulas. Use this to inspect available cells before configuring inputs/outputs. Defaults to test environment.',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -103,7 +104,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 				},
 				test: {
 					type: 'boolean',
-					description: 'If true, get test config. Defaults to false (live).',
+					description: 'If true, get test config. Defaults to true (test).',
 				},
 			},
 			required: ['calculator_id'],
@@ -111,7 +112,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 	},
 	{
 		name: 'configure_calculator',
-		description: 'Configure a calculator\'s input and/or output schema. Uses partial merge — new fields are added/updated without removing existing ones. Set a field to null to remove it. Types must be: string, number, integer, or boolean.',
+		description: 'Configure a calculator\'s input and/or output schema (test environment by default). Every field MUST include a \'mapping\' cell reference (e.g. \'Sheet1\'!A1). Use get_calculator_config first to inspect sheets and formulas for available cells. Uses partial merge — set a field to null to remove it.',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -121,7 +122,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 				},
 				test: {
 					type: 'boolean',
-					description: 'If true, configure the test environment config. Defaults to false (live).',
+					description: 'If true, configure the test environment config. Defaults to true (test).',
 				},
 				input: {
 					type: 'object',
@@ -137,7 +138,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 	},
 	{
 		name: 'deploy_calculator',
-		description: 'Deploy a calculator to the Formula API. For test: enables a 6-hour test window and deploys. For live: activates the calculator (respects subscription limits) and deploys. Config must be complete (sheets, formulas, input, output) before deploying.',
+		description: 'Deploy a calculator to the Formula API (test environment by default). For test: enables a 6-hour test window. For live: requires an active test deployment first — deploy to test, execute to verify, then deploy live.',
 		input_schema: {
 			type: 'object',
 			properties: {
@@ -147,7 +148,7 @@ export const AI_TOOLS: ToolDefinition[] = [
 				},
 				test: {
 					type: 'boolean',
-					description: 'If true, deploy to test environment (6h window). Defaults to false (live).',
+					description: 'If true, deploy to test environment (6h window). Defaults to true (test).',
 				},
 			},
 			required: ['calculator_id'],
@@ -260,6 +261,36 @@ export const AI_TOOLS: ToolDefinition[] = [
 			required: ['knowledge_base_id', 'file_id'],
 		},
 	},
+	{
+		name: 'save_test_case',
+		description: 'Save a test case for a calculator with input values and expected outputs. Use after executing a calculator to persist the inputs and results as a reusable test case for regression testing.',
+		input_schema: {
+			type: 'object',
+			properties: {
+				calculator_id: {
+					type: 'string',
+					description: 'The calculator ID',
+				},
+				name: {
+					type: 'string',
+					description: 'Descriptive name (e.g. "Standard — 3 employees, 50% savings")',
+				},
+				input: {
+					type: 'object',
+					description: 'Input values (same format as execute_calculator)',
+				},
+				expected_outputs: {
+					type: 'object',
+					description: 'Expected output values to verify against',
+				},
+				tolerance: {
+					type: 'number',
+					description: 'Numeric tolerance for output comparison. 0 = exact match. Default: 0',
+				},
+			},
+			required: ['calculator_id', 'name', 'input', 'expected_outputs'],
+		},
+	},
 ];
 
 export interface ToolExecutorDeps {
@@ -270,6 +301,9 @@ export interface ToolExecutorDeps {
 	encryptionKey?: string;
 	authToken?: string;
 	logger: any;
+	accountability?: any;
+	schema?: any;
+	services?: any;
 }
 
 export async function executeTool(
@@ -277,7 +311,7 @@ export async function executeTool(
 	toolInput: any,
 	deps: ToolExecutorDeps,
 ): Promise<{ result: unknown; isError?: boolean }> {
-	const { db, accountId, gatewayCalcUrl, internalSecret, encryptionKey, authToken, logger } = deps;
+	const { db, accountId, gatewayCalcUrl, internalSecret, encryptionKey, authToken, logger, accountability, schema, services } = deps;
 
 	try {
 		switch (toolName) {
@@ -292,11 +326,11 @@ export async function executeTool(
 			case 'update_calculator':
 				return await updateCalculator(db, accountId, toolInput);
 			case 'get_calculator_config':
-				return await getCalculatorConfig(db, accountId, toolInput.calculator_id, toolInput.test ?? false);
+				return await getCalculatorConfig(db, accountId, toolInput.calculator_id, toolInput.test ?? true);
 			case 'configure_calculator':
-				return await configureCalculator(db, accountId, toolInput);
+				return await configureCalculator(db, accountId, toolInput, { accountability, schema, services });
 			case 'deploy_calculator':
-				return await deployCalculator(db, accountId, toolInput.calculator_id, toolInput.test ?? false, gatewayCalcUrl, internalSecret, encryptionKey, logger);
+				return await deployCalculator(db, accountId, toolInput.calculator_id, toolInput.test ?? true, gatewayCalcUrl, internalSecret, encryptionKey, logger, accountability);
 			case 'search_knowledge':
 				return await searchKnowledge(db, accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit, authToken);
 			case 'ask_knowledge':
@@ -309,6 +343,8 @@ export async function executeTool(
 				return await getKnowledgeBase(db, accountId, toolInput);
 			case 'upload_to_knowledge_base':
 				return await uploadToKnowledgeBase(db, accountId, toolInput, authToken, logger);
+			case 'save_test_case':
+				return await saveTestCase(db, accountId, toolInput);
 			default:
 				return { result: `Unknown tool: ${toolName}`, isError: true };
 		}
@@ -474,24 +510,21 @@ async function createCalculator(db: DB, accountId: string, input: { id: string; 
 	const existing = await db('calculators').where('id', input.id).first('id');
 	if (existing) return { result: `Calculator "${input.id}" already exists.`, isError: true };
 
-	// Check subscription calculator limit
+	// v2: gate on the calculators-module slot allowance.
+	//   sp.calculator_limit → sp.slot_allowance (1 calc = 1 slot until task 19
+	//   ships size classification populating calculator_slots.slots_consumed).
 	const account = await db('account').where('id', accountId).select('exempt_from_subscription').first();
 	if (!account?.exempt_from_subscription) {
-		const sub = await db('subscriptions as s')
-			.join('subscription_plans as sp', 'sp.id', 's.plan')
-			.where('s.account', accountId)
-			.whereNotIn('s.status', ['canceled', 'expired'])
-			.select('sp.calculator_limit')
-			.first();
+		const sub = await getActiveSubscription(db, accountId, 'calculators');
 
-		if (sub?.calculator_limit !== null && sub?.calculator_limit !== undefined) {
+		if (sub?.slot_allowance !== null && sub?.slot_allowance !== undefined) {
 			const { count } = await db('calculators')
 				.where('account', accountId)
 				.count('* as count')
 				.first() as any;
 			const total = parseInt(count, 10) || 0;
-			if (total >= sub.calculator_limit) {
-				return { result: `Calculator limit reached (${sub.calculator_limit}). Upgrade your plan to create more.`, isError: true };
+			if (total >= sub.slot_allowance) {
+				return { result: `Calculator slot limit reached (${sub.slot_allowance}). Upgrade your Calculators plan to create more.`, isError: true };
 			}
 		}
 	}
@@ -569,17 +602,22 @@ async function getCalculatorConfig(db: DB, accountId: string, calculatorId: stri
 	const inputProps = inputSchema.properties || {};
 	const outputProps = outputSchema.properties || {};
 
+	const sheets = config.sheets ? (typeof config.sheets === 'string' ? JSON.parse(config.sheets) : config.sheets) : [];
+	const formulas = config.formulas ? (typeof config.formulas === 'string' ? JSON.parse(config.formulas) : config.formulas) : [];
+
 	return {
 		result: {
 			calculator_id: calculatorId,
 			environment: test ? 'test' : 'live',
 			input_fields: Object.keys(inputProps).length,
 			output_fields: Object.keys(outputProps).length,
-			input_field_names: Object.keys(inputProps),
-			output_field_names: Object.keys(outputProps),
-			has_sheets: !!(config.sheets && (typeof config.sheets === 'string' ? JSON.parse(config.sheets) : config.sheets).length > 0),
-			has_formulas: !!(config.formulas && (typeof config.formulas === 'string' ? JSON.parse(config.formulas) : config.formulas).length > 0),
-			is_complete: !!(config.sheets && config.formulas && Object.keys(inputProps).length > 0 && Object.keys(outputProps).length > 0),
+			input: inputSchema,
+			output: outputSchema,
+			sheets,
+			formulas,
+			has_sheets: sheets.length > 0,
+			has_formulas: formulas.length > 0,
+			is_complete: !!(sheets.length > 0 && formulas.length > 0 && Object.keys(inputProps).length > 0 && Object.keys(outputProps).length > 0),
 			config_version: config.config_version || 1,
 		},
 	};
@@ -587,11 +625,16 @@ async function getCalculatorConfig(db: DB, accountId: string, calculatorId: stri
 
 // ─── Configure calculator ────────────────────────────────────────
 
-async function configureCalculator(db: DB, accountId: string, input: { calculator_id: string; test?: boolean; input?: any; output?: any }) {
+async function configureCalculator(
+	db: DB,
+	accountId: string,
+	input: { calculator_id: string; test?: boolean; input?: any; output?: any },
+	ctx: { accountability?: any; schema?: any; services?: any },
+) {
 	const calc = await db('calculators').where('id', input.calculator_id).where('account', accountId).first();
 	if (!calc) return { result: `Calculator "${input.calculator_id}" not found in your account.`, isError: true };
 
-	const isTest = input.test ?? false;
+	const isTest = input.test ?? true;
 	const config = await db('calculator_configs')
 		.where('calculator', input.calculator_id)
 		.where('test_environment', isTest)
@@ -624,6 +667,13 @@ async function configureCalculator(db: DB, accountId: string, input: { calculato
 	}
 
 	if (Object.keys(updates).length > 0) {
+		// AI live config: only allowed after a successful test deploy (active test window)
+		if (ctx.accountability && !ctx.accountability.admin && !isTest) {
+			if (!calc.test_enabled_at || !calc.test_expires_at || new Date(calc.test_expires_at) < new Date()) {
+				return { result: 'Configure and deploy to test first, then verify results before configuring live. Set test=true.', isError: true };
+			}
+		}
+
 		await db('calculator_configs').where('id', config.id).update(updates);
 	}
 
@@ -668,9 +718,17 @@ async function deployCalculator(
 	internalSecret: string,
 	encryptionKey: string | undefined,
 	logger: any,
+	accountability?: any,
 ) {
 	const calc = await db('calculators').where('id', calculatorId).where('account', accountId).first();
 	if (!calc) return { result: `Calculator "${calculatorId}" not found in your account.`, isError: true };
+
+	// AI live deploy: only allowed after a successful test deploy (active test window)
+	if (accountability && !accountability.admin && !test) {
+		if (!calc.test_enabled_at || !calc.test_expires_at || new Date(calc.test_expires_at) < new Date()) {
+			return { result: 'Deploy to test first and verify results before deploying live. Use deploy_calculator with test=true.', isError: true };
+		}
+	}
 
 	const config = await db('calculator_configs')
 		.where('calculator', calculatorId)
@@ -700,17 +758,13 @@ async function deployCalculator(
 			test_expires_at: expiresAt.toISOString(),
 		});
 	} else {
-		// Live: check subscription limits
+		// Live: check calculators-module slot allowance.
+		//   sp.calculator_limit → sp.slot_allowance (1 active calc = 1 slot until task 19).
 		const account = await db('account').where('id', accountId).select('exempt_from_subscription').first();
 		if (!account?.exempt_from_subscription) {
-			const sub = await db('subscriptions as s')
-				.join('subscription_plans as sp', 'sp.id', 's.plan')
-				.where('s.account', accountId)
-				.whereNotIn('s.status', ['canceled', 'expired'])
-				.select('sp.calculator_limit')
-				.first();
+			const sub = await getActiveSubscription(db, accountId, 'calculators');
 
-			if (sub?.calculator_limit !== null && sub?.calculator_limit !== undefined) {
+			if (sub?.slot_allowance !== null && sub?.slot_allowance !== undefined) {
 				const { count } = await db('calculators')
 					.where('account', accountId)
 					.where('activated', true)
@@ -719,7 +773,7 @@ async function deployCalculator(
 					.first() as any;
 				const activeCount = parseInt(count, 10) || 0;
 
-				if (activeCount >= sub.calculator_limit) {
+				if (activeCount >= sub.slot_allowance) {
 					// Check if another over-limit calc exists
 					const existingOverLimit = await db('calculators')
 						.where('account', accountId)
@@ -778,8 +832,6 @@ async function deployCalculator(
 		output: outputSchema,
 	};
 
-	if (config.allowed_ips?.length) payload.allowedIps = config.allowed_ips;
-	if (config.allowed_origins?.length) payload.allowedOrigins = config.allowed_origins;
 	if (config.expressions?.length) payload.expressions = config.expressions;
 
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -864,6 +916,34 @@ function decryptApiKey(encrypted: string | null | undefined, encryptionKey?: str
 	} catch {
 		return undefined;
 	}
+}
+
+async function saveTestCase(db: DB, accountId: string, input: any) {
+	const calc = await db('calculators')
+		.where('id', input.calculator_id)
+		.where('account', accountId)
+		.first();
+
+	if (!calc) {
+		return { result: `Calculator "${input.calculator_id}" not found in your account.`, isError: true };
+	}
+
+	if (!input.name?.trim()) return { result: 'Test case name is required', isError: true };
+	if (!input.input || typeof input.input !== 'object') return { result: 'Input values are required', isError: true };
+	if (!input.expected_outputs || typeof input.expected_outputs !== 'object') return { result: 'Expected outputs are required', isError: true };
+
+	const id = randomUUID();
+	await db('calculator_test_cases').insert({
+		id,
+		calculator: input.calculator_id,
+		name: input.name.trim(),
+		input: JSON.stringify(input.input),
+		expected_outputs: JSON.stringify(input.expected_outputs),
+		tolerance: input.tolerance ?? 0,
+		date_created: new Date(),
+	});
+
+	return { result: { saved: true, id, name: input.name.trim(), calculator_id: input.calculator_id } };
 }
 
 // ─── Knowledge Base tools ────────────────────────────────────────
@@ -1070,27 +1150,13 @@ function selectKbIcon(name: string, description?: string): string {
 async function createKnowledgeBase(db: DB, accountId: string, input: { name: string; description?: string }) {
 	if (!input.name?.trim()) return { result: 'Name is required.', isError: true };
 
-	// Check KB limit
-	const account = await db('account').where('id', accountId).select('exempt_from_subscription').first();
-	if (!account?.exempt_from_subscription) {
-		const sub = await db('subscriptions as s')
-			.join('subscription_plans as sp', 'sp.id', 's.plan')
-			.where('s.account', accountId)
-			.whereNotIn('s.status', ['canceled', 'expired'])
-			.select('sp.kb_limit')
-			.first();
-
-		if (sub?.kb_limit !== null && sub?.kb_limit !== undefined) {
-			const { count } = await db('knowledge_bases')
-				.where('account', accountId)
-				.count('* as count')
-				.first() as any;
-			const total = parseInt(count, 10) || 0;
-			if (total >= sub.kb_limit) {
-				return { result: `Knowledge base limit reached (${sub.kb_limit}). Upgrade your plan to create more.`, isError: true };
-			}
-		}
-	}
+	// v2: Knowledge Base count is no longer capped by the plan; only storage_mb
+	// and embed_tokens_m are enforced (see knowledge-api/src/metering.ts).
+	// The legacy `kb_limit` column does not exist in v2 — gate dropped.
+	// Storage gating still happens on each upload via checkKbStorage().
+	// Module activeness is asserted by knowledge-api routes; this AI tool
+	// path skips the active-sub check (the user can already create rows via the
+	// KB module UI, so adding a gate here would be inconsistent).
 
 	const icon = selectKbIcon(input.name, input.description);
 	const id = randomUUID();

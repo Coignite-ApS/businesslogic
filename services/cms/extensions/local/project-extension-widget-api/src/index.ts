@@ -63,7 +63,7 @@ export default defineHook(
           const describeHeaders: Record<string, string> = {};
           if (gatewayInternalSecret) describeHeaders['X-Internal-Secret'] = gatewayInternalSecret;
           const describeRes = await fetch(
-            `${gatewayUrl}/internal/calc/calculator/${encodeURIComponent(calcId)}/describe`,
+            `${gatewayUrl}/internal/formula/calculator/${encodeURIComponent(calcId)}/describe`,
             { headers: describeHeaders },
           );
 

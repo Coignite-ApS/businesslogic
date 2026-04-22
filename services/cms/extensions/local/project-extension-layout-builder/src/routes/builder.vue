@@ -258,7 +258,7 @@ watch(showPreview, (show) => {
     nextTick(() => {
       const container = previewContainer.value;
       if (!container) return;
-      container.innerHTML = '';
+      container.replaceChildren();
       const el = document.createElement('bl-chatkit');
       (el as any).tree = toExportTree(tree.value);
       container.appendChild(el);

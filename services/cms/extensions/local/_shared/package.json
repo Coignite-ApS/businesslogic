@@ -1,0 +1,25 @@
+{
+  "name": "@businesslogic/cms-shared",
+  "version": "1.0.0",
+  "private": true,
+  "bl:shared-lib": true,
+  "type": "module",
+  "directus:extension": {
+    "host": "^11.0.0",
+    "type": "bundle",
+    "path": { "app": "dist/app.js", "api": "dist/api.js" },
+    "entries": []
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^17.0.11",
+    "@types/node": "^25.5.0",
+    "knex": "^3.1.0",
+    "pg": "^8.13.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

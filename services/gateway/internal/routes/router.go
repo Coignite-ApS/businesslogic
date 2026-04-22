@@ -23,6 +23,7 @@ type Router struct {
 	configCacheTTL       time.Duration
 	catalogCacheTTL      time.Duration
 	auditFn              middleware.AuditLogFn
+	internalHandler      http.Handler
 }
 
 type RouterConfig struct {
@@ -52,18 +53,20 @@ func New(cfg RouterConfig) *Router {
 		auditFn:              cfg.AuditFn,
 	}
 	r.setup()
+	r.internalHandler = middleware.InternalAuth(r.internalSecret)(middleware.InternalAudit(r.auditFn)(r.mux))
 	return r
 }
 
 func (r *Router) setup() {
 	// Standard API routes
 	apiRoutes := map[string]string{
-		"/v1/ai/":            "ai-api",
-		"/v1/calc/":          "formula-api",
-		"/v1/mcp/calc/":      "formula-api",
-		"/v1/mcp/ai/":        "ai-api",
-		"/v1/flows/webhook/": "flow-trigger",
-		"/admin/":            "cms",
+		"/v1/ai/":             "ai-api",
+		"/v1/formula/":        "formula-api",
+		"/v1/mcp/formula/":    "formula-api",
+		"/v1/mcp/calculator/": "formula-api",
+		"/v1/mcp/ai/":         "ai-api",
+		"/v1/flows/webhook/":  "flow-trigger",
+		"/admin/":             "cms",
 	}
 
 	for prefix, backendName := range apiRoutes {
@@ -79,6 +82,9 @@ func (r *Router) setup() {
 		})
 	}
 
+	// Calculator routes (path param extraction like widgets)
+	r.setupCalculatorRoutes()
+
 	// Widget routes (GW-03)
 	r.setupWidgetRoutes()
 
@@ -92,6 +98,38 @@ func (r *Router) setup() {
 	r.setupInternalRoutes()
 }
 
+func (r *Router) setupCalculatorRoutes() {
+	formulaAPI, ok := r.backends["formula-api"]
+	if !ok {
+		return
+	}
+
+	// /v1/calculator/execute/:id → formula-api /execute/calculator/:id
+	// /v1/calculator/describe/:id → formula-api /calculator/:id/describe
+	r.mux.HandleFunc("/v1/calculator/", func(w http.ResponseWriter, req *http.Request) {
+		rest := strings.TrimPrefix(req.URL.Path, "/v1/calculator/")
+		parts := strings.SplitN(rest, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			http.Error(w, `{"error":"invalid calculator path"}`, http.StatusBadRequest)
+			return
+		}
+
+		action := parts[0]
+		calcID := parts[1]
+
+		switch action {
+		case "execute":
+			req.URL.Path = "/execute/calculator/" + calcID
+		case "describe":
+			req.URL.Path = "/calculator/" + calcID + "/describe"
+		default:
+			http.Error(w, `{"error":"unknown calculator action"}`, http.StatusNotFound)
+			return
+		}
+		formulaAPI.ServeHTTP(w, req)
+	})
+}
+
 func (r *Router) setupMCPKeyPrefixRoute() {
 	formulaBackend, ok := r.backends["formula-api"]
 	if !ok {
@@ -103,11 +141,11 @@ func (r *Router) setupMCPKeyPrefixRoute() {
 	mcpHandler := handler.NewMCPHandler(formulaBackend, r.keyService)
 
 	// Register with a trailing slash to catch /v1/mcp/:keyPrefix
-	// Must be registered AFTER /v1/mcp/calc/ and /v1/mcp/ai/ (more specific prefixes win in ServeMux).
+	// Must be registered AFTER /v1/mcp/formula/, /v1/mcp/calculator/, /v1/mcp/ai/ (more specific prefixes win in ServeMux).
 	r.mux.HandleFunc("/v1/mcp/", func(w http.ResponseWriter, req *http.Request) {
-		// Only handle paths that look like /v1/mcp/:keyPrefix (not already matched by calc/ai routes)
+		// Only handle paths that look like /v1/mcp/:keyPrefix (not already matched by named routes)
 		rest := strings.TrimPrefix(req.URL.Path, "/v1/mcp/")
-		if strings.HasPrefix(rest, "calc/") || strings.HasPrefix(rest, "ai/") {
+		if strings.HasPrefix(rest, "formula/") || strings.HasPrefix(rest, "calculator/") || strings.HasPrefix(rest, "ai/") {
 			// Should be handled by the standard proxy routes above — fallback 404
 			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 			return
@@ -201,11 +239,11 @@ func (r *Router) setupInternalRoutes() {
 		return
 	}
 
-	internalAuth := middleware.InternalAuth(r.internalSecret)
-	internalAudit := middleware.InternalAudit(r.auditFn)
+	// NOTE: InternalAuth + InternalAudit applied as blanket middleware in ServeHTTP.
+	// No per-route wrapping needed — defense-in-depth.
 
 	// API Key management
-	r.mux.Handle("/internal/api-keys/", internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.mux.HandleFunc("/internal/api-keys/", func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
 		switch req.Method {
@@ -234,10 +272,10 @@ func (r *Router) setupInternalRoutes() {
 		default:
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		}
-	}))))
+	})
 
 	// Cache invalidation
-	r.mux.Handle("/internal/cache/invalidate", internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.mux.HandleFunc("/internal/cache/invalidate", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			return
@@ -249,7 +287,7 @@ func (r *Router) setupInternalRoutes() {
 		// Invalidate all widget cache entries
 		r.responseCache.Invalidate(req.Context(), "gw:rc:*")
 		w.WriteHeader(http.StatusNoContent)
-	}))))
+	})
 }
 
 func (r *Router) setupInternalServiceProxy() {
@@ -257,14 +295,14 @@ func (r *Router) setupInternalServiceProxy() {
 		return
 	}
 
-	internalAuth := middleware.InternalAuth(r.internalSecret)
-	internalAudit := middleware.InternalAudit(r.auditFn)
+	// NOTE: InternalAuth + InternalAudit applied as blanket middleware in ServeHTTP.
+	// No per-route wrapping needed — defense-in-depth.
 
-	// /internal/calc/* → formula-api, /internal/ai/* → ai-api, /internal/flow/* → flow-trigger
+	// /internal/formula/* → formula-api, /internal/ai/* → ai-api, /internal/flow/* → flow-trigger
 	internalRoutes := map[string]string{
-		"/internal/calc/": "formula-api",
-		"/internal/ai/":   "ai-api",
-		"/internal/flow/": "flow-trigger",
+		"/internal/formula/": "formula-api",
+		"/internal/ai/":      "ai-api",
+		"/internal/flow/":    "flow-trigger",
 	}
 
 	for prefix, backendName := range internalRoutes {
@@ -275,17 +313,17 @@ func (r *Router) setupInternalServiceProxy() {
 		p := prefix
 		b := backend
 		bn := backendName
-		r.mux.Handle(p, internalAuth(internalAudit(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		r.mux.HandleFunc(p, func(w http.ResponseWriter, req *http.Request) {
 			// Strip internal secret — don't leak to backend
 			req.Header.Del("X-Internal-Secret")
 			// Inject admin token for formula-api (P0-1)
 			if bn == "formula-api" && r.formulaAPIAdminToken != "" {
 				req.Header.Set("X-Admin-Token", r.formulaAPIAdminToken)
 			}
-			// Rewrite path: /internal/calc/foo → /foo
+			// Rewrite path: /internal/formula/foo → /foo
 			req.URL.Path = "/" + strings.TrimPrefix(req.URL.Path, p)
 			b.ServeHTTP(w, req)
-		}))))
+		})
 	}
 }
 
@@ -293,13 +331,15 @@ func rewritePath(path, prefix, backendName string) string {
 	remainder := strings.TrimPrefix(path, strings.TrimSuffix(prefix, "/"))
 
 	switch {
-	case strings.HasPrefix(prefix, "/v1/mcp/calc/"):
+	case strings.HasPrefix(prefix, "/v1/mcp/formula/"):
+		return "/mcp" + remainder
+	case strings.HasPrefix(prefix, "/v1/mcp/calculator/"):
 		return "/mcp" + remainder
 	case strings.HasPrefix(prefix, "/v1/mcp/ai/"):
 		return "/mcp" + remainder
 	case strings.HasPrefix(prefix, "/v1/ai/"):
 		return "/v1/ai/" + strings.TrimPrefix(remainder, "/")
-	case strings.HasPrefix(prefix, "/v1/calc/"):
+	case strings.HasPrefix(prefix, "/v1/formula/"):
 		return "/" + strings.TrimPrefix(remainder, "/")
 	case strings.HasPrefix(prefix, "/v1/flows/webhook/"):
 		return "/webhook" + remainder
@@ -310,5 +350,12 @@ func rewritePath(path, prefix, backendName string) string {
 }
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// Blanket InternalAuth + InternalAudit for ALL /internal/ routes.
+	// Defense-in-depth: any new /internal/ route is automatically protected
+	// even if the handler forgets to apply per-route middleware.
+	if strings.HasPrefix(req.URL.Path, "/internal/") {
+		r.internalHandler.ServeHTTP(w, req)
+		return
+	}
 	r.mux.ServeHTTP(w, req)
 }

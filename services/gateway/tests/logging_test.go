@@ -57,7 +57,7 @@ func TestRequestLogMiddleware_InsertsOnAuthenticatedRequest(t *testing.T) {
 
 	// Set up authenticated context
 	acct := &service.AccountData{AccountID: "acct-123", KeyID: "key-456"}
-	req := httptest.NewRequest(http.MethodGet, "/v1/calc/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/formula/health", nil)
 	req = req.WithContext(context.WithValue(req.Context(), middleware.AccountContextKey, acct))
 	rec := httptest.NewRecorder()
 
@@ -75,8 +75,8 @@ func TestRequestLogMiddleware_InsertsOnAuthenticatedRequest(t *testing.T) {
 	if insertedMethod != http.MethodGet {
 		t.Errorf("expected method GET, got %s", insertedMethod)
 	}
-	if insertedPath != "/v1/calc/health" {
-		t.Errorf("expected path /v1/calc/health, got %s", insertedPath)
+	if insertedPath != "/v1/formula/health" {
+		t.Errorf("expected path /v1/formula/health, got %s", insertedPath)
 	}
 	if insertedStatus != http.StatusOK {
 		t.Errorf("expected status 200, got %d", insertedStatus)
@@ -121,7 +121,7 @@ func TestRequestLogMiddleware_SkipsWhenNoAccountContext(t *testing.T) {
 	}))
 
 	// Authenticated path but no account context (e.g., auth middleware rejected early)
-	req := httptest.NewRequest(http.MethodGet, "/v1/calc/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/formula/health", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	time.Sleep(10 * time.Millisecond)
@@ -143,7 +143,7 @@ func TestRequestLogMiddleware_DBFailureDoesNotBlockResponse(t *testing.T) {
 	}))
 
 	acct := &service.AccountData{AccountID: "acct-123", KeyID: "key-456"}
-	req := httptest.NewRequest(http.MethodGet, "/v1/calc/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/formula/health", nil)
 	req = req.WithContext(context.WithValue(req.Context(), middleware.AccountContextKey, acct))
 	rec := httptest.NewRecorder()
 
@@ -178,7 +178,7 @@ func TestRequestLogMiddleware_CapturesStatusAndSize(t *testing.T) {
 	}))
 
 	acct := &service.AccountData{AccountID: "acct-123", KeyID: "key-456"}
-	req := httptest.NewRequest(http.MethodPost, "/v1/calc/execute", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/formula/execute", nil)
 	req = req.WithContext(context.WithValue(req.Context(), middleware.AccountContextKey, acct))
 	rec := httptest.NewRecorder()
 
@@ -209,7 +209,7 @@ func TestInternalAuditMiddleware_LogsStructuredFields(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/calc/execute", nil)
+	req := httptest.NewRequest(http.MethodPost, "/internal/formula/execute", nil)
 	req.Header.Set("X-User-Id", "user-789")
 	req.Header.Set("X-Account-Id", "acct-123")
 	req.RemoteAddr = "10.0.0.1:12345"
@@ -235,7 +235,7 @@ func TestInternalAuditMiddleware_LogsStructuredFields(t *testing.T) {
 	if loggedFields["method"] != http.MethodPost {
 		t.Errorf("expected method POST, got %v", loggedFields["method"])
 	}
-	if loggedFields["path"] != "/internal/calc/execute" {
-		t.Errorf("expected path /internal/calc/execute, got %v", loggedFields["path"])
+	if loggedFields["path"] != "/internal/formula/execute" {
+		t.Errorf("expected path /internal/formula/execute, got %v", loggedFields["path"])
 	}
 }

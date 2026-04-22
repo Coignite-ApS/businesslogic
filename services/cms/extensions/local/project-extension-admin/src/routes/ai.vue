@@ -113,7 +113,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="AI Dashboard" close>
+			<sidebar-detail id="info" icon="info" title="AI Dashboard">
 				<div class="sidebar-info">
 					<p>AI Assistant usage and cost monitoring across all accounts. Data refreshes on page load.</p>
 				</div>

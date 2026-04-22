@@ -151,7 +151,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Conversation Quality" close>
+			<sidebar-detail id="info" icon="info" title="Conversation Quality">
 				<div class="sidebar-info">
 					<p>Conversation outcomes, response time percentiles, and tool success rates over the selected period.</p>
 				</div>

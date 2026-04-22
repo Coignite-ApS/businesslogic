@@ -62,24 +62,24 @@ export const AI_TOOLS = [
   },
   {
     name: 'get_calculator_config',
-    description: 'Get the full configuration status of a calculator.',
+    description: 'Get the full configuration of a calculator including input/output schemas with mappings, sheet data, and formulas. Use this to inspect available cells before configuring inputs/outputs. Defaults to test environment.',
     input_schema: {
       type: 'object',
       properties: {
         calculator_id: { type: 'string', description: 'The calculator ID' },
-        test: { type: 'boolean', description: 'If true, get test config. Defaults to false.' },
+        test: { type: 'boolean', description: 'If true, get test config. Defaults to true (test).' },
       },
       required: ['calculator_id'],
     },
   },
   {
     name: 'configure_calculator',
-    description: "Configure a calculator's input and/or output schema. Uses partial merge.",
+    description: "Configure a calculator's input and/or output schema (test environment by default). Every field MUST include a 'mapping' cell reference (e.g. 'Sheet1'!A1). Use get_calculator_config first to inspect sheets and formulas for available cells. Uses partial merge — set a field to null to remove it.",
     input_schema: {
       type: 'object',
       properties: {
         calculator_id: { type: 'string', description: 'The calculator ID to configure' },
-        test: { type: 'boolean', description: 'If true, configure test config.' },
+        test: { type: 'boolean', description: 'If true, configure test config. Defaults to true (test).' },
         input: { type: 'object', description: 'Input schema with "properties" key' },
         output: { type: 'object', description: 'Output schema with "properties" key' },
       },
@@ -88,12 +88,12 @@ export const AI_TOOLS = [
   },
   {
     name: 'deploy_calculator',
-    description: 'Deploy a calculator to the Formula API. Config must be complete before deploying.',
+    description: 'Deploy a calculator to the Formula API (test environment by default). Always deploy to test first and verify before deploying live.',
     input_schema: {
       type: 'object',
       properties: {
         calculator_id: { type: 'string', description: 'The calculator ID to deploy' },
-        test: { type: 'boolean', description: 'If true, deploy to test (6h window).' },
+        test: { type: 'boolean', description: 'If true, deploy to test (6h window). Defaults to true (test).' },
       },
       required: ['calculator_id'],
     },
@@ -165,6 +165,21 @@ export const AI_TOOLS = [
       required: ['knowledge_base_id', 'file_id'],
     },
   },
+  {
+    name: 'save_test_case',
+    description: 'Save a test case for a calculator with input values and expected outputs. Use after executing a calculator to persist the inputs and results as a reusable test case for regression testing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        calculator_id: { type: 'string', description: 'The calculator ID' },
+        name: { type: 'string', description: 'Descriptive name (e.g. "Standard — 3 employees, 50% savings")' },
+        input: { type: 'object', description: 'Input values (same format as execute_calculator)' },
+        expected_outputs: { type: 'object', description: 'Expected output values to verify against' },
+        tolerance: { type: 'number', description: 'Numeric tolerance for output comparison. 0 = exact match. Default: 0' },
+      },
+      required: ['calculator_id', 'name', 'input', 'expected_outputs'],
+    },
+  },
 ];
 
 /**
@@ -203,7 +218,7 @@ export function filterToolsByPermissions(tools, permissions, isPublicRequest = f
   const calcTools = new Set([
     'list_calculators', 'describe_calculator', 'execute_calculator',
     'create_calculator', 'update_calculator', 'get_calculator_config',
-    'configure_calculator', 'deploy_calculator',
+    'configure_calculator', 'deploy_calculator', 'save_test_case',
   ]);
   const kbTools = new Set([
     'search_knowledge', 'ask_knowledge', 'list_knowledge_bases',
@@ -243,11 +258,11 @@ export async function executeTool(toolName, toolInput, deps) {
       case 'update_calculator':
         return await updateCalculator(accountId, toolInput);
       case 'get_calculator_config':
-        return await getCalculatorConfig(accountId, toolInput.calculator_id, toolInput.test ?? false);
+        return await getCalculatorConfig(accountId, toolInput.calculator_id, toolInput.test ?? true);
       case 'configure_calculator':
         return await configureCalculator(accountId, toolInput);
       case 'deploy_calculator':
-        return await deployCalculator(accountId, toolInput.calculator_id, toolInput.test ?? false, logger);
+        return await deployCalculator(accountId, toolInput.calculator_id, toolInput.test ?? true, logger);
       case 'search_knowledge':
         return await searchKnowledge(accountId, toolInput.query, toolInput.knowledge_base_id, toolInput.limit, allowedKbIds);
       case 'ask_knowledge':
@@ -260,6 +275,8 @@ export async function executeTool(toolName, toolInput, deps) {
         return await getKnowledgeBase(accountId, toolInput, allowedKbIds);
       case 'upload_to_knowledge_base':
         return await uploadToKb(accountId, toolInput, logger, allowedKbIds);
+      case 'save_test_case':
+        return await saveTestCase(accountId, toolInput);
       default:
         return { result: `Unknown tool: ${toolName}`, isError: true };
     }
@@ -398,8 +415,8 @@ async function getCalculatorConfig(accountId, calculatorId, test) {
   const outputSchema = typeof cfg.output === 'string' ? JSON.parse(cfg.output) : cfg.output;
   const inputFields = Object.keys(inputSchema?.properties || {}).length;
   const outputFields = Object.keys(outputSchema?.properties || {}).length;
-  const hasSheets = !!cfg.sheets;
-  const hasFormulas = !!cfg.formulas;
+  const sheets = cfg.sheets ? (typeof cfg.sheets === 'string' ? JSON.parse(cfg.sheets) : cfg.sheets) : [];
+  const formulas = cfg.formulas ? (typeof cfg.formulas === 'string' ? JSON.parse(cfg.formulas) : cfg.formulas) : [];
 
   return {
     result: {
@@ -407,11 +424,13 @@ async function getCalculatorConfig(accountId, calculatorId, test) {
       environment: test ? 'test' : 'live',
       input_fields: inputFields,
       output_fields: outputFields,
-      has_sheets: hasSheets,
-      has_formulas: hasFormulas,
-      complete: inputFields > 0 && outputFields > 0 && hasSheets && hasFormulas,
+      has_sheets: sheets.length > 0,
+      has_formulas: formulas.length > 0,
+      complete: inputFields > 0 && outputFields > 0 && sheets.length > 0 && formulas.length > 0,
       input: inputSchema,
       output: outputSchema,
+      sheets,
+      formulas,
     },
   };
 }
@@ -420,7 +439,7 @@ async function configureCalculator(accountId, input) {
   const calc = await queryOne('SELECT id FROM calculators WHERE id = $1 AND account = $2', [input.calculator_id, accountId]);
   if (!calc) return { result: `Calculator "${input.calculator_id}" not found.`, isError: true };
 
-  const test = input.test ?? false;
+  const test = input.test ?? true;
   const cfg = await queryOne(
     'SELECT id, input, output FROM calculator_configs WHERE calculator = $1 AND test_environment = $2',
     [input.calculator_id, test],
@@ -505,6 +524,71 @@ async function deployCalculator(accountId, calculatorId, test, logger) {
     logger.error(`Deploy calculator ${calculatorId} failed: ${err.message}`);
     return { result: `Deploy failed: ${err.message}`, isError: true };
   }
+}
+
+async function saveTestCase(accountId, input) {
+  const calc = await queryOne(
+    'SELECT id FROM calculators WHERE id = $1 AND account = $2',
+    [input.calculator_id, accountId],
+  );
+  if (!calc) return { result: `Calculator "${input.calculator_id}" not found in your account.`, isError: true };
+
+  if (!input.name?.trim()) return { result: 'Test case name is required', isError: true };
+  if (!input.input || typeof input.input !== 'object') return { result: 'Input values are required', isError: true };
+  if (!input.expected_outputs || typeof input.expected_outputs !== 'object') return { result: 'Expected outputs are required', isError: true };
+  if (input.tolerance !== undefined && (typeof input.tolerance !== 'number' || input.tolerance < 0)) {
+    return { result: 'Tolerance must be a non-negative number (e.g. 0.01 for ±0.01 absolute difference)', isError: true };
+  }
+
+  // Fetch calculator config to validate input/output schema
+  const cfg = await queryOne(
+    'SELECT input AS input_schema, output AS output_schema FROM calculator_configs WHERE calculator = $1 AND test_environment = false',
+    [input.calculator_id],
+  );
+  if (!cfg) return { result: 'Calculator has no live configuration. Configure it first.', isError: true };
+
+  // Validate input keys against schema
+  const schemaProps = cfg.input_schema?.properties || {};
+  const inputKeys = Object.keys(input.input || {});
+  const schemaKeys = Object.keys(schemaProps);
+  const unknownKeys = inputKeys.filter(k => !schemaKeys.includes(k));
+  const missingRequired = (cfg.input_schema?.required || []).filter(k => !(k in (input.input || {})));
+
+  if (unknownKeys.length) return { result: `Unknown input fields: ${unknownKeys.join(', ')}. Valid: ${schemaKeys.join(', ')}`, isError: true };
+  if (missingRequired.length) return { result: `Missing required inputs: ${missingRequired.join(', ')}`, isError: true };
+
+  // Validate expected_outputs keys against output schema
+  const outputProps = cfg.output_schema?.properties || {};
+  const outputKeys = Object.keys(input.expected_outputs || {});
+  const validOutputKeys = Object.keys(outputProps);
+  const unknownOutputs = outputKeys.filter(k => !validOutputKeys.includes(k));
+  if (unknownOutputs.length) return { result: `Unknown output fields: ${unknownOutputs.join(', ')}. Valid: ${validOutputKeys.join(', ')}`, isError: true };
+
+  // Dry-run: execute calculator to verify inputs work
+  if (config.formulaApiUrl) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (config.formulaApiAdminToken) headers['X-Admin-Token'] = config.formulaApiAdminToken;
+      const execRes = await fetch(`${config.formulaApiUrl}/execute/calculator/${encodeURIComponent(input.calculator_id)}`, {
+        method: 'POST', headers, body: JSON.stringify(input.input),
+      });
+      if (!execRes.ok) {
+        const errData = await execRes.json().catch(() => ({}));
+        return { result: `Test case inputs failed dry-run execution: ${JSON.stringify(errData)}`, isError: true };
+      }
+    } catch (err) {
+      return { result: `Dry-run execution failed: ${err.message}`, isError: true };
+    }
+  }
+
+  const id = randomUUID();
+  await query(
+    `INSERT INTO calculator_test_cases (id, calculator, name, input, expected_outputs, tolerance, date_created)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+    [id, input.calculator_id, input.name.trim(), JSON.stringify(input.input), JSON.stringify(input.expected_outputs), input.tolerance ?? 0],
+  );
+
+  return { result: { saved: true, id, name: input.name.trim(), calculator_id: input.calculator_id } };
 }
 
 // ─── Knowledge base tools ────────────────────────────────────

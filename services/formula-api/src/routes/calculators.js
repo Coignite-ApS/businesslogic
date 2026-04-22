@@ -14,9 +14,15 @@ import * as rateLimiter from '../services/rate-limiter.js';
 import { buildStaticProfile, mergeWithMeasured } from '../utils/profile.js';
 import { routeByCalcId } from '../utils/routing.js';
 import { loadAccountLimits } from '../services/account-limits.js';
-import { loadRecipeFromDb, loadMcpConfigFromDb } from '../services/calculator-db.js';
+import { loadRecipeFromDb, loadMcpConfigFromDb, loadCalculatorConfigMeta } from '../services/calculator-db.js';
+import { computeAndUpsertSlot, atomicCheckAndUpsertSlot, extractCounts, computeSizeClass, slotsForClass, checkUploadQuota, checkAlwaysOnQuota, setAlwaysOn } from '../services/calculator-slots.js';
 import { getPool } from '../db.js';
+import { emitCalcCall } from '../services/usage-events.js';
+import { enforceCalcQuota, currentPeriod, incrementAggCache } from '../middleware/quota.js';
 
+
+/** @type {import('pino').Logger | null} */
+let log = null;
 
 function cleanSchemaForDescribe(schema) {
   if (!schema) return schema;
@@ -146,7 +152,7 @@ async function loadFromDb(id) {
     return await loadRecipeFromDb(id);
   } catch (err) {
     // Log but don't throw — cache miss is handled upstream
-    console.error('[calculators] loadFromDb failed:', err.message);
+    (log || console).error({ err }, '[calculators] loadFromDb failed');
     return null;
   }
 }
@@ -156,7 +162,7 @@ async function fetchMcpConfig(id) {
   try {
     return await loadMcpConfigFromDb(id);
   } catch (err) {
-    console.error('[calculators] fetchMcpConfig failed:', err.message);
+    (log || console).error({ err }, '[calculators] fetchMcpConfig failed');
     return null;
   }
 }
@@ -311,8 +317,7 @@ async function getMetadata(id) {
       version: calc.version ?? null,
       hasToken: !!calc.token,
       accountId: calc.accountId ?? null,
-      allowedIps: calc.allowedIps ?? null,
-      allowedOrigins: calc.allowedOrigins ?? null,
+
       input: calc.inputSchema,
       output: calc.outputSchema,
     };
@@ -341,8 +346,7 @@ async function getMetadata(id) {
     version: version ?? null,
     hasToken: !!token,
     accountId: accountId ?? null,
-    allowedIps: recipe.allowedIps ?? null,
-    allowedOrigins: recipe.allowedOrigins ?? null,
+
     input: inputSchema,
     output: outputSchema,
   };
@@ -528,7 +532,38 @@ export async function executeCalculatorCore(calc, calcId, inputData) {
   }
 }
 
+/**
+ * Fastify preHandler: quota check before calculator upload.
+ * Requires admin token — runs BEFORE DB queries to avoid unauthenticated
+ * probing of account quota state + avoid DB-load amplification from unauth
+ * traffic. Computes size class from the request body, then verifies the
+ * account has enough slots in feature_quotas. Returns 402 if exceeded.
+ * No-op when pool is unavailable (graceful degradation).
+ */
+async function checkSlotQuota(req, reply) {
+  const authErr = checkAdminToken(req);
+  if (authErr) return reply.code(authErr.code).send(authErr.body);
+
+  const pool = getPool();
+  if (!pool) return; // no DB — skip quota check (degraded mode)
+
+  const { sheets, formulas, expressions, accountId, test } = req.body || {};
+  if (test) return; // test calculators don't consume quota
+
+  if (!accountId) return; // no account — gate handled elsewhere
+
+  const { sheetCount, expressionCount } = extractCounts(sheets, formulas, expressions);
+  const sizeClass = computeSizeClass(sheetCount, expressionCount);
+  const slotsConsumed = slotsForClass(sizeClass);
+
+  const quota = await checkUploadQuota(pool, accountId, slotsConsumed);
+  if (!quota.ok) {
+    return reply.code(quota.statusCode).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+  }
+}
+
 export async function registerRoutes(app) {
+  log = app.log;
   const routeById = routeByCalcId('params');
   const routeByBody = routeByCalcId('body');
 
@@ -568,8 +603,6 @@ export async function registerRoutes(app) {
         version: calc.version ?? null,
         hasToken: !!calc.token,
         accountId: calc.accountId ?? null,
-        allowedIps: calc.allowedIps ?? null,
-        allowedOrigins: calc.allowedOrigins ?? null,
         expiresAt: calc.expiresAt,
         source: 'memory',
       };
@@ -605,8 +638,7 @@ export async function registerRoutes(app) {
                 version: r.version ?? null,
                 hasToken: !!r.token,
                 accountId: r.accountId ?? null,
-                allowedIps: r.allowedIps ?? null,
-                allowedOrigins: r.allowedOrigins ?? null,
+
                 source: 'redis',
               };
               if (r.locale != null) item.locale = r.locale;
@@ -625,11 +657,11 @@ export async function registerRoutes(app) {
   });
 
   // Create calculator
-  app.post('/calculator', { preHandler: routeByBody }, async (req, reply) => {
+  app.post('/calculator', { preHandler: [routeByBody, checkSlotQuota] }, async (req, reply) => {
     const authErr = checkAdminToken(req);
     if (authErr) return reply.code(authErr.code).send(authErr.body);
 
-    const { sheets, formulas, input, output, locale, name, version, description, test, calculatorId, token, accountId, allowedIps, allowedOrigins, mcp, integration, expressions } = req.body || {};
+    const { sheets, formulas, input, output, locale, name, version, description, test, calculatorId, token, accountId, mcp, integration, expressions } = req.body || {};
 
     if (!token || typeof token !== 'string') {
       return reply.code(400).send({ error: 'token required (non-empty string)' });
@@ -750,6 +782,31 @@ export async function registerRoutes(app) {
 
       if (accountId) await loadAccountLimits(accountId, true);
 
+      // Atomic quota check + slot UPSERT inside an advisory-locked transaction.
+      // This is the authoritative gate against concurrent over-quota uploads (I-3).
+      // The preHandler checkSlotQuota is a cheap fast-fail only; this is definitive.
+      if (accountId && !test && getPool()) {
+        try {
+          const meta = await loadCalculatorConfigMeta(calculatorId);
+          if (meta) {
+            const slotResult = await atomicCheckAndUpsertSlot(getPool(), {
+              calculatorConfigId: meta.configId,
+              accountId: meta.accountId ?? accountId,
+              sheets,
+              formulas,
+              expressions: expressions || null,
+              fileVersion: meta.fileVersion,
+              configVersion: meta.configVersion,
+            });
+            if (!slotResult.ok) {
+              return reply.code(slotResult.statusCode).send({ error: slotResult.reason, code: 'QUOTA_EXCEEDED' });
+            }
+          }
+        } catch (slotErr) {
+          (log || console).warn({ err: slotErr }, '[calculators] calculator_slots upsert failed (non-fatal)');
+        }
+      }
+
       const resp = {
         calculatorId,
         ttl: config.calculatorTtl,
@@ -867,7 +924,7 @@ export async function registerRoutes(app) {
     if (!calc) return reply.code(404).send({ error: 'Calculator not found' });
 
     const body = req.body || {};
-    const { input, output, sheets, formulas, locale, name, version, description, test, token, allowedIps, allowedOrigins, mcp: mcpPatch, integration: integrationPatch, expressions } = body;
+    const { input, output, sheets, formulas, locale, name, version, description, test, token, mcp: mcpPatch, integration: integrationPatch, expressions } = body;
 
     // Validate MCP config if provided
     let newMcp = calc.mcp ?? null;
@@ -990,6 +1047,26 @@ export async function registerRoutes(app) {
         };
         saveToRedis(req.params.id, recipe);
 
+        // Recompute slot size on data change (fire-and-forget on error)
+        if (calc.accountId && !newTest && getPool()) {
+          try {
+            const meta = await loadCalculatorConfigMeta(req.params.id);
+            if (meta) {
+              await computeAndUpsertSlot(getPool(), {
+                calculatorConfigId: meta.configId,
+                accountId: meta.accountId ?? calc.accountId,
+                sheets: newSheets,
+                formulas: newFormulas,
+                expressions: newExpressions,
+                fileVersion: meta.fileVersion,
+                configVersion: meta.configVersion,
+              });
+            }
+          } catch (slotErr) {
+            (log || console).warn({ err: slotErr }, '[calculators] calculator_slots upsert on patch failed (non-fatal)');
+          }
+        }
+
         const resp = {
           calculatorId: req.params.id,
           ttl: config.calculatorTtl,
@@ -1072,6 +1149,53 @@ export async function registerRoutes(app) {
     if (newMcp) resp.mcp = newMcp;
     if (newIntegration) resp.integration = newIntegration;
     return resp;
+  });
+
+  // Toggle is_always_on for a calculator slot (admin-only)
+  // PATCH /calculator/:id/always-on { is_always_on: true|false }
+  app.patch('/calculator/:id/always-on', { preHandler: routeById }, async (req, reply) => {
+    const authErr = checkAdminToken(req);
+    if (authErr) return reply.code(authErr.code).send(authErr.body);
+
+    const pool = getPool();
+    if (!pool) return reply.code(503).send({ error: 'Database unavailable' });
+
+    const { is_always_on } = req.body || {};
+    if (typeof is_always_on !== 'boolean') {
+      return reply.code(400).send({ error: 'is_always_on must be a boolean' });
+    }
+
+    const calcId = req.params.id;
+
+    // Look up config meta to get calculator_config_id and accountId
+    const meta = await loadCalculatorConfigMeta(calcId);
+    if (!meta) return reply.code(404).send({ error: 'Calculator config not found' });
+
+    // When enabling always-on, check ao_allowance against THIS calc's slots_consumed
+    // (not just ao_remaining > 0 — a large 8-slot calc needs 8 AO slots free)
+    if (is_always_on) {
+      const slotRow = await pool.query(
+        `SELECT slots_consumed, is_always_on FROM public.calculator_slots
+         WHERE calculator_config_id = $1`,
+        [meta.configId],
+      );
+      if (!slotRow.rows.length) {
+        return reply.code(404).send({ error: 'Calculator slot not found — upload calculator first' });
+      }
+      // If already on, this is a no-op — don't double-count against quota
+      if (!slotRow.rows[0].is_always_on) {
+        const slotsConsumed = parseInt(slotRow.rows[0].slots_consumed, 10);
+        const quota = await checkAlwaysOnQuota(pool, meta.accountId, slotsConsumed);
+        if (!quota.ok) {
+          return reply.code(quota.statusCode).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+        }
+      }
+    }
+
+    const row = await setAlwaysOn(pool, meta.configId, is_always_on);
+    if (!row) return reply.code(404).send({ error: 'Calculator slot not found — upload calculator first' });
+
+    return { calculatorId: calcId, is_always_on: row.is_always_on };
   });
 
   // Delete calculator
@@ -1181,14 +1305,35 @@ export async function registerRoutes(app) {
       return reply.code(429).send({ error: msg });
     }
 
+    // Monthly calls_per_month quota enforcement (task 22)
+    req.quotaContext = { accountId, isTest: !!calc.test };
+    const quotaReply = await enforceCalcQuota(req, reply);
+    if (quotaReply !== undefined) return quotaReply; // middleware sent a response
+
     refreshRedisTtl(calcId);
 
     const inputData = req.body || {};
 
     try {
+      const execStart = Date.now();
       const { result, cached } = await executeCalculatorCore(calc, calcId, inputData);
+      const durationMs = Date.now() - execStart;
       reply.header('X-Cache', cached ? 'HIT' : 'MISS');
       stat({ cached, error: false });
+
+      // Emit usage event + write-through agg cache increment (fire-and-forget)
+      if (!calc.test) {
+        const _redis = isRedisReady() ? getRedisClient() : null;
+        emitCalcCall({
+          accountId: accountId,
+          apiKeyId: null, // formula-api doesn't receive api_key_id in this path
+          formulaId: calcId,
+          durationMs,
+          inputsSizeBytes: JSON.stringify(inputData).length,
+        });
+        incrementAggCache(_redis, accountId, currentPeriod()).catch(() => {});
+      }
+
       return result;
     } catch (err) {
       stat({ cached: false, error: true, errorMessage: err.body?.error || err.message?.slice(0, 200) });

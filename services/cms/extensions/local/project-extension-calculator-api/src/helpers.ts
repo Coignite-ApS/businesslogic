@@ -157,8 +157,6 @@ export function buildPayload(config: CalculatorConfig, meta?: { calculator_id?: 
 		formulas: config.formulas!,
 		input: sanitizeSchema(config.input as Record<string, unknown>),
 		output: sanitizeSchema(config.output as Record<string, unknown>),
-		allowedIps: config.allowed_ips?.length ? config.allowed_ips : undefined,
-		allowedOrigins: config.allowed_origins?.length ? config.allowed_origins : undefined,
 		mcp: config.mcp ? {
 			enabled: config.mcp.enabled,
 			toolName: config.mcp.toolName,

@@ -119,6 +119,42 @@ npm run test:all      # All test suites (381 tests)
 npm run test:load     # Load testing with autocannon
 ```
 
+## Calculator Slot Quota (Pricing v2)
+
+When a calculator is uploaded via `POST /calculator`, formula-api computes its `size_class` and writes a row to `public.calculator_slots`. This enforces account-level capacity limits.
+
+### Size-class heuristic
+
+| Class | Condition | Slots consumed |
+|-------|-----------|----------------|
+| `small` | ≤10 sheets **AND** ≤500 expressions | 1 |
+| `medium` | all other cases | 3 |
+| `large` | ≥50 sheets **OR** ≥5000 expressions | 8 |
+
+Expression count = `formulas.length + (expressions?.length ?? 0)`.
+
+### Upload quota check
+
+Before creating a calculator, formula-api checks `public.feature_quotas` for the account's `slot_allowance`. If insufficient → 402.
+
+### Always-on toggle
+
+```bash
+PATCH /calculator/:id/always-on
+X-Admin-Token: <token>
+{ "is_always_on": true }
+```
+
+Validates against `ao_allowance` before enabling. Returns 402 if quota exhausted.
+
+### ON DELETE CASCADE
+
+Deleting an account or `calculator_configs` row removes the `calculator_slots` row automatically (FK with `ON DELETE CASCADE`).
+
+### Constants
+
+All thresholds and slot counts are in `src/services/calculator-slots.js` under `THRESHOLDS` and `SLOTS_FOR_CLASS` — no magic numbers in business logic.
+
 ## License
 
 Licensed under **GNU General Public License v3.0**. See [LICENSE](LICENSE).

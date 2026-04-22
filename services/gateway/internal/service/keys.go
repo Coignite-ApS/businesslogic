@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 )
 
 type AccountData struct {
@@ -18,10 +21,15 @@ type AccountData struct {
 	KeyID          string              `json:"key_id"`
 	Environment    string              `json:"environment"`
 	Permissions    ResourcePermissions `json:"permissions"`
-	AllowedOrigins []string            `json:"allowed_origins"`
-	AllowedIPs     []string            `json:"allowed_ips"`
-	RateLimitRPS   int                 `json:"rate_limit_rps"`
-	MonthlyQuota   int                 `json:"monthly_quota"`
+	AllowedOrigins []string            `json:"allowed_origins,omitempty"`
+	AllowedIPs     []string            `json:"allowed_ips,omitempty"`
+	RateLimitRPS   *int                `json:"rate_limit_rps,omitempty"`
+	MonthlyQuota   *int                `json:"monthly_quota,omitempty"`
+	// v2 per-key sublimits (task 27)
+	AISpendCapMonthlyEUR *float64 `json:"ai_spend_cap_monthly_eur,omitempty"`
+	KBSearchCapMonthly   *int     `json:"kb_search_cap_monthly,omitempty"`
+	ModuleAllowlist      []string `json:"module_allowlist,omitempty"`     // nil = no restriction; []string{} = all blocked
+	ModuleAllowlistSet   bool     `json:"module_allowlist_set,omitempty"` // true when column is non-NULL
 }
 
 type KeyService struct {
@@ -84,19 +92,21 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 	}
 
 	var acct AccountData
-	var permJSON []byte
-	var allowedOrigins, allowedIPs []string
+	var permJSON, moduleAllowlistJSON []byte
+	var allowedOrigins, allowedIPs *[]string
 	var expiresAt, revokedAt *time.Time
 
 	err := ks.db.QueryRow(ctx, `
 		SELECT id, account_id, environment, permissions,
 			   allowed_origins, allowed_ips, rate_limit_rps, monthly_quota,
-			   expires_at, revoked_at
+			   expires_at, revoked_at,
+			   ai_spend_cap_monthly_eur, kb_search_cap_monthly, module_allowlist
 		FROM api_keys WHERE key_hash = $1
 	`, keyHash).Scan(
 		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
 		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
 		&expiresAt, &revokedAt,
+		&acct.AISpendCapMonthlyEUR, &acct.KBSearchCapMonthly, &moduleAllowlistJSON,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("key not found")
@@ -110,8 +120,13 @@ func (ks *KeyService) lookupDB(ctx context.Context, keyHash string) (*AccountDat
 	}
 
 	acct.Permissions = ParsePermissions(permJSON)
-	acct.AllowedOrigins = allowedOrigins
-	acct.AllowedIPs = allowedIPs
+	if allowedOrigins != nil {
+		acct.AllowedOrigins = *allowedOrigins
+	}
+	if allowedIPs != nil {
+		acct.AllowedIPs = *allowedIPs
+	}
+	parseModuleAllowlist(&acct, moduleAllowlistJSON)
 
 	return &acct, nil
 }
@@ -160,19 +175,21 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 	}
 
 	var acct AccountData
-	var permJSON []byte
-	var allowedOrigins, allowedIPs []string
+	var permJSON, moduleAllowlistJSON []byte
+	var allowedOrigins, allowedIPs *[]string
 	var expiresAt, revokedAt *time.Time
 
 	err := ks.db.QueryRow(ctx, `
 		SELECT id, account_id, environment, permissions,
 			   allowed_origins, allowed_ips, rate_limit_rps, monthly_quota,
-			   expires_at, revoked_at
+			   expires_at, revoked_at,
+			   ai_spend_cap_monthly_eur, kb_search_cap_monthly, module_allowlist
 		FROM api_keys WHERE key_prefix = $1
 	`, prefix).Scan(
 		&acct.KeyID, &acct.AccountID, &acct.Environment, &permJSON,
 		&allowedOrigins, &allowedIPs, &acct.RateLimitRPS, &acct.MonthlyQuota,
 		&expiresAt, &revokedAt,
+		&acct.AISpendCapMonthlyEUR, &acct.KBSearchCapMonthly, &moduleAllowlistJSON,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("key not found")
@@ -186,10 +203,36 @@ func (ks *KeyService) lookupDBByPrefix(ctx context.Context, prefix string) (*Acc
 	}
 
 	acct.Permissions = ParsePermissions(permJSON)
-	acct.AllowedOrigins = allowedOrigins
-	acct.AllowedIPs = allowedIPs
+	if allowedOrigins != nil {
+		acct.AllowedOrigins = *allowedOrigins
+	}
+	if allowedIPs != nil {
+		acct.AllowedIPs = *allowedIPs
+	}
+	parseModuleAllowlist(&acct, moduleAllowlistJSON)
 
 	return &acct, nil
+}
+
+// parseModuleAllowlist decodes a JSONB module_allowlist column into AccountData.
+// nil JSON → ModuleAllowlistSet=false (no restriction).
+// valid JSON → ModuleAllowlistSet=true, ModuleAllowlist set to decoded slice.
+// corrupt JSON → ModuleAllowlistSet=true, ModuleAllowlist=[] (fail closed — empty allowlist blocks all modules).
+func parseModuleAllowlist(acct *AccountData, raw []byte) {
+	if len(raw) == 0 {
+		acct.ModuleAllowlistSet = false
+		acct.ModuleAllowlist = nil
+		return
+	}
+	var list []string
+	if err := json.Unmarshal(raw, &list); err != nil {
+		log.Warn().Err(err).Str("key_id", acct.KeyID).Msg("module_allowlist corrupt JSON — fail closed (empty allowlist)")
+		acct.ModuleAllowlistSet = true
+		acct.ModuleAllowlist = []string{}
+		return
+	}
+	acct.ModuleAllowlistSet = true
+	acct.ModuleAllowlist = list
 }
 
 func (ks *KeyService) CheckRateLimit(ctx context.Context, accountID string, rpsLimit int) (allowed bool, remaining int, err error) {
@@ -213,6 +256,26 @@ func (ks *KeyService) CheckRateLimit(ctx context.Context, accountID string, rpsL
 		remaining = 0
 	}
 	return count <= rpsLimit, remaining, nil
+}
+
+type GeneratedKey struct {
+	RawKey    string
+	KeyHash   string
+	KeyPrefix string
+}
+
+func GenerateKey() (*GeneratedKey, error) {
+	rawBytes := make([]byte, 48)
+	if _, err := rand.Read(rawBytes); err != nil {
+		return nil, err
+	}
+	rawKey := "bl_" + base64.RawURLEncoding.EncodeToString(rawBytes)
+	hash := sha256.Sum256([]byte(rawKey))
+	return &GeneratedKey{
+		RawKey:    rawKey,
+		KeyHash:   hex.EncodeToString(hash[:]),
+		KeyPrefix: rawKey[:11],
+	}, nil
 }
 
 func hashKey(key string) string {

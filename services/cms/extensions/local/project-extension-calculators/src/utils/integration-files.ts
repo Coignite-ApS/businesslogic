@@ -6,6 +6,7 @@ export interface IntegrationFileParams {
 	effectiveId: string;
 	toolName: string;
 	formulaApiUrl: string;
+	mcpUrl?: string;
 	apiKey: string;
 	inputParams: Record<string, InputParameter>;
 	outputParams: Record<string, OutputParameter>;
@@ -44,7 +45,7 @@ function buildSampleBody(entries: [string, { type: string; default?: unknown }][
 
 export function generateSkillMd(params: IntegrationFileParams): string {
 	const desc = params.calculatorDescription || params.calculatorName;
-	const endpoint = `${params.formulaApiUrl}/execute/calculator/${params.effectiveId}`;
+	const endpoint = `${params.formulaApiUrl}/execute/${params.effectiveId}`;
 	const inputEntries = Object.entries(params.inputParams);
 	const outputEntries = Object.entries(params.outputParams);
 	const sampleBody = buildSampleBody(inputEntries);
@@ -102,7 +103,7 @@ export function generatePluginJson(params: IntegrationFileParams): string {
 		description_for_model: desc,
 		api: {
 			type: 'openapi',
-			url: `${params.formulaApiUrl}/calculator/${params.effectiveId}/describe`,
+			url: `${params.formulaApiUrl}/describe/${params.effectiveId}`,
 		},
 		auth: {
 			type: 'service_http',
@@ -117,7 +118,7 @@ export function generateMcpJson(params: IntegrationFileParams): string {
 	const obj = {
 		mcpServers: {
 			[params.toolName]: {
-				url: `${params.formulaApiUrl}/mcp/calculator/${params.effectiveId}`,
+				url: `${params.mcpUrl || params.formulaApiUrl}/${params.effectiveId}`,
 				headers: { 'X-API-Key': params.apiKey },
 			},
 		},

@@ -331,7 +331,6 @@
 				@launch="$emit('launch')"
 				@configure="navigateToConfigure"
 				@test="navigateToTest"
-				@regenerate-api-key="$emit('regenerate-api-key', 'test')"
 				@enable-test="$emit('enable-test')"
 				@disable-test="$emit('disable-test')"
 				@download="$emit('download-excel', testConfig!.id, `${calculator.id}-test-v${versionKey(testConfig)}.xlsx`)"
@@ -355,7 +354,6 @@
 				:action-error="actionError"
 				@activate="$emit('activate')"
 				@deactivate="$emit('deactivate')"
-				@regenerate-api-key="$emit('regenerate-api-key', 'prod')"
 				@download="$emit('download-excel', prodConfig!.id, `${calculator.id}-live-v${versionKey(prodConfig)}.xlsx`)"
 			/>
 		</template>
@@ -389,6 +387,7 @@ const props = defineProps<{
 	liveTestResult: unknown;
 	liveTestError: string | null;
 	actionError?: string | null;
+	gatewayApiKey?: string;
 }>();
 
 const emit = defineEmits<{
@@ -403,7 +402,6 @@ const emit = defineEmits<{
 	'complete-onboarding': [];
 	activate: [];
 	deactivate: [];
-	'regenerate-api-key': [env: string];
 	'enable-test': [];
 	'disable-test': [];
 	'download-excel': [configId: string, filename: string];
@@ -619,7 +617,7 @@ const sampleBody = computed(() => {
 const snippetParams = computed<SnippetParams>(() => ({
 	baseUrl: props.formulaApiUrl || '',
 	calculatorId: props.calculator.id,
-	apiKey: prodConfig.value?.api_key || 'YOUR_API_KEY',
+	apiKey: props.gatewayApiKey || 'YOUR_API_KEY',
 	sampleBody: sampleBody.value,
 }));
 

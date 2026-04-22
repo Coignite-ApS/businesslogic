@@ -1,0 +1,27 @@
+{
+  "name": "@coignite/bl-events",
+  "version": "0.1.0",
+  "description": "Usage event schema and Redis stream emit helper for BusinessLogic services",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

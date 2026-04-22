@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import { aggregateDailyMetrics } from '../services/metrics-aggregator.js';
+import { reconcileFailedDebits } from '../hooks/wallet-failed-debits.js';
 
 export async function registerRoutes(app) {
   app.get('/ping', async () => ({ status: 'ok' }));
@@ -38,6 +39,33 @@ export async function registerRoutes(app) {
     } catch (err) {
       req.log.error(`aggregate-metrics failed: ${err.message}`);
       return reply.code(500).send({ error: 'Aggregation failed', detail: err.message });
+    }
+  });
+
+  // Admin: reconcile queued failed debits (Task 33).
+  // Replays rows with status='pending' older than RECONCILE_MIN_AGE_MINUTES.
+  app.post('/v1/ai/admin/reconcile-failed-debits', {
+    preHandler: [app.verifyAuth],
+    schema: {
+      body: {
+        type: 'object',
+        properties: {
+          limit:          { type: 'integer', minimum: 1, maximum: 5000 },
+          minAgeMinutes:  { type: 'integer', minimum: 0 },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    if (!req.isAdmin) return reply.code(403).send({ error: 'Admin only' });
+    try {
+      const result = await reconcileFailedDebits({
+        limit: req.body?.limit,
+        minAgeMinutes: req.body?.minAgeMinutes,
+      });
+      return { data: result };
+    } catch (err) {
+      req.log.error(`reconcile-failed-debits failed: ${err.message}`);
+      return reply.code(500).send({ error: 'Reconciliation failed', detail: err.message });
     }
   });
 }

@@ -42,7 +42,6 @@
 				:creating="saving"
 				:has-excel="hasExcel"
 				:has-config="hasConfig"
-				current-view="integration"
 				@create="handleCreate"
 			/>
 		</template>
@@ -60,6 +59,47 @@
 		</div>
 
 		<div v-else-if="currentId && current" class="integration-content">
+			<!-- API Key selector -->
+			<div class="key-selector">
+				<div class="key-selector-label">API Key</div>
+				<div v-if="envCalcKeys.length === 0" class="key-selector-empty">
+					<span class="muted">No {{ env }} API key</span>
+					<v-button x-small @click="ensureCalcKey(env)">Create Key</v-button>
+				</div>
+				<div v-else-if="envCalcKeys.length === 1" class="key-selector-single">
+					<code class="key-mono">{{ apiKey }}</code>
+					<v-icon
+						class="key-copy"
+						name="content_copy"
+						small
+						clickable
+						v-tooltip.bottom="'Copy'"
+						@click="navigator.clipboard.writeText(apiKey)"
+					/>
+				</div>
+				<div v-else class="key-selector-multi">
+					<select class="key-dropdown" :value="selectedKey?.id" @change="selectKey(($event.target as HTMLSelectElement).value)">
+						<option v-for="k in envCalcKeys" :key="k.id" :value="k.id">{{ k.name }} ({{ k.key_prefix }}…)</option>
+					</select>
+					<code class="key-mono">{{ apiKey }}</code>
+					<v-icon
+						class="key-copy"
+						name="content_copy"
+						small
+						clickable
+						v-tooltip.bottom="'Copy'"
+						@click="navigator.clipboard.writeText(apiKey)"
+					/>
+				</div>
+			</div>
+
+			<!-- Rotation prompt for pre-encryption keys -->
+			<div v-if="selectedKey && !selectedKey.raw_key && selectedKey.key_prefix" class="key-rotation-notice">
+				<v-icon name="warning" small />
+				<span>Key created before encryption — rotate to get full key</span>
+				<v-button x-small @click="rotateKey(selectedKey!.id)">Rotate</v-button>
+			</div>
+
 			<!-- Integration type tabs (dynamic) -->
 			<div class="type-tabs">
 				<button
@@ -241,7 +281,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<p v-if="current">
 						Integration snippets for <strong>{{ current.name }}</strong>.
@@ -278,7 +318,9 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@directus/extensions-sdk';
 import { useCalculators } from '../composables/use-calculators';
+import { useCreateCalculator } from '../composables/use-create-calculator';
 import { useActiveAccount } from '../composables/use-active-account';
+import { useApiKeys } from '../composables/use-api-keys';
 import CalculatorNavigation from '../components/navigation.vue';
 import WidgetTab from '../components/widget-tab.vue';
 import CodeExamples from '../components/code-examples.vue';
@@ -300,13 +342,28 @@ const router = useRouter();
 
 const {
 	calculators, current, loading, saving,
-	fetchAll, fetchOne, create, update: updateCalculator, updateConfig,
-	fetchFormulaApiUrl, fetchApiKey,
+	fetchAll, fetchOne, update: updateCalculator, updateConfig,
+	fetchFormulaApiUrl,
 } = useCalculators(api);
+
+const { handleCreate } = useCreateCalculator(api);
 
 const { activeAccountId, fetchActiveAccount } = useActiveAccount(api);
 
+const {
+	selectedKey,
+	calcKeys,
+	testCalcKeys,
+	liveCalcKeys,
+	fetchKeys,
+	selectKey,
+	selectKeyForEnv,
+	ensureCalcKey,
+	rotateKey,
+} = useApiKeys(api);
+
 const formulaApiUrl = ref<string | null>(null);
+const mcpBaseUrl = ref<string | null>(null);
 const env = ref<'test' | 'live'>('test');
 const integrationTab = ref<'widget' | 'api' | 'ai' | 'mcp' | 'skill' | 'plugin'>('widget');
 const mcpSaving = ref(false);
@@ -341,19 +398,9 @@ const isDeployed = computed(() => {
 	return !!(c?.sheets && c?.formulas && c?.input && c?.output);
 });
 
-const apiKey = ref('');
+const apiKey = computed(() => selectedKey.value?.raw_key || selectedKey.value?.key_prefix || '');
 
-// Fetch decrypted api_key when active config changes
-watch(activeConfig, async (cfg) => {
-	apiKey.value = '';
-	if (cfg?.api_key && cfg.id) {
-		try {
-			apiKey.value = await fetchApiKey(cfg.id);
-		} catch {
-			apiKey.value = '';
-		}
-	}
-}, { immediate: true });
+const envCalcKeys = computed(() => env.value === 'test' ? testCalcKeys.value : liveCalcKeys.value);
 
 const effectiveId = computed(() => {
 	if (!currentId.value) return '';
@@ -520,7 +567,7 @@ const mcpDirty = computed(() => {
 
 const mcpSnippetParams = computed<McpSnippetParams>(() => ({
 	toolName: mcpConfigLocal.value.toolName || 'calculator',
-	mcpUrl: `${formulaApiUrl.value || ''}/mcp/calculator/${effectiveId.value}`,
+	mcpUrl: `${mcpBaseUrl.value || formulaApiUrl.value || ''}/${effectiveId.value}`,
 	apiKey: apiKey.value,
 }));
 
@@ -574,14 +621,6 @@ async function saveMcpLiveToggle() {
 	}
 }
 
-async function handleCreate() {
-	const id = crypto.randomUUID();
-	const accountId = activeAccountId.value || null;
-	const created = await create({ id, name: null, account: accountId, onboarded: false });
-	if (created) {
-		router.push(`/calculators/${created.id}`);
-	}
-}
 
 function handleDownloadSpec() {
 	if (!activeConfig.value || !current.value) return;
@@ -623,6 +662,9 @@ watch([env, testConfig, prodConfig], () => {
 	syncIntegrationFromConfig();
 }, { immediate: true });
 
+// Select gateway key matching env
+watch(env, (e) => { selectKeyForEnv(e); });
+
 // Sync ai_name when current calculator changes
 watch(() => current.value, () => {
 	syncAiNameFromCurrent();
@@ -630,8 +672,12 @@ watch(() => current.value, () => {
 
 fetchActiveAccount().then(() => {
 	fetchAll(activeAccountId.value);
+	fetchKeys();
 });
-fetchFormulaApiUrl().then((url) => { formulaApiUrl.value = url; }).catch(() => {});
+api.get('/calc/formula-api-url').then((res: any) => {
+	formulaApiUrl.value = res.data?.url || '';
+	mcpBaseUrl.value = res.data?.mcpUrl || null;
+}).catch(() => {});
 
 watch(activeAccountId, (id) => { fetchAll(id); });
 watch(currentId, (id) => { if (id) fetchOne(id); }, { immediate: true });
@@ -669,6 +715,76 @@ watch(currentId, (id) => { if (id) fetchOne(id); }, { immediate: true });
 
 .env-tabs .env-tab:not(:first-child):deep(.button) {
 	margin-left: -2px;
+}
+
+.key-selector {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 10px 16px;
+	background: var(--theme--background-subdued);
+	border: var(--theme--border-width) solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	margin-bottom: 16px;
+}
+
+.key-selector-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--theme--foreground-subdued);
+	white-space: nowrap;
+}
+
+.key-selector-empty,
+.key-selector-single,
+.key-selector-multi {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+
+.key-mono {
+	font-family: var(--theme--fonts--monospace--font-family, monospace);
+	font-size: 13px;
+	word-break: break-all;
+}
+
+.key-copy {
+	color: var(--theme--foreground-subdued);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.key-copy:hover {
+	color: var(--theme--foreground);
+}
+
+.key-dropdown {
+	padding: 4px 8px;
+	border: var(--theme--border-width) solid var(--theme--border-color);
+	border-radius: var(--theme--border-radius);
+	background: var(--theme--background);
+	font-size: 13px;
+	max-width: 200px;
+}
+
+.key-rotation-notice {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 16px;
+	background: var(--theme--warning-background);
+	border-radius: var(--theme--border-radius);
+	font-size: 13px;
+	color: var(--theme--warning);
+	margin-bottom: 16px;
+}
+
+.muted {
+	color: var(--theme--foreground-subdued);
+	font-size: 14px;
 }
 
 .type-tabs {

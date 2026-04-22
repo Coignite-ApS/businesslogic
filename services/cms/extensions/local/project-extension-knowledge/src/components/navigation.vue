@@ -1,16 +1,22 @@
 <template>
-	<div class="kb-navigation">
+	<div class="nav-container">
 		<v-list nav>
+			<v-list-item to="/knowledge" :active="!currentId" clickable>
+				<v-list-item-icon><v-icon name="dashboard" /></v-list-item-icon>
+				<v-list-item-content><v-text-overflow text="Dashboard" /></v-list-item-content>
+			</v-list-item>
+
+			<v-divider />
+
 			<v-list-item
 				v-for="kb in knowledgeBases"
 				:key="kb.id"
-				:active="kb.id === currentId"
+				:to="`/knowledge/${kb.id}`"
 				clickable
-				@click="$emit('select', kb.id)"
 			>
 				<v-list-item-icon><v-icon :name="kb.icon || 'menu_book'" /></v-list-item-icon>
 				<v-list-item-content>
-					<span class="kb-name">{{ kb.name }}</span>
+					<v-text-overflow :text="kb.name" class="kb-name" />
 					<span class="kb-meta">
 						{{ kb.document_count }} docs &middot; {{ kb.chunk_count }} chunks
 						<span v-if="kb.contextual_retrieval_enabled !== false" class="feature-badge" title="Contextual Retrieval">CR</span>
@@ -20,12 +26,14 @@
 			</v-list-item>
 		</v-list>
 
-		<div class="nav-actions">
-			<v-button full-width :loading="creating" @click="$emit('create')">
-				<v-icon name="add" />
-				New Knowledge Base
-			</v-button>
-		</div>
+		<v-info v-if="!loading && knowledgeBases.length === 0" icon="menu_book" title="No Knowledge Bases">
+			Create your first knowledge base to get started.
+		</v-info>
+
+		<v-button full-width :disabled="creating" @click="$emit('create')" class="create-button">
+			<v-icon name="add" left />
+			New Knowledge Base
+		</v-button>
 	</div>
 </template>
 
@@ -40,24 +48,30 @@ defineProps<{
 }>();
 
 defineEmits<{
-	select: [id: string];
 	create: [];
 }>();
 </script>
 
 <style scoped>
-.kb-navigation {
+.nav-container {
+	padding: 12px;
+	height: 100%;
 	display: flex;
 	flex-direction: column;
-	height: 100%;
+}
+
+.nav-container :deep(.v-list) {
+	flex: 1;
+	overflow-y: auto;
+}
+
+.create-button {
+	margin-top: auto;
+	flex-shrink: 0;
 }
 
 .kb-name {
-	display: block;
 	font-weight: 500;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .kb-meta {
@@ -76,10 +90,5 @@ defineEmits<{
 	color: var(--theme--primary);
 	margin-left: 4px;
 	vertical-align: middle;
-}
-
-.nav-actions {
-	margin-top: auto;
-	padding: 12px;
 }
 </style>

@@ -142,7 +142,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Tool Analytics" close>
+			<sidebar-detail id="info" icon="info" title="Tool Analytics">
 				<div class="sidebar-info">
 					<p>Per-tool call frequency, error rates, latency, sequential call patterns, and unused tool detection over the selected period.</p>
 				</div>

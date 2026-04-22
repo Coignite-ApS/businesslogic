@@ -210,7 +210,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="info" title="Model Performance" close>
+			<sidebar-detail id="info" icon="info" title="Model Performance">
 				<div class="sidebar-info">
 					<p>Compare AI model performance across cost, latency, and task types. Use this data to optimize model routing — e.g. directing KB queries to cheaper models while using premium models for complex calculator builds.</p>
 					<p style="margin-top: 8px; font-size: 12px; color: var(--theme--foreground-subdued);">Task types are derived from tool_calls: KB tools = knowledge, calculator tools = calculator, no tools = general chat, other tools = tool use.</p>

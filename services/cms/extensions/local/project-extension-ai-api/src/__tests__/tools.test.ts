@@ -30,7 +30,7 @@ function makeDeps(dbOverrides?: Record<string, any>): ToolExecutorDeps {
 	return {
 		db: createMockDb(),
 		accountId: 'acc-123',
-		gatewayCalcUrl: 'http://bl-gateway:8080/internal/calc',
+		gatewayCalcUrl: 'http://bl-gateway:8080/internal/formula',
 		internalSecret: 'dev-internal-secret',
 		encryptionKey: undefined,
 		logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -76,7 +76,7 @@ describe('AI_TOOLS definitions', () => {
 		expect(names).toContain('get_calculator_config');
 		expect(names).toContain('configure_calculator');
 		expect(names).toContain('deploy_calculator');
-		expect(AI_TOOLS.length).toBe(14);
+		expect(AI_TOOLS.length).toBe(15);
 	});
 
 	it('create_calculator requires id and name', () => {
@@ -142,12 +142,12 @@ describe('create_calculator', () => {
 		setupDb(deps, [
 			{ table: 'calculators', result: null }, // uniqueness check — not found
 			{ table: 'account', result: { exempt_from_subscription: false } }, // account check
-			{ table: 'subscriptions', result: { calculator_limit: 2 } }, // sub limit
+			{ table: 'subscriptions', result: { slot_allowance: 2, tier: 'starter', status: 'active' } }, // v2: getActiveSubscription helper returns slot_allowance from joined subscription_plans
 			{ table: 'calculators', result: { count: '2' } }, // count
 		]);
 		const res = await executeTool('create_calculator', { id: 'my-calc', name: 'Test' }, deps);
 		expect(res.isError).toBe(true);
-		expect(res.result).toContain('limit reached');
+		expect(res.result).toContain('slot limit reached');
 	});
 
 	it('creates calculator and both configs on success', async () => {
@@ -305,8 +305,10 @@ describe('get_calculator_config', () => {
 		expect(result.has_sheets).toBe(true);
 		expect(result.has_formulas).toBe(true);
 		expect(result.is_complete).toBe(true);
-		expect(result.input_field_names).toEqual(['amount']);
-		expect(result.output_field_names).toEqual(['result']);
+		expect(result.input).toEqual({ properties: { amount: { type: 'number', title: 'Amount' } } });
+		expect(result.output).toEqual({ properties: { result: { type: 'number', title: 'Result' } } });
+		expect(result.sheets).toEqual([{ name: 'Sheet1' }]);
+		expect(result.formulas).toEqual([{ id: 'f1' }]);
 	});
 
 	it('rejects if calculator not in account', async () => {

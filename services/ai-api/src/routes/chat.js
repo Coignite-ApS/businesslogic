@@ -14,6 +14,9 @@ import { getAllowedKbIds } from '../utils/kb-access.js';
 import { checkBudget, recordCost, getConversationBudgetWarning, injectBudgetWarning } from '../services/budget.js';
 import { compressIfNeeded } from '../services/summarize.js';
 import { resolveWidget } from '../widgets/resolver.js';
+import { debitWallet } from '../hooks/wallet-debit.js';
+import { recordFailedDebit } from '../hooks/wallet-failed-debits.js';
+import { emitAiMessage } from '../services/usage-events.js';
 
 export async function registerRoutes(app) {
   // ─── Chat (SSE) ────────────────────────────────────────────
@@ -69,7 +72,7 @@ export async function registerRoutes(app) {
     if (!req.isAdmin) {
       quota = await checkAiQuota(accountId);
       if (!quota.allowed) {
-        return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+        return reply.code(402).send({ error: quota.reason, code: 'WALLET_EMPTY' });
       }
     }
 
@@ -398,6 +401,69 @@ export async function registerRoutes(app) {
           await recordCost(accountId, conversationId, costUsd);
         }
 
+        // Debit AI Wallet (skip for admins; best-effort — failure logged but doesn't block response)
+        if (!req.isAdmin && accountId) {
+          try {
+            const debit = await debitWallet({
+              accountId,
+              costUsd,
+              model,
+              module: 'ai',
+              eventKind: 'ai.message',
+              apiKeyId: req.apiKeyId || null,
+              metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
+            });
+            if (!debit.ok) {
+              // User already got the answer, Anthropic already charged us — wallet
+              // was not debited. Persist failure row so the reconciler can retry.
+              req.log.error(
+                { accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, reason: debit.reason },
+                'wallet debit failed post-chat — failure row queued',
+              );
+              await recordFailedDebit({
+                accountId, costUsd, model,
+                inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+                eventKind: 'ai.message', module: 'ai',
+                apiKeyId: req.apiKeyId || null,
+                conversationId,
+                errorReason: 'debit_returned_not_ok',
+                errorDetail: debit.reason,
+              });
+            } else {
+              req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model }, 'wallet debit ok');
+              if (debit.autoReloadTriggered) {
+                req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+              }
+            }
+          } catch (err) {
+            req.log.error(
+              { err, accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+              'wallet debit threw post-chat — failure row queued',
+            );
+            await recordFailedDebit({
+              accountId, costUsd, model,
+              inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+              eventKind: 'ai.message', module: 'ai',
+              apiKeyId: req.apiKeyId || null,
+              conversationId,
+              errorReason: 'debit_threw',
+              errorDetail: err?.stack || err?.message || String(err),
+            });
+          }
+        }
+
+        // Emit ai.message usage event (fire-and-forget)
+        if (accountId && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+          emitAiMessage({
+            accountId,
+            apiKeyId: req.apiKeyId || null,
+            model,
+            conversationId: conversationId || null,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+          });
+        }
+
         // Note: cannot setHeader after writeHead() — usage data is in the done event payload
         const donePayload = {
           usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens, model, cost_usd: costUsd },
@@ -477,7 +543,7 @@ export async function registerRoutes(app) {
     if (!req.isAdmin) {
       quota = await checkAiQuota(accountId);
       if (!quota.allowed) {
-        return reply.code(429).send({ error: quota.reason, code: 'QUOTA_EXCEEDED' });
+        return reply.code(402).send({ error: quota.reason, code: 'WALLET_EMPTY' });
       }
     }
 
@@ -763,6 +829,67 @@ export async function registerRoutes(app) {
       // Record cost to Redis budget counters
       if (!req.isAdmin) {
         await recordCost(accountId, conversationId, costUsd);
+      }
+
+      // Debit AI Wallet (skip for admins; best-effort)
+      if (!req.isAdmin && accountId) {
+        try {
+          const debit = await debitWallet({
+            accountId,
+            costUsd,
+            model,
+            module: 'ai',
+            eventKind: 'ai.message',
+            apiKeyId: req.apiKeyId || null,
+            metadata: { conversation_id: conversationId, response_time_ms: responseTimeMs },
+          });
+          if (!debit.ok) {
+            req.log.error(
+              { accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, reason: debit.reason },
+              'wallet debit failed post-chat/sync — failure row queued',
+            );
+            await recordFailedDebit({
+              accountId, costUsd, model,
+              inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+              eventKind: 'ai.message', module: 'ai',
+              apiKeyId: req.apiKeyId || null,
+              conversationId,
+              errorReason: 'debit_returned_not_ok',
+              errorDetail: debit.reason,
+            });
+          } else {
+            req.log.debug({ accountId, costEur: debit.costEur, newBalance: debit.newBalance, model }, 'wallet debit ok');
+            if (debit.autoReloadTriggered) {
+              req.log.info({ accountId, amount: debit.autoReloadAmountEur }, 'wallet auto-reload threshold crossed');
+            }
+          }
+        } catch (err) {
+          req.log.error(
+            { err, accountId, costUsd, model, inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+            'wallet debit threw post-chat/sync — failure row queued',
+          );
+          await recordFailedDebit({
+            accountId, costUsd, model,
+            inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+            eventKind: 'ai.message', module: 'ai',
+            apiKeyId: req.apiKeyId || null,
+            conversationId,
+            errorReason: 'debit_threw',
+            errorDetail: err?.stack || err?.message || String(err),
+          });
+        }
+      }
+
+      // Emit ai.message usage event (fire-and-forget)
+      if (accountId && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+        emitAiMessage({
+          accountId,
+          apiKeyId: req.apiKeyId || null,
+          model,
+          conversationId: conversationId || null,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+        });
       }
 
       reply.header('X-AI-Cost', String(costUsd));

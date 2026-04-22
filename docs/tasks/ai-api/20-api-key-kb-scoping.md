@@ -1,6 +1,6 @@
 # ai-api/20 — API Key → KB Scoping
 
-**Status:** in-progress
+**Status:** completed
 **Priority:** critical
 **Service:** ai-api, cms
 **Spec:** [docs/superpowers/specs/2026-04-02-api-key-kb-scoping-design.md](../../superpowers/specs/2026-04-02-api-key-kb-scoping-design.md)
@@ -23,7 +23,7 @@ Enforce per-KB access restrictions on API keys. Currently all API keys within an
 - [x] CMS API key UI — verified `resource-picker.vue` already builds `services.kb.resources` correctly
 - [x] Tests: 13 kb-access unit tests + 14 kb-scoping tests (27 total)
 - [x] Verify backwards compat: existing keys with `resources: null`/missing → unrestricted (null = all)
-- [ ] CMS: fix pre-existing `summarizePermissions(null)` test assertion (returns "Full access" not "No permissions")
+- [x] CMS: fix pre-existing `summarizePermissions(null)` test assertion — impl returns 'Full access' for null (correct), 'No permissions' for empty services; all 15 tests pass
 
 ## Affected Files
 

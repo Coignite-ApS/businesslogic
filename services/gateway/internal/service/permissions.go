@@ -100,6 +100,16 @@ func ParsePermissions(data []byte) ResourcePermissions {
 	return ResourcePermissions{Services: nil}
 }
 
+func strSlicePtr(s []string) *[]string { return &s }
+
+var DefaultPermissions = ResourcePermissions{
+	Services: map[string]ServicePermission{
+		"calc": {Enabled: true, Resources: strSlicePtr([]string{"*"}), Actions: strSlicePtr([]string{"execute", "describe"})},
+		"kb":   {Enabled: true, Resources: strSlicePtr([]string{"*"}), Actions: strSlicePtr([]string{"search", "ask"})},
+		"flow": {Enabled: true, Resources: strSlicePtr([]string{"*"}), Actions: strSlicePtr([]string{"trigger"})},
+	},
+}
+
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {

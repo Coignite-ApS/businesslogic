@@ -7,16 +7,7 @@
 		</template>
 
 		<template #navigation>
-			<v-list nav>
-				<v-list-item to="/account" :active="!isSubscriptionRoute" clickable>
-					<v-list-item-icon><v-icon name="settings" /></v-list-item-icon>
-					<v-list-item-content>Account Settings</v-list-item-content>
-				</v-list-item>
-				<v-list-item to="/account/subscription" :active="isSubscriptionRoute" clickable>
-					<v-list-item-icon><v-icon name="credit_card" /></v-list-item-icon>
-					<v-list-item-content>Subscription</v-list-item-content>
-				</v-list-item>
-			</v-list>
+			<account-navigation />
 		</template>
 
 		<div class="module-content" v-if="activeAccountId">
@@ -251,7 +242,7 @@
 		</div>
 
 		<template #sidebar>
-			<sidebar-detail icon="people" title="Account" close>
+			<sidebar-detail id="account" icon="people" title="Account">
 				<account-selector
 					:model-value="activeAccountId"
 					:accounts="accounts"
@@ -259,7 +250,7 @@
 					@update:model-value="handleAccountChange"
 				/>
 			</sidebar-detail>
-			<sidebar-detail icon="info" title="Information" close>
+			<sidebar-detail id="info" icon="info" title="Information">
 				<div class="sidebar-info">
 					<p v-if="activeAccountId">
 						<strong>Account ID:</strong><br />
@@ -278,21 +269,25 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
-import { useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { useAccount } from '../composables/use-account';
+import { useOnboarding, registerOnboardingGuard } from '../composables/use-onboarding';
+import AccountNavigation from '../components/account-navigation.vue';
 import AccountSelector from '../components/account-selector.vue';
 import ResourcePicker from '../components/resource-picker.vue';
 import { buildPermissions, parsePermissions, summarizePermissions } from '../utils/permissions';
 import type { PermissionSelection } from '../utils/permissions';
 
 const api = useApi();
-const route = useRoute();
+const router = useRouter();
 
 const {
 	accounts, activeAccountId, subscription, loading, error,
 	fetchAccounts, setActiveAccount, fetchSubscription, updateAccount,
 	apiKeys, fetchApiKeys, createApiKey, updateApiKey, revokeApiKey, rotateApiKey,
 } = useAccount(api);
+
+const { needsWizard, fetchOnboardingState } = useOnboarding(api);
 
 const accountName = ref('');
 const saving = ref(false);
@@ -321,8 +316,6 @@ const editOrigins = ref('');
 const editIPs = ref('');
 
 const GATEWAY_URL = 'https://api.businesslogic.online';
-
-const isSubscriptionRoute = computed(() => route.path.includes('/subscription'));
 
 const currentAccount = computed(() =>
 	accounts.value.find((a) => a.id === activeAccountId.value),
@@ -471,9 +464,22 @@ watch(activeAccountId, () => {
 
 onMounted(async () => {
 	await fetchAccounts();
-	await fetchSubscription();
+	await Promise.all([fetchSubscription(), fetchOnboardingState()]);
 	await fetchUsageStats();
 	await fetchApiKeys();
+
+	// ── Immediate redirect (current navigation) ──────────────────────────────
+	// Redirect new users (no module activated, wizard not dismissed) to the wizard.
+	// Skip if already on the onboarding route to avoid redirect loops.
+	if (needsWizard.value && !router.currentRoute.value.path.includes('/onboarding')) {
+		router.push('/account/onboarding');
+	}
+
+	// ── Global session guard ─────────────────────────────────────────────────
+	// Register a router.beforeEach guard so that any navigation away from the
+	// wizard is intercepted and redirected back.  registerOnboardingGuard
+	// ensures at most one guard is active at a time.
+	registerOnboardingGuard(router, () => needsWizard.value);
 });
 </script>
 

@@ -116,4 +116,30 @@ export const config = {
 
   // Instance identity
   instanceId: env.INSTANCE_ID || `${os.hostname()}-${Math.random().toString(36).slice(2, 8)}`,
+
+  // Secret validation opt-out (for local dev without secrets)
+  skipSecretValidation: env.SKIP_SECRET_VALIDATION === 'true',
 };
+
+/**
+ * Validate critical secrets are present. Call during startup.
+ * Exits process if secrets missing and SKIP_SECRET_VALIDATION !== 'true'.
+ */
+export function validateSecrets() {
+  const required = [
+    ['GATEWAY_SHARED_SECRET', config.gatewaySharedSecret],
+    ['AI_API_ADMIN_TOKEN', config.adminToken],
+  ];
+  const missing = required.filter(([, v]) => !v).map(([k]) => k);
+
+  if (missing.length === 0) return;
+
+  if (config.skipSecretValidation) {
+    console.warn(`[config] SKIP_SECRET_VALIDATION=true — missing secrets ignored: ${missing.join(', ')}`);
+    return;
+  }
+
+  console.error(`[config] FATAL: missing required secrets: ${missing.join(', ')}`);
+  console.error('[config] Set them or use SKIP_SECRET_VALIDATION=true for local dev');
+  process.exit(1);
+}

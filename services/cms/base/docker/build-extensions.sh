@@ -28,6 +28,18 @@ for SRC_DIR in "$@"; do
     for ext_dir in "$SRC_DIR"/*/; do
         if [ -d "$ext_dir" ] && [ -f "$ext_dir/package.json" ]; then
             name=$(basename "$ext_dir")
+
+            # Shared libraries carry a no-op directus:extension bundle manifest
+            # (see bl:shared-lib convention). They are pre-seeded by the Dockerfile
+            # before this script runs. Build them normally — their no-op entries []
+            # produce dist/app.js + dist/api.js which the post-build check accepts.
+            if ! grep -q '"directus:extension"' "$ext_dir/package.json"; then
+                # Legacy path: truly manifest-less dir — copy in-place and skip build.
+                echo "Copying $name (no directus:extension manifest)"
+                cp -r "$ext_dir" "/directus/extensions/$name"
+                continue
+            fi
+
             echo "----------------------------------------"
             echo "Building: $name"
             echo "----------------------------------------"
@@ -40,9 +52,10 @@ for SRC_DIR in "$@"; do
             npm install --include=dev
             npx directus-extension build
 
-            # Verify build succeeded
-            if [ ! -f "dist/index.js" ]; then
-                echo "ERROR: Build failed - dist/index.js not found for $name"
+            # Verify build succeeded — hook extensions produce dist/index.js,
+            # bundle extensions produce dist/app.js + dist/api.js; accept either.
+            if [ ! -f "dist/index.js" ] && [ ! -f "dist/app.js" ] && [ ! -f "dist/api.js" ]; then
+                echo "ERROR: Build failed - no dist output found for $name"
                 exit 1
             fi
 

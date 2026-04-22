@@ -1,12 +1,15 @@
 import type { DB } from './types.js';
+import { getActiveSubscription } from '../../_shared/v2-subscription.js';
 
 export interface SubscriptionInfo {
 	exempt: boolean;
+	/** v2: number of slots the account is allowed to consume (was v1 calculator_limit). */
 	calculator_limit: number | null;
+	/** Active calculators belonging to the account. Until task 19 ships size classes, 1 calc = 1 slot. */
 	active_count: number;
 }
 
-/** Get subscription limit info for an account */
+/** Get subscription limit info for an account (calculators module). */
 export async function getSubscriptionInfo(db: DB, accountId: string): Promise<SubscriptionInfo> {
 	const account = await db('account')
 		.where('id', accountId)
@@ -17,12 +20,7 @@ export async function getSubscriptionInfo(db: DB, accountId: string): Promise<Su
 		return { exempt: true, calculator_limit: null, active_count: 0 };
 	}
 
-	const sub = await db('subscriptions as s')
-		.join('subscription_plans as sp', 'sp.id', 's.plan')
-		.where('s.account', accountId)
-		.whereNotIn('s.status', ['canceled', 'expired'])
-		.select('sp.calculator_limit')
-		.first();
+	const sub = await getActiveSubscription(db, accountId, 'calculators');
 
 	const { count } = await db('calculators')
 		.where('account', accountId)
@@ -32,7 +30,9 @@ export async function getSubscriptionInfo(db: DB, accountId: string): Promise<Su
 
 	return {
 		exempt: false,
-		calculator_limit: sub?.calculator_limit ?? null,
+		// v2: slot_allowance replaces v1 calculator_limit (semantic shift — 1 calc = 1 slot
+		// until task 19 ships size classification populating calculator_slots.slots_consumed).
+		calculator_limit: sub?.slot_allowance ?? null,
 		active_count: parseInt(count, 10) || 0,
 	};
 }
@@ -130,38 +130,28 @@ export function requireActiveSubscription(db: DB) {
 				return next();
 			}
 
-			// Get subscription with plan limits
-			const sub = await db('subscriptions as s')
-				.join('subscription_plans as sp', 'sp.id', 's.plan')
-				.where('s.account', user.active_account)
-				.select(
-					's.status',
-					's.trial_end',
-					'sp.calls_per_month',
-					'sp.calls_per_second',
-					'sp.calculator_limit',
-				)
-				.first();
+			// v2: get the calculators-module subscription joined with its plan allowances.
+			const sub = await getActiveSubscription(db, user.active_account, 'calculators');
 
 			if (!sub) {
-				return res.status(403).json({ errors: [{ message: 'No subscription found. Please subscribe.' }] });
+				return res.status(403).json({ errors: [{ message: 'No active Calculators subscription. Please subscribe.' }] });
 			}
 
-			// Reject canceled/expired
-			if (sub.status === 'canceled' || sub.status === 'expired') {
-				return res.status(403).json({ errors: [{ message: `Subscription ${sub.status}. Please subscribe to continue.` }] });
-			}
-
-			// Reject trial past end date
+			// (status filter `whereNotIn('canceled','expired')` already done in
+			// getActiveSubscription; only trial-expiry is left to enforce here.)
 			if (sub.status === 'trialing' && sub.trial_end && new Date(sub.trial_end) < new Date()) {
-				return res.status(403).json({ errors: [{ message: 'Trial expired. Please subscribe to continue.' }] });
+				return res.status(403).json({ errors: [{ message: 'Calculators trial expired. Please subscribe to continue.' }] });
 			}
 
-			// Attach limits for downstream use
+			// Attach limits for downstream use.
+			// Field renames vs v1:
+			//   calls_per_month   → request_allowance
+			//   calls_per_second  → rps_allowance (DB-backed; migration 038)
+			//   calculator_limit  → slot_allowance (1 calc = 1 slot until task 19)
 			req.subscriptionLimits = {
-				calls_per_month: sub.calls_per_month,
-				calls_per_second: sub.calls_per_second,
-				calculator_limit: sub.calculator_limit,
+				calls_per_month: sub.request_allowance,
+				calls_per_second: sub.rps_allowance,
+				calculator_limit: sub.slot_allowance,
 			};
 
 			next();

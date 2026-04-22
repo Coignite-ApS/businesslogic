@@ -2,21 +2,35 @@
 
 This directory holds rolling database snapshots for the BusinessLogic platform.
 
-**Managed by:** `/project-review` skill (automatic) or manual `pg_dump`
+**Managed by:** `/db-admin` skill (per-task `pre_/post_` snapshots), `/project-review` (routine), or manual `pg_dump`.
 
-**Policy:** Keep 5 most recent snapshots. Older ones are automatically rotated out.
+**Retention policy (count-based, never time-based):**
+- Routine `snapshot_YYYYMMDD_HHMMSS[_slug].sql.gz` — keep last **10** (`KEEP_ROUTINE`)
+- Task-bound `pre_<slug>_*.sql.gz` and `post_<slug>_*.sql.gz` — keep last **20 task slugs** (`KEEP_TASK`); `pre`+`post` of the same slug are deleted together
+- Dryrun `dryrun_<purpose>_*.sql.gz` — keep last **2** (`KEEP_DRYRUN`); aggressively pruned
+- Nothing is ever deleted because of age
 
-**Format:** `snapshot_YYYYMMDD_HHMMSS_branchname.sql.gz`
+Run `make prune` to apply rotation. See `.claude/skills/db-admin/SKILL.md` for the full workflow.
+
+**Formats (strict — anything else is "irregular" and must be renamed or deleted manually):**
+- `snapshot_YYYYMMDD_HHMMSS[_slug].sql.gz` — routine baseline (real history)
+- `pre_<slug>_YYYYMMDD_HHMMSS.sql.gz` — before a db-admin task (real history)
+- `post_<slug>_YYYYMMDD_HHMMSS.sql.gz` — after a db-admin task (real history)
+- `dryrun_<purpose>_YYYYMMDD_HHMMSS.sql.gz` — exploratory / cancelled (NOT history)
+
+**Irregular files** — names that look like ours (start with `snapshot_/pre_/post_/dryrun_`) but don't match the strict timestamp pattern — are reported by `make prune` and **never auto-deleted**. Goal: this directory contains only files you'd consult during an incident.
 
 **Schema-only export:** `schema_current.sql` (always up-to-date after review)
 
-## Manual Operations
+## Quick Operations
 
 ```bash
-# Take a snapshot
-docker compose -f infrastructure/docker/docker-compose.dev.yml exec -T postgres \
-  pg_dump -U directus -d directus --clean --if-exists | gzip > \
-  infrastructure/db-snapshots/snapshot_$(date +%Y%m%d_%H%M%S).sql.gz
+# Routine snapshot
+make snapshot
+
+# Task-bound snapshot (REQUIRED for db-admin workflow)
+make snapshot-pre  SLUG=<task-slug>
+make snapshot-post SLUG=<task-slug>
 
 # Restore from snapshot
 gunzip -c infrastructure/db-snapshots/snapshot_XXXXX.sql.gz | \

@@ -280,9 +280,8 @@ fn chunk_document(text: &str, source_file: &str, cfg: &ChunkConfig) -> Vec<Chunk
                     token_count: tokens,
                 });
                 global_index += 1;
-            } else if !chunks.is_empty() {
+            } else if let Some(prev) = chunks.last_mut() {
                 // Merge tiny section into previous
-                let prev = chunks.last_mut().unwrap();
                 let merged = format!("{}\n\n{}", prev.content, content);
                 let merged_tokens = estimate_tokens(&merged);
                 if merged_tokens <= cfg.max_size {

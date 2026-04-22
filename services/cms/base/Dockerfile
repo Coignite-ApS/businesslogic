@@ -71,12 +71,40 @@ RUN /directus/docker/build-extensions.sh /tmp/base-extensions && \
     rm -rf /tmp/base-extensions
 
 # -----------------------------------------------------------------------------
+# 3b. Copy shared packages from the repo root (for file: dependencies)
+# -----------------------------------------------------------------------------
+# project-extension-ai-assistant's package.json has "file:../../../../../packages/bl-widget".
+# We need only package.json (for install resolution) and dist/ (for imports) —
+# copying the full dir pulls host node_modules (~77MB) that rm can't reclaim later.
+COPY --from=packages --chown=node:node bl-widget/package.json /packages/bl-widget/package.json
+COPY --from=packages --chown=node:node bl-widget/dist /packages/bl-widget/dist
+
+# -----------------------------------------------------------------------------
 # 4. Build project-specific local extensions
 # -----------------------------------------------------------------------------
 COPY --chown=node:node extensions/local* /tmp/project-extensions/
 COPY --chown=node:node extensions/shared* /directus/shared/
+# Strip host node_modules and package-lock.json from all project extensions.
+# node_modules: stale symlinks confuse npm's arborist tree.
+# package-lock.json: "link":true entries in the lockfile cause arborist #loadLink to
+#   fail with "Cannot read properties of undefined (reading 'extraneous')" in npm 10.x.
+#   Without a lockfile, npm does a fresh idealTree build and resolves file: links correctly.
+RUN find /tmp/project-extensions -maxdepth 2 \( -name node_modules -type d -o -name package-lock.json \) -exec rm -rf {} + 2>/dev/null; true
+# Pre-seed all shared libraries to /directus/extensions/ before any extension
+# build runs. build-extensions.sh processes dirs alphabetically — ai-assistant
+# (a) is built before feature-gate (f) is copied, causing Rollup to fail
+# resolving "../../project-extension-feature-gate/src/...".
+# Shared libs are identified by "bl:shared-lib": true in their package.json
+# (explicit positive marker, stable regardless of directus:extension presence).
+RUN for d in /tmp/project-extensions/*/; do \
+      if [ -f "$d/package.json" ] && grep -q '"bl:shared-lib"' "$d/package.json"; then \
+        name=$(basename "$d"); \
+        echo "Pre-seeding shared lib: $name"; \
+        cp -r "$d" "/directus/extensions/$name"; \
+      fi; \
+    done
 RUN /directus/docker/build-extensions.sh /tmp/project-extensions && \
-    rm -rf /tmp/project-extensions /directus/shared
+    rm -rf /tmp/project-extensions /directus/shared /packages/bl-widget
 
 # -----------------------------------------------------------------------------
 # 5. Copy runtime scripts (from base/)

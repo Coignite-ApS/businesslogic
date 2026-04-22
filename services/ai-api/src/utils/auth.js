@@ -123,7 +123,19 @@ export async function getActiveAccount(userId) {
   return row?.active_account || null;
 }
 
-/** Check subscription status and AI quota */
+/**
+ * Check whether the account is allowed to make AI calls.
+ *
+ * v2 NOTE: per-tier monthly query quotas (`sp.ai_queries_per_month`) and
+ * per-tier model allowlists (`sp.ai_allowed_models`) were removed. AI access
+ * is now metered against the per-account `ai_wallet.balance_eur`. If the
+ * balance is ≤ 0, AI calls are blocked. The actual €-cost debit happens
+ * after the call completes (task 18).
+ *
+ * Return shape preserved (`queriesLimit`, `queriesUsed`, `periodStart`,
+ * `periodEnd`, `allowedModels`) so existing callers continue to work — but
+ * the meaningful field is now `walletBalanceEur` / the boolean `allowed`.
+ */
 export async function checkAiQuota(accountId) {
   if (!accountId) return { allowed: false, reason: 'No account' };
 
@@ -132,77 +144,58 @@ export async function checkAiQuota(accountId) {
     'SELECT exempt_from_subscription FROM account WHERE id = $1',
     [accountId],
   );
+
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
   if (account?.exempt_from_subscription) {
-    return { allowed: true, queriesLimit: null, queriesUsed: 0, periodStart: new Date(), periodEnd: new Date(), allowedModels: null };
-  }
-
-  // Get subscription + plan
-  const sub = await queryOne(
-    `SELECT s.status, s.current_period_start, s.current_period_end, s.trial_start, s.trial_end,
-            sp.ai_queries_per_month, sp.ai_allowed_models
-     FROM subscriptions s
-     JOIN subscription_plans sp ON sp.id = s.plan
-     WHERE s.account = $1 AND s.status NOT IN ('canceled', 'expired')
-     LIMIT 1`,
-    [accountId],
-  );
-
-  if (!sub) return { allowed: false, reason: 'No active subscription' };
-
-  const limit = sub.ai_queries_per_month;
-
-  // 0 = no AI access
-  if (limit === 0) return { allowed: false, reason: "Plan doesn't include AI" };
-
-  // Determine billing period
-  const { periodStart, periodEnd } = getBillingPeriod(sub);
-
-  // null = unlimited
-  if (limit === null || limit === undefined) {
     return {
       allowed: true,
       queriesLimit: null,
       queriesUsed: 0,
       periodStart,
       periodEnd,
-      allowedModels: sub.ai_allowed_models || null,
+      allowedModels: null,
+      walletBalanceEur: Number.POSITIVE_INFINITY,
+      walletMonthlyCapEur: null,
     };
   }
 
-  // Count queries in current period
-  const usage = await queryOne(
-    'SELECT COUNT(*) as count FROM ai_token_usage WHERE account = $1 AND date_created >= $2',
-    [accountId, periodStart.toISOString()],
+  // v2: AI Wallet balance gate. Wallet row is created on signup with €5 promo
+  // credit; missing rows for legacy accounts are treated as zero balance.
+  const wallet = await queryOne(
+    `SELECT balance_eur, monthly_cap_eur, auto_reload_enabled
+     FROM ai_wallet
+     WHERE account_id = $1`,
+    [accountId],
   );
-  const used = parseInt(usage?.count || '0', 10);
 
-  if (used >= limit) {
-    return { allowed: false, reason: `AI query limit reached (${used}/${limit})`, queriesUsed: used, queriesLimit: limit, periodStart, periodEnd };
+  const balance = wallet ? parseFloat(wallet.balance_eur) || 0 : 0;
+  const cap = wallet?.monthly_cap_eur != null ? parseFloat(wallet.monthly_cap_eur) : null;
+
+  if (balance <= 0) {
+    return {
+      allowed: false,
+      reason: 'AI Wallet balance is empty. Top up to continue using the AI Assistant.',
+      queriesLimit: null,
+      queriesUsed: 0,
+      periodStart,
+      periodEnd,
+      allowedModels: null,
+      walletBalanceEur: balance,
+      walletMonthlyCapEur: cap,
+    };
   }
 
   return {
     allowed: true,
-    queriesLimit: limit,
-    queriesUsed: used,
+    queriesLimit: null,
+    queriesUsed: 0,
     periodStart,
     periodEnd,
-    allowedModels: sub.ai_allowed_models || null,
-  };
-}
-
-function getBillingPeriod(sub) {
-  if (sub.current_period_start && sub.current_period_end) {
-    return { periodStart: new Date(sub.current_period_start), periodEnd: new Date(sub.current_period_end) };
-  }
-  if (sub.status === 'trialing' && sub.trial_start) {
-    const start = new Date(sub.trial_start);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 30);
-    return { periodStart: start, periodEnd: end };
-  }
-  const now = new Date();
-  return {
-    periodStart: new Date(now.getFullYear(), now.getMonth(), 1),
-    periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    allowedModels: null,
+    walletBalanceEur: balance,
+    walletMonthlyCapEur: cap,
   };
 }

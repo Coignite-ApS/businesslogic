@@ -26,6 +26,12 @@ import (
 func main() {
 	cfg := config.Load()
 
+	// Validate critical secrets before proceeding
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "[config] FATAL: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Setup logging
 	level, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
@@ -72,6 +78,22 @@ func main() {
 
 	// Key service
 	keyService := service.NewKeyService(rdb, dbPool, cfg.KeyCacheTTL, cfg.NegativeCacheTTL)
+
+	// Sublimit checker (task 27)
+	sublimitChecker := service.NewSublimitChecker(dbPool, rdb)
+
+	// Cache invalidation subscriber (task 42, task 58.10) — dedicated client
+	// for PubSub so Subscribe() does not hold a connection from the main pool.
+	// go-redis/v9 PubSub internally takes its own connection; a dedicated client
+	// makes this explicit and matches formula-api's quotaSubRedis pattern.
+	if rdb != nil {
+		subOpts, _ := redis.ParseURL(cfg.RedisURL) // already validated above; ignore err
+		subRdb := redis.NewClient(subOpts)
+		go func() {
+			service.StartCacheInvalidationSubscriber(ctx, subRdb, log.Logger)
+			subRdb.Close() //nolint:errcheck
+		}()
+	}
 
 	// Response cache
 	responseCache := cache.New(rdb)
@@ -150,6 +172,7 @@ func main() {
 	h = middleware.GatewaySign(cfg.GatewaySharedSecret)(h)
 	h = middleware.CORS(h)
 	h = middleware.RateLimit(keyService)(h)
+	h = middleware.Sublimits(sublimitChecker)(h)
 	h = middleware.RequestLog(requestLogFn)(h)
 	h = middleware.Auth(keyService, rdb)(h)
 	h = middleware.Tracing(h)

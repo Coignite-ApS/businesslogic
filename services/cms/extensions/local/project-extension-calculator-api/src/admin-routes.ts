@@ -18,7 +18,7 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 
 			const [
 				accountCount,
-				subsByPlan,
+				subsMatrix,
 				calcTotal,
 				calcActive,
 				callsToday,
@@ -28,20 +28,29 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 				callsPerDay,
 				accountsPerMonth,
 				mrrResult,
+				walletRevenueMonth,
 				churnedResult,
 				trialConversion,
 				deletionsPerMonth,
 				conversionsPerMonth,
 			] = await Promise.all([
 				db('account').where('exempt_from_subscription', false).count('* as count').first(),
+				// v2 Phase 5: subscriptions grouped by (module, tier) matrix.
+				// Each row = one cell of the matrix with count + summed MRR
+				// (annual cycle normalised to per-month) for that cell.
 				db('subscriptions as s')
-					.join('subscription_plans as sp', 'sp.id', 's.plan')
-					.join('account as a', 'a.id', 's.account')
+					.join('subscription_plans as sp', 'sp.id', 's.subscription_plan_id')
+					.join('account as a', 'a.id', 's.account_id')
 					.where('a.exempt_from_subscription', false)
 					.where('s.status', 'active')
-					.groupBy('sp.name', 'sp.id')
-					.select('sp.name as plan_name')
-					.count('* as count'),
+					.groupBy('s.module', 'sp.tier')
+					.select('s.module as module', 'sp.tier as tier')
+					.count('* as count')
+					.select(db.raw(`COALESCE(SUM(
+						CASE WHEN s.billing_cycle = 'annual' AND sp.price_eur_annual IS NOT NULL
+						THEN sp.price_eur_annual / 12.0
+						ELSE COALESCE(sp.price_eur_monthly, 0) END
+					), 0) as cell_mrr_eur`)),
 				db('calculators').count('* as count').first(),
 				db('calculators').where('activated', true).count('* as count').first(),
 				db('formula.calculator_calls').where('timestamp', '>=', todayStart).count('* as count').first(),
@@ -62,15 +71,23 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					.count('* as count')
 					.groupBy(db.raw("TO_CHAR(date_created, 'YYYY-MM')"))
 					.orderBy('month', 'asc'),
-				// MRR: sum monthly_price for active subs (yearly subs / 12)
+				// v2 MRR (subscriptions only): SUM normalised per-month price across all
+				// active subs in all modules. Annual billing is divided by 12.
 				db('subscriptions as s')
-					.join('subscription_plans as sp', 'sp.id', 's.plan')
+					.join('subscription_plans as sp', 'sp.id', 's.subscription_plan_id')
 					.where('s.status', 'active')
 					.select(db.raw(`COALESCE(SUM(
-						CASE WHEN sp.yearly_price > 0 AND sp.monthly_price = 0
-						THEN sp.yearly_price / 12
-						ELSE sp.monthly_price END
-					), 0) as mrr`))
+						CASE WHEN s.billing_cycle = 'annual' AND sp.price_eur_annual IS NOT NULL
+						THEN sp.price_eur_annual / 12.0
+						ELSE COALESCE(sp.price_eur_monthly, 0) END
+					), 0) as mrr_eur`))
+					.first(),
+				// AI Wallet revenue this month — completed top-ups only. Separate
+				// from subscription MRR because it's pay-as-you-go (one-time).
+				db('ai_wallet_topup')
+					.where('status', 'completed')
+					.where('date_created', '>=', monthStart)
+					.select(db.raw('COALESCE(SUM(amount_eur), 0) as wallet_revenue_eur'))
 					.first(),
 				// Churned in last 30 days
 				db('subscriptions')
@@ -104,12 +121,43 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					.orderBy('month', 'asc'),
 			]);
 
-			const activeSubCount = subsByPlan.reduce((s: number, r: any) => s + (parseInt(r.count, 10) || 0), 0);
+			// Build the (module, tier) matrix + totals.
+			const matrix: Record<string, Record<string, { count: number; mrr_eur: number }>> = {};
+			let totalCount = 0;
+			let totalSubMrrEur = 0;
+			for (const row of (subsMatrix as any[])) {
+				const mod = row.module as string;
+				const tier = row.tier as string;
+				const count = parseInt(row.count, 10) || 0;
+				const cellMrr = parseFloat(row.cell_mrr_eur) || 0;
+				if (!matrix[mod]) matrix[mod] = {};
+				matrix[mod][tier] = { count, mrr_eur: cellMrr };
+				totalCount += count;
+				totalSubMrrEur += cellMrr;
+			}
+
+			const subscriptionMrrEur = parseFloat((mrrResult as any)?.mrr_eur) || totalSubMrrEur;
+			const walletRevenueEur = parseFloat((walletRevenueMonth as any)?.wallet_revenue_eur) || 0;
 
 			return res.json({
 				accounts: { total: parseInt((accountCount as any)?.count, 10) || 0 },
 				subscriptions: {
-					by_plan: subsByPlan.map((r: any) => ({ plan: r.plan_name, count: parseInt(r.count, 10) || 0 })),
+					// New v2 shape: matrix + totals. Legacy `by_plan` kept as a flattened
+					// derivation so old admin UI clients that have not yet migrated still
+					// render something coherent.
+					matrix,
+					totals: {
+						count: totalCount,
+						mrr_eur: totalSubMrrEur,
+					},
+					by_plan: Object.entries(matrix).flatMap(([mod, tiers]) =>
+						Object.entries(tiers).map(([tier, cell]) => ({
+							plan: `${mod} ${tier}`,
+							module: mod,
+							tier,
+							count: cell.count,
+						})),
+					),
 				},
 				calculators: {
 					total: parseInt((calcTotal as any)?.count, 10) || 0,
@@ -122,8 +170,14 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					errors_month: parseInt((errorsMonth as any)?.count, 10) || 0,
 				},
 				revenue: {
-					mrr: parseInt((mrrResult as any)?.mrr, 10) || 0,
-					active_subscriptions: activeSubCount,
+					// MRR is now in EUR units (not cents). Frontend must update divisor.
+					subscription_mrr_eur: subscriptionMrrEur,
+					wallet_revenue_month_eur: walletRevenueEur,
+					total_revenue_month_eur: subscriptionMrrEur + walletRevenueEur,
+					// Legacy `mrr` (cents) kept for backwards compatibility — derived
+					// from subscription_mrr_eur. Old UI clients keep working.
+					mrr: Math.round(subscriptionMrrEur * 100),
+					active_subscriptions: totalCount,
 					churned_30d: parseInt((churnedResult as any)?.count, 10) || 0,
 					trial_total: parseInt((trialConversion as any)?.total_trials, 10) || 0,
 					trial_converted: parseInt((trialConversion as any)?.converted, 10) || 0,
@@ -162,15 +216,34 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 			const limitNum = Math.min(parseInt(limit, 10) || 25, 100);
 			const offset = (pageNum - 1) * limitNum;
 
+			// v2 Phase 5: each account row carries an `active_modules` array
+			// (e.g. ['calculators:growth', 'kb:starter']) plus a count. We still
+			// LEFT JOIN the calculators sub for back-compat fields used by the
+			// existing UI (subscription_status, plan_name) — those degrade to
+			// the calculators sub only.
 			let query = db('account as a')
 				.leftJoin('subscriptions as s', function () {
-					this.on('s.account', 'a.id').andOnNotIn('s.status', ['canceled', 'expired']);
+					this.on('s.account_id', 'a.id')
+						.andOnVal('s.module', 'calculators')
+						.andOnNotIn('s.status', ['canceled', 'expired']);
 				})
-				.leftJoin('subscription_plans as sp', 'sp.id', 's.plan')
+				.leftJoin('subscription_plans as sp', 'sp.id', 's.subscription_plan_id')
 				.select(
 					'a.id', 'a.name', 'a.date_created', 'a.exempt_from_subscription',
 					's.status as subscription_status', 's.trial_end',
 					'sp.name as plan_name',
+					db.raw(`(
+						SELECT COALESCE(array_agg(DISTINCT module || ':' || tier ORDER BY module || ':' || tier), ARRAY[]::text[])
+						FROM subscriptions
+						WHERE account_id = a.id
+						  AND status NOT IN ('canceled', 'expired')
+					) as active_modules`),
+					db.raw(`(
+						SELECT COUNT(*)::int
+						FROM subscriptions
+						WHERE account_id = a.id
+						  AND status NOT IN ('canceled', 'expired')
+					) as active_module_count`),
 				);
 
 			if (search) {
@@ -246,12 +319,29 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 			const now = new Date();
 			const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-			const [subscription, calculators, usage] = await Promise.all([
+			const [subscriptions, calculators, usage, wallet, recentTopups] = await Promise.all([
+				// v2 Phase 5: return ALL active module subscriptions (one per module).
+				// Each row carries plan allowance fields scoped to that module.
 				db('subscriptions as s')
-					.leftJoin('subscription_plans as sp', 'sp.id', 's.plan')
-					.where('s.account', accountId)
-					.select('s.*', 'sp.name as plan_name', 'sp.calculator_limit', 'sp.calls_per_month', 'sp.calls_per_second')
-					.first(),
+					.leftJoin('subscription_plans as sp', 'sp.id', 's.subscription_plan_id')
+					.where('s.account_id', accountId)
+					.whereNotIn('s.status', ['canceled', 'expired'])
+					.select(
+						's.*',
+						'sp.name as plan_name',
+						'sp.tier as plan_tier',
+						'sp.slot_allowance',
+						'sp.request_allowance',
+						'sp.ao_allowance',
+						'sp.storage_mb',
+						'sp.embed_tokens_m',
+						'sp.executions',
+						'sp.max_steps',
+						'sp.concurrent_runs',
+						'sp.price_eur_monthly',
+						'sp.price_eur_annual',
+					)
+					.orderBy('s.module'),
 				db('calculators')
 					.where('account', accountId)
 					.select('id', 'name', 'activated', 'over_limit', 'date_created', 'date_updated'),
@@ -264,7 +354,27 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 					.sum({ errors: db.raw("CASE WHEN cc.error = true THEN 1 ELSE 0 END") })
 					.groupBy(db.raw("DATE(cc.timestamp)"))
 					.orderBy('date', 'asc'),
+				db('ai_wallet')
+					.where('account_id', accountId)
+					.select('balance_eur', 'monthly_cap_eur', 'auto_reload_enabled',
+						'auto_reload_threshold_eur', 'auto_reload_amount_eur', 'last_topup_at', 'last_topup_eur')
+					.first(),
+				db('ai_wallet_topup')
+					.where('account_id', accountId)
+					.orderBy('date_created', 'desc')
+					.limit(5)
+					.select('id', 'amount_eur', 'status', 'is_auto_reload', 'date_created'),
 			]);
+
+			// Find the calculators sub (back-compat: existing UI reads
+			// detail.subscription.calculator_limit etc). New code should iterate
+			// `subscriptions` array.
+			const calcSub = (subscriptions as any[]).find((s) => s.module === 'calculators') || null;
+			const subscription = calcSub ? {
+				...calcSub,
+				calculator_limit: calcSub.slot_allowance,
+				calls_per_month: calcSub.request_allowance,
+			} : null;
 
 			// Enrich calculators with profile + monthly calls
 			const calcIds = calculators.map((c: any) => c.id);
@@ -304,7 +414,29 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 
 			return res.json({
 				account,
+				// Legacy single-sub field — preserved for current UI consumers.
 				subscription,
+				// v2 Phase 5: full per-module sub list + wallet block.
+				subscriptions,
+				wallet: wallet ? {
+					balance_eur: wallet.balance_eur,
+					monthly_cap_eur: wallet.monthly_cap_eur,
+					auto_reload_enabled: !!wallet.auto_reload_enabled,
+					auto_reload_threshold_eur: wallet.auto_reload_threshold_eur,
+					auto_reload_amount_eur: wallet.auto_reload_amount_eur,
+					last_topup_at: wallet.last_topup_at,
+					last_topup_eur: wallet.last_topup_eur,
+					recent_topups: recentTopups,
+				} : {
+					balance_eur: 0,
+					monthly_cap_eur: null,
+					auto_reload_enabled: false,
+					auto_reload_threshold_eur: null,
+					auto_reload_amount_eur: null,
+					last_topup_at: null,
+					last_topup_eur: null,
+					recent_topups: [],
+				},
 				calculators,
 				usage: usage.map((r: any) => ({
 					date: r.date,
@@ -459,18 +591,27 @@ export function registerAdminRoutes(app: any, db: DB, logger: any) {
 				return res.status(400).json({ errors: [{ message: 'Missing accountId or days' }] });
 			}
 
-			const sub = await db('subscriptions').where('account', accountId).first();
+			// v2: scope to calculators module. Phase 5 may extend the UI to let admins
+			// extend trials per-module; until then, the existing single-button stays
+			// scoped to Calculators (the most common case).
+			const sub = await db('subscriptions')
+				.where('account_id', accountId)
+				.where('module', 'calculators')
+				.first();
 			if (!sub) {
-				return res.status(404).json({ errors: [{ message: 'Subscription not found' }] });
+				return res.status(404).json({ errors: [{ message: 'Calculators subscription not found' }] });
 			}
 
 			const currentEnd = sub.trial_end ? new Date(sub.trial_end) : new Date();
 			const newEnd = new Date(Math.max(currentEnd.getTime(), Date.now()) + parseInt(days, 10) * 86400000);
 
-			await db('subscriptions').where('account', accountId).update({
-				trial_end: newEnd.toISOString(),
-				status: 'trialing',
-			});
+			await db('subscriptions')
+				.where('account_id', accountId)
+				.where('module', 'calculators')
+				.update({
+					trial_end: newEnd.toISOString(),
+					status: 'trialing',
+				});
 
 			return res.json({ trial_end: newEnd.toISOString() });
 		} catch (err: any) {

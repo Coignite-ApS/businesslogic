@@ -1,0 +1,155 @@
+# =============================================================================
+# BusinessLogic Platform — Buddy CI Pipeline
+# =============================================================================
+# Runs the full test suite on every PR targeting dev or main.
+#
+# Setup checklist (one-time in Buddy UI):
+#   1. Create a new pipeline from this file (Settings → YAML config)
+#   2. Set environment variables (Variables tab — mark secrets):
+#        NPM_TOKEN                  — npm token for private @coignite packages
+#        ANTHROPIC_API_KEY          — Anthropic API key (required by ai-api tests)
+#        OPENAI_API_KEY             — OpenAI API key (required by KB embedding tests)
+#        FORMULA_TEST_TOKEN         — token used by formula-api integration tests
+#        FORMULA_ADMIN_TOKEN        — admin token used by formula-api tests
+#   3. Add the coignite-directus-base deploy key as a workspace SSH key
+#      (Settings → SSH keys) and wire its numeric ID into the Checkout action below.
+#   4. Connect the pipeline as a required check on dev and main in GitHub branch protection
+#
+# Verify syntax: https://buddy.works/docs/yaml/yaml-schema
+# =============================================================================
+
+- pipeline: "Test on PR"
+  # Trigger on pull-request events targeting dev or main.
+  # For PULL_REQUEST triggers, Buddy expects `branches:` (target-branch filter),
+  # NOT `refs:` (which is push-only). See https://buddy.works/docs/yaml/yaml-schema
+  on: PULL_REQUEST
+  branches:
+    - "dev"
+    - "main"
+
+  # Skip draft PRs — run full suite only when PR is ready for review.
+  # Buddy evaluates trigger_conditions before starting the pipeline.
+  trigger_conditions:
+    - trigger_condition: "VAR"
+      trigger_condition_variable: "BUDDY_EXECUTION_PULL_REQUEST_IS_DRAFT"
+      trigger_condition_operator: "NOT_EQUALS"
+      trigger_condition_value: "true"
+
+  actions:
+
+    # ── 1. Checkout + submodule init ──────────────────────────────────────────
+    - action: "Checkout"
+      type: BUILD
+      git_submodules: true
+      # TODO (operator): Add the coignite-directus-base deploy key to the Buddy
+      # workspace (Settings → SSH keys) and set its numeric ID below. An env var
+      # (e.g. DIRECTUS_SUBMODULE_SSH_KEY) CANNOT be used here — Buddy YAML only
+      # accepts workspace SSH key IDs for submodule auth.
+      # ssh_key_id: 0
+
+    # ── 2. Configure .env for CI stack ───────────────────────────────────────
+    - action: "Write CI .env"
+      type: BUILD
+      docker_image_name: "library/node"
+      docker_image_tag: "20-alpine"
+      commands:
+        # Copy the example env and patch values for the CI-spun Docker stack.
+        # Service URLs use Docker Compose service names as hostnames.
+        - cp infrastructure/docker/.env.example infrastructure/docker/.env
+        # Unquoted heredoc delimiter → shell expands $VAR into the env file.
+        # All lines below intentionally contain only literals + shell vars we
+        # want expanded — no bare `$` that needs escaping.
+        - |
+          cat >> infrastructure/docker/.env <<ENVEOF
+          # CI overrides — service hostnames inside the Docker network
+          FORMULA_API_URL=http://bl-formula-api:3000
+          AI_API_URL=http://bl-ai-api:3200
+          FLOW_TRIGGER_URL=http://bl-flow-trigger:3100
+          # Real secret values injected from Buddy environment variables
+          NPM_TOKEN=$NPM_TOKEN
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          FORMULA_TEST_TOKEN=$FORMULA_TEST_TOKEN
+          FORMULA_ADMIN_TOKEN=$FORMULA_ADMIN_TOKEN
+          ENVEOF
+        # Also write formula-api service .env so test-all.sh can read tokens
+        - |
+          printf 'FORMULA_TEST_TOKEN=%s\nADMIN_TOKEN=%s\n' \
+            "$FORMULA_TEST_TOKEN" "$FORMULA_ADMIN_TOKEN" \
+            > services/formula-api/.env
+
+    # ── 3. npm cache restore ──────────────────────────────────────────────────
+    # Buddy caches keyed on a file hash. This restores node_modules across runs.
+    - action: "Restore npm cache"
+      type: BUILD
+      docker_image_name: "library/node"
+      docker_image_tag: "20-alpine"
+      cache:
+        - key: "npm-v1-{{ checksum 'services/cms/extensions/package.json' }}"
+          paths:
+            - "services/cms/extensions/node_modules"
+        - key: "npm-formula-v1-{{ checksum 'services/formula-api/package.json' }}"
+          paths:
+            - "services/formula-api/node_modules"
+      commands:
+        # Pre-install deps so test-all.sh doesn't have to wait
+        - cd services/formula-api && npm ci --prefer-offline
+        - cd services/cms/extensions && npm ci --prefer-offline
+
+    # ── 4. Boot Docker dev stack ──────────────────────────────────────────────
+    # Uses Buddy's DOCKER_COMPOSE action to start the full dev stack.
+    # NOTE: Buddy runs each pipeline in a Docker-in-Docker environment.
+    # See https://buddy.works/docs/yaml/yaml-actions#docker-compose
+    - action: "Start dev stack"
+      type: DOCKER_COMPOSE
+      compose_file_path: "infrastructure/docker/docker-compose.dev.yml"
+      # Start the minimum required services; add others as needed
+      services:
+        - postgres
+        - redis
+        - bl-cms
+        - bl-formula-api
+        - bl-ai-api
+      # Buddy mounts the workspace into the compose context automatically
+
+    # ── 5. Wait for services healthy ──────────────────────────────────────────
+    # Directus cold boot + migrations can take 60-120s; give the stack time.
+    # 5 retries x 30s = 150s max, plus the 15s warmup = ~165s total budget.
+    - action: "Health check"
+      type: BUILD
+      docker_image_name: "library/node"
+      docker_image_tag: "20-alpine"
+      retry_count: 5
+      retry_interval: 30
+      commands:
+        - apk add --no-cache make curl
+        - sleep 15
+        - make health
+
+    # ── 6. Run full test suite ─────────────────────────────────────────────────
+    # TEST_ALLOW_SKIP is intentionally NOT set — tests must pass or pipeline fails.
+    - action: "Run tests"
+      type: BUILD
+      docker_image_name: "library/node"
+      docker_image_tag: "20-alpine"
+      retry_count: 1
+      retry_interval: 15
+      commands:
+        # TODO: prebuilt CI image with toolchains preinstalled would save ~2min
+        # Install system deps for Rust (cargo) + Go tests if present
+        - apk add --no-cache make bash curl cargo go
+        - chmod +x scripts/test-all.sh
+        - ./scripts/test-all.sh
+
+    # ── 7. Tear down ──────────────────────────────────────────────────────────
+    - action: "Tear down stack"
+      type: DOCKER_COMPOSE
+      compose_file_path: "infrastructure/docker/docker-compose.dev.yml"
+      # VERIFY on first pipeline run: confirm this teardown runs even when an
+      # earlier action (health check / tests) fails. Per Buddy docs the action
+      # field is `trigger_time`, NOT `trigger_conditions`, and valid values are
+      # ON_EVERY_EXECUTION / ON_FAILURE / ON_BACK_TO_SUCCESS / ON_WARNING /
+      # ON_WAIT_FOR_APPROVE. If this does not run after a prior failure, split
+      # into two teardown actions: one default + one with trigger_time: ON_FAILURE.
+      # See https://buddy.works/docs/yaml/yaml-actions
+      trigger_time: "ON_EVERY_EXECUTION"

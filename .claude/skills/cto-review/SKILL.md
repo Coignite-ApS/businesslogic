@@ -561,6 +561,13 @@ find migrations/ -name "*rollback*" -o -name "*down*" -o -name "*revert*"
 find docs/ -name "*disaster*" -o -name "*recovery*" -o -name "*backup*" -o -name "*incident*"
 ```
 
+### 4.2b: Schema Drift Validation
+
+```bash
+# Check for drift between snapshot.yaml and DB
+./scripts/validate-schema.sh 2>&1 || true
+```
+
 ### 4.3: Performance & Scalability
 
 ```bash

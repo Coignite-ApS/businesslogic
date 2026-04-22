@@ -9,25 +9,28 @@
 			<v-progress-circular indeterminate small />
 		</div>
 
-		<div v-else class="conversation-list">
-			<div
+		<v-list v-else nav class="conversation-list">
+			<v-list-item
 				v-for="conv in conversations"
 				:key="conv.id"
-				class="conversation-item"
-				:class="{ active: conv.id === currentId }"
-				@click="$emit('select', conv.id)"
+				:to="`/ai-assistant/${conv.id}`"
+				clickable
 			>
-				<v-icon name="chat_bubble_outline" small />
-				<span class="conv-title">{{ conv.title || 'New conversation' }}</span>
+				<v-list-item-icon>
+					<v-icon name="chat_bubble_outline" small />
+				</v-list-item-icon>
+				<v-list-item-content>
+					<v-text-overflow :text="conv.title || 'New conversation'" />
+				</v-list-item-content>
 				<button
 					class="conv-delete"
-					@click.stop="$emit('archive', conv.id)"
+					@click.stop.prevent="$emit('archive', conv.id)"
 					title="Archive"
 				>
 					<v-icon name="close" x-small />
 				</button>
-			</div>
-		</div>
+			</v-list-item>
+		</v-list>
 
 		<!-- Usage nudge — only visible when it matters -->
 		<div v-if="usage && !isUnlimited && usagePercent >= 70" class="usage-section">
@@ -60,7 +63,6 @@ import type { UsageData } from '../composables/use-usage';
 
 const props = defineProps<{
 	conversations: Conversation[];
-	currentId: string | null;
 	loading: boolean;
 	usage: UsageData | null;
 	isUnlimited: boolean;
@@ -75,7 +77,6 @@ const queriesRemaining = computed(() => {
 
 defineEmits<{
 	(e: 'new-chat'): void;
-	(e: 'select', id: string): void;
 	(e: 'archive', id: string): void;
 	(e: 'upgrade'): void;
 }>();
@@ -104,41 +105,7 @@ defineEmits<{
 .conversation-list {
 	flex: 1;
 	overflow-y: auto;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
-
-.conversation-item {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 8px 10px;
-	border-radius: 6px;
-	cursor: pointer;
-	background: none;
-	border: none;
-	text-align: left;
-	width: 100%;
-	font-size: 13px;
-	color: var(--theme--foreground);
-	transition: background 0.1s;
-}
-
-.conversation-item:hover {
-	background: var(--theme--background-normal);
-}
-
-.conversation-item.active {
-	background: var(--theme--background-accent);
-	font-weight: 600;
-}
-
-.conv-title {
-	flex: 1;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	margin-top: 8px;
 }
 
 .conv-delete {
@@ -152,7 +119,7 @@ defineEmits<{
 	transition: opacity 0.1s;
 }
 
-.conversation-item:hover .conv-delete {
+.conversation-list :deep(.v-list-item:hover) .conv-delete {
 	opacity: 1;
 }
 

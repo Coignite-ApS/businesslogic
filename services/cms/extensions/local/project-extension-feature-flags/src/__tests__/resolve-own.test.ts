@@ -10,7 +10,7 @@ function mockRes() {
 
 const FEATURES = [
 	{ id: 'feat-1', key: 'ai.chat', name: 'AI Chat', category: 'ai', enabled: true },
-	{ id: 'feat-2', key: 'calc.execute', name: 'Calc Execute', category: 'calc', enabled: false },
+	{ id: 'feat-2', key: 'calculator.execute', name: 'Calculator Execute', category: 'calculator', enabled: false },
 ];
 
 function createMockDb(opts: {
@@ -120,7 +120,7 @@ describe('createResolveOwnHandler', () => {
 		expect(res.json).toHaveBeenCalledWith({
 			data: [
 				{ key: 'ai.chat', name: 'AI Chat', category: 'ai', enabled: true, source: 'platform' },
-				{ key: 'calc.execute', name: 'Calc Execute', category: 'calc', enabled: false, source: 'platform' },
+				{ key: 'calculator.execute', name: 'Calculator Execute', category: 'calculator', enabled: false, source: 'platform' },
 			],
 		});
 	});
@@ -139,7 +139,7 @@ describe('createResolveOwnHandler', () => {
 		await handler(req, res);
 
 		const result = res.json.mock.calls[0][0];
-		const calcFeature = result.data.find((f: any) => f.key === 'calc.execute');
+		const calcFeature = result.data.find((f: any) => f.key === 'calculator.execute');
 		expect(calcFeature.enabled).toBe(true);
 		expect(calcFeature.source).toBe('override');
 	});
