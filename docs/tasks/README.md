@@ -224,7 +224,14 @@ Infrastructure and multi-service concerns.
 | 03 | Node.js Process Reliability (Error Handlers, Structured Logging) | completed | [cross-cutting/03-node-process-reliability.md](cross-cutting/03-node-process-reliability.md) |
 | 04 | Formula-API Gateway Auth Path | completed | [cross-cutting/04-formula-gateway-auth.md](cross-cutting/04-formula-gateway-auth.md) |
 | 05 | Cedar Guardrails Engine (bl-policy) | planned | [cross-cutting/05-cedar-guardrails-engine.md](cross-cutting/05-cedar-guardrails-engine.md) |
-| 06 | MCP Server — Expose BusinessLogic as AI Tool | planned | [cross-cutting/06-mcp-server.md](cross-cutting/06-mcp-server.md) |
+| 06 | MCP Server — Expose BusinessLogic as AI Tool | **split 2026-04-22** into 06a–06g | [cross-cutting/06-mcp-server.md](cross-cutting/06-mcp-server.md) |
+| 06a | MCP Platform — Foundation (Gateway JSON-RPC + Streamable HTTP) | planned | [cross-cutting/06a-mcp-platform-foundation.md](cross-cutting/06a-mcp-platform-foundation.md) |
+| 06b | MCP Platform — Calculator tools (`bl_calculator_*`) | planned | [cross-cutting/06b-mcp-platform-calculator-tools.md](cross-cutting/06b-mcp-platform-calculator-tools.md) |
+| 06c | MCP Platform — KB tools (`bl_kb_*`) | planned | [cross-cutting/06c-mcp-platform-kb-tools.md](cross-cutting/06c-mcp-platform-kb-tools.md) |
+| 06d | MCP Platform — Chat tools + SSE bridge (`bl_chat_*`) | planned | [cross-cutting/06d-mcp-platform-chat-tools.md](cross-cutting/06d-mcp-platform-chat-tools.md) |
+| 06e | MCP Platform — Flow tools (`bl_flow_*`) | planned | [cross-cutting/06e-mcp-platform-flow-tools.md](cross-cutting/06e-mcp-platform-flow-tools.md) |
+| 06f | MCP Platform — Resources, discovery, tier filtering | planned | [cross-cutting/06f-mcp-platform-resources-discovery-tier-filtering.md](cross-cutting/06f-mcp-platform-resources-discovery-tier-filtering.md) |
+| 06g | MCP Platform — Client configs, docs, CMS tab | planned | [cross-cutting/06g-mcp-platform-client-configs-and-docs.md](cross-cutting/06g-mcp-platform-client-configs-and-docs.md) |
 | 07 | AI Safety Quick Fixes (4 items) | completed | [cross-cutting/07-ai-safety-quick-fixes.md](cross-cutting/07-ai-safety-quick-fixes.md) |
 | 08 | Unified Widget Foundation (ChatKit-Compatible bl-widget) | completed | [cross-cutting/08-unified-widget-foundation.md](cross-cutting/08-unified-widget-foundation.md) |
 | 09 | API Key & Resource Management Cleanup | completed | [cross-cutting/09-api-key-resource-cleanup.md](cross-cutting/09-api-key-resource-cleanup.md) |

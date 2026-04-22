@@ -1,9 +1,35 @@
-# 06. MCP Server — Expose BusinessLogic as an AI Tool
+# 06. MCP Server — Expose BusinessLogic as an AI Tool (UMBRELLA — SPLIT)
 
-**Status:** planned
+**Status:** split into 06a–06g (2026-04-22)
 **Phase:** 2 — Growth & Distribution
 **Inspired by:** [Hermes Agent](https://hermes-agent.nousresearch.com/) — native MCP with auto-registration, namespaced tools, per-server filtering
 **Related:** [formula-api/06](../formula-api/06-account-mcp.md) (account-level MCP, completed), [flow/03](../flow/03-mcp-client-node.md) (MCP client node)
+
+---
+
+## This task has been split
+
+Original scope was ~2 weeks / ~2000 LOC. Decomposed into slices that each produce working, testable software on their own:
+
+| Slice | Scope | Status |
+|---|---|---|
+| [06a](06a-mcp-platform-foundation.md) | Gateway JSON-RPC + Streamable HTTP foundation (empty tool registry) | planned |
+| [06b](06b-mcp-platform-calculator-tools.md) | `bl_calculator_list` / `_execute` / `_describe` | planned |
+| [06c](06c-mcp-platform-kb-tools.md) | `bl_kb_search` / `bl_kb_ask` + isolation | planned |
+| [06d](06d-mcp-platform-chat-tools.md) | `bl_chat_send` / `bl_chat_stream` (SSE bridge) | planned |
+| [06e](06e-mcp-platform-flow-tools.md) | `bl_flow_trigger` / `_status` | planned |
+| [06f](06f-mcp-platform-resources-discovery-tier-filtering.md) | `resources/*`, discovery endpoint, tier-based filtering | planned |
+| [06g](06g-mcp-platform-client-configs-and-docs.md) | Claude.ai / Claude Desktop / Cursor config snippets, CMS tab, docs | planned |
+
+**First sprint target:** 06a + 06b + 06c bundled. Plan: `docs/superpowers/plans/2026-04-22-mcp-platform-06abc.md`.
+
+**MCP spec version:** 2025-06-18 (Streamable HTTP). Backwards-negotiates to 2025-03-26 for parity with existing formula-api MCP.
+
+**Tier filtering:** Uses existing `subscription_plans.tier` + `subscriptions.tier` (see `docs/architecture/pricing-v2.md`) — NO new schemas. Gateway reads via new `GET /internal/account/:id/modules` on CMS.
+
+---
+
+## Original design (retained for historical reference)
 
 ---
 
