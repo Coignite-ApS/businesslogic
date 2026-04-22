@@ -50,7 +50,9 @@ Take the verified-in-dev pricing v2 stack live: create production Stripe catalog
 - [ ] **W.3** API version: `2024-12-18.acacia`
 - [ ] **W.4** Copy webhook signing secret → set `STRIPE_WEBHOOK_SECRET` in prod env
 - [ ] **W.5** Restart CMS service to load new env var
+- [ ] **W.5a** Within 30s of boot, `docker logs <prod-cms> | grep webhook-preflight` shows `OK` (task 60). If banner WARN appears, STOP — endpoint is misconfigured or secret drift. Fix before proceeding.
 - [ ] **W.6** Send test webhook from Stripe Dashboard → verify status `Succeeded`
+- [ ] **W.6a** Confirm the test webhook produced a row in `stripe_webhook_log` with `status=200` and event_type matching what was sent (Billing Health panel at `/admin/ai-observatory/billing-health` must show green banner)
 
 ### Smoke test
 
@@ -59,6 +61,7 @@ Take the verified-in-dev pricing v2 stack live: create production Stripe catalog
 - [ ] **S.3** Verify webhook delivery + `subscriptions` row created with `module='calculators'`, `tier='starter'`, `status='trialing'`
 - [ ] **S.4** Account UI shows the subscription card + wallet card correctly
 - [ ] **S.5** Test wallet top-up: €20 — verify wallet balance increments to €25, topup row created with `expires_at` = NOW() + 12 months
+- [ ] **S.5a** During S.5 return from Stripe, UI transitions `Verifying your top-up…` → `€20 added to your AI Wallet` in realtime (task 60). If it lands on `Payment received. Credit is still processing…`, webhook path is broken — do NOT launch. Re-audit W.1–W.6 + check CMS `STRIPE_WEBHOOK_SECRET` matches endpoint signing secret exactly.
 - [ ] **S.6** Cancel test subscription + refund test charges in Stripe Dashboard
 
 ## Acceptance
@@ -80,3 +83,4 @@ See `docs/operations/stripe-production-setup.md` §8.
 
 - **Hard:** Tasks 18, 19, 26
 - **Soft:** Task 17 + 20 + 21 (analytics layer; can ship after launch)
+- **Integrated:** Task 60 — W.5a/W.6a/S.5a gates rely on the webhook preflight banner, `stripe_webhook_log`, and the UI credit-verification polling shipped in task 60.
