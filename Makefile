@@ -286,6 +286,29 @@ validate-schema:
 db:
 	@$(COMPOSE) exec postgres psql -U directus -d directus
 
+# ─── Stripe ───────────────────────────────────────────────────────
+#
+# `make stripe-listen` forwards Stripe events from the CMS's Stripe
+# account to the local CMS webhook endpoint. REQUIRED for local wallet
+# top-ups and subscription activations to credit in real-time. If
+# unset, the CMS will log a banner WARN every ~15s after boot with
+# instructions (task 60 preflight check).
+#
+# First run: copy the `whsec_...` secret Stripe CLI prints into
+# infrastructure/docker/.env as STRIPE_WEBHOOK_SECRET, then
+# `make cms-restart`. Subsequent runs reuse the same secret.
+
+stripe-listen:
+	@which stripe >/dev/null 2>&1 || { echo "stripe CLI not installed. brew install stripe/stripe-cli/stripe"; exit 1; }
+	@KEY=$$(docker exec businesslogic-bl-cms-1 printenv STRIPE_SECRET_KEY 2>/dev/null); \
+	if [ -z "$$KEY" ]; then echo "CMS not running or STRIPE_SECRET_KEY unset. Run 'make up' first."; exit 1; fi; \
+	SECRET_PREFIX=$$(docker exec businesslogic-bl-cms-1 printenv STRIPE_WEBHOOK_SECRET 2>/dev/null | cut -c1-10); \
+	echo "→ Forwarding Stripe events to http://localhost:18055/stripe/webhook"; \
+	echo "→ CMS STRIPE_WEBHOOK_SECRET starts with: $$SECRET_PREFIX"; \
+	echo "→ If the whsec_... below differs, copy it into infrastructure/docker/.env and 'make cms-restart'."; \
+	echo ""; \
+	stripe listen --api-key "$$KEY" --forward-to http://localhost:18055/stripe/webhook
+
 # ─── Tests ────────────────────────────────────────────────────────
 
 test:

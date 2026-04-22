@@ -20,6 +20,7 @@ import { registerWebhookHealthRoute } from './webhook-health.js';
 import { validateWebhookSecret } from './startup-validation.js';
 import { createWebhookRouteHandler } from './webhook-route.js';
 import { buildReconcileCron, resolveReconcileCron } from './reconciliation-cron.js';
+import { resolvePreflightConfig, runWebhookPreflight } from './webhook-preflight.js';
 import type { Module, BillingCycle } from './types.js';
 
 const VALID_MODULES: Module[] = ['calculators', 'kb', 'flows'];
@@ -330,6 +331,26 @@ export default defineHook(({ init, action, schedule }, { env, logger, database, 
 	});
 	schedule(reconcileCronExpr, reconcileCron);
 	logger.info(`[stripe-reconcile] nightly reconciliation cron registered (${reconcileCronExpr})`);
+
+	// ─── Task 60: Stripe webhook preflight ───────────────────
+	//
+	// If no webhook hits land in `stripe_webhook_log` within 1h of boot,
+	// emit a loud banner WARN with env-driven instructions (dev: `make
+	// stripe-listen`; prod: Stripe Dashboard checklist). Re-checks every
+	// 6h so drift surfaces at most ~6h late.
+	const preflightConfig = resolvePreflightConfig(env as Record<string, unknown>);
+	setTimeout(() => {
+		runWebhookPreflight({ db, logger, config: preflightConfig }).catch((err: any) => {
+			logger.warn(`[webhook-preflight] initial check threw: ${err?.message || err}`);
+		});
+	}, 15_000).unref?.();
+	schedule('0 */6 * * *', async () => {
+		try {
+			await runWebhookPreflight({ db, logger, config: preflightConfig });
+		} catch (err: any) {
+			logger.warn(`[webhook-preflight] periodic check threw: ${err?.message || err}`);
+		}
+	});
 
 	// ─── Auto-reload consumer (every minute) ────────────────
 	//
