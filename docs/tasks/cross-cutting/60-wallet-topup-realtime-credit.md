@@ -1,6 +1,6 @@
 # 60. 🟠 P1: Wallet top-up realtime credit — UI lies + dev webhook missing + prod endpoint misconfigured
 
-**Status:** in-progress
+**Status:** code-complete (awaiting prod Stripe Dashboard audit)
 **Severity:** P1 — user pays, UI says "€X added to your AI Wallet", balance stays 0 for up to 18h (until nightly reconciliation cron)
 **Source:** ux-tester 2026-04-22 (admin persona, full report: `docs/reports/ux-test-2026-04-22-wallet-topup-bug.md`)
 **Related:** 48 (webhook pipeline — completed), 51 (return URLs — completed), 56 (observability — completed), 57 (reconciliation cron — completed)
@@ -120,14 +120,15 @@ For test mode specifically: the test-mode endpoint pointing at prod URL is unuse
 - [x] `STRIPE_PUBLIC_WEBHOOK_URL` + `STRIPE_REQUIRED_WEBHOOK_EVENTS` documented in `infrastructure/docker/.env.example`
 - [x] Browser-verified: simulated Stripe return → UI transitions from `Verifying…` to `Payment received. Credit is still processing…` within ~16s (screenshots in `docs/reports/screenshots/ux-test-2026-04-22-wallet-topup-bug/after-fix-*.png`)
 
+### Dev end-to-end verification (2026-04-22)
+- [x] `make stripe-listen` runs cleanly — secret printed matches CMS env (`whsec_7a1b...`)
+- [x] `stripe trigger payment_intent.succeeded` → 3 events forwarded, all POST /stripe/webhook 200
+- [x] `stripe_webhook_log` rows inserted with `status=200` for `charge.succeeded`, `payment_intent.created`, `payment_intent.succeeded`
+- [x] Stray test-mode endpoint `we_1T67F3RfGjysVTdNGXXL6J0v` deleted by user
+
 ### Config changes (user action — outside this commit)
 - [ ] Prod live-mode webhook endpoint URL = `.../stripe/webhook` and includes `payment_intent.succeeded`
 - [ ] Prod live-mode `STRIPE_WEBHOOK_SECRET` in Coolify env matches endpoint's signing secret
-- [ ] Stray test-mode endpoint `we_1T67F3RfGjysVTdNGXXL6J0v` deleted (points at prod URL, unused — dev uses `make stripe-listen`). Run on host:
-  ```bash
-  stripe webhook_endpoints delete we_1T67F3RfGjysVTdNGXXL6J0v \
-    --api-key "$(docker exec businesslogic-bl-cms-1 printenv STRIPE_SECRET_KEY)"
-  ```
 - [ ] Stripe Dashboard "Send test webhook" for `payment_intent.succeeded` returns 200 at cockpit.businesslogic.online/stripe/webhook
 
 ## Out of scope
