@@ -131,6 +131,7 @@ import AccountNavigation from '../components/account-navigation.vue';
 import AccountSelector from '../components/account-selector.vue';
 import SubscriptionInfo from '../components/subscription-info.vue';
 import WalletTopupDialog from '../components/wallet-topup-dialog.vue';
+import { verifyTopupCredit } from '../utils/verify-topup';
 
 const api = useApi();
 const route = useRoute();
@@ -159,30 +160,61 @@ const MODULE_LABELS: Record<Module, string> = {
 	flows: 'Flows',
 };
 
-function consumeReturnParams() {
+async function consumeReturnParams() {
 	const { activated, cancelled, topup, amount } = route.query as Record<string, string>;
+
+	const cleanup = () => {
+		if (activated || cancelled || topup) {
+			// Targeted cleanup: remove only handled params, preserve any others.
+			const { activated: _a, cancelled: _c, topup: _t, amount: _amt, ...rest } = route.query;
+			router.replace({ query: rest });
+		}
+	};
+
 	if (activated) {
-		// Use MODULE_LABELS for proper display names (e.g. 'kb' → 'Knowledge Base', not 'Kb')
 		const label = MODULE_LABELS[activated as Module] ?? activated;
 		returnNotice.value = { type: 'success', message: `Your ${label} subscription is active` };
-	} else if (cancelled) {
+		cleanup();
+		return;
+	}
+	if (cancelled) {
 		const label = MODULE_LABELS[cancelled as Module] ?? cancelled;
 		returnNotice.value = { type: 'info', message: `Checkout cancelled for ${label} — you weren't charged` };
-	} else if (topup === 'success') {
-		// Sanitize amount: only render if it's a valid positive number (guards against crafted URLs)
-		const amtNum = Number(amount);
-		if (Number.isFinite(amtNum) && amtNum > 0) {
-			returnNotice.value = { type: 'success', message: `€${amtNum.toFixed(2)} added to your AI Wallet` };
-		} else {
-			returnNotice.value = { type: 'success', message: `Wallet top-up successful` };
-		}
-	} else if (topup === 'cancelled') {
-		returnNotice.value = { type: 'info', message: `Top-up cancelled — you weren't charged` };
+		cleanup();
+		return;
 	}
-	if (activated || cancelled || topup) {
-		// Targeted cleanup: remove only handled params, preserve any others.
-		const { activated: _a, cancelled: _c, topup: _t, amount: _amt, ...rest } = route.query;
-		router.replace({ query: rest });
+	if (topup === 'cancelled') {
+		returnNotice.value = { type: 'info', message: `Top-up cancelled — you weren't charged` };
+		cleanup();
+		return;
+	}
+	if (topup === 'success') {
+		// Don't trust the URL param alone — poll the ledger until the webhook credits,
+		// or time out and tell the user the payment is processing.
+		returnNotice.value = { type: 'info', message: 'Verifying your top-up…' };
+		cleanup();
+
+		const amtNum = Number(amount);
+		// 5 min window covers slow Stripe checkout flows; amount-match prevents a
+		// prior topup within the window from false-positiving the current one.
+		const since = new Date(Date.now() - 5 * 60_000);
+		const status = await verifyTopupCredit({
+			refreshWallet: fetchWallet,
+			getRecentLedger: () => wallet.value.recent_ledger || [],
+			since,
+			expectedAmountEur: Number.isFinite(amtNum) && amtNum > 0 ? amtNum : undefined,
+		});
+
+		if (status === 'credited') {
+			returnNotice.value = Number.isFinite(amtNum) && amtNum > 0
+				? { type: 'success', message: `€${amtNum.toFixed(2)} added to your AI Wallet` }
+				: { type: 'success', message: `Wallet top-up successful` };
+		} else {
+			returnNotice.value = {
+				type: 'info',
+				message: `Payment received. Credit is still processing — refresh in a minute. If it doesn't appear, contact support.`,
+			};
+		}
 	}
 }
 
@@ -274,9 +306,10 @@ watch(activeAccountId, () => {
 });
 
 onMounted(async () => {
-	consumeReturnParams();
 	await fetchAccounts();
 	await Promise.all([fetchSubscription(), fetchWallet(), fetchPlans()]);
+	// Run last so the wallet is hydrated; topup=success will poll fetchWallet() itself.
+	consumeReturnParams();
 });
 </script>
 
