@@ -59,6 +59,7 @@ infrastructure/db-snapshots/*.sql.gz
 coverage/
 .nyc_output/
 *.lcov
+.playwright-cli/
 
 # ── Legacy implementation (reference only, has its own git history) ──
 # legacy-implementation/ is tracked but its internal .git dirs are not
